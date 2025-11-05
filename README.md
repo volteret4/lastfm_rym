@@ -19,8 +19,6 @@ Script Python que genera estadísticas HTML sobre coincidencias musicales entre 
 - **Interfaz HTML interactiva:**
   - Destacar scrobbles de un usuario específico
   - Filtrar por período (semanal, mensual, anual)
-  - Diseño responsive y moderno
-  - Visualización clara de coincidencias
 
 ## 🚀 Instalación
 
@@ -102,45 +100,7 @@ Solo si quieres información de sellos discográficos:
 python3 lastfm_stats.py
 ```
 
-Esto generará un archivo `index.html` en el directorio actual.
-
-### Configurar con cron (ejecución diaria automática)
-
-#### 1. Hacer el script ejecutable
-
-```bash
-chmod +x lastfm_stats.py
-```
-
-#### 2. Editar crontab
-
-```bash
-crontab -e
-```
-
-#### 3. Agregar la tarea (ejemplo: cada día a las 3:00 AM)
-
-```cron
-0 3 * * * cd /ruta/completa/a/lastfm-stats && /usr/bin/python3 lastfm_stats.py >> /tmp/lastfm_stats.log 2>&1
-```
-
-**Importante:** Reemplaza `/ruta/completa/a/lastfm-stats` con la ruta real de tu proyecto.
-
-#### Ejemplos de horarios cron:
-
-```cron
-# Todos los días a las 3:00 AM
-0 3 * * * cd /path/to/project && python3 lastfm_stats.py
-
-# Todos los días a las 12:00 PM (mediodía)
-0 12 * * * cd /path/to/project && python3 lastfm_stats.py
-
-# Cada 6 horas
-0 */6 * * * cd /path/to/project && python3 lastfm_stats.py
-
-# Todos los lunes a las 8:00 AM
-0 8 * * 1 cd /path/to/project && python3 lastfm_stats.py
-```
+Esto generará un archivo `weekly.html` en el directorio `docs`.
 
 ## 🌐 Publicar en GitHub Pages
 
@@ -159,7 +119,7 @@ git push -u origin main
 
 1. Ve a tu repositorio en GitHub
 2. Ir a **Settings** > **Pages**
-3. En "Source", selecciona la rama `main` y carpeta `/ (root)`
+3. En "Source", selecciona la rama `main` y carpeta `/ (docs)`
 4. Guarda los cambios
 
 Tu sitio estará disponible en: `https://tu-usuario.github.io/lastfm-stats/`
@@ -226,7 +186,7 @@ jobs:
 
 ### Persistencia de datos
 
-El script guarda las estadísticas en `stats_data.json` para:
+El script guarda las estadísticas usando sqlite en `lastfm_stats.db` para:
 
 - Mantener estadísticas mensuales entre ejecuciones diarias
 - Mantener estadísticas anuales durante todo el año
@@ -240,7 +200,6 @@ Solo se muestran items (artistas, canciones, etc.) que han sido escuchados por *
 
 - **Selector de usuario:** Destaca las coincidencias de un usuario específico con un fondo dorado
 - **Selector de período:** Filtra para ver solo estadísticas semanales, mensuales o anuales
-- **Diseño responsive:** Funciona perfectamente en móviles, tablets y escritorio
 - **Información detallada:** Muestra número de plays y qué usuarios escucharon cada item
 
 ## ⚙️ Opciones de configuración
@@ -253,53 +212,16 @@ Solo se muestran items (artistas, canciones, etc.) que han sido escuchados por *
 | `LASTFM_USERS`   | ✅ Sí       | Usuarios separados por comas |
 | `DISCOGS_TOKEN`  | ❌ No       | Token de Discogs para sellos |
 
-### Límites y consideraciones
+### Límites
 
-- **Rate limiting:** El script incluye delays para respetar los límites de las APIs
 - **Last.fm:** ~5 peticiones por segundo (el script usa delays de 0.2s)
 - **Discogs:** ~60 peticiones por minuto (el script usa delays de 1s)
-- **Géneros:** Solo se obtienen para artistas únicos, no por cada scrobble
-- **Sellos:** Solo si se proporciona token de Discogs
-
-## 🐛 Resolución de problemas
-
-### Error: "LASTFM_API_KEY no encontrada"
-
-- Verifica que el archivo `.env` existe y tiene el formato correcto
-- O que las variables de entorno están configuradas en el sistema
-
-### Las estadísticas mensuales/anuales no aparecen
-
-- Normal si no es día 1 del mes o 1 de enero
-- Se generarán automáticamente cuando corresponda
-
-### Error de rate limiting
-
-- El script tiene delays incorporados, pero si tienes muchos usuarios/scrobbles, puede tardar
-- Considera reducir el número de usuarios o ejecutar en horarios de baja carga
-
-### No se muestran sellos discográficos
-
-- Verifica que `DISCOGS_TOKEN` está configurado
-- Los sellos solo se obtienen para álbumes (no para singles sin álbum)
-- Discogs puede no tener información de todos los lanzamientos
 
 ## 📝 Notas adicionales
 
 - Los datos se cachean durante la ejecución para evitar llamadas repetidas a las APIs
 - El HTML generado es completamente estático y no requiere backend
 - Puedes personalizar los estilos editando el CSS en `lastfm_stats.py`
-- El script es compatible con Python 3.7+
-
-## 🤝 Contribuciones
-
-Sugerencias y mejoras son bienvenidas. Algunas ideas:
-
-- [ ] Agregar gráficos visuales
-- [ ] Exportar datos a CSV
-- [ ] Soporte para más fuentes de datos musicales
-- [ ] Sistema de notificaciones
-- [ ] Comparación histórica de períodos
 
 ## 📄 Licencia
 

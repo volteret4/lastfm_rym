@@ -49,7 +49,7 @@ class Database:
         cursor = self.conn.cursor()
         cursor.execute('SELECT label FROM album_labels WHERE artist = ? AND album = ?', (artist, album))
         result = cursor.fetchone()
-        return result['label'] if result and result['label'] else None
+        return result['label']
 
     def close(self):
         self.conn.close()

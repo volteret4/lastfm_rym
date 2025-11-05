@@ -192,13 +192,14 @@ def create_html(stats: Dict, users: List[str]) -> str:
     """Crea el HTML para las estadÃ­sticas mensuales"""
     users_json = json.dumps(users)
     stats_json = json.dumps(stats, indent=2, ensure_ascii=False)
+    period_label = stats['period_label']
 
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Stats - {stats['period_label']}</title>
+    <title>Last.fm Stats - """ + period_label + """</title>
     <style>
         * {{
             margin: 0;
@@ -447,7 +448,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
     <div class="container">
         <header>
             <h1>ðŸ“… EstadÃ­sticas Mensuales</h1>
-            <p class="subtitle">{stats['period_label']}</p>
+            <p class="subtitle">""" + period_label + """</p>
         </header>
 
         <div class="controls">
@@ -471,7 +472,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
         </div>
 
         <div class="period-header">
-            <h2>{stats['period_label']}</h2>
+            <h2>Mes """ + period_label + """</h2>
             <p class="period-info">
                 <span id="dateRange"></span> |
                 <span id="totalScrobbles"></span> scrobbles totales
@@ -490,8 +491,9 @@ def create_html(stats: Dict, users: List[str]) -> str:
     </div>
 
     <script>
-        const users = {users_json};
-        const stats = {stats_json};
+        const users = """ + users_json + """;
+        const stats = """ + stats_json + """;
+
 
         const userSelect = document.getElementById('userSelect');
         users.forEach(user => {{
@@ -504,6 +506,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
         document.getElementById('dateRange').textContent = `${{stats.from_date}} â†’ ${{stats.to_date}}`;
         document.getElementById('totalScrobbles').textContent = stats.total_scrobbles;
         document.getElementById('generatedAt').textContent = stats.generated_at;
+        let activeCategories = new Set(['artists']);
 
         function renderStats() {{
             const selectedUser = userSelect.value;

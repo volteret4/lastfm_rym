@@ -517,8 +517,8 @@ def create_html(stats: Dict, users: List[str]) -> str:
             const categoryTitles = {
                 artists: 'Artistas',
                 tracks: 'Canciones',
-                albums: 'Ãlbumes',
-                genres: 'GÃ©neros',
+                albums: 'Álbumes',
+                genres: 'Géneros',
                 labels: 'Sellos'
             };
 
@@ -578,13 +578,16 @@ def create_html(stats: Dict, users: List[str]) -> str:
                 container.appendChild(categoryDiv);
             });
 
-            if (!hasData) {
+            if (!hasData || activeCategories.size === 0) {
                 const noData = document.createElement('div');
                 noData.className = 'no-data';
-                noData.textContent = 'No hay coincidencias para este perÃ­odo';
+                noData.textContent = activeCategories.size === 0
+                    ? 'Selecciona al menos una categoría para ver las estadísticas'
+                    : 'No hay coincidencias para este período';
                 container.appendChild(noData);
             }
         }
+
 
         userSelect.addEventListener('change', renderStats);
         renderStats();

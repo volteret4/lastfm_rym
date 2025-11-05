@@ -50,6 +50,12 @@ class Database:
         result = cursor.fetchone()
         return result['label'] if result and result['label'] else None
 
+    def get_album_release_year(self, artist: str, album: str) -> int:
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT release_year FROM album_release_dates WHERE artist = ? AND album = ?', (artist, album))
+        result = cursor.fetchone()
+        return result['release_year'] if result and result['release_year'] else None
+
     def close(self):
         self.conn.close()
 
@@ -76,10 +82,12 @@ def generate_weekly_stats():
     print(f"   Desde: {from_date.strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"   Hasta: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    # Recopilar scrobbles
+    # Recopilar scrobbles por usuario
+    user_scrobbles = {}
     all_tracks = []
     for user in users:
         tracks = db.get_scrobbles(user, from_timestamp, to_timestamp)
+        user_scrobbles[user] = tracks
         all_tracks.extend(tracks)
         print(f"   {user}: {len(tracks)} scrobbles")
 
@@ -93,15 +101,45 @@ def generate_weekly_stats():
     albums_counter = Counter()
     genres_counter = Counter()
     labels_counter = Counter()
+    decades_counter = Counter()
 
     artists_users = defaultdict(set)
     tracks_users = defaultdict(set)
     albums_users = defaultdict(set)
     genres_users = defaultdict(set)
     labels_users = defaultdict(set)
+    decades_users = defaultdict(set)
+
+    # Para contar scrobbles por usuario en cada categoría
+    artists_user_counts = defaultdict(lambda: defaultdict(int))
+    tracks_user_counts = defaultdict(lambda: defaultdict(int))
+    albums_user_counts = defaultdict(lambda: defaultdict(int))
+    genres_user_counts = defaultdict(lambda: defaultdict(int))
+    labels_user_counts = defaultdict(lambda: defaultdict(int))
+    decades_user_counts = defaultdict(lambda: defaultdict(int))
+
+    # Para almacenar artistas que contribuyen a cada categoría por usuario
+    genres_user_artists = defaultdict(lambda: defaultdict(set))
+    labels_user_artists = defaultdict(lambda: defaultdict(set))
+    decades_user_artists = defaultdict(lambda: defaultdict(set))
 
     processed_artists = set()
     processed_albums = set()
+
+    def get_decade_label(year):
+        """Convierte un año a etiqueta de década"""
+        if year is None:
+            return "Desconocido"
+
+        decade_start = (year // 10) * 10
+        decade_end = decade_start + 9
+
+        if decade_start < 1950:
+            return "Antes de 1950"
+        elif decade_start >= 2020:
+            return "2020s+"
+        else:
+            return f"{decade_start}s"
 
     for track in all_tracks:
         artist = track['artist']
@@ -111,13 +149,18 @@ def generate_weekly_stats():
 
         artists_counter[artist] += 1
         artists_users[artist].add(user)
+        artists_user_counts[artist][user] += 1
 
         tracks_counter[track_name] += 1
         tracks_users[track_name].add(user)
+        tracks_user_counts[track_name][user] += 1
 
         if album:
-            albums_counter[album] += 1
-            albums_users[album].add(user)
+            # Mostrar álbum como "artista - álbum"
+            album_display = f"{artist} - {album}"
+            albums_counter[album_display] += 1
+            albums_users[album_display].add(user)
+            albums_user_counts[album_display][user] += 1
 
         # Géneros (procesar solo una vez por artista)
         if artist not in processed_artists:
@@ -125,28 +168,55 @@ def generate_weekly_stats():
             for genre in genres:
                 genres_counter[genre] += 1
                 genres_users[genre].add(user)
+                # Para géneros, contamos scrobbles de todos los artistas de ese género del usuario
+                for user_track in user_scrobbles[user]:
+                    if user_track['artist'] == artist:
+                        genres_user_counts[genre][user] += 1
+                        genres_user_artists[genre][user].add(artist)
             processed_artists.add(artist)
 
-        # Sellos (procesar solo una vez por álbum único - artista+album)
+        # Sellos y Décadas (procesar solo una vez por álbum único - artista+album)
         if album:
             album_key = f"{artist}|{album}"
             if album_key not in processed_albums:
+                # Sellos
                 label = db.get_album_label(artist, album)
                 if label:
                     labels_counter[label] += 1
                     labels_users[label].add(user)
+                    # Para sellos, contamos scrobbles de todos los álbumes de ese sello del usuario
+                    for user_track in user_scrobbles[user]:
+                        if user_track['album'] == album and user_track['artist'] == artist:
+                            labels_user_counts[label][user] += 1
+                            labels_user_artists[label][user].add(artist)
+
+                # Décadas
+                release_year = db.get_album_release_year(artist, album)
+                decade_label = get_decade_label(release_year)
+                decades_counter[decade_label] += 1
+                decades_users[decade_label].add(user)
+                # Para décadas, contamos scrobbles de todos los álbumes de esa década del usuario
+                for user_track in user_scrobbles[user]:
+                    if user_track['album'] == album and user_track['artist'] == artist:
+                        decades_user_counts[decade_label][user] += 1
+                        decades_user_artists[decade_label][user].add(artist)
+
                 processed_albums.add(album_key)
 
-    def filter_common(counter, users_dict):
-        return [
-            {
-                'name': item,
-                'count': count,
-                'users': list(users_dict[item])
-            }
-            for item, count in counter.most_common(50)
-            if len(users_dict[item]) >= 2
-        ]
+    def filter_common(counter, users_dict, user_counts_dict, user_artists_dict=None):
+        result = []
+        for item, count in counter.most_common(50):
+            if len(users_dict[item]) >= 2:
+                entry = {
+                    'name': item,
+                    'count': count,
+                    'users': list(users_dict[item]),
+                    'user_counts': dict(user_counts_dict[item])
+                }
+                if user_artists_dict:
+                    entry['user_artists'] = {user: list(artists) for user, artists in user_artists_dict[item].items()}
+                result.append(entry)
+        return result
 
     stats = {
         'period_type': 'weekly',
@@ -155,11 +225,12 @@ def generate_weekly_stats():
         'to_date': now.strftime('%Y-%m-%d'),
         'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'total_scrobbles': len(all_tracks),
-        'artists': filter_common(artists_counter, artists_users),
-        'tracks': filter_common(tracks_counter, tracks_users),
-        'albums': filter_common(albums_counter, albums_users),
-        'genres': filter_common(genres_counter, genres_users),
-        'labels': filter_common(labels_counter, labels_users)
+        'artists': filter_common(artists_counter, artists_users, artists_user_counts),
+        'tracks': filter_common(tracks_counter, tracks_users, tracks_user_counts),
+        'albums': filter_common(albums_counter, albums_users, albums_user_counts),
+        'genres': filter_common(genres_counter, genres_users, genres_user_counts, genres_user_artists),
+        'labels': filter_common(labels_counter, labels_users, labels_user_counts, labels_user_artists),
+        'decades': filter_common(decades_counter, decades_users, decades_user_counts, decades_user_artists)
     }
 
     db.close()
@@ -343,6 +414,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
             border-radius: 8px;
             border-left: 3px solid #45475a;
             transition: all 0.3s;
+            cursor: pointer;
         }}
 
         .item:hover {{
@@ -352,6 +424,14 @@ def create_html(stats: Dict, users: List[str]) -> str:
 
         .item.highlighted {{
             border-left-color: #cba6f7;
+            background: #1e1e2e;
+        }}
+
+        .item.clickable {{
+            cursor: pointer;
+        }}
+
+        .item.clickable:hover {{
             background: #1e1e2e;
         }}
 
@@ -390,6 +470,69 @@ def create_html(stats: Dict, users: List[str]) -> str:
             font-weight: 600;
         }}
 
+        .artists-popup {{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }}
+
+        .popup-overlay {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+        }}
+
+        .popup-header {{
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
+        }}
+
+        .popup-close {{
+            float: right;
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+            margin-top: -5px;
+        }}
+
+        .popup-close:hover {{
+            color: #cba6f7;
+        }}
+
+        .artist-list {{
+            list-style: none;
+            padding: 0;
+        }}
+
+        .artist-list li {{
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+        }}
+
         .no-data {{
             text-align: center;
             padding: 40px;
@@ -418,6 +561,11 @@ def create_html(stats: Dict, users: List[str]) -> str:
             .category-filters {{
                 justify-content: center;
             }}
+
+            .artists-popup {{
+                max-width: 90%;
+                max-height: 80%;
+            }}
         }}
     </style>
 </head>
@@ -444,6 +592,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
                     <button class="category-filter" data-category="albums">Álbumes</button>
                     <button class="category-filter" data-category="genres">Géneros</button>
                     <button class="category-filter" data-category="labels">Sellos</button>
+                    <button class="category-filter" data-category="decades">Décadas</button>
                 </div>
             </div>
         </div>
@@ -471,6 +620,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
         const users = {users_json};
         const stats = {stats_json};
 
+        // Inicializar categorías activas
         let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
 
         const userSelect = document.getElementById('userSelect');
@@ -503,18 +653,69 @@ def create_html(stats: Dict, users: List[str]) -> str:
             }});
         }});
 
+        function showArtistsPopup(itemName, category, user) {{
+            const item = stats[category].find(item => item.name === itemName);
+            if (!item || !item.user_artists || !item.user_artists[user]) return;
+
+            const artists = item.user_artists[user];
+
+            // Crear overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+
+            // Crear popup
+            const popup = document.createElement('div');
+            popup.className = 'artists-popup';
+
+            const header = document.createElement('div');
+            header.className = 'popup-header';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'popup-close';
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = () => {{
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            }};
+
+            header.innerHTML = `Artistas de ${{user}} en "${{itemName}}"`;
+            header.appendChild(closeBtn);
+
+            const artistList = document.createElement('ul');
+            artistList.className = 'artist-list';
+
+            artists.forEach(artist => {{
+                const li = document.createElement('li');
+                li.textContent = artist;
+                artistList.appendChild(li);
+            }});
+
+            popup.appendChild(header);
+            popup.appendChild(artistList);
+
+            // Cerrar al hacer click en overlay
+            overlay.onclick = () => {{
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            }};
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(popup);
+        }}
+
         function renderStats() {{
             const selectedUser = userSelect.value;
             const container = document.getElementById('categoriesContainer');
             container.innerHTML = '';
 
-            const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels'];
+            const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels', 'decades'];
             const categoryTitles = {{
                 artists: 'Artistas',
                 tracks: 'Canciones',
                 albums: 'Álbumes',
                 genres: 'Géneros',
-                labels: 'Sellos'
+                labels: 'Sellos',
+                decades: 'Décadas'
             }};
 
             let hasData = false;
@@ -544,6 +745,19 @@ def create_html(stats: Dict, users: List[str]) -> str:
                         itemDiv.classList.add('highlighted');
                     }}
 
+                    // Hacer clickeable si es género, década o sello y hay usuario seleccionado
+                    const isClickable = ['genres', 'labels', 'decades'].includes(categoryKey) &&
+                                       selectedUser &&
+                                       item.users.includes(selectedUser) &&
+                                       item.user_artists &&
+                                       item.user_artists[selectedUser];
+
+                    if (isClickable) {{
+                        itemDiv.classList.add('clickable');
+                        itemDiv.onclick = () => showArtistsPopup(item.name, categoryKey, selectedUser);
+                        itemDiv.title = `Click para ver artistas de ${{selectedUser}}`;
+                    }}
+
                     const itemName = document.createElement('div');
                     itemName.className = 'item-name';
                     itemName.textContent = item.name;
@@ -563,7 +777,10 @@ def create_html(stats: Dict, users: List[str]) -> str:
                         if (user === selectedUser) {{
                             userBadge.classList.add('highlighted-user');
                         }}
-                        userBadge.textContent = user;
+
+                        // Mostrar usuario con número de scrobbles entre paréntesis
+                        const userScrobbles = item.user_counts[user] || 0;
+                        userBadge.textContent = `${{user}} (${{userScrobbles}})`;
                         itemMeta.appendChild(userBadge);
                     }});
 
@@ -614,6 +831,7 @@ def main():
         print(f"   - Álbumes: {len(stats['albums'])}")
         print(f"   - Géneros: {len(stats['genres'])}")
         print(f"   - Sellos: {len(stats['labels'])}")
+        print(f"   - Décadas: {len(stats['decades'])}")
 
     except Exception as e:
         print(f"❌ Error: {e}")

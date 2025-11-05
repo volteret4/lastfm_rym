@@ -506,7 +506,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
         document.getElementById('dateRange').textContent = `${stats.from_date} → ${stats.to_date}`;
         document.getElementById('totalScrobbles').textContent = stats.total_scrobbles;
         document.getElementById('generatedAt').textContent = stats.generated_at;
-        let activeCategories = new Set(['artists']);
+
 
         function renderStats() {
             const selectedUser = userSelect.value;

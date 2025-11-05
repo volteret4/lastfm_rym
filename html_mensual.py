@@ -194,12 +194,13 @@ def create_html(stats: Dict, users: List[str]) -> str:
     stats_json = json.dumps(stats, indent=2, ensure_ascii=False)
     period_label = stats['period_label']
 
-    return f"""<!DOCTYPE html>
+    return """<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Stats - """ + period_label + """</title>
+
     <style>
         * {{
             margin: 0;
@@ -447,7 +448,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
 <body>
     <div class="container">
         <header>
-            <h1>ðŸ“… EstadÃ­sticas Mensuales</h1>
+            <h1> Estadísticas Mensuales</h1>
             <p class="subtitle">""" + period_label + """</p>
         </header>
 

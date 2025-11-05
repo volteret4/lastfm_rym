@@ -1,0 +1,3370 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last.fm Stats - December 2024</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #181825;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: #1e1e2e;
+            padding: 30px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        h1 {
+            font-size: 2em;
+            color: #cba6f7;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #a6adc8;
+            font-size: 1em;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #1e1e2e;
+            border-bottom: 1px solid #313244;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .category-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .category-filter {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .category-filter:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+        }
+
+        .category-filter.active {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        label {
+            color: #cba6f7;
+            font-weight: 600;
+        }
+
+        select {
+            padding: 8px 15px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        select:hover {
+            border-color: #cba6f7;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #cba6f7;
+            box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.2);
+        }
+
+        .period-header {
+            background: #1e1e2e;
+            padding: 25px 30px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .period-header h2 {
+            color: #cba6f7;
+            font-size: 1.5em;
+            margin-bottom: 8px;
+        }
+
+        .period-info {
+            color: #a6adc8;
+            font-size: 0.9em;
+        }
+
+        .stats-container {
+            padding: 30px;
+        }
+
+        .categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 25px;
+        }
+
+        .category {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #313244;
+            display: none;
+        }
+
+        .category.visible {
+            display: block;
+        }
+
+        .category h3 {
+            color: #cba6f7;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #181825;
+            border-radius: 8px;
+            border-left: 3px solid #45475a;
+            transition: all 0.3s;
+        }
+
+        .item:hover {
+            transform: translateX(5px);
+            border-left-color: #cba6f7;
+        }
+
+        .item.highlighted {
+            border-left-color: #cba6f7;
+            background: #1e1e2e;
+        }
+
+        .item-name {
+            color: #cdd6f4;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .item-meta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 0.9em;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            background: #313244;
+            color: #a6adc8;
+            border-radius: 6px;
+            font-size: 0.85em;
+        }
+
+        .user-badge {
+            padding: 4px 10px;
+            background: #45475a;
+            color: #cdd6f4;
+            border-radius: 6px;
+            font-size: 0.85em;
+        }
+
+        .user-badge.highlighted-user {
+            background: #cba6f7;
+            color: #1e1e2e;
+            font-weight: 600;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c7086;
+            font-style: italic;
+        }
+
+        .last-update {
+            text-align: center;
+            padding: 20px;
+            color: #6c7086;
+            font-size: 0.85em;
+            border-top: 1px solid #313244;
+        }
+
+        @media (max-width: 768px) {
+            .categories {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .category-filters {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📅 Estadísticas Mensuales</h1>
+            <p class="subtitle">December 2024</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="userSelect">Destacar usuario:</label>
+                <select id="userSelect">
+                    <option value="">Ninguno</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Mostrar categorías:</label>
+                <div class="category-filters">
+                    <button class="category-filter active" data-category="artists">Artistas</button>
+                    <button class="category-filter" data-category="tracks">Canciones</button>
+                    <button class="category-filter" data-category="albums">Álbumes</button>
+                    <button class="category-filter" data-category="genres">Géneros</button>
+                    <button class="category-filter" data-category="labels">Sellos</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="period-header">
+            <h2>Mes December 2024</h2>
+            <p class="period-info">
+                <span id="dateRange"></span> |
+                <span id="totalScrobbles"></span> scrobbles totales
+            </p>
+        </div>
+
+        <div class="stats-container">
+            <div class="categories" id="categoriesContainer">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+
+        <div class="last-update">
+            Generado: <span id="generatedAt"></span>
+        </div>
+    </div>
+
+    <script>
+        const users = ["paqueradejere", "sdecandelario", "GabredMared", "Nubis84", "alberto_gu", "Frikomid", "Rocky_stereo", "EliasJ72", "Lonsonxd"];
+        const stats = {
+  "period_type": "monthly",
+  "period_label": "December 2024",
+  "from_date": "2024-12-01",
+  "to_date": "2024-12-31",
+  "generated_at": "2025-11-05 17:31:47",
+  "total_scrobbles": 13800,
+  "artists": [
+    {
+      "name": "The Beatles",
+      "count": 194,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 32,
+        "Rocky_stereo": 3,
+        "Lonsonxd": 159
+      }
+    },
+    {
+      "name": "Magdalena Bay",
+      "count": 170,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 1,
+        "alberto_gu": 112,
+        "Frikomid": 17,
+        "Rocky_stereo": 10,
+        "EliasJ72": 10,
+        "Lonsonxd": 20
+      }
+    },
+    {
+      "name": "Charli xcx",
+      "count": 146,
+      "users": [
+        "GabredMared",
+        "alberto_gu",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 114,
+        "alberto_gu": 2,
+        "Frikomid": 30
+      }
+    },
+    {
+      "name": "JPEGMAFIA",
+      "count": 112,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 12,
+        "EliasJ72": 100
+      }
+    },
+    {
+      "name": "Arca",
+      "count": 95,
+      "users": [
+        "GabredMared",
+        "EliasJ72",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 19,
+        "Frikomid": 5,
+        "EliasJ72": 71
+      }
+    },
+    {
+      "name": "Kendrick Lamar",
+      "count": 93,
+      "users": [
+        "EliasJ72",
+        "sdecandelario",
+        "alberto_gu",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "sdecandelario": 13,
+        "alberto_gu": 9,
+        "Frikomid": 1,
+        "EliasJ72": 70
+      }
+    },
+    {
+      "name": "Radiohead",
+      "count": 86,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 13,
+        "GabredMared": 9,
+        "alberto_gu": 2,
+        "Frikomid": 2,
+        "Rocky_stereo": 59,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "Death Grips",
+      "count": 83,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 18,
+        "EliasJ72": 65
+      }
+    },
+    {
+      "name": "System of a Down",
+      "count": 78,
+      "users": [
+        "EliasJ72",
+        "sdecandelario",
+        "alberto_gu",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "alberto_gu": 61,
+        "EliasJ72": 9,
+        "Lonsonxd": 6
+      }
+    },
+    {
+      "name": "Iron Maiden",
+      "count": 75,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 31,
+        "Lonsonxd": 44
+      }
+    },
+    {
+      "name": "Kanye West",
+      "count": 71,
+      "users": [
+        "EliasJ72",
+        "Rocky_stereo",
+        "alberto_gu",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "alberto_gu": 28,
+        "Frikomid": 10,
+        "Rocky_stereo": 3,
+        "EliasJ72": 30
+      }
+    },
+    {
+      "name": "The Smiths",
+      "count": 65,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "GabredMared": 28,
+        "alberto_gu": 24,
+        "Rocky_stereo": 5,
+        "Lonsonxd": 7
+      }
+    },
+    {
+      "name": "Nine Inch Nails",
+      "count": 62,
+      "users": [
+        "sdecandelario",
+        "EliasJ72",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "EliasJ72": 2,
+        "Lonsonxd": 58
+      }
+    },
+    {
+      "name": "Soundgarden",
+      "count": 61,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "Lonsonxd": 58
+      }
+    },
+    {
+      "name": "Triángulo de Amor Bizarro",
+      "count": 61,
+      "users": [
+        "GabredMared",
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "GabredMared": 1,
+        "Lonsonxd": 59
+      }
+    },
+    {
+      "name": "Geordie Greep",
+      "count": 60,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 1,
+        "Frikomid": 1,
+        "Rocky_stereo": 1,
+        "EliasJ72": 1,
+        "Lonsonxd": 56
+      }
+    },
+    {
+      "name": "Billie Eilish",
+      "count": 59,
+      "users": [
+        "GabredMared",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "GabredMared": 44,
+        "Lonsonxd": 15
+      }
+    },
+    {
+      "name": "Slowdive",
+      "count": 54,
+      "users": [
+        "sdecandelario",
+        "Rocky_stereo",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 15,
+        "Rocky_stereo": 38
+      }
+    },
+    {
+      "name": "Cocteau Twins",
+      "count": 54,
+      "users": [
+        "GabredMared",
+        "Rocky_stereo",
+        "alberto_gu",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 33,
+        "alberto_gu": 1,
+        "Frikomid": 12,
+        "Rocky_stereo": 8
+      }
+    },
+    {
+      "name": "Barón Rojo",
+      "count": 53,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Lonsonxd": 52
+      }
+    },
+    {
+      "name": "Killing Joke",
+      "count": 53,
+      "users": [
+        "EliasJ72",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "Frikomid": 49,
+        "EliasJ72": 4
+      }
+    },
+    {
+      "name": "Linkin Park",
+      "count": 50,
+      "users": [
+        "EliasJ72",
+        "sdecandelario",
+        "alberto_gu",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 27,
+        "alberto_gu": 1,
+        "EliasJ72": 19,
+        "Lonsonxd": 3
+      }
+    },
+    {
+      "name": "A$AP Rocky",
+      "count": 49,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 2,
+        "EliasJ72": 47
+      }
+    },
+    {
+      "name": "Prince",
+      "count": 48,
+      "users": [
+        "GabredMared",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 47,
+        "Frikomid": 1
+      }
+    },
+    {
+      "name": "Sigur Rós",
+      "count": 48,
+      "users": [
+        "GabredMared",
+        "Rocky_stereo",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 19,
+        "Frikomid": 28,
+        "Rocky_stereo": 1
+      }
+    },
+    {
+      "name": "Willie Colón",
+      "count": 45,
+      "users": [
+        "GabredMared",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 24,
+        "Rocky_stereo": 21
+      }
+    },
+    {
+      "name": "The Chemical Brothers",
+      "count": 43,
+      "users": [
+        "sdecandelario",
+        "paqueradejere"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 42
+      }
+    },
+    {
+      "name": "Earl Sweatshirt",
+      "count": 41,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 4,
+        "EliasJ72": 37
+      }
+    },
+    {
+      "name": "Beyoncé",
+      "count": 40,
+      "users": [
+        "GabredMared",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 13,
+        "Frikomid": 27
+      }
+    },
+    {
+      "name": "J Dilla",
+      "count": 40,
+      "users": [
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "alberto_gu": 1,
+        "Rocky_stereo": 39
+      }
+    },
+    {
+      "name": "The Smashing Pumpkins",
+      "count": 39,
+      "users": [
+        "sdecandelario",
+        "alberto_gu",
+        "Lonsonxd",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "alberto_gu": 8,
+        "Rocky_stereo": 25,
+        "Lonsonxd": 1
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "name": "Billie Eilish - BIRDS OF A FEATHER",
+      "count": 40,
+      "users": [
+        "GabredMared",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "GabredMared": 38,
+        "Lonsonxd": 2
+      }
+    },
+    {
+      "name": "Slowdive - Souvlaki Space Station",
+      "count": 37,
+      "users": [
+        "Rocky_stereo",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "Frikomid": 2,
+        "Rocky_stereo": 35
+      }
+    },
+    {
+      "name": "Charli xcx - 360",
+      "count": 32,
+      "users": [
+        "GabredMared",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 31,
+        "Frikomid": 1
+      }
+    },
+    {
+      "name": "Magdalena Bay - Image",
+      "count": 29,
+      "users": [
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "alberto_gu": 22,
+        "Frikomid": 1,
+        "Rocky_stereo": 3,
+        "EliasJ72": 1,
+        "Lonsonxd": 2
+      }
+    },
+    {
+      "name": "Willie Colón - Calle Luna Calle Sol",
+      "count": 22,
+      "users": [
+        "GabredMared",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 20,
+        "Rocky_stereo": 2
+      }
+    },
+    {
+      "name": "Ariel Pink - Not Enough Violence",
+      "count": 21,
+      "users": [
+        "GabredMared",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "GabredMared": 1,
+        "alberto_gu": 20
+      }
+    },
+    {
+      "name": "Charli xcx - Talk talk",
+      "count": 21,
+      "users": [
+        "GabredMared",
+        "alberto_gu",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 19,
+        "alberto_gu": 1,
+        "Frikomid": 1
+      }
+    },
+    {
+      "name": "Magdalena Bay - Killing Time",
+      "count": 21,
+      "users": [
+        "Rocky_stereo",
+        "alberto_gu",
+        "Lonsonxd",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "alberto_gu": 13,
+        "Frikomid": 5,
+        "Rocky_stereo": 1,
+        "Lonsonxd": 2
+      }
+    },
+    {
+      "name": "Charli xcx - Sympathy is a knife",
+      "count": 18,
+      "users": [
+        "GabredMared",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 17,
+        "Frikomid": 1
+      }
+    },
+    {
+      "name": "Kanye West - On Sight",
+      "count": 18,
+      "users": [
+        "EliasJ72",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "Frikomid": 9,
+        "EliasJ72": 9
+      }
+    },
+    {
+      "name": "JPEGMAFIA - 1539 N. Calvert",
+      "count": 16,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 10,
+        "EliasJ72": 6
+      }
+    },
+    {
+      "name": "Magdalena Bay - She Looked Like Me!",
+      "count": 14,
+      "users": [
+        "Lonsonxd",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "alberto_gu": 12,
+        "Rocky_stereo": 1,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "Magdalena Bay - Death & Romance",
+      "count": 13,
+      "users": [
+        "EliasJ72",
+        "Lonsonxd",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "alberto_gu": 8,
+        "Rocky_stereo": 1,
+        "EliasJ72": 2,
+        "Lonsonxd": 2
+      }
+    },
+    {
+      "name": "The Cure - Disintegration",
+      "count": 12,
+      "users": [
+        "GabredMared",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "GabredMared": 11,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "Magdalena Bay - Cry For Me",
+      "count": 12,
+      "users": [
+        "Lonsonxd",
+        "alberto_gu",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "alberto_gu": 5,
+        "Frikomid": 6,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "Charli xcx - Apple",
+      "count": 11,
+      "users": [
+        "GabredMared",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 8,
+        "Frikomid": 3
+      }
+    },
+    {
+      "name": "Magdalena Bay - Watching T.V.",
+      "count": 11,
+      "users": [
+        "EliasJ72",
+        "Lonsonxd",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "alberto_gu": 7,
+        "Rocky_stereo": 1,
+        "EliasJ72": 2,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "Death Grips - Beware",
+      "count": 11,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 10,
+        "EliasJ72": 1
+      }
+    }
+  ],
+  "albums": [
+    {
+      "name": "Imaginal Disk",
+      "count": 153,
+      "users": [
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "alberto_gu": 112,
+        "Frikomid": 3,
+        "Rocky_stereo": 10,
+        "EliasJ72": 9,
+        "Lonsonxd": 19
+      }
+    },
+    {
+      "name": "BRAT",
+      "count": 119,
+      "users": [
+        "GabredMared",
+        "alberto_gu",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 97,
+        "alberto_gu": 2,
+        "Frikomid": 20
+      }
+    },
+    {
+      "name": "Abbey Road (Remastered)",
+      "count": 74,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 32,
+        "Rocky_stereo": 1,
+        "Lonsonxd": 41
+      }
+    },
+    {
+      "name": "Toxicity",
+      "count": 61,
+      "users": [
+        "EliasJ72",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "alberto_gu": 54,
+        "EliasJ72": 6
+      }
+    },
+    {
+      "name": "In Rainbows",
+      "count": 60,
+      "users": [
+        "GabredMared",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 1,
+        "Rocky_stereo": 59
+      }
+    },
+    {
+      "name": "HIT ME HARD AND SOFT",
+      "count": 57,
+      "users": [
+        "GabredMared",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "GabredMared": 43,
+        "Lonsonxd": 14
+      }
+    },
+    {
+      "name": "The New Sound",
+      "count": 56,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 1,
+        "Rocky_stereo": 1,
+        "Lonsonxd": 54
+      }
+    },
+    {
+      "name": "Souvlaki",
+      "count": 48,
+      "users": [
+        "sdecandelario",
+        "Rocky_stereo",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 11,
+        "Rocky_stereo": 36
+      }
+    },
+    {
+      "name": "Purple Rain",
+      "count": 44,
+      "users": [
+        "GabredMared",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "GabredMared": 43,
+        "Frikomid": 1
+      }
+    },
+    {
+      "name": "The Smiths",
+      "count": 44,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "GabredMared": 27,
+        "alberto_gu": 16,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "Yeezus",
+      "count": 39,
+      "users": [
+        "EliasJ72",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "Frikomid": 9,
+        "EliasJ72": 30
+      }
+    },
+    {
+      "name": "Donuts",
+      "count": 38,
+      "users": [
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "alberto_gu": 1,
+        "Rocky_stereo": 37
+      }
+    },
+    {
+      "name": "Cool World",
+      "count": 37,
+      "users": [
+        "sdecandelario",
+        "EliasJ72",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 14,
+        "EliasJ72": 10,
+        "Lonsonxd": 13
+      }
+    },
+    {
+      "name": "Triángulo de Amor Bizarro",
+      "count": 36,
+      "users": [
+        "GabredMared",
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "GabredMared": 1,
+        "Lonsonxd": 34
+      }
+    },
+    {
+      "name": "Exmilitary",
+      "count": 34,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 10,
+        "EliasJ72": 24
+      }
+    },
+    {
+      "name": "pom pom",
+      "count": 33,
+      "users": [
+        "GabredMared",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "GabredMared": 1,
+        "alberto_gu": 31
+      }
+    },
+    {
+      "name": "THE GHOST~POP TAPE",
+      "count": 33,
+      "users": [
+        "EliasJ72",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "Rocky_stereo": 22,
+        "EliasJ72": 11
+      }
+    },
+    {
+      "name": "Floating Into the Night",
+      "count": 30,
+      "users": [
+        "GabredMared",
+        "paqueradejere"
+      ],
+      "user_counts": {
+        "paqueradejere": 20,
+        "GabredMared": 10
+      }
+    },
+    {
+      "name": "LIVE.LOVE.A$AP",
+      "count": 30,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 1,
+        "EliasJ72": 29
+      }
+    },
+    {
+      "name": "Deathconsciousness",
+      "count": 29,
+      "users": [
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 13,
+        "Rocky_stereo": 16
+      }
+    },
+    {
+      "name": "KiCk i",
+      "count": 29,
+      "users": [
+        "GabredMared",
+        "EliasJ72"
+      ],
+      "user_counts": {
+        "GabredMared": 1,
+        "EliasJ72": 28
+      }
+    },
+    {
+      "name": "Lo Mato",
+      "count": 28,
+      "users": [
+        "GabredMared",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 23,
+        "Rocky_stereo": 5
+      }
+    },
+    {
+      "name": "Veteran",
+      "count": 27,
+      "users": [
+        "EliasJ72",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 10,
+        "EliasJ72": 17
+      }
+    }
+  ],
+  "genres": [
+    {
+      "name": "rock",
+      "count": 405,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 5,
+        "sdecandelario": 264,
+        "GabredMared": 266,
+        "alberto_gu": 72,
+        "Frikomid": 190,
+        "Rocky_stereo": 80,
+        "EliasJ72": 73,
+        "Lonsonxd": 1041
+      }
+    },
+    {
+      "name": "electronic",
+      "count": 359,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 123,
+        "sdecandelario": 315,
+        "GabredMared": 288,
+        "alberto_gu": 84,
+        "Frikomid": 233,
+        "Rocky_stereo": 50,
+        "EliasJ72": 184,
+        "Lonsonxd": 74
+      }
+    },
+    {
+      "name": "indie",
+      "count": 303,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 43,
+        "sdecandelario": 317,
+        "GabredMared": 198,
+        "alberto_gu": 55,
+        "Frikomid": 170,
+        "Rocky_stereo": 110,
+        "EliasJ72": 16,
+        "Lonsonxd": 171
+      }
+    },
+    {
+      "name": "pop",
+      "count": 273,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 26,
+        "GabredMared": 711,
+        "alberto_gu": 48,
+        "Frikomid": 348,
+        "Rocky_stereo": 46,
+        "EliasJ72": 8,
+        "Lonsonxd": 236
+      }
+    },
+    {
+      "name": "experimental",
+      "count": 218,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 211,
+        "sdecandelario": 126,
+        "GabredMared": 133,
+        "alberto_gu": 73,
+        "Frikomid": 114,
+        "Rocky_stereo": 14,
+        "EliasJ72": 204,
+        "Lonsonxd": 196
+      }
+    },
+    {
+      "name": "alternative",
+      "count": 210,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 9,
+        "sdecandelario": 222,
+        "GabredMared": 272,
+        "alberto_gu": 68,
+        "Frikomid": 90,
+        "Rocky_stereo": 37,
+        "EliasJ72": 6,
+        "Lonsonxd": 122
+      }
+    },
+    {
+      "name": "indie rock",
+      "count": 182,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 12,
+        "sdecandelario": 286,
+        "GabredMared": 68,
+        "alberto_gu": 31,
+        "Frikomid": 78,
+        "Rocky_stereo": 115,
+        "EliasJ72": 8,
+        "Lonsonxd": 27
+      }
+    },
+    {
+      "name": "spanish",
+      "count": 176,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 10,
+        "sdecandelario": 82,
+        "GabredMared": 139,
+        "alberto_gu": 11,
+        "Frikomid": 102,
+        "Rocky_stereo": 42,
+        "Lonsonxd": 724
+      }
+    },
+    {
+      "name": "female vocalists",
+      "count": 171,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 52,
+        "sdecandelario": 41,
+        "GabredMared": 511,
+        "alberto_gu": 33,
+        "Frikomid": 188,
+        "Rocky_stereo": 16,
+        "EliasJ72": 14,
+        "Lonsonxd": 16
+      }
+    },
+    {
+      "name": "Hip-Hop",
+      "count": 160,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 87,
+        "GabredMared": 38,
+        "alberto_gu": 257,
+        "Frikomid": 9,
+        "Rocky_stereo": 221,
+        "EliasJ72": 172,
+        "Lonsonxd": 7
+      }
+    },
+    {
+      "name": "punk",
+      "count": 155,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 250,
+        "GabredMared": 35,
+        "alberto_gu": 13,
+        "Frikomid": 5,
+        "Rocky_stereo": 2,
+        "EliasJ72": 22,
+        "Lonsonxd": 183
+      }
+    },
+    {
+      "name": "latin",
+      "count": 155,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 23,
+        "GabredMared": 266,
+        "alberto_gu": 39,
+        "Frikomid": 21,
+        "Rocky_stereo": 296,
+        "Lonsonxd": 35
+      }
+    },
+    {
+      "name": "metal",
+      "count": 151,
+      "users": [
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 15,
+        "sdecandelario": 213,
+        "alberto_gu": 3,
+        "Frikomid": 22,
+        "Rocky_stereo": 2,
+        "EliasJ72": 1,
+        "Lonsonxd": 645
+      }
+    },
+    {
+      "name": "rap",
+      "count": 147,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 60,
+        "GabredMared": 10,
+        "alberto_gu": 234,
+        "Frikomid": 9,
+        "Rocky_stereo": 227,
+        "EliasJ72": 174,
+        "Lonsonxd": 6
+      }
+    },
+    {
+      "name": "ambient",
+      "count": 131,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 102,
+        "sdecandelario": 66,
+        "GabredMared": 65,
+        "alberto_gu": 25,
+        "Frikomid": 51,
+        "Rocky_stereo": 16,
+        "EliasJ72": 29,
+        "Lonsonxd": 169
+      }
+    },
+    {
+      "name": "post-punk",
+      "count": 130,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 14,
+        "sdecandelario": 199,
+        "GabredMared": 74,
+        "alberto_gu": 5,
+        "Frikomid": 76,
+        "Rocky_stereo": 8,
+        "EliasJ72": 50,
+        "Lonsonxd": 32
+      }
+    },
+    {
+      "name": "folk",
+      "count": 104,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 28,
+        "sdecandelario": 26,
+        "GabredMared": 196,
+        "alberto_gu": 26,
+        "Frikomid": 71,
+        "Rocky_stereo": 29,
+        "EliasJ72": 13,
+        "Lonsonxd": 43
+      }
+    },
+    {
+      "name": "hip hop",
+      "count": 103,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 17,
+        "GabredMared": 4,
+        "alberto_gu": 174,
+        "Frikomid": 2,
+        "Rocky_stereo": 184,
+        "EliasJ72": 110,
+        "Lonsonxd": 24
+      }
+    },
+    {
+      "name": "shoegaze",
+      "count": 102,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 18,
+        "sdecandelario": 72,
+        "GabredMared": 36,
+        "alberto_gu": 12,
+        "Frikomid": 23,
+        "Rocky_stereo": 162,
+        "EliasJ72": 37,
+        "Lonsonxd": 23
+      }
+    },
+    {
+      "name": "alternative rock",
+      "count": 101,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 4,
+        "sdecandelario": 115,
+        "GabredMared": 26,
+        "alberto_gu": 21,
+        "Frikomid": 29,
+        "Rocky_stereo": 9,
+        "EliasJ72": 1,
+        "Lonsonxd": 127
+      }
+    },
+    {
+      "name": "hardcore",
+      "count": 96,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 181,
+        "GabredMared": 3,
+        "alberto_gu": 10,
+        "Frikomid": 4,
+        "Rocky_stereo": 8,
+        "EliasJ72": 37,
+        "Lonsonxd": 30
+      }
+    },
+    {
+      "name": "Progressive rock",
+      "count": 95,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 2,
+        "sdecandelario": 14,
+        "GabredMared": 23,
+        "alberto_gu": 4,
+        "Frikomid": 21,
+        "Rocky_stereo": 19,
+        "Lonsonxd": 595
+      }
+    },
+    {
+      "name": "heavy metal",
+      "count": 95,
+      "users": [
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 15,
+        "sdecandelario": 130,
+        "Rocky_stereo": 4,
+        "EliasJ72": 5,
+        "Lonsonxd": 255
+      }
+    },
+    {
+      "name": "punk rock",
+      "count": 93,
+      "users": [
+        "paqueradejere",
+        "Lonsonxd",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 3,
+        "sdecandelario": 132,
+        "alberto_gu": 13,
+        "Rocky_stereo": 1,
+        "Lonsonxd": 173
+      }
+    },
+    {
+      "name": "emo",
+      "count": 91,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 252,
+        "GabredMared": 5,
+        "alberto_gu": 4,
+        "Frikomid": 1,
+        "Rocky_stereo": 75,
+        "EliasJ72": 7,
+        "Lonsonxd": 10
+      }
+    },
+    {
+      "name": "dance",
+      "count": 89,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 6,
+        "sdecandelario": 124,
+        "GabredMared": 44,
+        "alberto_gu": 19,
+        "Frikomid": 47,
+        "Rocky_stereo": 4,
+        "EliasJ72": 3
+      }
+    },
+    {
+      "name": "classic rock",
+      "count": 89,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 26,
+        "GabredMared": 69,
+        "alberto_gu": 6,
+        "Frikomid": 12,
+        "Rocky_stereo": 28,
+        "Lonsonxd": 198
+      }
+    },
+    {
+      "name": "singer-songwriter",
+      "count": 84,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 18,
+        "sdecandelario": 13,
+        "GabredMared": 233,
+        "alberto_gu": 22,
+        "Frikomid": 95,
+        "Rocky_stereo": 10,
+        "EliasJ72": 3,
+        "Lonsonxd": 44
+      }
+    },
+    {
+      "name": "dream pop",
+      "count": 84,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 37,
+        "sdecandelario": 12,
+        "GabredMared": 49,
+        "alberto_gu": 9,
+        "Frikomid": 35,
+        "Rocky_stereo": 72,
+        "EliasJ72": 4,
+        "Lonsonxd": 11
+      }
+    },
+    {
+      "name": "80s",
+      "count": 84,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 5,
+        "sdecandelario": 59,
+        "GabredMared": 282,
+        "alberto_gu": 6,
+        "Frikomid": 19,
+        "Rocky_stereo": 25,
+        "Lonsonxd": 74
+      }
+    },
+    {
+      "name": "post-hardcore",
+      "count": 84,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 203,
+        "GabredMared": 2,
+        "alberto_gu": 1,
+        "Frikomid": 4,
+        "Rocky_stereo": 2,
+        "Lonsonxd": 11
+      }
+    },
+    {
+      "name": "Progressive metal",
+      "count": 83,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd",
+        "Rocky_stereo",
+        "paqueradejere"
+      ],
+      "user_counts": {
+        "paqueradejere": 4,
+        "sdecandelario": 28,
+        "Rocky_stereo": 4,
+        "Lonsonxd": 620
+      }
+    },
+    {
+      "name": "hard rock",
+      "count": 82,
+      "users": [
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 90,
+        "Frikomid": 4,
+        "Rocky_stereo": 8,
+        "Lonsonxd": 203
+      }
+    },
+    {
+      "name": "indie pop",
+      "count": 80,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 13,
+        "sdecandelario": 23,
+        "GabredMared": 119,
+        "alberto_gu": 4,
+        "Frikomid": 73,
+        "Rocky_stereo": 36,
+        "EliasJ72": 3,
+        "Lonsonxd": 130
+      }
+    },
+    {
+      "name": "electronica",
+      "count": 72,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 22,
+        "sdecandelario": 80,
+        "GabredMared": 23,
+        "alberto_gu": 37,
+        "Frikomid": 37,
+        "Rocky_stereo": 1,
+        "EliasJ72": 3,
+        "Lonsonxd": 6
+      }
+    },
+    {
+      "name": "psychedelic",
+      "count": 70,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 10,
+        "sdecandelario": 50,
+        "GabredMared": 20,
+        "alberto_gu": 22,
+        "Frikomid": 19,
+        "Rocky_stereo": 72,
+        "EliasJ72": 13,
+        "Lonsonxd": 65
+      }
+    },
+    {
+      "name": "spain",
+      "count": 68,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 5,
+        "sdecandelario": 27,
+        "GabredMared": 7,
+        "alberto_gu": 1,
+        "Frikomid": 71,
+        "Rocky_stereo": 3,
+        "Lonsonxd": 134
+      }
+    },
+    {
+      "name": "jazz",
+      "count": 68,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 44,
+        "sdecandelario": 18,
+        "GabredMared": 70,
+        "alberto_gu": 10,
+        "Frikomid": 25,
+        "Rocky_stereo": 29,
+        "EliasJ72": 1,
+        "Lonsonxd": 67
+      }
+    },
+    {
+      "name": "death metal",
+      "count": 66,
+      "users": [
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "paqueradejere": 6,
+        "sdecandelario": 20,
+        "alberto_gu": 1,
+        "Frikomid": 1,
+        "EliasJ72": 25,
+        "Lonsonxd": 302
+      }
+    },
+    {
+      "name": "new wave",
+      "count": 64,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 5,
+        "sdecandelario": 82,
+        "GabredMared": 215,
+        "alberto_gu": 2,
+        "Frikomid": 139,
+        "Rocky_stereo": 15,
+        "Lonsonxd": 34
+      }
+    },
+    {
+      "name": "british",
+      "count": 63,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 14,
+        "sdecandelario": 21,
+        "GabredMared": 41,
+        "alberto_gu": 20,
+        "Frikomid": 31,
+        "Rocky_stereo": 8,
+        "EliasJ72": 10,
+        "Lonsonxd": 67
+      }
+    },
+    {
+      "name": "instrumental",
+      "count": 63,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 29,
+        "sdecandelario": 29,
+        "GabredMared": 45,
+        "alberto_gu": 6,
+        "Frikomid": 14,
+        "Rocky_stereo": 32,
+        "EliasJ72": 4,
+        "Lonsonxd": 163
+      }
+    },
+    {
+      "name": "techno",
+      "count": 61,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 31,
+        "sdecandelario": 128,
+        "GabredMared": 2,
+        "alberto_gu": 10,
+        "Frikomid": 10,
+        "Rocky_stereo": 3,
+        "EliasJ72": 1
+      }
+    },
+    {
+      "name": "post-rock",
+      "count": 59,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 5,
+        "sdecandelario": 53,
+        "GabredMared": 196,
+        "alberto_gu": 4,
+        "Frikomid": 5,
+        "Rocky_stereo": 18,
+        "EliasJ72": 9,
+        "Lonsonxd": 31
+      }
+    },
+    {
+      "name": "synthpop",
+      "count": 58,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 93,
+        "GabredMared": 126,
+        "alberto_gu": 2,
+        "Frikomid": 66,
+        "Rocky_stereo": 3,
+        "EliasJ72": 13,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "salsa",
+      "count": 58,
+      "users": [
+        "GabredMared",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "GabredMared": 35,
+        "alberto_gu": 2,
+        "Frikomid": 1,
+        "Rocky_stereo": 257
+      }
+    },
+    {
+      "name": "german",
+      "count": 57,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 118,
+        "GabredMared": 12,
+        "Frikomid": 24,
+        "Rocky_stereo": 34,
+        "EliasJ72": 2,
+        "Lonsonxd": 17
+      }
+    },
+    {
+      "name": "black metal",
+      "count": 55,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd",
+        "paqueradejere"
+      ],
+      "user_counts": {
+        "paqueradejere": 11,
+        "sdecandelario": 127,
+        "Lonsonxd": 137
+      }
+    },
+    {
+      "name": "noise rock",
+      "count": 54,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "paqueradejere": 4,
+        "sdecandelario": 110,
+        "GabredMared": 1,
+        "alberto_gu": 1,
+        "Frikomid": 4,
+        "EliasJ72": 4,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "Lo-Fi",
+      "count": 53,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 5,
+        "sdecandelario": 23,
+        "GabredMared": 24,
+        "alberto_gu": 11,
+        "Frikomid": 7,
+        "Rocky_stereo": 107,
+        "EliasJ72": 28,
+        "Lonsonxd": 2
+      }
+    }
+  ],
+  "labels": [
+    {
+      "name": "Columbia",
+      "count": 56,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 2,
+        "sdecandelario": 8,
+        "GabredMared": 55,
+        "alberto_gu": 4,
+        "Frikomid": 20,
+        "Rocky_stereo": 11,
+        "EliasJ72": 9,
+        "Lonsonxd": 26
+      }
+    },
+    {
+      "name": "Not On Label",
+      "count": 51,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 14,
+        "GabredMared": 17,
+        "alberto_gu": 6,
+        "Frikomid": 7,
+        "Rocky_stereo": 34,
+        "EliasJ72": 23,
+        "Lonsonxd": 20
+      }
+    },
+    {
+      "name": "DRO",
+      "count": 42,
+      "users": [
+        "GabredMared",
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 31,
+        "GabredMared": 5,
+        "Lonsonxd": 140
+      }
+    },
+    {
+      "name": "Sony Music",
+      "count": 39,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 33,
+        "sdecandelario": 3,
+        "GabredMared": 64,
+        "alberto_gu": 1,
+        "Frikomid": 4,
+        "Rocky_stereo": 12,
+        "Lonsonxd": 29
+      }
+    },
+    {
+      "name": "Polydor",
+      "count": 39,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 4,
+        "GabredMared": 148,
+        "alberto_gu": 3,
+        "Frikomid": 13,
+        "Rocky_stereo": 5,
+        "Lonsonxd": 46
+      }
+    },
+    {
+      "name": "Virgin",
+      "count": 38,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 19,
+        "GabredMared": 28,
+        "alberto_gu": 37,
+        "Frikomid": 20,
+        "Rocky_stereo": 25,
+        "Lonsonxd": 16
+      }
+    },
+    {
+      "name": "Parlophone",
+      "count": 37,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 32,
+        "GabredMared": 35,
+        "alberto_gu": 1,
+        "Frikomid": 6,
+        "Rocky_stereo": 1,
+        "Lonsonxd": 141
+      }
+    },
+    {
+      "name": "RCA",
+      "count": 34,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 15,
+        "GabredMared": 19,
+        "alberto_gu": 5,
+        "Frikomid": 4,
+        "Rocky_stereo": 4,
+        "EliasJ72": 34,
+        "Lonsonxd": 23
+      }
+    },
+    {
+      "name": "Capitol Records",
+      "count": 31,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 13,
+        "GabredMared": 11,
+        "alberto_gu": 3,
+        "Frikomid": 8,
+        "Rocky_stereo": 4,
+        "Lonsonxd": 22
+      }
+    },
+    {
+      "name": "XL Recordings",
+      "count": 29,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "paqueradejere": 1,
+        "sdecandelario": 16,
+        "GabredMared": 21,
+        "alberto_gu": 3,
+        "Frikomid": 18,
+        "EliasJ72": 22,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "EMI",
+      "count": 28,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 6,
+        "GabredMared": 21,
+        "alberto_gu": 2,
+        "Frikomid": 13,
+        "Rocky_stereo": 3,
+        "Lonsonxd": 25
+      }
+    },
+    {
+      "name": "Atlantic",
+      "count": 28,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "GabredMared": 110,
+        "alberto_gu": 2,
+        "Frikomid": 22,
+        "Rocky_stereo": 11,
+        "Lonsonxd": 14
+      }
+    },
+    {
+      "name": "Fania Records",
+      "count": 28,
+      "users": [
+        "GabredMared",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 23,
+        "alberto_gu": 1,
+        "Rocky_stereo": 78
+      }
+    },
+    {
+      "name": "Nuclear Blast",
+      "count": 27,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 36,
+        "Lonsonxd": 23
+      }
+    },
+    {
+      "name": "Chapa Discos",
+      "count": 27,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Lonsonxd": 99
+      }
+    },
+    {
+      "name": "Roadrunner Records",
+      "count": 24,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 7,
+        "Lonsonxd": 49
+      }
+    },
+    {
+      "name": "Epic",
+      "count": 24,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 12,
+        "GabredMared": 4,
+        "alberto_gu": 32,
+        "Frikomid": 1,
+        "Lonsonxd": 36
+      }
+    },
+    {
+      "name": "Elektra",
+      "count": 22,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 12,
+        "GabredMared": 1,
+        "alberto_gu": 5,
+        "Rocky_stereo": 7,
+        "Lonsonxd": 22
+      }
+    },
+    {
+      "name": "Warner Bros. Records",
+      "count": 21,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 20,
+        "sdecandelario": 6,
+        "GabredMared": 64,
+        "alberto_gu": 4,
+        "Frikomid": 2,
+        "Rocky_stereo": 2,
+        "Lonsonxd": 6
+      }
+    },
+    {
+      "name": "Century Media",
+      "count": 21,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd",
+        "paqueradejere"
+      ],
+      "user_counts": {
+        "paqueradejere": 4,
+        "sdecandelario": 3,
+        "Lonsonxd": 72
+      }
+    },
+    {
+      "name": "4AD",
+      "count": 21,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 4,
+        "GabredMared": 32,
+        "alberto_gu": 13,
+        "Frikomid": 3,
+        "Rocky_stereo": 5,
+        "Lonsonxd": 3
+      }
+    },
+    {
+      "name": "Universal Music Group",
+      "count": 19,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "GabredMared": 10,
+        "alberto_gu": 1,
+        "Frikomid": 10,
+        "Lonsonxd": 7
+      }
+    },
+    {
+      "name": "Interscope Records",
+      "count": 19,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "GabredMared": 5,
+        "alberto_gu": 5,
+        "Frikomid": 7,
+        "EliasJ72": 2,
+        "Lonsonxd": 10
+      }
+    },
+    {
+      "name": "Music On Vinyl",
+      "count": 18,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "GabredMared": 1,
+        "alberto_gu": 1,
+        "Frikomid": 4,
+        "Rocky_stereo": 2,
+        "EliasJ72": 1,
+        "Lonsonxd": 47
+      }
+    },
+    {
+      "name": "Island Records",
+      "count": 18,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 4,
+        "GabredMared": 5,
+        "alberto_gu": 2,
+        "Frikomid": 29,
+        "Lonsonxd": 10
+      }
+    },
+    {
+      "name": "Sub Pop",
+      "count": 17,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 5,
+        "sdecandelario": 5,
+        "GabredMared": 13,
+        "Frikomid": 10,
+        "Rocky_stereo": 1,
+        "EliasJ72": 27,
+        "Lonsonxd": 1
+      }
+    },
+    {
+      "name": "Warp Records",
+      "count": 17,
+      "users": [
+        "paqueradejere",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 17,
+        "sdecandelario": 2,
+        "Frikomid": 11,
+        "Rocky_stereo": 4,
+        "EliasJ72": 7,
+        "Lonsonxd": 7
+      }
+    },
+    {
+      "name": "A&M Records",
+      "count": 17,
+      "users": [
+        "sdecandelario",
+        "alberto_gu",
+        "Lonsonxd",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "alberto_gu": 2,
+        "Rocky_stereo": 2,
+        "Lonsonxd": 75
+      }
+    },
+    {
+      "name": "Mute",
+      "count": 16,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 2,
+        "sdecandelario": 17,
+        "GabredMared": 1,
+        "alberto_gu": 2,
+        "Frikomid": 13,
+        "Rocky_stereo": 1
+      }
+    },
+    {
+      "name": "Rough Trade",
+      "count": 16,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 7,
+        "GabredMared": 2,
+        "alberto_gu": 6,
+        "Frikomid": 6,
+        "EliasJ72": 8,
+        "Lonsonxd": 9
+      }
+    },
+    {
+      "name": "Sonido Muchacho",
+      "count": 16,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Lonsonxd": 33
+      }
+    },
+    {
+      "name": "Mushroom Pillow",
+      "count": 16,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Lonsonxd": 34
+      }
+    },
+    {
+      "name": "Universal Music Latino",
+      "count": 16,
+      "users": [
+        "GabredMared",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 24,
+        "alberto_gu": 8,
+        "Rocky_stereo": 10
+      }
+    },
+    {
+      "name": "Polyvinyl Record Company",
+      "count": 15,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 35,
+        "GabredMared": 1,
+        "Frikomid": 1,
+        "Rocky_stereo": 2,
+        "Lonsonxd": 6
+      }
+    },
+    {
+      "name": "Metal Blade Records",
+      "count": 14,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 19,
+        "Lonsonxd": 22
+      }
+    },
+    {
+      "name": "CBS",
+      "count": 14,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "GabredMared": 8,
+        "alberto_gu": 1,
+        "Rocky_stereo": 4,
+        "Lonsonxd": 4
+      }
+    },
+    {
+      "name": "Domino",
+      "count": 13,
+      "users": [
+        "GabredMared",
+        "paqueradejere",
+        "Frikomid",
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "paqueradejere": 13,
+        "sdecandelario": 3,
+        "GabredMared": 10,
+        "Frikomid": 25,
+        "Rocky_stereo": 2
+      }
+    },
+    {
+      "name": "Run For Cover Records",
+      "count": 13,
+      "users": [
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 23,
+        "Rocky_stereo": 1
+      }
+    },
+    {
+      "name": "Universal",
+      "count": 13,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "GabredMared": 3,
+        "alberto_gu": 3,
+        "Frikomid": 1,
+        "Rocky_stereo": 3,
+        "Lonsonxd": 12
+      }
+    },
+    {
+      "name": "Apple Records",
+      "count": 13,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 32,
+        "alberto_gu": 2,
+        "Rocky_stereo": 3,
+        "Lonsonxd": 14
+      }
+    },
+    {
+      "name": "Mercury",
+      "count": 13,
+      "users": [
+        "Rocky_stereo",
+        "Lonsonxd",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "Frikomid": 4,
+        "Rocky_stereo": 1,
+        "Lonsonxd": 25
+      }
+    },
+    {
+      "name": "WEA",
+      "count": 12,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "sdecandelario",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "GabredMared": 15,
+        "alberto_gu": 4,
+        "Rocky_stereo": 4,
+        "Lonsonxd": 6
+      }
+    },
+    {
+      "name": "Steamhammer",
+      "count": 12,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 16,
+        "Lonsonxd": 4
+      }
+    },
+    {
+      "name": "Ariola",
+      "count": 12,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "Frikomid",
+        "alberto_gu",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "GabredMared": 7,
+        "alberto_gu": 2,
+        "Frikomid": 1,
+        "Rocky_stereo": 10,
+        "Lonsonxd": 4
+      }
+    },
+    {
+      "name": "Sacred Bones Records",
+      "count": 11,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd",
+        "Frikomid"
+      ],
+      "user_counts": {
+        "sdecandelario": 17,
+        "Frikomid": 3,
+        "Lonsonxd": 6
+      }
+    },
+    {
+      "name": "Napalm Records",
+      "count": 11,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 15,
+        "Lonsonxd": 8
+      }
+    },
+    {
+      "name": "Harvest",
+      "count": 11,
+      "users": [
+        "GabredMared",
+        "Lonsonxd",
+        "EliasJ72",
+        "Frikomid",
+        "sdecandelario",
+        "Rocky_stereo"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "GabredMared": 9,
+        "Frikomid": 4,
+        "Rocky_stereo": 1,
+        "EliasJ72": 33,
+        "Lonsonxd": 2
+      }
+    },
+    {
+      "name": "Candlelight Records",
+      "count": 11,
+      "users": [
+        "sdecandelario",
+        "Lonsonxd"
+      ],
+      "user_counts": {
+        "sdecandelario": 10,
+        "Lonsonxd": 44
+      }
+    }
+  ]
+};
+
+        // Inicializar categorías activas
+        let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
+
+        const userSelect = document.getElementById('userSelect');
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user;
+            option.textContent = user;
+            userSelect.appendChild(option);
+        });
+
+        document.getElementById('dateRange').textContent = `${stats.from_date} → ${stats.to_date}`;
+        document.getElementById('totalScrobbles').textContent = stats.total_scrobbles;
+        document.getElementById('generatedAt').textContent = stats.generated_at;
+
+        // Manejar filtros de categorías
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        categoryFilters.forEach(filter => {
+            filter.addEventListener('click', () => {
+                const category = filter.dataset.category;
+
+                if (activeCategories.has(category)) {
+                    activeCategories.delete(category);
+                    filter.classList.remove('active');
+                } else {
+                    activeCategories.add(category);
+                    filter.classList.add('active');
+                }
+
+                renderStats();
+            });
+        });
+
+        function renderStats() {
+            const selectedUser = userSelect.value;
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+
+            const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels'];
+            const categoryTitles = {
+                artists: 'Artistas',
+                tracks: 'Canciones',
+                albums: 'Álbumes',
+                genres: 'Géneros',
+                labels: 'Sellos'
+            };
+
+            let hasData = false;
+
+            categoryOrder.forEach(categoryKey => {
+                if (!stats[categoryKey] || stats[categoryKey].length === 0) return;
+
+                hasData = true;
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category';
+                categoryDiv.dataset.category = categoryKey;
+
+                if (activeCategories.has(categoryKey)) {
+                    categoryDiv.classList.add('visible');
+                }
+
+                const title = document.createElement('h3');
+                title.textContent = categoryTitles[categoryKey];
+                categoryDiv.appendChild(title);
+
+                stats[categoryKey].forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'item';
+
+                    if (selectedUser && item.users.includes(selectedUser)) {
+                        itemDiv.classList.add('highlighted');
+                    }
+
+                    const itemName = document.createElement('div');
+                    itemName.className = 'item-name';
+                    itemName.textContent = item.name;
+                    itemDiv.appendChild(itemName);
+
+                    const itemMeta = document.createElement('div');
+                    itemMeta.className = 'item-meta';
+
+                    const countBadge = document.createElement('span');
+                    countBadge.className = 'badge';
+                    countBadge.textContent = `${item.count} plays`;
+                    itemMeta.appendChild(countBadge);
+
+                    item.users.forEach(user => {
+                        const userBadge = document.createElement('span');
+                        userBadge.className = 'user-badge';
+                        if (user === selectedUser) {
+                            userBadge.classList.add('highlighted-user');
+                        }
+
+                        // Mostrar usuario con número de scrobbles entre paréntesis
+                        const userScrobbles = item.user_counts[user] || 0;
+                        userBadge.textContent = `${user} (${userScrobbles})`;
+                        itemMeta.appendChild(userBadge);
+                    });
+
+                    itemDiv.appendChild(itemMeta);
+                    categoryDiv.appendChild(itemDiv);
+                });
+
+                container.appendChild(categoryDiv);
+            });
+
+            if (!hasData || activeCategories.size === 0) {
+                const noData = document.createElement('div');
+                noData.className = 'no-data';
+                noData.textContent = activeCategories.size === 0
+                    ? 'Selecciona al menos una categoría para ver las estadísticas'
+                    : 'No hay coincidencias para este período';
+                container.appendChild(noData);
+            }
+        }
+
+        userSelect.addEventListener('change', renderStats);
+        renderStats();
+    </script>
+</body>
+</html>

@@ -200,7 +200,6 @@ def create_html(stats: Dict, users: List[str]) -> str:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Stats - """ + period_label + """</title>
-
     <style>
         * {{
             margin: 0;
@@ -504,7 +503,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
             userSelect.appendChild(option);
         }});
 
-        document.getElementById('dateRange').textContent = `${{stats.from_date}} â†’ ${{stats.to_date}}`;
+        document.getElementById('dateRange').textContent = `${stats.from_date} → ${stats.to_date}`;
         document.getElementById('totalScrobbles').textContent = stats.total_scrobbles;
         document.getElementById('generatedAt').textContent = stats.generated_at;
         let activeCategories = new Set(['artists']);

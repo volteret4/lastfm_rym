@@ -201,47 +201,47 @@ def create_html(stats: Dict, users: List[str]) -> str:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Stats - """ + period_label + """</title>
     <style>
-        * {{
+        * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-        }}
+        }
 
-        body {{
+        body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: #1e1e2e;
             color: #cdd6f4;
             padding: 20px;
             line-height: 1.6;
-        }}
+        }
 
-        .container {{
+        .container {
             max-width: 1400px;
             margin: 0 auto;
             background: #181825;
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             overflow: hidden;
-        }}
+        }
 
-        header {{
+        header {
             background: #1e1e2e;
             padding: 30px;
             border-bottom: 2px solid #cba6f7;
-        }}
+        }
 
-        h1 {{
+        h1 {
             font-size: 2em;
             color: #cba6f7;
             margin-bottom: 10px;
-        }}
+        }
 
-        .subtitle {{
+        .subtitle {
             color: #a6adc8;
             font-size: 1em;
-        }}
+        }
 
-        .controls {{
+        .controls {
             padding: 20px 30px;
             background: #1e1e2e;
             border-bottom: 1px solid #313244;
@@ -249,21 +249,21 @@ def create_html(stats: Dict, users: List[str]) -> str:
             gap: 20px;
             flex-wrap: wrap;
             align-items: center;
-        }}
+        }
 
-        .control-group {{
+        .control-group {
             display: flex;
             gap: 15px;
             align-items: center;
-        }}
+        }
 
-        .category-filters {{
+        .category-filters {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
-        }}
+        }
 
-        .category-filter {{
+        .category-filter {
             padding: 8px 16px;
             background: #313244;
             color: #cdd6f4;
@@ -273,25 +273,25 @@ def create_html(stats: Dict, users: List[str]) -> str:
             transition: all 0.3s;
             font-size: 0.9em;
             font-weight: 600;
-        }}
+        }
 
-        .category-filter:hover {{
+        .category-filter:hover {
             border-color: #cba6f7;
             background: #45475a;
-        }}
+        }
 
-        .category-filter.active {{
+        .category-filter.active {
             background: #cba6f7;
             color: #1e1e2e;
             border-color: #cba6f7;
-        }}
+        }
 
-        label {{
+        label {
             color: #cba6f7;
             font-weight: 600;
-        }}
+        }
 
-        select {{
+        select {
             padding: 8px 15px;
             background: #313244;
             color: #cdd6f4;
@@ -300,148 +300,148 @@ def create_html(stats: Dict, users: List[str]) -> str:
             font-size: 0.95em;
             cursor: pointer;
             transition: all 0.3s;
-        }}
+        }
 
-        select:hover {{
+        select:hover {
             border-color: #cba6f7;
-        }}
+        }
 
-        select:focus {{
+        select:focus {
             outline: none;
             border-color: #cba6f7;
             box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.2);
-        }}
+        }
 
-        .period-header {{
+        .period-header {
             background: #1e1e2e;
             padding: 25px 30px;
             border-bottom: 2px solid #cba6f7;
-        }}
+        }
 
-        .period-header h2 {{
+        .period-header h2 {
             color: #cba6f7;
             font-size: 1.5em;
             margin-bottom: 8px;
-        }}
+        }
 
-        .period-info {{
+        .period-info {
             color: #a6adc8;
             font-size: 0.9em;
-        }}
+        }
 
-        .stats-container {{
+        .stats-container {
             padding: 30px;
-        }}
+        }
 
-        .categories {{
+        .categories {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
             gap: 25px;
-        }}
+        }
 
-        .category {{
+        .category {
             background: #1e1e2e;
             border-radius: 12px;
             padding: 20px;
             border: 1px solid #313244;
             display: none;
-        }}
+        }
 
-        .category.visible {{
+        .category.visible {
             display: block;
-        }}
+        }
 
-        .category h3 {{
+        .category h3 {
             color: #cba6f7;
             font-size: 1.2em;
             margin-bottom: 15px;
             padding-bottom: 10px;
             border-bottom: 2px solid #cba6f7;
-        }}
+        }
 
-        .item {{
+        .item {
             padding: 12px;
             margin-bottom: 10px;
             background: #181825;
             border-radius: 8px;
             border-left: 3px solid #45475a;
             transition: all 0.3s;
-        }}
+        }
 
-        .item:hover {{
+        .item:hover {
             transform: translateX(5px);
             border-left-color: #cba6f7;
-        }}
+        }
 
-        .item.highlighted {{
+        .item.highlighted {
             border-left-color: #cba6f7;
             background: #1e1e2e;
-        }}
+        }
 
-        .item-name {{
+        .item-name {
             color: #cdd6f4;
             font-weight: 600;
             margin-bottom: 8px;
-        }}
+        }
 
-        .item-meta {{
+        .item-meta {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
             font-size: 0.9em;
-        }}
+        }
 
-        .badge {{
+        .badge {
             padding: 4px 10px;
             background: #313244;
             color: #a6adc8;
             border-radius: 6px;
             font-size: 0.85em;
-        }}
+        }
 
-        .user-badge {{
+        .user-badge {
             padding: 4px 10px;
             background: #45475a;
             color: #cdd6f4;
             border-radius: 6px;
             font-size: 0.85em;
-        }}
+        }
 
-        .user-badge.highlighted-user {{
+        .user-badge.highlighted-user {
             background: #cba6f7;
             color: #1e1e2e;
             font-weight: 600;
-        }}
+        }
 
-        .no-data {{
+        .no-data {
             text-align: center;
             padding: 40px;
             color: #6c7086;
             font-style: italic;
-        }}
+        }
 
-        .last-update {{
+        .last-update {
             text-align: center;
             padding: 20px;
             color: #6c7086;
             font-size: 0.85em;
             border-top: 1px solid #313244;
-        }}
+        }
 
-        @media (max-width: 768px) {{
-            .categories {{
+        @media (max-width: 768px) {
+            .categories {
                 grid-template-columns: 1fr;
-            }}
+            }
 
-            .controls {{
+            .controls {
                 flex-direction: column;
                 align-items: stretch;
-            }}
+            }
 
-            .category-filters {{
+            .category-filters {
                 justify-content: center;
-            }}
-        }}
+            }
+        }
     </style>
 </head>
 <body>
@@ -496,35 +496,35 @@ def create_html(stats: Dict, users: List[str]) -> str:
 
 
         const userSelect = document.getElementById('userSelect');
-        users.forEach(user => {{
+        users.forEach(user => {
             const option = document.createElement('option');
             option.value = user;
             option.textContent = user;
             userSelect.appendChild(option);
-        }});
+        });
 
         document.getElementById('dateRange').textContent = `${stats.from_date} → ${stats.to_date}`;
         document.getElementById('totalScrobbles').textContent = stats.total_scrobbles;
         document.getElementById('generatedAt').textContent = stats.generated_at;
         let activeCategories = new Set(['artists']);
 
-        function renderStats() {{
+        function renderStats() {
             const selectedUser = userSelect.value;
             const container = document.getElementById('categoriesContainer');
             container.innerHTML = '';
 
             const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels'];
-            const categoryTitles = {{
+            const categoryTitles = {
                 artists: 'Artistas',
                 tracks: 'Canciones',
                 albums: 'Ãlbumes',
                 genres: 'GÃ©neros',
                 labels: 'Sellos'
-            }};
+            };
 
             let hasData = false;
 
-            categoryOrder.forEach(categoryKey => {{
+            categoryOrder.forEach(categoryKey => {
                 if (!stats[categoryKey] || stats[categoryKey].length === 0) return;
 
                 hasData = true;
@@ -540,13 +540,13 @@ def create_html(stats: Dict, users: List[str]) -> str:
                 title.textContent = categoryTitles[categoryKey];
                 categoryDiv.appendChild(title);
 
-                stats[categoryKey].forEach(item => {{
+                stats[categoryKey].forEach(item => {
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'item';
 
-                    if (selectedUser && item.users.includes(selectedUser)) {{
+                    if (selectedUser && item.users.includes(selectedUser)) {
                         itemDiv.classList.add('highlighted');
-                    }}
+                    }
 
                     const itemName = document.createElement('div');
                     itemName.className = 'item-name';
@@ -558,33 +558,33 @@ def create_html(stats: Dict, users: List[str]) -> str:
 
                     const countBadge = document.createElement('span');
                     countBadge.className = 'badge';
-                    countBadge.textContent = `${{item.count}} plays`;
+                    countBadge.textContent = `${item.count} plays`;
                     itemMeta.appendChild(countBadge);
 
-                    item.users.forEach(user => {{
+                    item.users.forEach(user => {
                         const userBadge = document.createElement('span');
                         userBadge.className = 'user-badge';
-                        if (user === selectedUser) {{
+                        if (user === selectedUser) {
                             userBadge.classList.add('highlighted-user');
-                        }}
+                        }
                         userBadge.textContent = user;
                         itemMeta.appendChild(userBadge);
-                    }});
+                    });
 
                     itemDiv.appendChild(itemMeta);
                     categoryDiv.appendChild(itemDiv);
-                }});
+                });
 
                 container.appendChild(categoryDiv);
-            }});
+            });
 
-            if (!hasData) {{
+            if (!hasData) {
                 const noData = document.createElement('div');
                 noData.className = 'no-data';
                 noData.textContent = 'No hay coincidencias para este perÃ­odo';
                 container.appendChild(noData);
-            }}
-        }}
+            }
+        }
 
         userSelect.addEventListener('change', renderStats);
         renderStats();

@@ -99,7 +99,7 @@ def generate_index_html(files):
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Last.fm Statistics</title>
+        <title>RYM Hispano Estadísticas</title>
         <style>
             * {
                 margin: 0;
@@ -460,10 +460,10 @@ def generate_index_html(files):
                 <!-- Tab About -->
                 <div id="about" class="tab-content">
                     <div class="info-box">
-                        <h3>📖 Acerca de Last.fm Statistics</h3>
+                        <h3>📖 Acerca de RYM Hispano Estadísticas</h3>
                         <p>
                             Esta aplicación genera estadísticas de coincidencias
-                            musicales entre múltiples usuarios de Last.fm.
+                            musicales entre múltiples usuarios de Last.fm usando este <a href="https://github.com/volteret4/lastfm_rym">repositorio</a>
                         </p>
                     </div>
 
@@ -558,7 +558,7 @@ def generate_index_html(files):
         </div>
 
         <footer>
-            <p>Last.fm Statistics | Generado con ❤️ | Última actualización: """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + """</p>
+            <p>RYM Hispano Estadísticas | Última actualización: """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + """</p>
         </footer>
 
         <script>

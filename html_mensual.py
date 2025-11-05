@@ -507,6 +507,23 @@ def create_html(stats: Dict, users: List[str]) -> str:
         document.getElementById('totalScrobbles').textContent = stats.total_scrobbles;
         document.getElementById('generatedAt').textContent = stats.generated_at;
 
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        categoryFilters.forEach(filter => {
+            filter.addEventListener('click', () => {
+                const category = filter.dataset.category;
+
+                if (activeCategories.has(category)) {
+                    activeCategories.delete(category);
+                    filter.classList.remove('active');
+                } else {
+                    activeCategories.add(category);
+                    filter.classList.add('active');
+                }
+
+                renderStats();
+            });
+        });
+
 
         function renderStats() {
             const selectedUser = userSelect.value;

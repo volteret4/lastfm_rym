@@ -1,0 +1,57 @@
+name: Update Last.fm Stats
+
+on:
+  schedule:
+    # Ejecutar diariamente a las 3:00 AM UTC
+    - cron: "0 3 * * *"
+
+  # Permitir ejecución manual desde la interfaz de GitHub
+  workflow_dispatch:
+
+jobs:
+  update-stats:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Generate statistics
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+          LASTFM_USERS: ${{ secrets.LASTFM_USERS }}
+          DISCOGS_TOKEN: ${{ secrets.DISCOGS_TOKEN }}
+        run: |
+          python3 lastfm_stats.py
+
+      - name: Check for changes
+        id: verify_diff
+        run: |
+          git diff --quiet index.html || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        if: steps.verify_diff.outputs.changed == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add index.html stats_data.json
+          git commit -m "🎵 Update Last.fm statistics - $(date +'%Y-%m-%d %H:%M')"
+          git push
+
+      - name: No changes
+        if: steps.verify_diff.outputs.changed != 'true'
+        run: |
+          echo "No changes detected in statistics"

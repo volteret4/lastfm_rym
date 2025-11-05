@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Last.fm Monthly Stats Generator
-Genera estadÃ­sticas mensuales de coincidencias entre usuarios
+Genera estadísticas mensuales de coincidencias entre usuarios
 """
 
 import os
@@ -56,7 +56,7 @@ class Database:
 
 
 def generate_monthly_stats(months_ago: int = 0):
-    """Genera estadÃ­sticas mensuales"""
+    """Genera estadísticas mensuales"""
     users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
 
     if not users:
@@ -68,7 +68,7 @@ def generate_monthly_stats(months_ago: int = 0):
     now = datetime.now()
 
     if months_ago > 0:
-        # Calcular mes especÃ­fico del pasado
+        # Calcular mes específico del pasado
         target_month = now.month - months_ago
         target_year = now.year
 
@@ -78,7 +78,7 @@ def generate_monthly_stats(months_ago: int = 0):
 
         from_date = datetime(target_year, target_month, 1, 0, 0, 0)
 
-        # Ãšltimo dÃ­a del mes
+        # Último día del mes
         if target_month == 12:
             to_date = datetime(target_year + 1, 1, 1, 0, 0, 0) - timedelta(seconds=1)
         else:
@@ -93,22 +93,24 @@ def generate_monthly_stats(months_ago: int = 0):
 
     period_label = from_date.strftime('%B %Y')
 
-    print(f"ðŸ“Š Generando estadÃ­sticas mensuales: {period_label}")
+    print(f"📊 Generando estadísticas mensuales: {period_label}")
     print(f"   Desde: {from_date.strftime('%Y-%m-%d')}")
     print(f"   Hasta: {to_date.strftime('%Y-%m-%d')}")
 
-    # Recopilar scrobbles
+    # Recopilar scrobbles por usuario
+    user_scrobbles = {}
     all_tracks = []
     for user in users:
         tracks = db.get_scrobbles(user, from_timestamp, to_timestamp)
+        user_scrobbles[user] = tracks
         all_tracks.extend(tracks)
         print(f"   {user}: {len(tracks)} scrobbles")
 
     if not all_tracks:
-        print("âš ï¸  No hay scrobbles en este perÃ­odo")
+        print("⚠️  No hay scrobbles en este período")
         return None, period_label
 
-    # Calcular estadÃ­sticas
+    # Calcular estadísticas
     artists_counter = Counter()
     tracks_counter = Counter()
     albums_counter = Counter()
@@ -121,6 +123,13 @@ def generate_monthly_stats(months_ago: int = 0):
     genres_users = defaultdict(set)
     labels_users = defaultdict(set)
 
+    # Para contar scrobbles por usuario en cada categoría
+    artists_user_counts = defaultdict(lambda: defaultdict(int))
+    tracks_user_counts = defaultdict(lambda: defaultdict(int))
+    albums_user_counts = defaultdict(lambda: defaultdict(int))
+    genres_user_counts = defaultdict(lambda: defaultdict(int))
+    labels_user_counts = defaultdict(lambda: defaultdict(int))
+
     processed_artists = set()
     processed_albums = set()
 
@@ -132,39 +141,50 @@ def generate_monthly_stats(months_ago: int = 0):
 
         artists_counter[artist] += 1
         artists_users[artist].add(user)
+        artists_user_counts[artist][user] += 1
 
         tracks_counter[track_name] += 1
         tracks_users[track_name].add(user)
+        tracks_user_counts[track_name][user] += 1
 
         if album:
             albums_counter[album] += 1
             albums_users[album].add(user)
+            albums_user_counts[album][user] += 1
 
-        # GÃ©neros (procesar solo una vez por artista)
+        # Géneros (procesar solo una vez por artista)
         if artist not in processed_artists:
             genres = db.get_artist_genres(artist)
             for genre in genres:
                 genres_counter[genre] += 1
                 genres_users[genre].add(user)
+                # Para géneros, contamos scrobbles de todos los artistas de ese género del usuario
+                for user_track in user_scrobbles[user]:
+                    if user_track['artist'] == artist:
+                        genres_user_counts[genre][user] += 1
             processed_artists.add(artist)
 
-        # Sellos (procesar solo una vez por Ã¡lbum Ãºnico - artista+album)
+        # Sellos (procesar solo una vez por álbum único - artista+album)
         if album:
             album_key = f"{artist}|{album}"
             if album_key not in processed_albums:
                 label = db.get_album_label(artist, album)
                 if label:
                     labels_counter[label] += 1
-                    # Agregar todos los usuarios que escucharon este Ã¡lbum
                     labels_users[label].add(user)
+                    # Para sellos, contamos scrobbles de todos los álbumes de ese sello del usuario
+                    for user_track in user_scrobbles[user]:
+                        if user_track['album'] == album and user_track['artist'] == artist:
+                            labels_user_counts[label][user] += 1
                 processed_albums.add(album_key)
 
-    def filter_common(counter, users_dict):
+    def filter_common(counter, users_dict, user_counts_dict):
         return [
             {
                 'name': item,
                 'count': count,
-                'users': list(users_dict[item])
+                'users': list(users_dict[item]),
+                'user_counts': dict(user_counts_dict[item])
             }
             for item, count in counter.most_common(50)
             if len(users_dict[item]) >= 2
@@ -177,11 +197,11 @@ def generate_monthly_stats(months_ago: int = 0):
         'to_date': to_date.strftime('%Y-%m-%d'),
         'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'total_scrobbles': len(all_tracks),
-        'artists': filter_common(artists_counter, artists_users),
-        'tracks': filter_common(tracks_counter, tracks_users),
-        'albums': filter_common(albums_counter, albums_users),
-        'genres': filter_common(genres_counter, genres_users),
-        'labels': filter_common(labels_counter, labels_users)
+        'artists': filter_common(artists_counter, artists_users, artists_user_counts),
+        'tracks': filter_common(tracks_counter, tracks_users, tracks_user_counts),
+        'albums': filter_common(albums_counter, albums_users, albums_user_counts),
+        'genres': filter_common(genres_counter, genres_users, genres_user_counts),
+        'labels': filter_common(labels_counter, labels_users, labels_user_counts)
     }
 
     db.close()
@@ -189,7 +209,7 @@ def generate_monthly_stats(months_ago: int = 0):
 
 
 def create_html(stats: Dict, users: List[str]) -> str:
-    """Crea el HTML para las estadÃ­sticas mensuales"""
+    """Crea el HTML para las estadísticas mensuales"""
     users_json = json.dumps(users)
     stats_json = json.dumps(stats, indent=2, ensure_ascii=False)
     period_label = stats['period_label']
@@ -447,7 +467,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
 <body>
     <div class="container">
         <header>
-            <h1> Estadísticas Mensuales</h1>
+            <h1>📅 Estadísticas Mensuales</h1>
             <p class="subtitle">""" + period_label + """</p>
         </header>
 
@@ -481,7 +501,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
 
         <div class="stats-container">
             <div class="categories" id="categoriesContainer">
-                <!-- Se llenarÃ¡ dinÃ¡micamente -->
+                <!-- Se llenará dinámicamente -->
             </div>
         </div>
 
@@ -494,6 +514,8 @@ def create_html(stats: Dict, users: List[str]) -> str:
         const users = """ + users_json + """;
         const stats = """ + stats_json + """;
 
+        // Inicializar categorías activas
+        let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
 
         const userSelect = document.getElementById('userSelect');
         users.forEach(user => {
@@ -507,6 +529,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
         document.getElementById('totalScrobbles').textContent = stats.total_scrobbles;
         document.getElementById('generatedAt').textContent = stats.generated_at;
 
+        // Manejar filtros de categorías
         const categoryFilters = document.querySelectorAll('.category-filter');
         categoryFilters.forEach(filter => {
             filter.addEventListener('click', () => {
@@ -523,7 +546,6 @@ def create_html(stats: Dict, users: List[str]) -> str:
                 renderStats();
             });
         });
-
 
         function renderStats() {
             const selectedUser = userSelect.value;
@@ -549,9 +571,9 @@ def create_html(stats: Dict, users: List[str]) -> str:
                 categoryDiv.className = 'category';
                 categoryDiv.dataset.category = categoryKey;
 
-                if (activeCategories.has(categoryKey)) {{
+                if (activeCategories.has(categoryKey)) {
                     categoryDiv.classList.add('visible');
-                }}
+                }
 
                 const title = document.createElement('h3');
                 title.textContent = categoryTitles[categoryKey];
@@ -584,7 +606,10 @@ def create_html(stats: Dict, users: List[str]) -> str:
                         if (user === selectedUser) {
                             userBadge.classList.add('highlighted-user');
                         }
-                        userBadge.textContent = user;
+
+                        // Mostrar usuario con número de scrobbles entre paréntesis
+                        const userScrobbles = item.user_counts[user] || 0;
+                        userBadge.textContent = `${user} (${userScrobbles})`;
                         itemMeta.appendChild(userBadge);
                     });
 
@@ -605,7 +630,6 @@ def create_html(stats: Dict, users: List[str]) -> str:
             }
         }
 
-
         userSelect.addEventListener('change', renderStats);
         renderStats();
     </script>
@@ -614,38 +638,38 @@ def create_html(stats: Dict, users: List[str]) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Generador de estadÃ­sticas mensuales de Last.fm')
+    parser = argparse.ArgumentParser(description='Generador de estadísticas mensuales de Last.fm')
     parser.add_argument('--months-ago', type=int, default=0,
-                       help='NÃºmero de meses atrÃ¡s (0 = mes actual)')
+                       help='Número de meses atrás (0 = mes actual)')
     args = parser.parse_args()
 
     try:
         stats, period_label = generate_monthly_stats(args.months_ago)
 
         if not stats:
-            print("âŒ No se pudieron generar estadÃ­sticas")
+            print("❌ No se pudieron generar estadísticas")
             sys.exit(1)
 
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
         html = create_html(stats, users)
 
-        # Nombre del archivo basado en el perÃ­odo
+        # Nombre del archivo basado en el período
         safe_label = period_label.replace(' ', '_').lower()
         output_file = f'monthly_{safe_label}.html'
 
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html)
 
-        print(f"\nâœ… Archivo generado: {output_file}")
+        print(f"\n✅ Archivo generado: {output_file}")
         print(f"   Coincidencias encontradas:")
         print(f"   - Artistas: {len(stats['artists'])}")
         print(f"   - Canciones: {len(stats['tracks'])}")
-        print(f"   - Ãlbumes: {len(stats['albums'])}")
-        print(f"   - GÃ©neros: {len(stats['genres'])}")
+        print(f"   - Álbumes: {len(stats['albums'])}")
+        print(f"   - Géneros: {len(stats['genres'])}")
         print(f"   - Sellos: {len(stats['labels'])}")
 
     except Exception as e:
-        print(f"âŒ Error: {e}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

@@ -407,7 +407,7 @@ def generate_index_html(files):
                 <!-- Tab Mensual -->
                 <div id="monthly" class="tab-content">
                     <div class="period-selector">
-                        <h2>ðŸ"Š Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>
+                        <h2>🌀 Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces mensuales
@@ -469,7 +469,7 @@ def generate_index_html(files):
                     </div>
 
                     <div class="info-box">
-                        <h3>âœ¨ Caracterásticas</h3>
+                        <h3>âœ¨ Características</h3>
                         <ul>
                             <li>
                                 <strong>Estadísticas Semanales:</strong>
@@ -500,7 +500,7 @@ def generate_index_html(files):
                     </div>
 
                     <div class="info-box">
-                        <h3>ðŸ"§ Uso</h3>
+                        <h3>🪤 Uso</h3>
                         <p><strong>Actualización de datos:</strong></p>
                         <ul>
                             <li>
@@ -542,7 +542,7 @@ def generate_index_html(files):
                     </div>
 
                     <div class="info-box">
-                        <h3>âš™ï¸ Configuración</h3>
+                        <h3>🌊Configuración</h3>
                         <p>Crea un archivo <code>.env</code> con:</p>
                         <ul>
                             <li><code>LASTFM_API_KEY=tu_api_key</code></li>

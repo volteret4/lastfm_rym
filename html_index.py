@@ -57,9 +57,9 @@ def scan_html_files(docs_dir='docs'):
 
                 # Convertir nombre de mes a número
                 months = {
-                    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
-                    'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
-                    'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+                    'january': 1, 'february': 2, 'march': 3, 'april': 4,
+                    'may': 5, 'june': 6, 'july': 7, 'august': 8,
+                    'september': 9, 'october': 10, 'november': 11, 'december': 12
                 }
                 month_num = months.get(match.group(1).lower(), 1)
                 date_obj = datetime(int(year), month_num, 1)
@@ -461,7 +461,7 @@ def generate_index_html(files):
                 <!-- Tab About -->
                 <div id="about" class="tab-content">
                     <div class="info-box">
-                        <h3>ðŸ"– Acerca de RYM Hispano Estadísticas</h3>
+                        <h3>🍥 Acerca de RYM Hispano Estadísticas</h3>
                         <p>
                             Esta aplicación genera estadísticas de coincidencias
                             musicales entre múltiples usuarios de Last.fm usando este <a href="https://github.com/volteret4/lastfm_rym">repositorio</a>
@@ -469,7 +469,7 @@ def generate_index_html(files):
                     </div>
 
                     <div class="info-box">
-                        <h3>âœ¨ Características</h3>
+                        <h3>🎏 Características</h3>
                         <ul>
                             <li>
                                 <strong>Estadísticas Semanales:</strong>

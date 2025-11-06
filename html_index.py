@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 def scan_html_files(docs_dir='docs'):
-    """Escanea la carpeta docs/ en busca de archivos HTML de estadÃ­sticas"""
+    """Escanea la carpeta docs/ en busca de archivos HTML de estadísticas"""
     files = {
         'weekly': [],
         'monthly': [],
@@ -28,7 +28,7 @@ def scan_html_files(docs_dir='docs'):
 
         filepath = os.path.join(docs_dir, filename)
 
-        # Detectar tipo de archivo y extraer informaciÃ³n
+        # Detectar tipo de archivo y extraer información
         if filename.startswith('weekly'):
             # weekly.html o weekly_2024_11_05.html
             match = re.match(r'weekly(?:_(\d{4})_(\d{2})_(\d{2}))?\.html', filename)
@@ -55,11 +55,11 @@ def scan_html_files(docs_dir='docs'):
                 year = match.group(2)
                 label = f"{month_name} {year}"
 
-                # Convertir nombre de mes a nÃºmero
+                # Convertir nombre de mes a número
                 months = {
-                    'january': 1, 'february': 2, 'march': 3, 'april': 4,
-                    'may': 5, 'june': 6, 'july': 7, 'august': 8,
-                    'september': 9, 'october': 10, 'november': 11, 'december': 12
+                    'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4,
+                    'mayo': 5, 'junio': 6, 'julio': 7, 'agosto': 8,
+                    'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
                 }
                 month_num = months.get(match.group(1).lower(), 1)
                 date_obj = datetime(int(year), month_num, 1)
@@ -75,7 +75,7 @@ def scan_html_files(docs_dir='docs'):
             match = re.match(r'yearly_(\d{4})\.html', filename)
             if match:
                 year = match.group(1)
-                label = f"AÃ±o {year}"
+                label = f"Año {year}"
                 date_obj = datetime(int(year), 1, 1)
 
                 files['yearly'].append({
@@ -99,7 +99,7 @@ def generate_index_html(files):
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>RYM Hispano EstadÃ­sticas</title>
+        <title>RYM Hispano Estadísticas</title>
         <link rel="icon" type="image/png" href="images/music.png">
         <style>
             * {
@@ -347,7 +347,7 @@ def generate_index_html(files):
     <body>
         <header>
             <div class="container">
-                <h1>ðŸŽµ RYM Hispano EstadÃ­sticas</h1>
+                <h1>🌀 RYM Hispano Estadísticas</h1>
                 <p class="subtitle">Coincidencias musicales entre usuarios</p>
             </div>
         </header>
@@ -380,7 +380,7 @@ def generate_index_html(files):
                 <!-- Tab Semanal -->
                 <div id="weekly" class="tab-content active">
                     <div class="period-selector">
-                        <h2>ðŸ"… EstadÃ­sticas Semanales<span class="stats-badge">{len(files['weekly'])}</span></h2>
+                        <h2> Estadísticas Semanales<span class="stats-badge">{len(files['weekly'])}</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces semanales
@@ -389,13 +389,13 @@ def generate_index_html(files):
             html += f"""
                             <a href="{file_info['filename']}" class="period-link">
                                 <div class="period-name">{file_info['label']}</div>
-                                <div class="period-date">Ãšltimos 7 dÃ­as</div>
+                                <div class="period-date">Ãšltimos 7 días</div>
                             </a>"""
     else:
         html += """
                             <div class="empty-state">
-                                <div class="empty-state-icon">ðŸ"Š</div>
-                                <p>No hay estadÃ­sticas semanales disponibles</p>
+                                <div class="empty-state-icon">🌀</div>
+                                <p>No hay estadísticas semanales disponibles</p>
                                 <p style="font-size: 0.9em;">Ejecuta <code>python3 html_semanal.py</code></p>
                             </div>"""
 
@@ -407,7 +407,7 @@ def generate_index_html(files):
                 <!-- Tab Mensual -->
                 <div id="monthly" class="tab-content">
                     <div class="period-selector">
-                        <h2>ðŸ"Š EstadÃ­sticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>
+                        <h2>ðŸ"Š Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces mensuales
@@ -422,7 +422,7 @@ def generate_index_html(files):
         html += """
                             <div class="empty-state">
                                 <div class="empty-state-icon">ðŸ"…</div>
-                                <p>No hay estadÃ­sticas mensuales disponibles</p>
+                                <p>No hay estadísticas mensuales disponibles</p>
                                 <p style="font-size: 0.9em;">Ejecuta <code>python3 html_mensual.py</code></p>
                             </div>"""
 
@@ -434,7 +434,7 @@ def generate_index_html(files):
                 <!-- Tab Anual -->
                 <div id="yearly" class="tab-content">
                     <div class="period-selector">
-                        <h2>ðŸŽŠ EstadÃ­sticas Anuales<span class="stats-badge">""" + str(len(files['yearly'])) + """</span></h2>
+                        <h2>🌀 Estadísticas Anuales<span class="stats-badge">""" + str(len(files['yearly'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces anuales
@@ -448,8 +448,8 @@ def generate_index_html(files):
     else:
         html += """
                             <div class="empty-state">
-                                <div class="empty-state-icon">ðŸŽŠ</div>
-                                <p>No hay estadÃ­sticas anuales disponibles</p>
+                                <div class="empty-state-icon">🌀</div>
+                                <p>No hay estadísticas anuales disponibles</p>
                                 <p style="font-size: 0.9em;">Ejecuta <code>python3 html_anual.py</code></p>
                             </div>"""
 
@@ -461,26 +461,26 @@ def generate_index_html(files):
                 <!-- Tab About -->
                 <div id="about" class="tab-content">
                     <div class="info-box">
-                        <h3>ðŸ"– Acerca de RYM Hispano EstadÃ­sticas</h3>
+                        <h3>ðŸ"– Acerca de RYM Hispano Estadísticas</h3>
                         <p>
-                            Esta aplicaciÃ³n genera estadÃ­sticas de coincidencias
-                            musicales entre mÃºltiples usuarios de Last.fm usando este <a href="https://github.com/volteret4/lastfm_rym">repositorio</a>
+                            Esta aplicación genera estadísticas de coincidencias
+                            musicales entre múltiples usuarios de Last.fm usando este <a href="https://github.com/volteret4/lastfm_rym">repositorio</a>
                         </p>
                     </div>
 
                     <div class="info-box">
-                        <h3>âœ¨ CaracterÃ­sticas</h3>
+                        <h3>âœ¨ Caracterásticas</h3>
                         <ul>
                             <li>
-                                <strong>EstadÃ­sticas Semanales:</strong>
-                                AnÃ¡lisis de los Ãºltimos 7 dÃ­as
+                                <strong>Estadísticas Semanales:</strong>
+                                Análisis de los últimos 7 días
                             </li>
                             <li>
-                                <strong>EstadÃ­sticas Mensuales:</strong>
+                                <strong>Estadísticas Mensuales:</strong>
                                 AnÃ¡lisis de meses completos
                             </li>
                             <li>
-                                <strong>EstadÃ­sticas Anuales:</strong> AnÃ¡lisis
+                                <strong>Estadísticas Anuales:</strong> AnÃ¡lisis
                                 de aÃ±os completos
                             </li>
                             <li>
@@ -489,11 +489,11 @@ def generate_index_html(files):
                                 mÃ¡s usuarios
                             </li>
                             <li>
-                                <strong>GÃ©neros:</strong> DetecciÃ³n automÃ¡tica
+                                <strong>Géneros:</strong> Detección automÃ¡tica
                                 de gÃ©neros musicales
                             </li>
                             <li>
-                                <strong>Sellos:</strong> InformaciÃ³n sobre
+                                <strong>Sellos:</strong> Información sobre
                                 sellos discogrÃ¡ficos (si estÃ¡ configurado)
                             </li>
                         </ul>
@@ -501,7 +501,7 @@ def generate_index_html(files):
 
                     <div class="info-box">
                         <h3>ðŸ"§ Uso</h3>
-                        <p><strong>ActualizaciÃ³n de datos:</strong></p>
+                        <p><strong>Actualización de datos:</strong></p>
                         <ul>
                             <li>
                                 Ejecuta
@@ -509,30 +509,30 @@ def generate_index_html(files):
                                 diariamente para actualizar la base de datos
                             </li>
                         </ul>
-                        <p><strong>GeneraciÃ³n de estadÃ­sticas:</strong></p>
+                        <p><strong>Generación de estadísticas:</strong></p>
                         <ul>
                             <li>
                                 <code>python3 html_semanal.py</code> - Genera
-                                estadÃ­sticas semanales
+                                estadísticas semanales
                             </li>
                             <li>
                                 <code>python3 html_mensual.py</code> -
-                                Genera estadÃ­sticas del mes actual
+                                Genera estadísticas del mes actual
                             </li>
                             <li>
                                 <code>python3 html_mensual.py --months-ago 1</code>
-                                - Genera estadÃ­sticas del mes pasado
+                                - Genera estadísticas del mes pasado
                             </li>
                             <li>
                                 <code>python3 html_anual.py</code> - Genera
-                                estadÃ­sticas del aÃ±o actual
+                                estadísticas del año actual
                             </li>
                             <li>
                                 <code>python3 html_anual.py --years-ago 1</code>
-                                - Genera estadÃ­sticas del aÃ±o pasado
+                                - Genera estadísticas del año pasado
                             </li>
                         </ul>
-                        <p><strong>GeneraciÃ³n del Ã­ndice:</strong></p>
+                        <p><strong>Generación del índice:</strong></p>
                         <ul>
                             <li>
                                 <code>python3 generate_index.py</code> - Genera
@@ -542,7 +542,7 @@ def generate_index_html(files):
                     </div>
 
                     <div class="info-box">
-                        <h3>âš™ï¸ ConfiguraciÃ³n</h3>
+                        <h3>âš™ï¸ Configuración</h3>
                         <p>Crea un archivo <code>.env</code> con:</p>
                         <ul>
                             <li><code>LASTFM_API_KEY=tu_api_key</code></li>
@@ -559,7 +559,7 @@ def generate_index_html(files):
         </div>
 
         <footer>
-            <p>RYM Hispano EstadÃ­sticas | Ãšltima actualizaciÃ³n: """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + """</p>
+            <p>RYM Hispano Estadísticas | Última actualización: """ + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + """</p>
         </footer>
 
         <script>
@@ -633,7 +633,7 @@ def main():
 
     print(f"Archivo generado: {output_path}")
     print("\n" + "=" * 60)
-    print("âœ… PROCESO COMPLETADO")
+    print("😃 PROCESO COMPLETADO")
     print("=" * 60)
 
 

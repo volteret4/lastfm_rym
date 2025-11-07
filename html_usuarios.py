@@ -38,7 +38,7 @@ def main():
     if args.output is None:
         current_year = datetime.now().year
         from_year = current_year - args.years_back
-        args.output = f'db/usuarios_{from_year}-{current_year}.html'
+        args.output = f'docs/usuarios_{from_year}-{current_year}.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]

@@ -2214,6 +2214,7 @@ class UserStatsHTMLGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Usuarios - Estadísticas Individuales</title>
+    <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {{
@@ -3542,7 +3543,7 @@ def main():
     if args.output is None:
         current_year = datetime.now().year
         from_year = current_year - args.years_back
-        args.output = f'usuarios_{from_year}-{current_year}.html'
+        args.output = f'docs/usuarios_{from_year}-{current_year}.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]

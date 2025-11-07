@@ -90,13 +90,7 @@ class UserStatsAnalyzer:
         )
 
         return {
-            'artists': artist_coincidences,
-            'albums': album_coincidences,
-            'tracks': track_coincidences,
-            'genres': dict(user_genres),
-            'release_years': release_years,
-            'formation_years': formation_years,
-            'charts': charts_data
+            'charts': charts_data  # Solo los datos procesados para gráficos
         }
 
     def _prepare_coincidence_charts_data(self, user: str, other_users: List[str],
@@ -146,34 +140,51 @@ class UserStatsAnalyzer:
                                      other_users: List[str]) -> Dict:
         """Prepara datos para gráfico circular de coincidencias"""
         user_data = {}
+        popup_details = {}
 
         for other_user in other_users:
             if other_user in coincidences:
                 user_data[other_user] = len(coincidences[other_user])
+
+                # Solo incluir top 20 elementos para popups
+                if coincidences[other_user]:
+                    sorted_items = sorted(
+                        coincidences[other_user].items(),
+                        key=lambda x: x[1]['total_plays'] if isinstance(x[1], dict) and 'total_plays' in x[1] else 0,
+                        reverse=True
+                    )
+                    popup_details[other_user] = dict(sorted_items[:20])  # Solo top 20
+                else:
+                    popup_details[other_user] = {}
             else:
                 user_data[other_user] = 0
+                popup_details[other_user] = {}
 
         # Solo incluir usuarios con coincidencias
         filtered_data = {user: count for user, count in user_data.items() if count > 0}
+        filtered_details = {user: details for user, details in popup_details.items() if user_data.get(user, 0) > 0}
 
         return {
             'title': f'Coincidencias en {chart_type}',
             'data': filtered_data,
             'total': sum(filtered_data.values()) if filtered_data else 0,
-            'details': coincidences
+            'details': filtered_details
         }
 
     def _prepare_genres_pie_data(self, user_genres: List[Tuple]) -> Dict:
         """Prepara datos para gráfico circular de géneros"""
-        # Tomar solo los top 8 géneros para mejor visualización
+        # Tomar solo los top 8 géneros para visualización
         top_genres = dict(user_genres[:8])
         total_plays = sum(top_genres.values()) if top_genres else 0
+
+        # Para popup, solo top 15 géneros
+        popup_genres = dict(user_genres[:15])
 
         return {
             'title': 'Distribución de Géneros',
             'data': top_genres,
             'total': total_plays,
-            'details': dict(user_genres)
+            'details': popup_genres  # Solo top 15 en lugar de todos
         }
 
     def _prepare_years_pie_data(self, chart_type: str, years_data: Dict,
@@ -181,19 +192,34 @@ class UserStatsAnalyzer:
         """Prepara datos para gráfico circular de años"""
         # Agrupar por décadas para mejor visualización
         decade_plays = defaultdict(int)
-        decade_details = defaultdict(dict)
+        decade_details = defaultdict(list)
 
-        for item, info in years_data.items():
+        # Ordenar por reproducciones primero
+        sorted_items = sorted(years_data.items(), key=lambda x: x[1]['plays'], reverse=True)
+
+        for item, info in sorted_items:
             year = info[year_field]
             decade = self._get_decade(year)
             decade_plays[decade] += info['plays']
-            decade_details[decade][item] = info
+
+            # Solo agregar top 10 elementos por década para popup
+            if len(decade_details[decade]) < 10:
+                decade_details[decade].append({
+                    'name': item,
+                    'year': year,
+                    'plays': info['plays']
+                })
+
+        # Convertir listas a diccionarios para popup
+        popup_details = {}
+        for decade, items in decade_details.items():
+            popup_details[decade] = {item['name']: item for item in items}
 
         return {
             'title': f'Distribución por {chart_type}',
             'data': dict(decade_plays),
             'total': sum(decade_plays.values()) if decade_plays else 0,
-            'details': dict(decade_details)
+            'details': popup_details
         }
 
     def _get_decade(self, year: int) -> str:
@@ -210,21 +236,21 @@ class UserStatsAnalyzer:
         """Analiza la evolución temporal del usuario"""
         other_users = [u for u in all_users if u != user]
 
-        # Evolución de géneros por año
-        genres_evolution = self._analyze_genres_evolution(user)
+        # Evolución de géneros por año - limitada
+        genres_evolution = self._analyze_genres_evolution_limited(user)
 
-        # Evolución de coincidencias por año
-        coincidences_evolution = self._analyze_coincidences_evolution(user, other_users)
+        # Evolución de coincidencias por año - solo conteos
+        coincidences_evolution = self._analyze_coincidences_evolution_counts(user, other_users)
 
         return {
             'genres': genres_evolution,
             'coincidences': coincidences_evolution
         }
 
-    def _analyze_genres_evolution(self, user: str) -> Dict:
-        """Analiza la evolución de géneros por año"""
+    def _analyze_genres_evolution_limited(self, user: str) -> Dict:
+        """Analiza la evolución de géneros por año - solo top 10"""
         genres_by_year = self.database.get_user_genres_by_year(
-            user, self.from_year, self.to_year
+            user, self.from_year, self.to_year, limit=10
         )
 
         # Obtener los top 10 géneros de todo el período
@@ -248,32 +274,28 @@ class UserStatsAnalyzer:
             'top_genres': top_genre_names
         }
 
-    def _analyze_coincidences_evolution(self, user: str, other_users: List[str]) -> Dict:
-        """Analiza la evolución de coincidencias por año"""
+    def _analyze_coincidences_evolution_counts(self, user: str, other_users: List[str]) -> Dict:
+        """Analiza la evolución de coincidencias por año - solo conteos"""
         evolution_data = {
             'artists': {},
             'albums': {},
             'tracks': {}
         }
 
-        # Para cada año, calcular coincidencias
+        # Para cada año, calcular solo conteos de coincidencias
         for year in range(self.from_year, self.to_year + 1):
-            # Artistas
+            # Obtener coincidencias pero solo contar
             artist_coincidences = self.database.get_common_artists_with_users(
                 user, other_users, year, year
             )
-
-            # Álbumes
             album_coincidences = self.database.get_common_albums_with_users(
                 user, other_users, year, year
             )
-
-            # Canciones
             track_coincidences = self.database.get_common_tracks_with_users(
                 user, other_users, year, year
             )
 
-            # Preparar datos por usuario
+            # Preparar datos por usuario - solo conteos
             for other_user in other_users:
                 if other_user not in evolution_data['artists']:
                     evolution_data['artists'][other_user] = {}
@@ -282,7 +304,7 @@ class UserStatsAnalyzer:
                 if other_user not in evolution_data['tracks']:
                     evolution_data['tracks'][other_user] = {}
 
-                # Contar coincidencias
+                # Solo guardar conteos, no datos completos
                 evolution_data['artists'][other_user][year] = len(
                     artist_coincidences.get(other_user, {})
                 )

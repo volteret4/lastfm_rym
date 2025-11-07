@@ -1410,6 +1410,17 @@ class UserStatsDatabase:
 
         return []
 
+
+    def _get_decade(self, year: int) -> str:
+        """Convierte un año a etiqueta de década"""
+        if year < 1950:
+            return "Antes de 1950"
+        elif year >= 2020:
+            return "2020s+"
+        else:
+            decade_start = (year // 10) * 10
+            return f"{decade_start}s"
+
     def close(self):
         """Cerrar conexión a la base de datos"""
         self.conn.close()

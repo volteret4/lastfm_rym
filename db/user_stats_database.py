@@ -152,6 +152,108 @@ class UserStatsDatabase:
 
         return common_artists
 
+
+    def get_common_tracks_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int) -> Dict[str, Dict[str, int]]:
+        """Obtiene canciones comunes entre el usuario y otros usuarios"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        # Obtener canciones del usuario principal (concatenando artista - canción)
+        cursor.execute('''
+            SELECT (artist || ' - ' || track) as track_key, COUNT(*) as plays
+            FROM scrobbles
+            WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+            GROUP BY track_key
+        ''', (user, from_timestamp, to_timestamp))
+
+        user_tracks = {row['track_key']: row['plays'] for row in cursor.fetchall()}
+
+        # Obtener canciones comunes con cada otro usuario
+        common_tracks = {}
+
+        for other_user in other_users:
+            if other_user == user:
+                continue
+
+            cursor.execute('''
+                SELECT (artist || ' - ' || track) as track_key, COUNT(*) as plays
+                FROM scrobbles
+                WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+                  AND (artist || ' - ' || track) IN ({})
+                GROUP BY track_key
+            '''.format(','.join(['?'] * len(user_tracks))),
+            [other_user, from_timestamp, to_timestamp] + list(user_tracks.keys()))
+
+            other_user_tracks = {row['track_key']: row['plays'] for row in cursor.fetchall()}
+
+            # Calcular coincidencias
+            common = {}
+            for track in user_tracks:
+                if track in other_user_tracks:
+                    common[track] = {
+                        'user_plays': user_tracks[track],
+                        'other_plays': other_user_tracks[track],
+                        'total_plays': user_tracks[track] + other_user_tracks[track]
+                    }
+
+            if common:
+                common_tracks[other_user] = common
+
+        return common_tracks
+        """Obtiene álbumes comunes entre el usuario y otros usuarios"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        # Obtener álbumes del usuario principal (concatenando artista - álbum)
+        cursor.execute('''
+            SELECT (artist || ' - ' || album) as album_key, COUNT(*) as plays
+            FROM scrobbles
+            WHERE user = ? AND timestamp >= ? AND timestamp <= ? AND album IS NOT NULL AND album != ''
+            GROUP BY album_key
+        ''', (user, from_timestamp, to_timestamp))
+
+        user_albums = {row['album_key']: row['plays'] for row in cursor.fetchall()}
+
+        # Obtener álbumes comunes con cada otro usuario
+        common_albums = {}
+
+        for other_user in other_users:
+            if other_user == user:
+                continue
+
+            cursor.execute('''
+                SELECT (artist || ' - ' || album) as album_key, COUNT(*) as plays
+                FROM scrobbles
+                WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+                  AND album IS NOT NULL AND album != ''
+                  AND (artist || ' - ' || album) IN ({})
+                GROUP BY album_key
+            '''.format(','.join(['?'] * len(user_albums))),
+            [other_user, from_timestamp, to_timestamp] + list(user_albums.keys()))
+
+            other_user_albums = {row['album_key']: row['plays'] for row in cursor.fetchall()}
+
+            # Calcular coincidencias
+            common = {}
+            for album in user_albums:
+                if album in other_user_albums:
+                    common[album] = {
+                        'user_plays': user_albums[album],
+                        'other_plays': other_user_albums[album],
+                        'total_plays': user_albums[album] + other_user_albums[album]
+                    }
+
+            if common:
+                common_albums[other_user] = common
+
+        return common_albums
+
+
+
     def get_common_albums_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int) -> Dict[str, Dict[str, int]]:
         """Obtiene álbumes comunes entre el usuario y otros usuarios"""
         cursor = self.conn.cursor()

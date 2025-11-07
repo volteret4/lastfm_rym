@@ -24,15 +24,20 @@ from db.user_stats_database import UserStatsDatabase
 from db.user_stats_analyzer import UserStatsAnalyzer
 from db.user_stats_html_generator import UserStatsHTMLGenerator
 
-
 def main():
     """Función principal para generar estadísticas de usuarios"""
     parser = argparse.ArgumentParser(description='Generador de estadísticas individuales de usuarios de Last.fm')
     parser.add_argument('--years-back', type=int, default=5,
                        help='Número de años hacia atrás para analizar (por defecto: 5)')
-    parser.add_argument('--output', type=str, default='docs/usuarios.html',
-                       help='Archivo de salida HTML (por defecto: usuarios.html)')
+    parser.add_argument('--output', type=str, default=None,
+                       help='Archivo de salida HTML (por defecto: auto-generado con fecha)')
     args = parser.parse_args()
+
+    # Auto-generar nombre de archivo si no se especifica
+    if args.output is None:
+        current_year = datetime.now().year
+        from_year = current_year - args.years_back
+        args.output = f'usuarios_{from_year}-{current_year}.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]

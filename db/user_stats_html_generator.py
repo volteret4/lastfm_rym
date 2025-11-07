@@ -438,6 +438,14 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
+                        <h3>Canciones</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="tracksChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="tracksInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
                         <h3>Géneros</h3>
                         <div class="chart-wrapper">
                             <canvas id="genresChart"></canvas>
@@ -491,6 +499,13 @@ class UserStatsHTMLGenerator:
                             <h4>Coincidencias en Álbumes</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="albumsEvolutionChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>Coincidencias en Canciones</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="tracksEvolutionChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -597,6 +612,7 @@ class UserStatsHTMLGenerator:
             const totalScrobbles = Object.values(userStats.yearly_scrobbles).reduce((a, b) => a + b, 0);
             const totalArtistCoincidences = Object.keys(userStats.coincidences.artists).length;
             const totalAlbumCoincidences = Object.keys(userStats.coincidences.albums).length;
+            const totalTrackCoincidences = Object.keys(userStats.coincidences.tracks).length;
             const totalGenres = Object.keys(userStats.coincidences.genres).length;
 
             const summaryHTML = `
@@ -611,6 +627,10 @@ class UserStatsHTMLGenerator:
                 <div class="summary-card">
                     <div class="number">${{totalAlbumCoincidences}}</div>
                     <div class="label">Usuarios (Álbumes)</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${{totalTrackCoincidences}}</div>
+                    <div class="label">Usuarios (Canciones)</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalGenres}}</div>
@@ -630,9 +650,11 @@ class UserStatsHTMLGenerator:
 
             renderPieChart('artistsChart', userStats.coincidences.charts.artists, 'artistsInfo');
             renderPieChart('albumsChart', userStats.coincidences.charts.albums, 'albumsInfo');
+            renderPieChart('tracksChart', userStats.coincidences.charts.tracks, 'tracksInfo');
             renderPieChart('genresChart', userStats.coincidences.charts.genres, 'genresInfo');
             renderPieChart('releaseYearsChart', userStats.coincidences.charts.release_years, 'releaseYearsInfo');
             renderPieChart('formationYearsChart', userStats.coincidences.charts.formation_years, 'formationYearsInfo');
+        }}
         }}
 
         function renderEvolutionCharts(userStats) {{
@@ -645,6 +667,7 @@ class UserStatsHTMLGenerator:
             renderGenresEvolution(userStats.evolution.genres);
             renderCoincidencesEvolution('artists', userStats.evolution.coincidences);
             renderCoincidencesEvolution('albums', userStats.evolution.coincidences);
+            renderCoincidencesEvolution('tracks', userStats.evolution.coincidences);
         }}
 
         function renderPieChart(canvasId, chartData, infoId) {{
@@ -844,6 +867,18 @@ class UserStatsHTMLGenerator:
                                 color: '#313244'
                             }}
                         }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const dataset = this.data.datasets[datasetIndex];
+                            const year = this.data.labels[pointIndex];
+                            const user = dataset.label;
+                            const coincidences = dataset.data[pointIndex];
+
+                            showEvolutionPopup(type, user, year, coincidences);
+                        }}
                     }}
                 }}
             }};
@@ -881,34 +916,123 @@ class UserStatsHTMLGenerator:
             content.className = 'popup-content';
 
             // Generar contenido según el tipo de datos
+            let hasContent = false;
+
             if (details && typeof details === 'object') {{
-                Object.keys(details).forEach(key => {{
-                    const item = document.createElement('div');
-                    item.className = 'detail-item';
+                // Si es coincidencias de usuario (artistas, álbumes, canciones)
+                if (details[selectedLabel]) {{
+                    const userDetails = details[selectedLabel];
+                    Object.keys(userDetails).forEach(itemKey => {{
+                        const item = document.createElement('div');
+                        item.className = 'detail-item';
 
-                    const name = document.createElement('span');
-                    name.className = 'name';
-                    name.textContent = key;
+                        const name = document.createElement('span');
+                        name.className = 'name';
+                        name.textContent = itemKey;
 
-                    const count = document.createElement('span');
-                    count.className = 'count';
+                        const count = document.createElement('span');
+                        count.className = 'count';
 
-                    const value = details[key];
-                    if (typeof value === 'object' && value.plays) {{
-                        count.textContent = `${{value.plays}} reproducciones`;
-                    }} else if (typeof value === 'number') {{
-                        count.textContent = `${{value}} reproducciones`;
-                    }} else {{
-                        count.textContent = value;
-                    }}
+                        const itemData = userDetails[itemKey];
+                        if (typeof itemData === 'object' && itemData.user_plays !== undefined) {{
+                            count.textContent = `${{itemData.user_plays + itemData.other_plays}} reproducciones totales`;
+                        }} else if (typeof itemData === 'object' && itemData.plays) {{
+                            count.textContent = `${{itemData.plays}} reproducciones`;
+                        }} else if (typeof itemData === 'number') {{
+                            count.textContent = `${{itemData}} reproducciones`;
+                        }} else {{
+                            count.textContent = itemData;
+                        }}
 
-                    item.appendChild(name);
-                    item.appendChild(count);
-                    content.appendChild(item);
-                }});
-            }} else {{
+                        item.appendChild(name);
+                        item.appendChild(count);
+                        content.appendChild(item);
+                        hasContent = true;
+                    }});
+                }} else {{
+                    // Para otros tipos de datos (géneros, años, etc.)
+                    Object.keys(details).forEach(key => {{
+                        const item = document.createElement('div');
+                        item.className = 'detail-item';
+
+                        const name = document.createElement('span');
+                        name.className = 'name';
+                        name.textContent = key;
+
+                        const count = document.createElement('span');
+                        count.className = 'count';
+
+                        const value = details[key];
+                        if (typeof value === 'object' && value.plays) {{
+                            count.textContent = `${{value.plays}} reproducciones`;
+                        }} else if (typeof value === 'number') {{
+                            count.textContent = `${{value}} reproducciones`;
+                        }} else {{
+                            count.textContent = value;
+                        }}
+
+                        item.appendChild(name);
+                        item.appendChild(count);
+                        content.appendChild(item);
+                        hasContent = true;
+                    }});
+                }}
+            }}
+
+            if (!hasContent) {{
                 content.innerHTML = '<div class="no-data">No hay detalles disponibles</div>';
             }}
+
+            popup.appendChild(header);
+            popup.appendChild(content);
+
+            // Cerrar al hacer click en overlay
+            overlay.onclick = () => {{
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            }};
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(popup);
+        }}
+
+        function showEvolutionPopup(type, user, year, coincidences) {{
+            // Crear overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+
+            // Crear popup
+            const popup = document.createElement('div');
+            popup.className = 'popup';
+
+            const header = document.createElement('div');
+            header.className = 'popup-header';
+
+            const title = document.createElement('span');
+            const typeLabel = type === 'artists' ? 'Artistas' : type === 'albums' ? 'Álbumes' : 'Canciones';
+            title.textContent = `Evolución - ${{typeLabel}} (${{year}})`;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'popup-close';
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = () => {{
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            }};
+
+            header.appendChild(title);
+            header.appendChild(closeBtn);
+
+            const content = document.createElement('div');
+            content.className = 'popup-content';
+
+            const info = document.createElement('div');
+            info.className = 'detail-item';
+            info.innerHTML = `
+                <span class="name">Usuario: ${{user}}</span>
+                <span class="count">${{coincidences}} coincidencias en ${{year}}</span>
+            `;
+            content.appendChild(info);
 
             popup.appendChild(header);
             popup.appendChild(content);

@@ -63,6 +63,11 @@ class UserStatsAnalyzer:
             user, other_users, self.from_year, self.to_year
         )
 
+        # Coincidencias de canciones
+        track_coincidences = self.database.get_common_tracks_with_users(
+            user, other_users, self.from_year, self.to_year
+        )
+
         # Estadísticas de géneros del usuario
         user_genres = self.database.get_user_top_genres(
             user, self.from_year, self.to_year, limit=20
@@ -81,12 +86,13 @@ class UserStatsAnalyzer:
         # Procesar datos para gráficos circulares
         charts_data = self._prepare_coincidence_charts_data(
             user, other_users, artist_coincidences, album_coincidences,
-            user_genres, release_years, formation_years
+            track_coincidences, user_genres, release_years, formation_years
         )
 
         return {
             'artists': artist_coincidences,
             'albums': album_coincidences,
+            'tracks': track_coincidences,
             'genres': dict(user_genres),
             'release_years': release_years,
             'formation_years': formation_years,
@@ -95,8 +101,8 @@ class UserStatsAnalyzer:
 
     def _prepare_coincidence_charts_data(self, user: str, other_users: List[str],
                                        artist_coincidences: Dict, album_coincidences: Dict,
-                                       user_genres: List[Tuple], release_years: Dict,
-                                       formation_years: Dict) -> Dict:
+                                       track_coincidences: Dict, user_genres: List[Tuple],
+                                       release_years: Dict, formation_years: Dict) -> Dict:
         """Prepara datos para gráficos circulares de coincidencias"""
 
         # Gráfico de coincidencias de artistas
@@ -107,6 +113,11 @@ class UserStatsAnalyzer:
         # Gráfico de coincidencias de álbumes
         album_chart = self._prepare_coincidences_pie_data(
             "Álbumes", album_coincidences, other_users
+        )
+
+        # Gráfico de coincidencias de canciones
+        track_chart = self._prepare_coincidences_pie_data(
+            "Canciones", track_coincidences, other_users
         )
 
         # Gráfico de géneros (distribución personal)
@@ -125,6 +136,7 @@ class UserStatsAnalyzer:
         return {
             'artists': artist_chart,
             'albums': album_chart,
+            'tracks': track_chart,
             'genres': genres_chart,
             'release_years': release_years_chart,
             'formation_years': formation_years_chart
@@ -169,17 +181,19 @@ class UserStatsAnalyzer:
         """Prepara datos para gráfico circular de años"""
         # Agrupar por décadas para mejor visualización
         decade_plays = defaultdict(int)
+        decade_details = defaultdict(dict)
 
         for item, info in years_data.items():
             year = info[year_field]
             decade = self._get_decade(year)
             decade_plays[decade] += info['plays']
+            decade_details[decade][item] = info
 
         return {
             'title': f'Distribución por {chart_type}',
             'data': dict(decade_plays),
             'total': sum(decade_plays.values()) if decade_plays else 0,
-            'details': years_data
+            'details': dict(decade_details)
         }
 
     def _get_decade(self, year: int) -> str:
@@ -254,12 +268,19 @@ class UserStatsAnalyzer:
                 user, other_users, year, year
             )
 
+            # Canciones
+            track_coincidences = self.database.get_common_tracks_with_users(
+                user, other_users, year, year
+            )
+
             # Preparar datos por usuario
             for other_user in other_users:
                 if other_user not in evolution_data['artists']:
                     evolution_data['artists'][other_user] = {}
                 if other_user not in evolution_data['albums']:
                     evolution_data['albums'][other_user] = {}
+                if other_user not in evolution_data['tracks']:
+                    evolution_data['tracks'][other_user] = {}
 
                 # Contar coincidencias
                 evolution_data['artists'][other_user][year] = len(
@@ -267,6 +288,9 @@ class UserStatsAnalyzer:
                 )
                 evolution_data['albums'][other_user][year] = len(
                     album_coincidences.get(other_user, {})
+                )
+                evolution_data['tracks'][other_user][year] = len(
+                    track_coincidences.get(other_user, {})
                 )
 
         return {

@@ -86,13 +86,14 @@ def scan_html_files(docs_dir='docs'):
                 })
 
         elif filename.startswith('usuarios'):
-            # usuarios.html
-            match = re.match(r'usuarios(?:_(\d{4}))?\.html', filename)
+            # usuarios.html, usuarios_2019-2024.html
+            match = re.match(r'usuarios(?:_(\d{4})-(\d{4}))?\.html', filename)
             if match:
-                if match.group(1):
-                    year = match.group(1)
-                    label = f"Usuarios {year}"
-                    date_obj = datetime(int(year), 1, 1)
+                if match.group(1) and match.group(2):
+                    from_year = match.group(1)
+                    to_year = match.group(2)
+                    label = f"Usuarios {from_year}-{to_year}"
+                    date_obj = datetime(int(to_year), 12, 31)
                 else:
                     label = "Estadísticas de Usuarios"
                     date_obj = datetime.now()

@@ -560,6 +560,8 @@ class UserStatsHTMLGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Usuarios - Estadísticas Individuales</title>
+    <link rel="icon" type="image/png" href="images/music.png">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {{
@@ -954,66 +956,25 @@ class UserStatsHTMLGenerator:
         let currentView = 'coincidences';
         let charts = {{}};
 
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', function() {{
-            console.log('DOM loaded');
-            console.log('Users:', users);
-            console.log('Stats:', allStats);
+        // Inicialización simple sin DOMContentLoaded - siguiendo el patrón de html_anual.py
+        const userSelect = document.getElementById('userSelect');
 
-            initializeUserSelector();
-            initializeViewButtons();
-
-            if (users.length > 0) {{
-                selectUser(users[0]);
-            }}
+        // Llenar selector de usuarios
+        users.forEach(user => {{
+            const option = document.createElement('option');
+            option.value = user;
+            option.textContent = user;
+            userSelect.appendChild(option);
         }});
 
-        function initializeUserSelector() {{
-            const userSelect = document.getElementById('userSelect');
-            userSelect.innerHTML = '';
-
-            users.forEach(user => {{
-                const option = document.createElement('option');
-                option.value = user;
-                option.textContent = user;
-                userSelect.appendChild(option);
+        // Manejar botones de vista
+        const viewButtons = document.querySelectorAll('.view-btn');
+        viewButtons.forEach(btn => {{
+            btn.addEventListener('click', function() {{
+                const view = this.dataset.view;
+                switchView(view);
             }});
-
-            userSelect.addEventListener('change', function() {{
-                selectUser(this.value);
-            }});
-        }}
-
-        function initializeViewButtons() {{
-            const viewButtons = document.querySelectorAll('.view-btn');
-            viewButtons.forEach(btn => {{
-                btn.addEventListener('click', function() {{
-                    const view = this.dataset.view;
-                    switchView(view);
-                }});
-            }});
-        }}
-
-        function selectUser(username) {{
-            currentUser = username;
-            const userStats = allStats[username];
-
-            if (!userStats) {{
-                console.error('No stats found for user:', username);
-                return;
-            }}
-
-            console.log('Selected user:', username, userStats);
-
-            updateUserHeader(username, userStats);
-            updateSummaryStats(userStats);
-
-            if (currentView === 'coincidences') {{
-                renderCoincidenceCharts(userStats);
-            }} else if (currentView === 'evolution') {{
-                renderEvolutionCharts(userStats);
-            }}
-        }}
+        }});
 
         function switchView(view) {{
             currentView = view;
@@ -1038,6 +999,25 @@ class UserStatsHTMLGenerator:
                 }} else if (view === 'evolution') {{
                     renderEvolutionCharts(userStats);
                 }}
+            }}
+        }}
+
+        function selectUser(username) {{
+            currentUser = username;
+            const userStats = allStats[username];
+
+            if (!userStats) {{
+                console.error('No stats found for user:', username);
+                return;
+            }}
+
+            updateUserHeader(username, userStats);
+            updateSummaryStats(userStats);
+
+            if (currentView === 'coincidences') {{
+                renderCoincidenceCharts(userStats);
+            }} else if (currentView === 'evolution') {{
+                renderEvolutionCharts(userStats);
             }}
         }}
 
@@ -1307,6 +1287,16 @@ class UserStatsHTMLGenerator:
             }};
 
             charts[type + 'EvolutionChart'] = new Chart(canvas, config);
+        }}
+
+        // Siguiendo el patrón de html_anual.py: eventos directos al final
+        userSelect.addEventListener('change', function() {{
+            selectUser(this.value);
+        }});
+
+        // Seleccionar primer usuario automáticamente si hay usuarios
+        if (users.length > 0) {{
+            selectUser(users[0]);
         }}
     </script>
 </body>

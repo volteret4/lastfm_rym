@@ -410,6 +410,9 @@ class UserStatsHTMLGenerator:
         <div id="userHeader" class="user-header">
             <h2 id="userName">Selecciona un usuario</h2>
             <p class="user-info" id="userInfo">Período de análisis: {years_back + 1} años</p>
+            <p class="user-info" style="font-size: 0.8em; color: #6c7086; margin-top: 5px;">
+                📊 Datos optimizados: Top 10 artistas, 8 álbumes, 6 canciones por usuario
+            </p>
         </div>
 
         <div class="stats-container">

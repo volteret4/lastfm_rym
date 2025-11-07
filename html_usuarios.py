@@ -24,6 +24,7 @@ from db.user_stats_database import UserStatsDatabase
 from db.user_stats_analyzer import UserStatsAnalyzer
 from db.user_stats_html_generator import UserStatsHTMLGenerator
 
+
 def main():
     """Función principal para generar estadísticas de usuarios"""
     parser = argparse.ArgumentParser(description='Generador de estadísticas individuales de usuarios de Last.fm')
@@ -37,7 +38,7 @@ def main():
     if args.output is None:
         current_year = datetime.now().year
         from_year = current_year - args.years_back
-        args.output = f'usuarios_{from_year}-{current_year}.html'
+        args.output = f'docs/usuarios_{from_year}-{current_year}.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
@@ -69,9 +70,15 @@ def main():
             f.write(html_content)
 
         print(f"✅ Archivo generado: {args.output}")
+        print(f"📊 Límites aplicados para optimización:")
+        print(f"  • Artistas comunes: Top 10 por usuario")
+        print(f"  • Álbumes comunes: Top 8 por usuario")
+        print(f"  • Canciones comunes: Top 6 por usuario")
+        print(f"  • Géneros por año: Top 10")
+        print(f"  • Años de lanzamiento/formación: Top 50")
 
         # Mostrar resumen
-        print("\n📊 Resumen:")
+        print("\n📈 Resumen:")
         for user, stats in all_user_stats.items():
             total_scrobbles = sum(stats['yearly_scrobbles'].values())
             print(f"  • {user}: {total_scrobbles:,} scrobbles analizados")

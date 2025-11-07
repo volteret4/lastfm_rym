@@ -38,14 +38,14 @@ class UserStatsAnalyzer:
         }
 
     def _analyze_yearly_scrobbles(self, user: str) -> Dict[int, int]:
-        """Analiza el número de scrobbles por año"""
+        """Analiza el número de scrobbles por año - optimizado"""
         scrobbles_by_year = self.database.get_user_scrobbles_by_year(
             user, self.from_year, self.to_year
         )
 
         yearly_counts = {}
         for year in range(self.from_year, self.to_year + 1):
-            yearly_counts[year] = len(scrobbles_by_year.get(year, []))
+            yearly_counts[year] = scrobbles_by_year.get(year, 0)
 
         return yearly_counts
 

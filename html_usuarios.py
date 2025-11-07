@@ -655,16 +655,238 @@ class UserStatsAnalyzer:
         # Evolución de géneros por año - limitada
         genres_evolution = self._analyze_genres_evolution_limited(user)
 
-        # Evolución de coincidencias por año - solo conteos
-        coincidences_evolution = self._analyze_coincidences_evolution_counts(user, other_users)
+        # Evolución de sellos por año
+        labels_evolution = self._analyze_labels_evolution_limited(user)
+
+        # Evolución de años de lanzamiento por año
+        release_years_evolution = self._analyze_release_years_evolution_limited(user)
+
+        # Evolución de coincidencias por año - con datos detallados para popups
+        coincidences_evolution = self._analyze_coincidences_evolution_with_details(user, other_users)
 
         return {
             'genres': genres_evolution,
+            'labels': labels_evolution,
+            'release_years': release_years_evolution,
             'coincidences': coincidences_evolution
         }
 
+    def _analyze_labels_evolution_limited(self, user: str) -> Dict:
+        """Analiza la evolución de sellos por año - solo top 10"""
+        cursor = self.database.conn.cursor()
+
+        labels_by_year = {}
+
+        for year in range(self.from_year, self.to_year + 1):
+            from_timestamp = int(datetime(year, 1, 1).timestamp())
+            to_timestamp = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+            cursor.execute('''
+                SELECT al.label, s.artist, COUNT(*) as plays
+                FROM scrobbles s
+                LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND al.label IS NOT NULL AND al.label != ''
+                GROUP BY al.label, s.artist
+                ORDER BY al.label, plays DESC
+            ''', (user, from_timestamp, to_timestamp))
+
+            year_labels = defaultdict(lambda: {'plays': 0, 'artists': []})
+            for row in cursor.fetchall():
+                label = row['label']
+                year_labels[label]['plays'] += row['plays']
+                if len(year_labels[label]['artists']) < 5:
+                    year_labels[label]['artists'].append({
+                        'name': row['artist'],
+                        'plays': row['plays']
+                    })
+
+            labels_by_year[year] = dict(year_labels)
+
+        # Obtener los top 10 sellos de todo el período
+        all_labels = defaultdict(int)
+        for year_data in labels_by_year.values():
+            for label, data in year_data.items():
+                all_labels[label] += data['plays']
+
+        top_labels = sorted(all_labels.items(), key=lambda x: x[1], reverse=True)[:10]
+        top_label_names = [label for label, _ in top_labels]
+
+        # Crear datos para el gráfico lineal
+        evolution_data = {}
+        evolution_details = {}
+
+        for label in top_label_names:
+            evolution_data[label] = {}
+            evolution_details[label] = {}
+            for year in range(self.from_year, self.to_year + 1):
+                year_data = labels_by_year.get(year, {})
+                if label in year_data:
+                    evolution_data[label][year] = year_data[label]['plays']
+                    evolution_details[label][year] = year_data[label]['artists']
+                else:
+                    evolution_data[label][year] = 0
+                    evolution_details[label][year] = []
+
+        return {
+            'data': evolution_data,
+            'details': evolution_details,
+            'years': list(range(self.from_year, self.to_year + 1)),
+            'top_labels': top_label_names
+        }
+
+    def _analyze_release_years_evolution_limited(self, user: str) -> Dict:
+        """Analiza la evolución de décadas de lanzamiento por año - solo top 8"""
+        cursor = self.database.conn.cursor()
+
+        decades_by_year = {}
+
+        for year in range(self.from_year, self.to_year + 1):
+            from_timestamp = int(datetime(year, 1, 1).timestamp())
+            to_timestamp = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+            cursor.execute('''
+                SELECT ard.release_year, s.artist, COUNT(*) as plays
+                FROM scrobbles s
+                LEFT JOIN album_release_dates ard ON s.artist = ard.artist AND s.album = ard.album
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND ard.release_year IS NOT NULL
+                GROUP BY ard.release_year, s.artist
+                ORDER BY ard.release_year, plays DESC
+            ''', (user, from_timestamp, to_timestamp))
+
+            year_decades = defaultdict(lambda: {'plays': 0, 'artists': []})
+            for row in cursor.fetchall():
+                decade = self.database._get_decade(row['release_year'])
+                year_decades[decade]['plays'] += row['plays']
+                if len(year_decades[decade]['artists']) < 5:
+                    year_decades[decade]['artists'].append({
+                        'name': row['artist'],
+                        'plays': row['plays']
+                    })
+
+            decades_by_year[year] = dict(year_decades)
+
+        # Obtener las top 8 décadas de todo el período
+        all_decades = defaultdict(int)
+        for year_data in decades_by_year.values():
+            for decade, data in year_data.items():
+                all_decades[decade] += data['plays']
+
+        top_decades = sorted(all_decades.items(), key=lambda x: x[1], reverse=True)[:8]
+        top_decade_names = [decade for decade, _ in top_decades]
+
+        # Crear datos para el gráfico lineal
+        evolution_data = {}
+        evolution_details = {}
+
+        for decade in top_decade_names:
+            evolution_data[decade] = {}
+            evolution_details[decade] = {}
+            for year in range(self.from_year, self.to_year + 1):
+                year_data = decades_by_year.get(year, {})
+                if decade in year_data:
+                    evolution_data[decade][year] = year_data[decade]['plays']
+                    evolution_details[decade][year] = year_data[decade]['artists']
+                else:
+                    evolution_data[decade][year] = 0
+                    evolution_details[decade][year] = []
+
+        return {
+            'data': evolution_data,
+            'details': evolution_details,
+            'years': list(range(self.from_year, self.to_year + 1)),
+            'top_decades': top_decade_names
+        }
+
+    def _analyze_coincidences_evolution_with_details(self, user: str, other_users: List[str]) -> Dict:
+        """Analiza la evolución de coincidencias por año - con datos detallados para popups"""
+        evolution_data = {
+            'artists': {},
+            'albums': {},
+            'tracks': {}
+        }
+
+        evolution_details = {
+            'artists': {},
+            'albums': {},
+            'tracks': {}
+        }
+
+        # Para cada año, calcular coincidencias con detalles
+        for year in range(self.from_year, self.to_year + 1):
+            # Obtener coincidencias detalladas
+            artist_coincidences = self.database.get_common_artists_with_users(
+                user, other_users, year, year
+            )
+            album_coincidences = self.database.get_common_albums_with_users(
+                user, other_users, year, year
+            )
+            track_coincidences = self.database.get_common_tracks_with_users(
+                user, other_users, year, year
+            )
+
+            # Preparar datos por usuario
+            for other_user in other_users:
+                if other_user not in evolution_data['artists']:
+                    evolution_data['artists'][other_user] = {}
+                    evolution_data['albums'][other_user] = {}
+                    evolution_data['tracks'][other_user] = {}
+                    evolution_details['artists'][other_user] = {}
+                    evolution_details['albums'][other_user] = {}
+                    evolution_details['tracks'][other_user] = {}
+
+                # Artistas
+                artist_data = artist_coincidences.get(other_user, {})
+                evolution_data['artists'][other_user][year] = len(artist_data)
+                # Top 5 artistas con más coincidencias
+                top_artists = sorted(
+                    artist_data.items(),
+                    key=lambda x: x[1]['total_plays'],
+                    reverse=True
+                )[:5]
+                evolution_details['artists'][other_user][year] = [
+                    {'name': name, 'plays': data['total_plays']}
+                    for name, data in top_artists
+                ]
+
+                # Álbumes
+                album_data = album_coincidences.get(other_user, {})
+                evolution_data['albums'][other_user][year] = len(album_data)
+                # Top 5 álbumes con más coincidencias
+                top_albums = sorted(
+                    album_data.items(),
+                    key=lambda x: x[1]['total_plays'],
+                    reverse=True
+                )[:5]
+                evolution_details['albums'][other_user][year] = [
+                    {'name': name, 'plays': data['total_plays']}
+                    for name, data in top_albums
+                ]
+
+                # Canciones
+                track_data = track_coincidences.get(other_user, {})
+                evolution_data['tracks'][other_user][year] = len(track_data)
+                # Top 5 canciones con más coincidencias
+                top_tracks = sorted(
+                    track_data.items(),
+                    key=lambda x: x[1]['total_plays'],
+                    reverse=True
+                )[:5]
+                evolution_details['tracks'][other_user][year] = [
+                    {'name': name, 'plays': data['total_plays']}
+                    for name, data in top_tracks
+                ]
+
+        return {
+            'data': evolution_data,
+            'details': evolution_details,
+            'years': list(range(self.from_year, self.to_year + 1)),
+            'users': other_users
+        }
+
     def _analyze_genres_evolution_limited(self, user: str) -> Dict:
-        """Analiza la evolución de géneros por año - solo top 10"""
+        """Analiza la evolución de géneros por año - solo top 10 con detalles"""
         genres_by_year = self.database.get_user_genres_by_year(
             user, self.from_year, self.to_year, limit=10
         )
@@ -678,63 +900,29 @@ class UserStatsAnalyzer:
 
         # Crear datos para el gráfico lineal
         evolution_data = {}
+        evolution_details = {}
+
         for genre in top_genre_names:
             evolution_data[genre] = {}
+            evolution_details[genre] = {}
             for year in range(self.from_year, self.to_year + 1):
                 year_genres = genres_by_year.get(year, {})
                 evolution_data[genre][year] = year_genres.get(genre, 0)
 
+                # Para cada género/año, obtener top 5 artistas
+                if year_genres.get(genre, 0) > 0:
+                    artists = self.database.get_top_artists_for_genre(
+                        user, genre, year, year, 5
+                    )
+                    evolution_details[genre][year] = artists
+                else:
+                    evolution_details[genre][year] = []
+
         return {
             'data': evolution_data,
+            'details': evolution_details,
             'years': list(range(self.from_year, self.to_year + 1)),
             'top_genres': top_genre_names
-        }
-
-    def _analyze_coincidences_evolution_counts(self, user: str, other_users: List[str]) -> Dict:
-        """Analiza la evolución de coincidencias por año - solo conteos"""
-        evolution_data = {
-            'artists': {},
-            'albums': {},
-            'tracks': {}
-        }
-
-        # Para cada año, calcular solo conteos de coincidencias
-        for year in range(self.from_year, self.to_year + 1):
-            # Obtener coincidencias pero solo contar
-            artist_coincidences = self.database.get_common_artists_with_users(
-                user, other_users, year, year
-            )
-            album_coincidences = self.database.get_common_albums_with_users(
-                user, other_users, year, year
-            )
-            track_coincidences = self.database.get_common_tracks_with_users(
-                user, other_users, year, year
-            )
-
-            # Preparar datos por usuario - solo conteos
-            for other_user in other_users:
-                if other_user not in evolution_data['artists']:
-                    evolution_data['artists'][other_user] = {}
-                if other_user not in evolution_data['albums']:
-                    evolution_data['albums'][other_user] = {}
-                if other_user not in evolution_data['tracks']:
-                    evolution_data['tracks'][other_user] = {}
-
-                # Solo guardar conteos, no datos completos
-                evolution_data['artists'][other_user][year] = len(
-                    artist_coincidences.get(other_user, {})
-                )
-                evolution_data['albums'][other_user][year] = len(
-                    album_coincidences.get(other_user, {})
-                )
-                evolution_data['tracks'][other_user][year] = len(
-                    track_coincidences.get(other_user, {})
-                )
-
-        return {
-            'data': evolution_data,
-            'years': list(range(self.from_year, self.to_year + 1)),
-            'users': other_users
         }
 
 
@@ -1210,6 +1398,30 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
+                    <h3>🏷️ Evolución de Sellos Discográficos</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Sellos por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="labelsEvolutionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📅 Evolución de Décadas de Lanzamiento</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top Décadas por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="releaseYearsEvolutionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
                     <h3>🤝 Evolución de Coincidencias</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
@@ -1398,6 +1610,8 @@ class UserStatsHTMLGenerator:
             charts = {{}};
 
             renderGenresEvolution(userStats.evolution.genres);
+            renderLabelsEvolution(userStats.evolution.labels);
+            renderReleaseYearsEvolution(userStats.evolution.release_years);
             renderCoincidencesEvolution('artists', userStats.evolution.coincidences);
             renderCoincidencesEvolution('albums', userStats.evolution.coincidences);
             renderCoincidencesEvolution('tracks', userStats.evolution.coincidences);
@@ -1622,13 +1836,185 @@ class UserStatsHTMLGenerator:
                             const year = this.data.labels[pointIndex];
                             const plays = this.data.datasets[datasetIndex].data[pointIndex];
 
-                            showEvolutionPopup('género', genre, year, plays);
+                            if (plays > 0 && genresData.details && genresData.details[genre] && genresData.details[genre][year]) {{
+                                showLinearPopup(`Top 5 Artistas - ${{genre}} (${{year}})`, genresData.details[genre][year]);
+                            }}
                         }}
                     }}
                 }}
             }};
 
             charts['genresEvolutionChart'] = new Chart(canvas, config);
+        }}
+
+        function renderLabelsEvolution(labelsData) {{
+            const canvas = document.getElementById('labelsEvolutionChart');
+
+            if (!labelsData || !labelsData.data) {{
+                return;
+            }}
+
+            const datasets = [];
+            let colorIndex = 0;
+
+            Object.keys(labelsData.data).forEach(label => {{
+                datasets.push({{
+                    label: label,
+                    data: labelsData.years.map(year => labelsData.data[label][year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false
+                }});
+                colorIndex++;
+            }});
+
+            const config = {{
+                type: 'line',
+                data: {{
+                    labels: labelsData.years,
+                    datasets: datasets
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{
+                                color: '#cdd6f4',
+                                padding: 10,
+                                usePointStyle: true
+                            }}
+                        }},
+                        tooltip: {{
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }}
+                    }},
+                    scales: {{
+                        x: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }},
+                        y: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const label = this.data.datasets[datasetIndex].label;
+                            const year = this.data.labels[pointIndex];
+                            const plays = this.data.datasets[datasetIndex].data[pointIndex];
+
+                            if (plays > 0 && labelsData.details && labelsData.details[label] && labelsData.details[label][year]) {{
+                                showLinearPopup(`Top 5 Artistas - ${{label}} (${{year}})`, labelsData.details[label][year]);
+                            }}
+                        }}
+                    }}
+                }}
+            }};
+
+            charts['labelsEvolutionChart'] = new Chart(canvas, config);
+        }}
+
+        function renderReleaseYearsEvolution(releaseYearsData) {{
+            const canvas = document.getElementById('releaseYearsEvolutionChart');
+
+            if (!releaseYearsData || !releaseYearsData.data) {{
+                return;
+            }}
+
+            const datasets = [];
+            let colorIndex = 0;
+
+            Object.keys(releaseYearsData.data).forEach(decade => {{
+                datasets.push({{
+                    label: decade,
+                    data: releaseYearsData.years.map(year => releaseYearsData.data[decade][year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false
+                }});
+                colorIndex++;
+            }});
+
+            const config = {{
+                type: 'line',
+                data: {{
+                    labels: releaseYearsData.years,
+                    datasets: datasets
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{
+                                color: '#cdd6f4',
+                                padding: 10,
+                                usePointStyle: true
+                            }}
+                        }},
+                        tooltip: {{
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }}
+                    }},
+                    scales: {{
+                        x: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }},
+                        y: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const decade = this.data.datasets[datasetIndex].label;
+                            const year = this.data.labels[pointIndex];
+                            const plays = this.data.datasets[datasetIndex].data[pointIndex];
+
+                            if (plays > 0 && releaseYearsData.details && releaseYearsData.details[decade] && releaseYearsData.details[decade][year]) {{
+                                showLinearPopup(`Top 5 Artistas - ${{decade}} (${{year}})`, releaseYearsData.details[decade][year]);
+                            }}
+                        }}
+                    }}
+                }}
+            }};
+
+            charts['releaseYearsEvolutionChart'] = new Chart(canvas, config);
         }}
 
         function renderCoincidencesEvolution(type, evolutionData) {{
@@ -1706,14 +2092,33 @@ class UserStatsHTMLGenerator:
                             const year = this.data.labels[pointIndex];
                             const coincidences = this.data.datasets[datasetIndex].data[pointIndex];
 
-                            const typeLabel = type === 'artists' ? 'artistas' : type === 'albums' ? 'álbumes' : 'canciones';
-                            showEvolutionPopup(`coincidencias en ${{typeLabel}}`, user, year, coincidences);
+                            if (coincidences > 0 && evolutionData.details && evolutionData.details[type] && evolutionData.details[type][user] && evolutionData.details[type][user][year]) {{
+                                const typeLabel = type === 'artists' ? 'Artistas' : type === 'albums' ? 'Álbumes' : 'Canciones';
+                                showLinearPopup(`Top 5 ${{typeLabel}} - ${{user}} (${{year}})`, evolutionData.details[type][user][year]);
+                            }}
                         }}
                     }}
                 }}
             }};
 
             charts[type + 'EvolutionChart'] = new Chart(canvas, config);
+        }}
+
+        function showLinearPopup(title, details) {{
+            if (!details || details.length === 0) return;
+
+            let content = '';
+            details.slice(0, 5).forEach(item => {{
+                content += `<div class="popup-item">
+                    <span class="name">${{item.name}}</span>
+                    <span class="count">${{item.plays}} plays</span>
+                </div>`;
+            }});
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
         }}
 
         function showEvolutionPopup(dataType, item, year, value) {{
@@ -1756,7 +2161,7 @@ def main():
     if args.output is None:
         current_year = datetime.now().year
         from_year = current_year - args.years_back
-        args.output = f'docs/usuarios_{from_year}-{current_year}.html'
+        args.output = f'usuarios_{from_year}-{current_year}.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]

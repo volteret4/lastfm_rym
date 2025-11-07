@@ -38,7 +38,7 @@ def main():
     if args.output is None:
         current_year = datetime.now().year
         from_year = current_year - args.years_back
-        args.output = f'docs/usuarios_{from_year}-{current_year}.html'
+        args.output = f'db/usuarios_{from_year}-{current_year}.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
@@ -70,10 +70,10 @@ def main():
             f.write(html_content)
 
         print(f"✅ Archivo generado: {args.output}")
-        print(f"📊 Configuración de optimización:")
-        print(f"  • Análisis: Datos completos para gráficos precisos")
-        print(f"  • Popups: Limitados a 50 elementos por rendimiento")
-        print(f"  • Los elementos se ordenan por relevancia (más reproducciones)")
+        print(f"📊 Optimización aplicada:")
+        print(f"  • Análisis: Datos completos procesados en Python")
+        print(f"  • HTML: Solo datos necesarios para gráficos y top elementos para popups")
+        print(f"  • Resultado: Archivo HTML ligero con funcionalidad completa")
 
         # Mostrar resumen
         print("\n📈 Resumen:")

@@ -767,6 +767,321 @@ class UserStatsDatabase:
 
         return [{'name': row['artist'], 'plays': row['plays']} for row in cursor.fetchall()]
 
+    def get_one_hit_wonders_for_user(self, user: str, from_year: int, to_year: int, min_scrobbles: int = 25, limit: int = 10) -> List[Dict]:
+        """Obtiene artistas con una sola canción y más de min_scrobbles reproducciones"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        cursor.execute('''
+            SELECT artist, COUNT(DISTINCT track) as track_count, COUNT(*) as total_plays
+            FROM scrobbles
+            WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+            GROUP BY artist
+            HAVING track_count = 1 AND total_plays >= ?
+            ORDER BY total_plays DESC
+            LIMIT ?
+        ''', (user, from_timestamp, to_timestamp, min_scrobbles, limit))
+
+        return [{'name': row['artist'], 'plays': row['total_plays'], 'tracks': row['track_count']} for row in cursor.fetchall()]
+
+    def get_new_artists_for_user(self, user: str, from_year: int, to_year: int, limit: int = 10) -> List[Dict]:
+        """Obtiene artistas nuevos (sin scrobbles antes del período) con más reproducciones"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        # Obtener artistas del período actual
+        cursor.execute('''
+            SELECT artist, COUNT(*) as plays
+            FROM scrobbles
+            WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+            GROUP BY artist
+        ''', (user, from_timestamp, to_timestamp))
+
+        current_artists = {row['artist']: row['plays'] for row in cursor.fetchall()}
+
+        # Obtener artistas de períodos anteriores
+        cursor.execute('''
+            SELECT DISTINCT artist
+            FROM scrobbles
+            WHERE user = ? AND timestamp < ?
+        ''', (user, from_timestamp))
+
+        previous_artists = set(row['artist'] for row in cursor.fetchall())
+
+        # Filtrar artistas nuevos
+        new_artists = []
+        for artist, plays in current_artists.items():
+            if artist not in previous_artists:
+                new_artists.append({'name': artist, 'plays': plays})
+
+        # Ordenar por reproducciones y tomar top
+        new_artists.sort(key=lambda x: x['plays'], reverse=True)
+        return new_artists[:limit]
+
+    def get_artist_monthly_ranks(self, user: str, from_year: int, to_year: int, min_monthly_scrobbles: int = 50) -> Dict[str, Dict]:
+        """Obtiene rankings mensuales de artistas para calcular cambios de ranking"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        cursor.execute('''
+            SELECT artist,
+                   strftime('%Y-%m', datetime(timestamp, 'unixepoch')) as month,
+                   COUNT(*) as plays
+            FROM scrobbles
+            WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+            GROUP BY artist, month
+            HAVING plays >= ?
+            ORDER BY month, plays DESC
+        ''', (user, from_timestamp, to_timestamp, min_monthly_scrobbles))
+
+        monthly_data = defaultdict(list)
+        for row in cursor.fetchall():
+            monthly_data[row['month']].append({
+                'artist': row['artist'],
+                'plays': row['plays']
+            })
+
+        # Calcular rankings por mes
+        artist_rankings = defaultdict(dict)
+        for month, artists in monthly_data.items():
+            for rank, artist_data in enumerate(artists, 1):
+                artist_rankings[artist_data['artist']][month] = {
+                    'rank': rank,
+                    'plays': artist_data['plays']
+                }
+
+        return dict(artist_rankings)
+
+    def get_fastest_rising_artists(self, user: str, from_year: int, to_year: int, limit: int = 10) -> List[Dict]:
+        """Obtiene artistas que más rápido han subido en rankings mensuales"""
+        rankings = self.get_artist_monthly_ranks(user, from_year, to_year)
+
+        rising_artists = []
+        for artist, monthly_ranks in rankings.items():
+            months = sorted(monthly_ranks.keys())
+            if len(months) < 2:
+                continue
+
+            # Calcular mayor mejora de ranking
+            max_improvement = 0
+            best_period = None
+
+            for i in range(1, len(months)):
+                prev_rank = monthly_ranks[months[i-1]]['rank']
+                curr_rank = monthly_ranks[months[i]]['rank']
+
+                # Mejora = rank anterior - rank actual (positivo es mejor)
+                improvement = prev_rank - curr_rank
+                if improvement > max_improvement:
+                    max_improvement = improvement
+                    best_period = f"{months[i-1]} → {months[i]}"
+
+            if max_improvement > 0:
+                rising_artists.append({
+                    'name': artist,
+                    'improvement': max_improvement,
+                    'period': best_period,
+                    'total_months': len(months)
+                })
+
+        rising_artists.sort(key=lambda x: x['improvement'], reverse=True)
+        return rising_artists[:limit]
+
+    def get_fastest_falling_artists(self, user: str, from_year: int, to_year: int, limit: int = 10) -> List[Dict]:
+        """Obtiene artistas que más rápido han bajado en rankings mensuales"""
+        rankings = self.get_artist_monthly_ranks(user, from_year, to_year)
+
+        falling_artists = []
+        for artist, monthly_ranks in rankings.items():
+            months = sorted(monthly_ranks.keys())
+            if len(months) < 2:
+                continue
+
+            # Calcular mayor caída de ranking
+            max_decline = 0
+            worst_period = None
+
+            for i in range(1, len(months)):
+                prev_rank = monthly_ranks[months[i-1]]['rank']
+                curr_rank = monthly_ranks[months[i]]['rank']
+
+                # Caída = rank actual - rank anterior (positivo es peor)
+                decline = curr_rank - prev_rank
+                if decline > max_decline:
+                    max_decline = decline
+                    worst_period = f"{months[i-1]} → {months[i]}"
+
+            if max_decline > 0:
+                falling_artists.append({
+                    'name': artist,
+                    'decline': max_decline,
+                    'period': worst_period,
+                    'total_months': len(months)
+                })
+
+        falling_artists.sort(key=lambda x: x['decline'], reverse=True)
+        return falling_artists[:limit]
+
+    def get_user_individual_evolution_data(self, user: str, from_year: int, to_year: int) -> Dict:
+        """Obtiene todos los datos de evolución individual del usuario"""
+        cursor = self.conn.cursor()
+
+        evolution_data = {}
+        years = list(range(from_year, to_year + 1))
+
+        # 1. Top 10 géneros por año
+        top_genres = self.get_user_top_genres(user, from_year, to_year, 10)
+        top_genre_names = [genre for genre, _ in top_genres]
+
+        genres_evolution = {}
+        for genre in top_genre_names:
+            genres_evolution[genre] = {}
+            for year in years:
+                cursor.execute('''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND strftime('%Y', datetime(s.timestamp, 'unixepoch')) = ?
+                      AND ag.genres LIKE ?
+                ''', (user, str(year), f'%"{genre}"%'))
+                result = cursor.fetchone()
+                genres_evolution[genre][year] = result['plays'] if result else 0
+
+        evolution_data['genres'] = {
+            'data': genres_evolution,
+            'years': years,
+            'names': top_genre_names
+        }
+
+        # 2. Top 10 sellos por año
+        cursor.execute('''
+            SELECT al.label, COUNT(*) as total_plays
+            FROM scrobbles s
+            LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+              AND al.label IS NOT NULL AND al.label != ''
+            GROUP BY al.label
+            ORDER BY total_plays DESC
+            LIMIT 10
+        ''', (user, int(datetime(from_year, 1, 1).timestamp()), int(datetime(to_year + 1, 1, 1).timestamp()) - 1))
+
+        top_labels = [row['label'] for row in cursor.fetchall()]
+
+        labels_evolution = {}
+        for label in top_labels:
+            labels_evolution[label] = {}
+            for year in years:
+                cursor.execute('''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles s
+                    LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                    WHERE s.user = ? AND strftime('%Y', datetime(s.timestamp, 'unixepoch')) = ?
+                      AND al.label = ?
+                ''', (user, str(year), label))
+                result = cursor.fetchone()
+                labels_evolution[label][year] = result['plays'] if result else 0
+
+        evolution_data['labels'] = {
+            'data': labels_evolution,
+            'years': years,
+            'names': top_labels
+        }
+
+        # 3. Top 10 artistas por año
+        cursor.execute('''
+            SELECT artist, COUNT(*) as total_plays
+            FROM scrobbles
+            WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+            GROUP BY artist
+            ORDER BY total_plays DESC
+            LIMIT 10
+        ''', (user, int(datetime(from_year, 1, 1).timestamp()), int(datetime(to_year + 1, 1, 1).timestamp()) - 1))
+
+        top_artists = [row['artist'] for row in cursor.fetchall()]
+
+        artists_evolution = {}
+        for artist in top_artists:
+            artists_evolution[artist] = {}
+            for year in years:
+                cursor.execute('''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                artists_evolution[artist][year] = result['plays'] if result else 0
+
+        evolution_data['artists'] = {
+            'data': artists_evolution,
+            'years': years,
+            'names': top_artists
+        }
+
+        # 4. One hit wonders, 5. Streaks, 6. Track counts, 7. New artists
+        one_hit_wonders = self.get_one_hit_wonders_for_user(user, from_year, to_year, 25, 10)
+        top_streak_artists = [artist['name'] for artist in self.get_top_artists_by_streaks([user], from_year, to_year, 10).get(user, [])[:10]]
+        top_track_count_artists = [artist['name'] for artist in self.get_top_artists_by_track_count([user], from_year, to_year, 10).get(user, [])[:10]]
+        new_artists = self.get_new_artists_for_user(user, from_year, to_year, 10)
+
+        # Procesar evolution para estas categorías especiales
+        for category, artists_list in [
+            ('one_hit_wonders', [artist['name'] for artist in one_hit_wonders]),
+            ('streak_artists', top_streak_artists),
+            ('track_count_artists', top_track_count_artists),
+            ('new_artists', [artist['name'] for artist in new_artists])
+        ]:
+            category_evolution = {}
+            for artist in artists_list:
+                category_evolution[artist] = {}
+                for year in years:
+                    cursor.execute('''
+                        SELECT COUNT(*) as plays
+                        FROM scrobbles
+                        WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    ''', (user, artist, str(year)))
+                    result = cursor.fetchone()
+                    category_evolution[artist][year] = result['plays'] if result else 0
+
+            evolution_data[category] = {
+                'data': category_evolution,
+                'years': years,
+                'names': artists_list
+            }
+
+        # 8. & 9. Rising and falling artists evolution
+        rising_artists = self.get_fastest_rising_artists(user, from_year, to_year, 10)
+        falling_artists = self.get_fastest_falling_artists(user, from_year, to_year, 10)
+
+        for category, artists_list in [
+            ('rising_artists', [artist['name'] for artist in rising_artists]),
+            ('falling_artists', [artist['name'] for artist in falling_artists])
+        ]:
+            category_evolution = {}
+            for artist in artists_list:
+                category_evolution[artist] = {}
+                for year in years:
+                    cursor.execute('''
+                        SELECT COUNT(*) as plays
+                        FROM scrobbles
+                        WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    ''', (user, artist, str(year)))
+                    result = cursor.fetchone()
+                    category_evolution[artist][year] = result['plays'] if result else 0
+
+            evolution_data[category] = {
+                'data': category_evolution,
+                'years': years,
+                'names': artists_list
+            }
+
+        return evolution_data
+
     def _get_decade(self, year: int) -> str:
         """Convierte un año a etiqueta de década"""
         if year < 1950:
@@ -803,14 +1118,26 @@ class UserStatsAnalyzer:
         print(f"    • Analizando evolución...")
         evolution_stats = self._analyze_evolution(user, all_users)
 
+        print(f"    • Analizando datos individuales...")
+        individual_stats = self._analyze_individual(user)
+
         return {
             'user': user,
             'period': f"{self.from_year}-{self.to_year}",
             'yearly_scrobbles': yearly_scrobbles,
             'coincidences': coincidences_stats,
             'evolution': evolution_stats,
+            'individual': individual_stats,
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
+
+    def _analyze_individual(self, user: str) -> Dict:
+        """Analiza datos individuales del usuario para la vista 'yomimeconmigo'"""
+        individual_data = self.database.get_user_individual_evolution_data(
+            user, self.from_year, self.to_year
+        )
+
+        return individual_data
 
     def _analyze_yearly_scrobbles(self, user: str) -> Dict[int, int]:
         """Analiza el número de scrobbles por año - optimizado"""
@@ -1558,6 +1885,7 @@ class UserStatsHTMLGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Usuarios - Estadísticas Individuales</title>
+    <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {{
@@ -1923,7 +2251,8 @@ class UserStatsHTMLGenerator:
             <div class="control-group">
                 <label>Vista:</label>
                 <div class="view-buttons">
-                    <button class="view-btn active" data-view="coincidences">Coincidencias</button>
+                    <button class="view-btn active" data-view="individual">YoMiMeConMigo</button>
+                    <button class="view-btn" data-view="coincidences">Coincidencias</button>
                     <button class="view-btn" data-view="evolution">Evolución</button>
                 </div>
             </div>
@@ -1940,8 +2269,119 @@ class UserStatsHTMLGenerator:
                 <!-- Se llenará dinámicamente -->
             </div>
 
+            <!-- Vista Individual (YoMiMeConMigo) -->
+            <div id="individualView" class="view active">
+                <div class="evolution-section">
+                    <h3>🎵 Evolución de Géneros Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Géneros por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualGenresChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🏷️ Evolución de Sellos Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Sellos por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualLabelsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🎤 Evolución de Artistas Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualArtistsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>💫 One Hit Wonders</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas con 1 Canción (+25 scrobbles)</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualOneHitChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🔥 Artistas con Mayor Streak</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas con Más Días Consecutivos</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualStreakChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📚 Artistas con Mayor Discografía</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas con Más Canciones Únicas</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualTrackCountChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🌟 Artistas Nuevos</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas Nuevos (Sin Escuchas Previas)</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualNewArtistsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📈 Artistas en Ascenso</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas que Más Rápido Subieron</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualRisingChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📉 Artistas en Declive</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas que Más Rápido Bajaron</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualFallingChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Vista de Coincidencias -->
-            <div id="coincidencesView" class="view active">
+            <div id="coincidencesView" class="view">
                 <div class="coincidences-grid">
                     <div class="chart-container">
                         <h3>Artistas</h3>
@@ -2116,7 +2556,7 @@ class UserStatsHTMLGenerator:
         const colors = {colors_json};
 
         let currentUser = null;
-        let currentView = 'coincidences';
+        let currentView = 'individual';
         let charts = {{}};
 
         // Inicialización simple sin DOMContentLoaded - siguiendo el patrón de html_anual.py
@@ -2157,7 +2597,9 @@ class UserStatsHTMLGenerator:
             // Render appropriate charts
             if (currentUser && allStats[currentUser]) {{
                 const userStats = allStats[currentUser];
-                if (view === 'coincidences') {{
+                if (view === 'individual') {{
+                    renderIndividualCharts(userStats);
+                }} else if (view === 'coincidences') {{
                     renderCoincidenceCharts(userStats);
                 }} else if (view === 'evolution') {{
                     renderEvolutionCharts(userStats);
@@ -2177,7 +2619,9 @@ class UserStatsHTMLGenerator:
             updateUserHeader(username, userStats);
             updateSummaryStats(userStats);
 
-            if (currentView === 'coincidences') {{
+            if (currentView === 'individual') {{
+                renderIndividualCharts(userStats);
+            }} else if (currentView === 'coincidences') {{
                 renderCoincidenceCharts(userStats);
             }} else if (currentView === 'evolution') {{
                 renderEvolutionCharts(userStats);
@@ -2495,11 +2939,13 @@ class UserStatsHTMLGenerator:
 
             // Para tipos básicos (artists, albums, tracks), usar evolutionData.data[type]
             // Para nuevos tipos (genres, labels, release_years), usar directamente evolutionData.data
-            let typeData;
+            let typeData, detailsData;
             if (['artists', 'albums', 'tracks'].includes(type)) {{
                 typeData = evolutionData.data[type];
+                detailsData = evolutionData.details[type];
             }} else {{
                 typeData = evolutionData.data;
+                detailsData = evolutionData.details;
             }}
 
             if (!typeData) return;
@@ -2571,14 +3017,18 @@ class UserStatsHTMLGenerator:
                             const year = this.data.labels[pointIndex];
                             const coincidences = this.data.datasets[datasetIndex].data[pointIndex];
 
-                            if (coincidences > 0 && evolutionData.details && evolutionData.details[user] && evolutionData.details[user][year]) {{
+                            if (coincidences > 0 && detailsData && detailsData[user] && detailsData[user][year]) {{
                                 const typeLabel = type === 'artists' ? 'Artistas' :
                                                type === 'albums' ? 'Álbumes' :
                                                type === 'tracks' ? 'Canciones' :
                                                type === 'genres' ? 'Géneros' :
                                                type === 'labels' ? 'Sellos' :
                                                type === 'release_years' ? 'Décadas' : type;
-                                showLinearPopup(`Top 5 ${{typeLabel}} - ${{user}} (${{year}})`, evolutionData.details[user][year]);
+
+                                // Para gráficos básicos, mostrar top 10; para otros, top 5
+                                const limit = ['artists', 'albums', 'tracks'].includes(type) ? 10 : 5;
+                                const limitedDetails = detailsData[user][year].slice(0, limit);
+                                showLinearPopup(`Top ${{limit}} ${{typeLabel}} - ${{user}} (${{year}})`, limitedDetails);
                             }}
                         }}
                     }}
@@ -2598,6 +3048,125 @@ class UserStatsHTMLGenerator:
                     <span class="count">${{item.plays}} plays</span>
                 </div>`;
             }});
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }}
+
+        function renderIndividualCharts(userStats) {{
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {{
+                if (chart) chart.destroy();
+            }});
+            charts = {{}};
+
+            // Renderizar todos los gráficos individuales
+            if (userStats.individual) {{
+                renderIndividualLineChart('individualGenresChart', userStats.individual.genres, 'Géneros');
+                renderIndividualLineChart('individualLabelsChart', userStats.individual.labels, 'Sellos');
+                renderIndividualLineChart('individualArtistsChart', userStats.individual.artists, 'Artistas');
+                renderIndividualLineChart('individualOneHitChart', userStats.individual.one_hit_wonders, 'One Hit Wonders');
+                renderIndividualLineChart('individualStreakChart', userStats.individual.streak_artists, 'Artistas con Mayor Streak');
+                renderIndividualLineChart('individualTrackCountChart', userStats.individual.track_count_artists, 'Artistas con Mayor Discografía');
+                renderIndividualLineChart('individualNewArtistsChart', userStats.individual.new_artists, 'Artistas Nuevos');
+                renderIndividualLineChart('individualRisingChart', userStats.individual.rising_artists, 'Artistas en Ascenso');
+                renderIndividualLineChart('individualFallingChart', userStats.individual.falling_artists, 'Artistas en Declive');
+            }}
+        }}
+
+        function renderIndividualLineChart(canvasId, chartData, title) {{
+            const canvas = document.getElementById(canvasId);
+
+            if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {{
+                return;
+            }}
+
+            const datasets = [];
+            let colorIndex = 0;
+
+            Object.keys(chartData.data).forEach(item => {{
+                datasets.push({{
+                    label: item,
+                    data: chartData.years.map(year => chartData.data[item][year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false
+                }});
+                colorIndex++;
+            }});
+
+            const config = {{
+                type: 'line',
+                data: {{
+                    labels: chartData.years,
+                    datasets: datasets
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{
+                                color: '#cdd6f4',
+                                padding: 10,
+                                usePointStyle: true
+                            }}
+                        }},
+                        tooltip: {{
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }}
+                    }},
+                    scales: {{
+                        x: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }},
+                        y: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const item = this.data.datasets[datasetIndex].label;
+                            const year = this.data.labels[pointIndex];
+                            const plays = this.data.datasets[datasetIndex].data[pointIndex];
+
+                            if (plays > 0) {{
+                                showIndividualPopup(title, item, year, plays);
+                            }}
+                        }}
+                    }}
+                }}
+            }};
+
+            charts[canvasId] = new Chart(canvas, config);
+        }}
+
+        function showIndividualPopup(category, item, year, plays) {{
+            const title = `${{category}} - ${{item}} (${{year}})`;
+            const content = `<div class="popup-item">
+                <span class="name">${{item}} en ${{year}}</span>
+                <span class="count">${{plays}} reproducciones</span>
+            </div>`;
 
             document.getElementById('popupTitle').textContent = title;
             document.getElementById('popupContent').innerHTML = content;

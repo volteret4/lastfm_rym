@@ -232,8 +232,11 @@ Este proyecto es de código abierto y está disponible para uso personal.
 - Last.fm API para los datos de scrobbles
 - Discogs API para información de sellos discográficos
 
+# **USUARIOS**
+
 ## FAVORITOS
 
+<!--
 ### 📈 Top 10 artistas por escuchas
 
 - contando solo con los top 10 artistas con mas scrobbles de cada usuario, crear un grafico circular con las coincidencias del usuario seleccionado en el dropdown con el resto. al hacer click mostrará las 10 canciones mas escuchadas para ese artista, con una cuenta de escuchas para cada usuario.
@@ -246,6 +249,14 @@ Este proyecto es de código abierto y está disponible para uso personal.
 
 - contando solo con los top 10 de cada usuario con mayor numero de temas escuchados suyos, crea un grafico circular con las coincidencias del usuario seleccionado en el dropdown con el resto. al hacer click mostrará las artistas coincidentes y el numero de escuchas para cada artista
 
+### 💫 Streaks
+
+contando con el top 5 artistas con mas streaks (mas dias seguidos escuchando a dicho artista) de cada usurario, crear un grafico circular con las coincidencias del usuario seleccionado en el dropdown con el resto, cada porcion sera un usuario y el tamaño dependera de la suma de dias de los 5 artistas. al hacer click mostrará las artistas coincidentes y el numero de escuchas para cada artista-->
+
+## FECHAS
+
+- grafico barras, cada barra una decada divida por el numero de scrobbles de cada usuario para la misma en el periodo calculado por el script.
+
 ## SCROBBLES
 
 grafico lineal de evolucion de usuarios en el tiempo de artistas nuevos (descubrimiento)
@@ -253,13 +264,13 @@ grafico lineal de evolucion de usuarios de artistas unicos en un año ( el varia
 grafico lineal de evolucion en el tiempo de los scrobbles de cada usuario correspondiente a sus artistas mas escuchados, por ejemplo en 2005 una media de 19 scrobbles por artista (media de scrobbles por artista al año)
 grafico lineal evolucion en el tiempo de scrobbles por usuario
 
-## MENSUAL Y ANUAL
+# **MENSUAL Y ANUAL**
 
 ## destacar obsesiones individuales (scripts temporales)
 
 - grafico lineal temporal, en el eje x el periodo que el script analiza, cada linea sera un artista NUEVO (no tiene scrobble antes) con mas scrobbles en el periodo. cada punto con un pop up por ej en abril descubriste artista 1, 2 y 3 y escuchaste 100, 200 y 300 scrobbles respectivamente en ese mes **(solo anual)**
 
-#### obsesiones compartidas
+#### obsesiones
 
 - grafico circular cada porcion un usuario y el tamaño dependera del mayor numero de scrobbles de un mismo artista en un dia (mensual y anual)
 
@@ -288,9 +299,9 @@ grafico lineal evolucion en el tiempo de scrobbles por usuario
 
 #### streaks
 
-- evolucion de top 10 artistas con mas streaks (mas scrobbles seguidos del mismo artista)
+- grafico lineal temporal que muestre la evolucion de top 10 artistas con mas streaks (mas scrobbles seguidos del mismo artista)
 
-grafico barras, cada barra una decada divida por el numero de scrobbles de cada usuario para la misma en el periodo calculado por el script.
+- grafico barras, cada barra una decada divida por el numero de scrobbles de cada usuario para la misma en el periodo calculado por el script.
 
 grafico circular cada porcion un usuario y el tamaño depende del numero de scrobbles que tiene el dia de mas scrobbles tenga para el tiempo calculado por el script
 
@@ -310,3 +321,27 @@ A tener en cuenta:
 - Coincidencia con otro usuario en artistas con mas streaks
 - Coincidencia con otro usuario en descubrimientos obsesivos
 - Coincidencia con otro usuario en artistas que no desaparecen
+
+en la nueva seccion yomimeconmigo:
+en top artistas con una cancion el pop up y el tooltip deben mostrar el nombre del artista y la cancion
+en top sellos y artistas los pop up y el tooltip deben mostrar los artistas que mas scrobbles aportan a dicho genero o sello en ese periodo de tiempo.
+en "Top 10 Artistas con Más Días Consecutivos" el pop up debe mosrar el numero de dias, al igual que el eje Y debe ser el numero de dias, no de scrobbles
+en "Top 10 Artistas con Más Canciones Únicas" el pop up debe mostrar el numero de canciones añadidas en ese periodo, y los 10 albums con mas scrobbles para ese periodo. El eje Y debe ser el numero de canciones únicas, no de scrobbles
+en "Top 10 Artistas que Más Rápido Subieron" el pop up debe mostrar el top 10 canciones mas escuchadas en ese periodo
+"Top 10 Artistas que Más Rápido Bajaron" es identico al anterior, esto debe ser un error de calculo.
+
+en "EVOLUCION"
+en todos los graficos deberia mostrar en el pop up las coincidencias con cada usuario (las discos que ayudan a establecer ese valor, no el numero de scrobbles del elemento). Por ejemplo si en "Coincidencias en Géneros por Año" el user1 tiene 10 coincidencias con el user2 no quiero ver los scrobbles para el año para ese genero, sino cuales son esas coincidencias, que canciones, albumes o artistas son esas (si es posible los 3 datos, mejor) en las que coincido con ese usuario, limitado a 10 (eligiendo las mas escuchadas)
+
+Antes de crear los graficos has añadido una info que solo cambia el numero de scrobbles entre usuarios, el resto lo muestra LASTFM_API_KEY
+251.390
+Scrobbles
+7
+Usuarios (Artistas)
+7
+Usuarios (Álbumes)
+8
+Géneros
+7
+Décadas
+7

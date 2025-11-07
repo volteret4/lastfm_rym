@@ -894,7 +894,7 @@ class UserStatsDatabase:
         return rising_artists[:limit]
 
     def get_fastest_falling_artists(self, user: str, from_year: int, to_year: int, limit: int = 10) -> List[Dict]:
-        """Obtiene artistas que más rápido han bajado en rankings mensuales"""
+        """Obtiene artistas que más rápido han bajado en rankings mensuales - ALGORITMO CORREGIDO"""
         rankings = self.get_artist_monthly_ranks(user, from_year, to_year)
 
         falling_artists = []
@@ -903,29 +903,41 @@ class UserStatsDatabase:
             if len(months) < 2:
                 continue
 
-            # Calcular mayor caída de ranking
+            # Algoritmo diferente: calcular la peor caída consecutiva
             max_decline = 0
+            worst_streak = 0
+            current_decline = 0
             worst_period = None
 
             for i in range(1, len(months)):
                 prev_rank = monthly_ranks[months[i-1]]['rank']
                 curr_rank = monthly_ranks[months[i]]['rank']
 
-                # Caída = rank actual - rank anterior (positivo es peor)
-                decline = curr_rank - prev_rank
-                if decline > max_decline:
-                    max_decline = decline
-                    worst_period = f"{months[i-1]} → {months[i]}"
+                # Si empeoró el ranking
+                if curr_rank > prev_rank:
+                    current_decline += (curr_rank - prev_rank)
+                    worst_streak += 1
+
+                    # Si es la peor caída hasta ahora
+                    if current_decline > max_decline:
+                        max_decline = current_decline
+                        worst_period = f"{months[i-worst_streak]} → {months[i]}"
+                else:
+                    # Reset streak si mejoró
+                    current_decline = 0
+                    worst_streak = 0
 
             if max_decline > 0:
                 falling_artists.append({
                     'name': artist,
                     'decline': max_decline,
                     'period': worst_period,
-                    'total_months': len(months)
+                    'total_months': len(months),
+                    'streak_months': worst_streak
                 })
 
-        falling_artists.sort(key=lambda x: x['decline'], reverse=True)
+        # Ordenar por caída total y luego por duración del streak
+        falling_artists.sort(key=lambda x: (x['decline'], x['streak_months']), reverse=True)
         return falling_artists[:limit]
 
     def get_user_individual_evolution_data(self, user: str, from_year: int, to_year: int) -> Dict:
@@ -940,8 +952,10 @@ class UserStatsDatabase:
         top_genre_names = [genre for genre, _ in top_genres]
 
         genres_evolution = {}
+        genres_details = {}
         for genre in top_genre_names:
             genres_evolution[genre] = {}
+            genres_details[genre] = {}
             for year in years:
                 cursor.execute('''
                     SELECT COUNT(*) as plays
@@ -953,8 +967,22 @@ class UserStatsDatabase:
                 result = cursor.fetchone()
                 genres_evolution[genre][year] = result['plays'] if result else 0
 
+                # Obtener top 5 artistas para este género en este año
+                cursor.execute('''
+                    SELECT s.artist, COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND strftime('%Y', datetime(s.timestamp, 'unixepoch')) = ?
+                      AND ag.genres LIKE ?
+                    GROUP BY s.artist
+                    ORDER BY plays DESC
+                    LIMIT 5
+                ''', (user, str(year), f'%"{genre}"%'))
+                genres_details[genre][year] = [{'name': row['artist'], 'plays': row['plays']} for row in cursor.fetchall()]
+
         evolution_data['genres'] = {
             'data': genres_evolution,
+            'details': genres_details,
             'years': years,
             'names': top_genre_names
         }
@@ -974,8 +1002,10 @@ class UserStatsDatabase:
         top_labels = [row['label'] for row in cursor.fetchall()]
 
         labels_evolution = {}
+        labels_details = {}
         for label in top_labels:
             labels_evolution[label] = {}
+            labels_details[label] = {}
             for year in years:
                 cursor.execute('''
                     SELECT COUNT(*) as plays
@@ -987,8 +1017,22 @@ class UserStatsDatabase:
                 result = cursor.fetchone()
                 labels_evolution[label][year] = result['plays'] if result else 0
 
+                # Obtener top 5 artistas para este sello en este año
+                cursor.execute('''
+                    SELECT s.artist, COUNT(*) as plays
+                    FROM scrobbles s
+                    LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                    WHERE s.user = ? AND strftime('%Y', datetime(s.timestamp, 'unixepoch')) = ?
+                      AND al.label = ?
+                    GROUP BY s.artist
+                    ORDER BY plays DESC
+                    LIMIT 5
+                ''', (user, str(year), label))
+                labels_details[label][year] = [{'name': row['artist'], 'plays': row['plays']} for row in cursor.fetchall()]
+
         evolution_data['labels'] = {
             'data': labels_evolution,
+            'details': labels_details,
             'years': years,
             'names': top_labels
         }
@@ -1023,48 +1067,145 @@ class UserStatsDatabase:
             'names': top_artists
         }
 
-        # 4. One hit wonders, 5. Streaks, 6. Track counts, 7. New artists
+        # 4. One hit wonders con detalles de la canción
         one_hit_wonders = self.get_one_hit_wonders_for_user(user, from_year, to_year, 25, 10)
-        top_streak_artists = [artist['name'] for artist in self.get_top_artists_by_streaks([user], from_year, to_year, 10).get(user, [])[:10]]
-        top_track_count_artists = [artist['name'] for artist in self.get_top_artists_by_track_count([user], from_year, to_year, 10).get(user, [])[:10]]
+        one_hit_evolution = {}
+        one_hit_details = {}
+        for artist_data in one_hit_wonders:
+            artist = artist_data['name']
+            one_hit_evolution[artist] = {}
+            one_hit_details[artist] = {}
+            for year in years:
+                cursor.execute('''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                one_hit_evolution[artist][year] = result['plays'] if result else 0
+
+                # Obtener la canción única
+                cursor.execute('''
+                    SELECT track, COUNT(*) as plays
+                    FROM scrobbles
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    GROUP BY track
+                    ORDER BY plays DESC
+                    LIMIT 1
+                ''', (user, artist, str(year)))
+                track_result = cursor.fetchone()
+                if track_result:
+                    one_hit_details[artist][year] = {'track': track_result['track'], 'plays': track_result['plays']}
+                else:
+                    one_hit_details[artist][year] = {'track': 'N/A', 'plays': 0}
+
+        evolution_data['one_hit_wonders'] = {
+            'data': one_hit_evolution,
+            'details': one_hit_details,
+            'years': years,
+            'names': [artist['name'] for artist in one_hit_wonders]
+        }
+
+        # 5. Streaks - datos en días
+        top_streak_artists_data = self.get_top_artists_by_streaks([user], from_year, to_year, 10).get(user, [])[:10]
+        streak_evolution = {}
+        streak_details = {}
+        for artist_data in top_streak_artists_data:
+            artist = artist_data['name']
+            streak_evolution[artist] = {}
+            streak_details[artist] = {}
+            for year in years:
+                # Calcular días únicos por año
+                cursor.execute('''
+                    SELECT COUNT(DISTINCT date(datetime(timestamp, 'unixepoch'))) as days_count
+                    FROM scrobbles
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                days_count = result['days_count'] if result else 0
+                streak_evolution[artist][year] = days_count
+                streak_details[artist][year] = {'days': days_count, 'max_streak': artist_data.get('max_streak', 0)}
+
+        evolution_data['streak_artists'] = {
+            'data': streak_evolution,
+            'details': streak_details,
+            'years': years,
+            'names': [artist['name'] for artist in top_streak_artists_data]
+        }
+
+        # 6. Track count - datos en número de canciones únicas
+        top_track_count_artists_data = self.get_top_artists_by_track_count([user], from_year, to_year, 10).get(user, [])[:10]
+        track_count_evolution = {}
+        track_count_details = {}
+        for artist_data in top_track_count_artists_data:
+            artist = artist_data['name']
+            track_count_evolution[artist] = {}
+            track_count_details[artist] = {}
+            for year in years:
+                cursor.execute('''
+                    SELECT COUNT(DISTINCT track) as track_count
+                    FROM scrobbles
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                track_count = result['track_count'] if result else 0
+                track_count_evolution[artist][year] = track_count
+
+                # Obtener top 10 álbumes para este año
+                cursor.execute('''
+                    SELECT album, COUNT(*) as plays
+                    FROM scrobbles
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                      AND album IS NOT NULL AND album != ''
+                    GROUP BY album
+                    ORDER BY plays DESC
+                    LIMIT 10
+                ''', (user, artist, str(year)))
+                albums = [{'name': row['album'], 'plays': row['plays']} for row in cursor.fetchall()]
+                track_count_details[artist][year] = {'track_count': track_count, 'albums': albums}
+
+        evolution_data['track_count_artists'] = {
+            'data': track_count_evolution,
+            'details': track_count_details,
+            'years': years,
+            'names': [artist['name'] for artist in top_track_count_artists_data]
+        }
+
+        # 7. New artists
         new_artists = self.get_new_artists_for_user(user, from_year, to_year, 10)
+        new_artists_evolution = {}
+        for artist_data in new_artists:
+            artist = artist_data['name']
+            new_artists_evolution[artist] = {}
+            for year in years:
+                cursor.execute('''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                new_artists_evolution[artist][year] = result['plays'] if result else 0
 
-        # Procesar evolution para estas categorías especiales
-        for category, artists_list in [
-            ('one_hit_wonders', [artist['name'] for artist in one_hit_wonders]),
-            ('streak_artists', top_streak_artists),
-            ('track_count_artists', top_track_count_artists),
-            ('new_artists', [artist['name'] for artist in new_artists])
-        ]:
-            category_evolution = {}
-            for artist in artists_list:
-                category_evolution[artist] = {}
-                for year in years:
-                    cursor.execute('''
-                        SELECT COUNT(*) as plays
-                        FROM scrobbles
-                        WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
-                    ''', (user, artist, str(year)))
-                    result = cursor.fetchone()
-                    category_evolution[artist][year] = result['plays'] if result else 0
+        evolution_data['new_artists'] = {
+            'data': new_artists_evolution,
+            'years': years,
+            'names': [artist['name'] for artist in new_artists]
+        }
 
-            evolution_data[category] = {
-                'data': category_evolution,
-                'years': years,
-                'names': artists_list
-            }
-
-        # 8. & 9. Rising and falling artists evolution
+        # 8. & 9. Rising and falling artists evolution con detalles de canciones
         rising_artists = self.get_fastest_rising_artists(user, from_year, to_year, 10)
         falling_artists = self.get_fastest_falling_artists(user, from_year, to_year, 10)
 
         for category, artists_list in [
-            ('rising_artists', [artist['name'] for artist in rising_artists]),
-            ('falling_artists', [artist['name'] for artist in falling_artists])
+            ('rising_artists', rising_artists),
+            ('falling_artists', falling_artists)
         ]:
             category_evolution = {}
-            for artist in artists_list:
+            category_details = {}
+            for artist_data in artists_list:
+                artist = artist_data['name']
                 category_evolution[artist] = {}
+                category_details[artist] = {}
                 for year in years:
                     cursor.execute('''
                         SELECT COUNT(*) as plays
@@ -1074,23 +1215,200 @@ class UserStatsDatabase:
                     result = cursor.fetchone()
                     category_evolution[artist][year] = result['plays'] if result else 0
 
+                    # Obtener top 10 canciones para este año
+                    cursor.execute('''
+                        SELECT track, COUNT(*) as plays
+                        FROM scrobbles
+                        WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                        GROUP BY track
+                        ORDER BY plays DESC
+                        LIMIT 10
+                    ''', (user, artist, str(year)))
+                    tracks = [{'name': row['track'], 'plays': row['plays']} for row in cursor.fetchall()]
+                    category_details[artist][year] = tracks
+
             evolution_data[category] = {
                 'data': category_evolution,
+                'details': category_details,
                 'years': years,
-                'names': artists_list
+                'names': [artist['name'] for artist in artists_list]
             }
 
         return evolution_data
 
-    def _get_decade(self, year: int) -> str:
-        """Convierte un año a etiqueta de década"""
-        if year < 1950:
-            return "Antes de 1950"
-        elif year >= 2020:
-            return "2020s+"
-        else:
-            decade_start = (year // 10) * 10
-            return f"{decade_start}s"
+    def get_detailed_coincidences_for_popup(self, user: str, other_user: str, year: int, coincidence_type: str) -> List[Dict]:
+        """Obtiene coincidencias detalladas para popups de evolución"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(year, 1, 1).timestamp())
+        to_timestamp = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+        if coincidence_type == 'artists':
+            # Obtener artistas comunes con canciones, álbumes y artistas
+            cursor.execute('''
+                SELECT s1.artist,
+                       s1.track,
+                       s1.album,
+                       COUNT(s1.artist) as user1_plays,
+                       COUNT(s2.artist) as user2_plays
+                FROM scrobbles s1
+                JOIN scrobbles s2 ON s1.artist = s2.artist
+                WHERE s1.user = ? AND s2.user = ?
+                  AND s1.timestamp >= ? AND s1.timestamp <= ?
+                  AND s2.timestamp >= ? AND s2.timestamp <= ?
+                GROUP BY s1.artist, s1.track, s1.album
+                ORDER BY (user1_plays + user2_plays) DESC
+                LIMIT 10
+            ''', (user, other_user, from_timestamp, to_timestamp, from_timestamp, to_timestamp))
+
+            return [{'artist': row['artist'], 'track': row['track'], 'album': row['album'],
+                    'user1_plays': row['user1_plays'], 'user2_plays': row['user2_plays']}
+                    for row in cursor.fetchall()]
+
+        elif coincidence_type == 'albums':
+            # Obtener álbumes comunes con canciones
+            cursor.execute('''
+                SELECT s1.artist,
+                       s1.album,
+                       s1.track,
+                       COUNT(s1.album) as user1_plays,
+                       COUNT(s2.album) as user2_plays
+                FROM scrobbles s1
+                JOIN scrobbles s2 ON s1.artist = s2.artist AND s1.album = s2.album
+                WHERE s1.user = ? AND s2.user = ?
+                  AND s1.timestamp >= ? AND s1.timestamp <= ?
+                  AND s2.timestamp >= ? AND s2.timestamp <= ?
+                  AND s1.album IS NOT NULL AND s1.album != ''
+                GROUP BY s1.artist, s1.album, s1.track
+                ORDER BY (user1_plays + user2_plays) DESC
+                LIMIT 10
+            ''', (user, other_user, from_timestamp, to_timestamp, from_timestamp, to_timestamp))
+
+            return [{'artist': row['artist'], 'album': row['album'], 'track': row['track'],
+                    'user1_plays': row['user1_plays'], 'user2_plays': row['user2_plays']}
+                    for row in cursor.fetchall()]
+
+        elif coincidence_type == 'tracks':
+            # Obtener canciones comunes
+            cursor.execute('''
+                SELECT s1.artist,
+                       s1.track,
+                       s1.album,
+                       COUNT(s1.track) as user1_plays,
+                       COUNT(s2.track) as user2_plays
+                FROM scrobbles s1
+                JOIN scrobbles s2 ON s1.artist = s2.artist AND s1.track = s2.track
+                WHERE s1.user = ? AND s2.user = ?
+                  AND s1.timestamp >= ? AND s1.timestamp <= ?
+                  AND s2.timestamp >= ? AND s2.timestamp <= ?
+                GROUP BY s1.artist, s1.track, s1.album
+                ORDER BY (user1_plays + user2_plays) DESC
+                LIMIT 10
+            ''', (user, other_user, from_timestamp, to_timestamp, from_timestamp, to_timestamp))
+
+            return [{'artist': row['artist'], 'track': row['track'], 'album': row['album'],
+                    'user1_plays': row['user1_plays'], 'user2_plays': row['user2_plays']}
+                    for row in cursor.fetchall()]
+
+        elif coincidence_type == 'genres':
+            # Obtener coincidencias de géneros con artistas y canciones
+            cursor.execute('''
+                SELECT s1.artist,
+                       s1.track,
+                       s1.album,
+                       ag.genres,
+                       COUNT(s1.artist) as user1_plays,
+                       COUNT(s2.artist) as user2_plays
+                FROM scrobbles s1
+                JOIN scrobbles s2 ON s1.artist = s2.artist
+                JOIN artist_genres ag ON s1.artist = ag.artist
+                WHERE s1.user = ? AND s2.user = ?
+                  AND s1.timestamp >= ? AND s1.timestamp <= ?
+                  AND s2.timestamp >= ? AND s2.timestamp <= ?
+                GROUP BY s1.artist, s1.track, s1.album, ag.genres
+                ORDER BY (user1_plays + user2_plays) DESC
+                LIMIT 10
+            ''', (user, other_user, from_timestamp, to_timestamp, from_timestamp, to_timestamp))
+
+            results = []
+            for row in cursor.fetchall():
+                try:
+                    genres_list = json.loads(row['genres']) if row['genres'] else []
+                    genre_str = ', '.join(genres_list[:3])
+                except:
+                    genre_str = 'Unknown'
+
+                results.append({
+                    'artist': row['artist'],
+                    'track': row['track'],
+                    'album': row['album'],
+                    'genres': genre_str,
+                    'user1_plays': row['user1_plays'],
+                    'user2_plays': row['user2_plays']
+                })
+            return results
+
+        elif coincidence_type == 'labels':
+            # Obtener coincidencias de sellos con artistas y álbumes
+            cursor.execute('''
+                SELECT s1.artist,
+                       s1.track,
+                       s1.album,
+                       al.label,
+                       COUNT(s1.artist) as user1_plays,
+                       COUNT(s2.artist) as user2_plays
+                FROM scrobbles s1
+                JOIN scrobbles s2 ON s1.artist = s2.artist AND s1.album = s2.album
+                LEFT JOIN album_labels al ON s1.artist = al.artist AND s1.album = al.album
+                WHERE s1.user = ? AND s2.user = ?
+                  AND s1.timestamp >= ? AND s1.timestamp <= ?
+                  AND s2.timestamp >= ? AND s2.timestamp <= ?
+                  AND al.label IS NOT NULL AND al.label != ''
+                GROUP BY s1.artist, s1.track, s1.album, al.label
+                ORDER BY (user1_plays + user2_plays) DESC
+                LIMIT 10
+            ''', (user, other_user, from_timestamp, to_timestamp, from_timestamp, to_timestamp))
+
+            return [{'artist': row['artist'], 'track': row['track'], 'album': row['album'],
+                    'label': row['label'], 'user1_plays': row['user1_plays'], 'user2_plays': row['user2_plays']}
+                    for row in cursor.fetchall()]
+
+        elif coincidence_type == 'release_years':
+            # Obtener coincidencias de décadas con artistas y álbumes
+            cursor.execute('''
+                SELECT s1.artist,
+                       s1.track,
+                       s1.album,
+                       ard.release_year,
+                       COUNT(s1.artist) as user1_plays,
+                       COUNT(s2.artist) as user2_plays
+                FROM scrobbles s1
+                JOIN scrobbles s2 ON s1.artist = s2.artist AND s1.album = s2.album
+                LEFT JOIN album_release_dates ard ON s1.artist = ard.artist AND s1.album = ard.album
+                WHERE s1.user = ? AND s2.user = ?
+                  AND s1.timestamp >= ? AND s1.timestamp <= ?
+                  AND s2.timestamp >= ? AND s2.timestamp <= ?
+                  AND ard.release_year IS NOT NULL
+                GROUP BY s1.artist, s1.track, s1.album, ard.release_year
+                ORDER BY (user1_plays + user2_plays) DESC
+                LIMIT 10
+            ''', (user, other_user, from_timestamp, to_timestamp, from_timestamp, to_timestamp))
+
+            results = []
+            for row in cursor.fetchall():
+                decade = self._get_decade(row['release_year'])
+                results.append({
+                    'artist': row['artist'],
+                    'track': row['track'],
+                    'album': row['album'],
+                    'decade': decade,
+                    'year': row['release_year'],
+                    'user1_plays': row['user1_plays'],
+                    'user2_plays': row['user2_plays']
+                })
+            return results
+
+        return []
 
     def close(self):
         """Cerrar conexión a la base de datos"""
@@ -1885,7 +2203,6 @@ class UserStatsHTMLGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Usuarios - Estadísticas Individuales</title>
-    <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {{
@@ -3214,7 +3531,7 @@ def main():
     if args.output is None:
         current_year = datetime.now().year
         from_year = current_year - args.years_back
-        args.output = f'docs/usuarios_{from_year}-{current_year}.html'
+        args.output = f'usuarios_{from_year}-{current_year}.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]

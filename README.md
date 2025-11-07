@@ -231,3 +231,82 @@ Este proyecto es de código abierto y está disponible para uso personal.
 
 - Last.fm API para los datos de scrobbles
 - Discogs API para información de sellos discográficos
+
+## FAVORITOS
+
+### 📈 Top 10 artistas por escuchas
+
+- contando solo con los top 10 artistas con mas scrobbles de cada usuario, crear un grafico circular con las coincidencias del usuario seleccionado en el dropdown con el resto. al hacer click mostrará las 10 canciones mas escuchadas para ese artista, con una cuenta de escuchas para cada usuario.
+
+### 🏠 Vuelve a casa
+
+- contando solo con los top 10 artistas que aparezcan mas dias en el periodo seleccionado, crear un grafico circular con las coincidencias del usuario seleccionado en el dropdown con otros usuarios, cada porcion sera otro usuario y el tamaño de la porcion sera la cantidad de dias que aparece en el periodo seleccionado.
+
+### 📚 Discografía completada
+
+- contando solo con los top 10 de cada usuario con mayor numero de temas escuchados suyos, crea un grafico circular con las coincidencias del usuario seleccionado en el dropdown con el resto. al hacer click mostrará las artistas coincidentes y el numero de escuchas para cada artista
+
+## SCROBBLES
+
+grafico lineal de evolucion de usuarios en el tiempo de artistas nuevos (descubrimiento)
+grafico lineal de evolucion de usuarios de artistas unicos en un año ( el variadito )
+grafico lineal de evolucion en el tiempo de los scrobbles de cada usuario correspondiente a sus artistas mas escuchados, por ejemplo en 2005 una media de 19 scrobbles por artista (media de scrobbles por artista al año)
+grafico lineal evolucion en el tiempo de scrobbles por usuario
+
+## MENSUAL Y ANUAL
+
+## destacar obsesiones individuales (scripts temporales)
+
+- grafico lineal temporal, en el eje x el periodo que el script analiza, cada linea sera un artista NUEVO (no tiene scrobble antes) con mas scrobbles en el periodo. cada punto con un pop up por ej en abril descubriste artista 1, 2 y 3 y escuchaste 100, 200 y 300 scrobbles respectivamente en ese mes **(solo anual)**
+
+#### obsesiones compartidas
+
+- grafico circular cada porcion un usuario y el tamaño dependera del mayor numero de scrobbles de un mismo artista en un dia (mensual y anual)
+
+#### top 10 artistas
+
+- grafico circular para el usuario Selecccionado en el dropdwon, cada porcion uno de sus top 10 artistas mas escuchados en el periodo calculado por el script, y el tamaño dependera del numero de scrobbles para el artista en ese periodo (mensual y anual)
+
+- grafico ciruclar de artistas con tracks nuevos, del top 10 artistas con mas scrobbles, por ej. The Beach Boys has añadido 10 temas nuevos, llevas 130 temas de ellos escuchados
+
+#### ultimos descubrimientos (scripts temporales)
+
+- 10 ultimos artistas nuevos para el periodo calculado por el script
+
+#### one hit wonder (scripts temporales)
+
+- grafico circular 10 artistas mas escuchados con solo un tema escuchado en el periodo calculado por el script
+
+#### golden oldies
+
+- grafico circular de artistas que llevas sin escuchar un porcentaje de tiempo de un tercio el valor del periodo calculado por el script, (si se calculan 9 años, 3 años) que tengan al menos 50 scrobbles. cada porcion sera mayor o menor segun el numero de scrobbles del artista.
+
+#### escaladores
+
+- grafico lineal temporal que muestre los 10 artistas que con al menos 50 scrobbles en un mes han subido mas rapido de rango en el periodo calculado por el script
+- grafico lineal temporal que muestre los 10 artistas que con al menos 50 scrobbles en un mes han bajado mas rapido de rango en el periodo calculado por el script
+
+#### streaks
+
+- evolucion de top 10 artistas con mas streaks (mas scrobbles seguidos del mismo artista)
+
+grafico barras, cada barra una decada divida por el numero de scrobbles de cada usuario para la misma en el periodo calculado por el script.
+
+grafico circular cada porcion un usuario y el tamaño depende del numero de scrobbles que tiene el dia de mas scrobbles tenga para el tiempo calculado por el script
+
+#### coincidencias
+
+- grafico circular cada porcion un usuario y el tamaño depende del numero de coincidencias en el top 10 artistas con mas scrobbles para el periodo calculado por el script
+- grafico circular cada porcion un usuario y el tamaño depende del numero de coincidencias en el top 10 albumes con mas scrobbles para el periodo calculado por el script
+- grafico circular cada porcion un usuario y el tamaño depende del numero de coincidencias en el top 10 canciones con mas scrobbles para el periodo calculado por el script
+
+## SISTEMA DE PUNTOS PARA RECOMENDACIONES
+
+A tener en cuenta:
+
+- Coincidencia con otro usuario en one hit wonder
+- Coincidencia con otro usuario en golden oldies
+- Coincidencia con otro usuario en escaladores
+- Coincidencia con otro usuario en artistas con mas streaks
+- Coincidencia con otro usuario en descubrimientos obsesivos
+- Coincidencia con otro usuario en artistas que no desaparecen

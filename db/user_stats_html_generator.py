@@ -411,7 +411,7 @@ class UserStatsHTMLGenerator:
             <h2 id="userName">Selecciona un usuario</h2>
             <p class="user-info" id="userInfo">Período de análisis: {years_back + 1} años</p>
             <p class="user-info" style="font-size: 0.8em; color: #6c7086; margin-top: 5px;">
-                📊 Datos optimizados: Top 10 artistas, 8 álbumes, 6 canciones por usuario
+                📊 Análisis completo - Popups limitados a 50 elementos por rendimiento
             </p>
         </div>
 
@@ -538,6 +538,8 @@ class UserStatsHTMLGenerator:
 
         function initializeUserSelector() {{
             const userSelect = document.getElementById('userSelect');
+            userSelect.innerHTML = ''; // Limpiar opciones existentes
+
             users.forEach(user => {{
                 const option = document.createElement('option');
                 option.value = user;
@@ -595,7 +597,7 @@ class UserStatsHTMLGenerator:
             document.getElementById(view + 'View').classList.add('active');
 
             // Render appropriate charts
-            if (currentUser) {{
+            if (currentUser && allStats[currentUser]) {{
                 const userStats = allStats[currentUser];
                 if (view === 'coincidences') {{
                     renderCoincidenceCharts(userStats);
@@ -918,14 +920,29 @@ class UserStatsHTMLGenerator:
             const content = document.createElement('div');
             content.className = 'popup-content';
 
-            // Generar contenido según el tipo de datos
+            // Generar contenido según el tipo de datos - LIMITAR AQUÍ PARA POPUPS
             let hasContent = false;
+            let itemCount = 0;
+            const MAX_POPUP_ITEMS = 50; // Límite solo para popups
 
             if (details && typeof details === 'object') {{
                 // Si es coincidencias de usuario (artistas, álbumes, canciones)
                 if (details[selectedLabel]) {{
                     const userDetails = details[selectedLabel];
-                    Object.keys(userDetails).forEach(itemKey => {{
+
+                    // Convertir a array, ordenar por reproducciones y limitar
+                    const sortedItems = Object.entries(userDetails)
+                        .map(([key, value]) => [key, value])
+                        .sort((a, b) => {{
+                            const aTotal = (typeof a[1] === 'object' && a[1].total_plays) ? a[1].total_plays :
+                                          (typeof a[1] === 'object' && a[1].plays) ? a[1].plays : a[1];
+                            const bTotal = (typeof b[1] === 'object' && b[1].total_plays) ? b[1].total_plays :
+                                          (typeof b[1] === 'object' && b[1].plays) ? b[1].plays : b[1];
+                            return bTotal - aTotal;
+                        }})
+                        .slice(0, MAX_POPUP_ITEMS); // LÍMITE SOLO EN POPUP
+
+                    sortedItems.forEach(([itemKey, itemData]) => {{
                         const item = document.createElement('div');
                         item.className = 'detail-item';
 
@@ -936,7 +953,6 @@ class UserStatsHTMLGenerator:
                         const count = document.createElement('span');
                         count.className = 'count';
 
-                        const itemData = userDetails[itemKey];
                         if (typeof itemData === 'object' && itemData.user_plays !== undefined) {{
                             count.textContent = `${{itemData.user_plays + itemData.other_plays}} reproducciones totales`;
                         }} else if (typeof itemData === 'object' && itemData.plays) {{
@@ -951,10 +967,21 @@ class UserStatsHTMLGenerator:
                         item.appendChild(count);
                         content.appendChild(item);
                         hasContent = true;
+                        itemCount++;
                     }});
                 }} else {{
                     // Para otros tipos de datos (géneros, años, etc.)
-                    Object.keys(details).forEach(key => {{
+                    const sortedEntries = Object.entries(details)
+                        .sort((a, b) => {{
+                            const aVal = typeof a[1] === 'object' && a[1].plays ? a[1].plays :
+                                        typeof a[1] === 'number' ? a[1] : 0;
+                            const bVal = typeof b[1] === 'object' && b[1].plays ? b[1].plays :
+                                        typeof b[1] === 'number' ? b[1] : 0;
+                            return bVal - aVal;
+                        }})
+                        .slice(0, MAX_POPUP_ITEMS); // LÍMITE SOLO EN POPUP
+
+                    sortedEntries.forEach(([key, value]) => {{
                         const item = document.createElement('div');
                         item.className = 'detail-item';
 
@@ -965,7 +992,6 @@ class UserStatsHTMLGenerator:
                         const count = document.createElement('span');
                         count.className = 'count';
 
-                        const value = details[key];
                         if (typeof value === 'object' && value.plays) {{
                             count.textContent = `${{value.plays}} reproducciones`;
                         }} else if (typeof value === 'number') {{
@@ -978,7 +1004,21 @@ class UserStatsHTMLGenerator:
                         item.appendChild(count);
                         content.appendChild(item);
                         hasContent = true;
+                        itemCount++;
                     }});
+                }}
+
+                // Mostrar información si hay más elementos
+                if (Object.keys(details[selectedLabel] || details).length > MAX_POPUP_ITEMS) {{
+                    const moreInfo = document.createElement('div');
+                    moreInfo.className = 'detail-item';
+                    moreInfo.style.fontStyle = 'italic';
+                    moreInfo.style.color = '#6c7086';
+                    moreInfo.innerHTML = `
+                        <span class="name">...</span>
+                        <span class="count">y ${{Object.keys(details[selectedLabel] || details).length - MAX_POPUP_ITEMS}} elementos más</span>
+                    `;
+                    content.appendChild(moreInfo);
                 }}
             }}
 

@@ -124,22 +124,20 @@ class UserStatsDatabase:
 
         return limited_genres_by_year
 
-    def get_common_artists_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int, limit: int = 50) -> Dict[str, Dict[str, int]]:
-        """Obtiene artistas comunes entre el usuario y otros usuarios - limitado a top 10 por usuario"""
+    def get_common_artists_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int) -> Dict[str, Dict[str, int]]:
+        """Obtiene artistas comunes entre el usuario y otros usuarios - todos los datos"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
 
-        # Obtener solo los top artistas del usuario principal
+        # Obtener artistas del usuario principal
         cursor.execute('''
             SELECT artist, COUNT(*) as plays
             FROM scrobbles
             WHERE user = ? AND timestamp >= ? AND timestamp <= ?
             GROUP BY artist
-            ORDER BY plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, limit))
+        ''', (user, from_timestamp, to_timestamp))
 
         user_artists = {row['artist']: row['plays'] for row in cursor.fetchall()}
 
@@ -163,43 +161,36 @@ class UserStatsDatabase:
 
             other_user_artists = {row['artist']: row['plays'] for row in cursor.fetchall()}
 
-            # Calcular coincidencias - solo top 10 por usuario
-            common_sorted = []
+            # Calcular todas las coincidencias
+            common = {}
             for artist in user_artists:
                 if artist in other_user_artists:
-                    total_plays = user_artists[artist] + other_user_artists[artist]
-                    common_sorted.append((artist, {
+                    common[artist] = {
                         'user_plays': user_artists[artist],
                         'other_plays': other_user_artists[artist],
-                        'total_plays': total_plays
-                    }))
-
-            # Ordenar por total de reproducciones y tomar solo top 10
-            common_sorted.sort(key=lambda x: x[1]['total_plays'], reverse=True)
-            common = dict(common_sorted[:10])
+                        'total_plays': user_artists[artist] + other_user_artists[artist]
+                    }
 
             if common:
                 common_artists[other_user] = common
 
         return common_artists
 
-    def get_common_albums_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int, limit: int = 30) -> Dict[str, Dict[str, int]]:
-        """Obtiene álbumes comunes entre el usuario y otros usuarios - limitado a top 8 por usuario"""
+    def get_common_albums_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int) -> Dict[str, Dict[str, int]]:
+        """Obtiene álbumes comunes entre el usuario y otros usuarios - todos los datos"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
 
-        # Obtener solo los top álbumes del usuario principal
+        # Obtener álbumes del usuario principal
         cursor.execute('''
             SELECT (artist || ' - ' || album) as album_key, COUNT(*) as plays
             FROM scrobbles
             WHERE user = ? AND timestamp >= ? AND timestamp <= ?
               AND album IS NOT NULL AND album != ''
             GROUP BY album_key
-            ORDER BY plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, limit))
+        ''', (user, from_timestamp, to_timestamp))
 
         user_albums = {row['album_key']: row['plays'] for row in cursor.fetchall()}
 
@@ -224,41 +215,35 @@ class UserStatsDatabase:
 
             other_user_albums = {row['album_key']: row['plays'] for row in cursor.fetchall()}
 
-            # Calcular coincidencias - solo top 8 por usuario
-            common_sorted = []
+            # Calcular todas las coincidencias
+            common = {}
             for album in user_albums:
                 if album in other_user_albums:
-                    total_plays = user_albums[album] + other_user_albums[album]
-                    common_sorted.append((album, {
+                    common[album] = {
                         'user_plays': user_albums[album],
                         'other_plays': other_user_albums[album],
-                        'total_plays': total_plays
-                    }))
-
-            common_sorted.sort(key=lambda x: x[1]['total_plays'], reverse=True)
-            common = dict(common_sorted[:8])
+                        'total_plays': user_albums[album] + other_user_albums[album]
+                    }
 
             if common:
                 common_albums[other_user] = common
 
         return common_albums
 
-    def get_common_tracks_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int, limit: int = 20) -> Dict[str, Dict[str, int]]:
-        """Obtiene canciones comunes entre el usuario y otros usuarios - limitado a top 6 por usuario"""
+    def get_common_tracks_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int) -> Dict[str, Dict[str, int]]:
+        """Obtiene canciones comunes entre el usuario y otros usuarios - todos los datos"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
 
-        # Obtener solo las top canciones del usuario principal
+        # Obtener canciones del usuario principal
         cursor.execute('''
             SELECT (artist || ' - ' || track) as track_key, COUNT(*) as plays
             FROM scrobbles
             WHERE user = ? AND timestamp >= ? AND timestamp <= ?
             GROUP BY track_key
-            ORDER BY plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, limit))
+        ''', (user, from_timestamp, to_timestamp))
 
         user_tracks = {row['track_key']: row['plays'] for row in cursor.fetchall()}
 
@@ -282,27 +267,23 @@ class UserStatsDatabase:
 
             other_user_tracks = {row['track_key']: row['plays'] for row in cursor.fetchall()}
 
-            # Calcular coincidencias - solo top 6 por usuario
-            common_sorted = []
+            # Calcular todas las coincidencias
+            common = {}
             for track in user_tracks:
                 if track in other_user_tracks:
-                    total_plays = user_tracks[track] + other_user_tracks[track]
-                    common_sorted.append((track, {
+                    common[track] = {
                         'user_plays': user_tracks[track],
                         'other_plays': other_user_tracks[track],
-                        'total_plays': total_plays
-                    }))
-
-            common_sorted.sort(key=lambda x: x[1]['total_plays'], reverse=True)
-            common = dict(common_sorted[:6])
+                        'total_plays': user_tracks[track] + other_user_tracks[track]
+                    }
 
             if common:
                 common_tracks[other_user] = common
 
         return common_tracks
 
-    def get_artist_release_years_for_user(self, user: str, from_year: int, to_year: int, limit: int = 50) -> Dict[str, int]:
-        """Obtiene años de lanzamiento de álbumes escuchados por el usuario - limitado"""
+    def get_artist_release_years_for_user(self, user: str, from_year: int, to_year: int) -> Dict[str, int]:
+        """Obtiene años de lanzamiento de álbumes escuchados por el usuario"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -317,8 +298,7 @@ class UserStatsDatabase:
               AND ard.release_year IS NOT NULL
             GROUP BY s.artist, s.album, ard.release_year
             ORDER BY plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, limit))
+        ''', (user, from_timestamp, to_timestamp))
 
         release_years = {}
         for row in cursor.fetchall():
@@ -330,8 +310,8 @@ class UserStatsDatabase:
 
         return release_years
 
-    def get_artist_formation_years_for_user(self, user: str, from_year: int, to_year: int, limit: int = 50) -> Dict[str, int]:
-        """Obtiene años de formación de artistas escuchados por el usuario - limitado"""
+    def get_artist_formation_years_for_user(self, user: str, from_year: int, to_year: int) -> Dict[str, int]:
+        """Obtiene años de formación de artistas escuchados por el usuario"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -345,8 +325,7 @@ class UserStatsDatabase:
               AND ad.begin_date IS NOT NULL
             GROUP BY s.artist, ad.begin_date
             ORDER BY plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, limit))
+        ''', (user, from_timestamp, to_timestamp))
 
         formation_years = {}
         for row in cursor.fetchall():

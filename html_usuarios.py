@@ -70,12 +70,10 @@ def main():
             f.write(html_content)
 
         print(f"✅ Archivo generado: {args.output}")
-        print(f"📊 Límites aplicados para optimización:")
-        print(f"  • Artistas comunes: Top 10 por usuario")
-        print(f"  • Álbumes comunes: Top 8 por usuario")
-        print(f"  • Canciones comunes: Top 6 por usuario")
-        print(f"  • Géneros por año: Top 10")
-        print(f"  • Años de lanzamiento/formación: Top 50")
+        print(f"📊 Configuración de optimización:")
+        print(f"  • Análisis: Datos completos para gráficos precisos")
+        print(f"  • Popups: Limitados a 50 elementos por rendimiento")
+        print(f"  • Los elementos se ordenan por relevancia (más reproducciones)")
 
         # Mostrar resumen
         print("\n📈 Resumen:")

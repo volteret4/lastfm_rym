@@ -22,7 +22,7 @@ except ImportError:
 
 
 class Database:
-    def __init__(self, db_path='lastfm_cache.db'):
+    def __init__(self, db_path='db/lastfm_cache.db'):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
@@ -832,7 +832,7 @@ def main():
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
         html = create_html(stats, users)
 
-        output_file = f'yearly_{period_label}.html'
+        output_file = f'docs/yearly_{period_label}.html'
 
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html)

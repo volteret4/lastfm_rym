@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate Index
-Genera el index.html dinÃ¡micamente basÃ¡ndose en los archivos HTML en docs/
+Genera el index.html dinámicamente basándose en los archivos HTML en docs/
 """
 
 import os
@@ -15,11 +15,12 @@ def scan_html_files(docs_dir='docs'):
     files = {
         'weekly': [],
         'monthly': [],
-        'yearly': []
+        'yearly': [],
+        'users': []
     }
 
     if not os.path.exists(docs_dir):
-        print(f"âš ï¸  La carpeta '{docs_dir}' no existe")
+        print(f"⚠️  La carpeta '{docs_dir}' no existe")
         return files
 
     for filename in os.listdir(docs_dir):
@@ -38,7 +39,7 @@ def scan_html_files(docs_dir='docs'):
                     label = f"Semana del {date_str}"
                     date_obj = datetime.strptime(date_str, '%Y-%m-%d')
                 else:
-                    label = "Ãšltima semana"
+                    label = "Última semana"
                     date_obj = datetime.now()
 
                 files['weekly'].append({
@@ -84,7 +85,25 @@ def scan_html_files(docs_dir='docs'):
                     'date': date_obj
                 })
 
-    # Ordenar por fecha (mÃ¡s reciente primero)
+        elif filename.startswith('usuarios'):
+            # usuarios.html
+            match = re.match(r'usuarios(?:_(\d{4}))?\.html', filename)
+            if match:
+                if match.group(1):
+                    year = match.group(1)
+                    label = f"Usuarios {year}"
+                    date_obj = datetime(int(year), 1, 1)
+                else:
+                    label = "Estadísticas de Usuarios"
+                    date_obj = datetime.now()
+
+                files['users'].append({
+                    'filename': filename,
+                    'label': label,
+                    'date': date_obj
+                })
+
+    # Ordenar por fecha (más reciente primero)
     for category in files:
         files[category].sort(key=lambda x: x['date'], reverse=True)
 
@@ -370,6 +389,11 @@ def generate_index_html(files):
                     >
                 </li>
                 <li>
+                    <a href="#users" class="tab-link" data-tab="users"
+                        >Usuarios</a
+                    >
+                </li>
+                <li>
                     <a href="#about" class="tab-link" data-tab="about">About</a>
                 </li>
             </ul>
@@ -380,7 +404,7 @@ def generate_index_html(files):
                 <!-- Tab Semanal -->
                 <div id="weekly" class="tab-content active">
                     <div class="period-selector">
-                        <h2> Estadísticas Semanales<span class="stats-badge">{len(files['weekly'])}</span></h2>
+                        <h2>🌀 Estadísticas Semanales<span class="stats-badge">""" + str(len(files['weekly'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces semanales
@@ -389,7 +413,7 @@ def generate_index_html(files):
             html += f"""
                             <a href="{file_info['filename']}" class="period-link">
                                 <div class="period-name">{file_info['label']}</div>
-                                <div class="period-date">Ãšltimos 7 días</div>
+                                <div class="period-date">Últimos 7 días</div>
                             </a>"""
     else:
         html += """
@@ -421,7 +445,7 @@ def generate_index_html(files):
     else:
         html += """
                             <div class="empty-state">
-                                <div class="empty-state-icon">ðŸ"…</div>
+                                <div class="empty-state-icon">📅</div>
                                 <p>No hay estadísticas mensuales disponibles</p>
                                 <p style="font-size: 0.9em;">Ejecuta <code>python3 html_mensual.py</code></p>
                             </div>"""
@@ -443,7 +467,7 @@ def generate_index_html(files):
             html += f"""
                             <a href="{file_info['filename']}" class="period-link">
                                 <div class="period-name">{file_info['label']}</div>
-                                <div class="period-date">AÃ±o completo</div>
+                                <div class="period-date">Año completo</div>
                             </a>"""
     else:
         html += """
@@ -458,10 +482,37 @@ def generate_index_html(files):
                     </div>
                 </div>
 
+                <!-- Tab Usuarios -->
+                <div id="users" class="tab-content">
+                    <div class="period-selector">
+                        <h2>👤 Estadísticas de Usuarios<span class="stats-badge">""" + str(len(files['users'])) + """</span></h2>
+                        <div class="period-grid">"""
+
+    # Agregar enlaces de usuarios
+    if files['users']:
+        for file_info in files['users']:
+            html += f"""
+                            <a href="{file_info['filename']}" class="period-link">
+                                <div class="period-name">{file_info['label']}</div>
+                                <div class="period-date">Análisis individual</div>
+                            </a>"""
+    else:
+        html += """
+                            <div class="empty-state">
+                                <div class="empty-state-icon">👤</div>
+                                <p>No hay estadísticas de usuarios disponibles</p>
+                                <p style="font-size: 0.9em;">Ejecuta <code>python3 html_usuarios.py</code></p>
+                            </div>"""
+
+    html += """
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Tab About -->
                 <div id="about" class="tab-content">
                     <div class="info-box">
-                        <h3>🍥 Acerca de RYM Hispano Estadísticas</h3>
+                        <h3>🎵 Acerca de RYM Hispano Estadísticas</h3>
                         <p>
                             Esta aplicación genera estadísticas de coincidencias
                             musicales entre múltiples usuarios de Last.fm usando este <a href="https://github.com/volteret4/lastfm_rym">repositorio</a>
@@ -469,7 +520,7 @@ def generate_index_html(files):
                     </div>
 
                     <div class="info-box">
-                        <h3>🎏 Características</h3>
+                        <h3>🎯 Características</h3>
                         <ul>
                             <li>
                                 <strong>Estadísticas Semanales:</strong>
@@ -477,30 +528,34 @@ def generate_index_html(files):
                             </li>
                             <li>
                                 <strong>Estadísticas Mensuales:</strong>
-                                AnÃ¡lisis de meses completos
+                                Análisis de meses completos
                             </li>
                             <li>
-                                <strong>Estadísticas Anuales:</strong> AnÃ¡lisis
-                                de aÃ±os completos
+                                <strong>Estadísticas Anuales:</strong> Análisis
+                                de años completos
+                            </li>
+                            <li>
+                                <strong>Estadísticas de Usuarios:</strong> Análisis
+                                individual con gráficos de coincidencias y evolución
                             </li>
                             <li>
                                 <strong>Coincidencias:</strong> Muestra solo
-                                artistas, canciones y Ã¡lbumes escuchados por 2 o
-                                mÃ¡s usuarios
+                                artistas, canciones y álbumes escuchados por 2 o
+                                más usuarios
                             </li>
                             <li>
-                                <strong>Géneros:</strong> Detección automÃ¡tica
-                                de gÃ©neros musicales
+                                <strong>Géneros:</strong> Detección automática
+                                de géneros musicales
                             </li>
                             <li>
                                 <strong>Sellos:</strong> Información sobre
-                                sellos discogrÃ¡ficos (si estÃ¡ configurado)
+                                sellos discográficos (si está configurado)
                             </li>
                         </ul>
                     </div>
 
                     <div class="info-box">
-                        <h3>🪤 Uso</h3>
+                        <h3>🛠️ Uso</h3>
                         <p><strong>Actualización de datos:</strong></p>
                         <ul>
                             <li>
@@ -531,18 +586,26 @@ def generate_index_html(files):
                                 <code>python3 html_anual.py --years-ago 1</code>
                                 - Genera estadísticas del año pasado
                             </li>
+                            <li>
+                                <code>python3 html_usuarios.py</code> - Genera
+                                estadísticas individuales de usuarios
+                            </li>
+                            <li>
+                                <code>python3 html_usuarios.py --years-back 3</code>
+                                - Análisis de los últimos 3 años
+                            </li>
                         </ul>
                         <p><strong>Generación del índice:</strong></p>
                         <ul>
                             <li>
-                                <code>python3 generate_index.py</code> - Genera
-                                el index.html basÃ¡ndose en los archivos disponibles
+                                <code>python3 html_index.py</code> - Genera
+                                el index.html basándose en los archivos disponibles
                             </li>
                         </ul>
                     </div>
 
                     <div class="info-box">
-                        <h3>🌊Configuración</h3>
+                        <h3>🔧 Configuración</h3>
                         <p>Crea un archivo <code>.env</code> con:</p>
                         <ul>
                             <li><code>LASTFM_API_KEY=tu_api_key</code></li>
@@ -621,6 +684,7 @@ def main():
     print(f"Semanales: {len(files['weekly'])}")
     print(f"Mensuales: {len(files['monthly'])}")
     print(f"Anuales: {len(files['yearly'])}")
+    print(f"Usuarios: {len(files['users'])}")
 
     # Generar HTML
     print(f"Generando index.html...")

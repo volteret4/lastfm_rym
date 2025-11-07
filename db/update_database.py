@@ -84,6 +84,42 @@ class OptimizedDatabase:
             ON scrobbles(artist, album)
         ''')
 
+        # NUEVO: Índice para consultas de artistas escuchados por usuario (sugerido)
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scrobbles_user_artist
+            ON scrobbles(user, artist)
+        ''')
+
+        # NUEVO: Índice para análisis temporales por artista
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scrobbles_artist_timestamp
+            ON scrobbles(artist, timestamp)
+        ''')
+
+        # NUEVO: Índice para consultas de tracks por usuario
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scrobbles_user_track
+            ON scrobbles(user, track)
+        ''')
+
+        # NUEVO: Índice compuesto para análisis detallados
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scrobbles_user_artist_timestamp
+            ON scrobbles(user, artist, timestamp)
+        ''')
+
+        # NUEVO: Índice para búsquedas de álbumes
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scrobbles_album_artist
+            ON scrobbles(album, artist)
+        ''')
+
+        # NUEVO: Índice para análisis de tracks por artista
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_scrobbles_track_artist
+            ON scrobbles(track, artist)
+        ''')
+
         # Tablas existentes
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS artist_genres (

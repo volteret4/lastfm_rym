@@ -284,6 +284,147 @@ class UserStatsDatabase:
         sorted_genres = sorted(total_genres.items(), key=lambda x: x[1], reverse=True)
         return sorted_genres[:limit]
 
+    def get_user_release_years_distribution(self, user: str, from_year: int, to_year: int) -> Dict[str, Dict]:
+        """Obtiene distribución de años de lanzamiento para el usuario"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        cursor.execute('''
+            SELECT ard.release_year, s.artist, COUNT(*) as plays
+            FROM scrobbles s
+            LEFT JOIN album_release_dates ard ON s.artist = ard.artist AND s.album = ard.album
+            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+              AND s.album IS NOT NULL AND s.album != ''
+              AND ard.release_year IS NOT NULL
+            GROUP BY ard.release_year, s.artist
+            ORDER BY ard.release_year, plays DESC
+        ''', (user, from_timestamp, to_timestamp))
+
+        years_data = defaultdict(lambda: {'total': 0, 'artists': []})
+
+        for row in cursor.fetchall():
+            year = row['release_year']
+            decade = self._get_decade(year)
+            years_data[decade]['total'] += row['plays']
+            if len(years_data[decade]['artists']) < 5:  # Solo top 5 artistas por década
+                years_data[decade]['artists'].append({
+                    'name': row['artist'],
+                    'plays': row['plays']
+                })
+
+        return dict(years_data)
+
+    def get_user_labels_distribution(self, user: str, from_year: int, to_year: int) -> Dict[str, Dict]:
+        """Obtiene distribución de sellos discográficos para el usuario"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        cursor.execute('''
+            SELECT al.label, s.artist, COUNT(*) as plays
+            FROM scrobbles s
+            LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+              AND s.album IS NOT NULL AND s.album != ''
+              AND al.label IS NOT NULL AND al.label != ''
+            GROUP BY al.label, s.artist
+            ORDER BY al.label, plays DESC
+        ''', (user, from_timestamp, to_timestamp))
+
+        labels_data = defaultdict(lambda: {'total': 0, 'artists': []})
+
+        for row in cursor.fetchall():
+            label = row['label']
+            labels_data[label]['total'] += row['plays']
+            if len(labels_data[label]['artists']) < 5:  # Solo top 5 artistas por sello
+                labels_data[label]['artists'].append({
+                    'name': row['artist'],
+                    'plays': row['plays']
+                })
+
+        return dict(labels_data)
+
+    def get_top_albums_for_artists(self, user: str, artists: List[str], from_year: int, to_year: int, limit: int = 5) -> Dict[str, List]:
+        """Obtiene top álbumes para artistas específicos"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        albums_data = {}
+        for artist in artists[:10]:  # Limitar artistas
+            cursor.execute('''
+                SELECT album, COUNT(*) as plays
+                FROM scrobbles
+                WHERE user = ? AND artist = ? AND timestamp >= ? AND timestamp <= ?
+                  AND album IS NOT NULL AND album != ''
+                GROUP BY album
+                ORDER BY plays DESC
+                LIMIT ?
+            ''', (user, artist, from_timestamp, to_timestamp, limit))
+
+            albums_data[artist] = [{'name': row['album'], 'plays': row['plays']} for row in cursor.fetchall()]
+
+        return albums_data
+
+    def get_top_tracks_for_albums(self, user: str, albums: List[str], from_year: int, to_year: int, limit: int = 5) -> Dict[str, List]:
+        """Obtiene top canciones para álbumes específicos"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        tracks_data = {}
+        for album in albums[:10]:  # Limitar álbumes
+            # Separar artista y álbum
+            if ' - ' in album:
+                artist, album_name = album.split(' - ', 1)
+                cursor.execute('''
+                    SELECT track, COUNT(*) as plays
+                    FROM scrobbles
+                    WHERE user = ? AND artist = ? AND album = ? AND timestamp >= ? AND timestamp <= ?
+                    GROUP BY track
+                    ORDER BY plays DESC
+                    LIMIT ?
+                ''', (user, artist, album_name, from_timestamp, to_timestamp, limit))
+
+                tracks_data[album] = [{'name': row['track'], 'plays': row['plays']} for row in cursor.fetchall()]
+
+        return tracks_data
+
+    def get_top_artists_for_genre(self, user: str, genre: str, from_year: int, to_year: int, limit: int = 5) -> List[Dict]:
+        """Obtiene top artistas para un género específico"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        cursor.execute('''
+            SELECT s.artist, COUNT(*) as plays
+            FROM scrobbles s
+            JOIN artist_genres ag ON s.artist = ag.artist
+            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+              AND ag.genres LIKE ?
+            GROUP BY s.artist
+            ORDER BY plays DESC
+            LIMIT ?
+        ''', (user, from_timestamp, to_timestamp, f'%"{genre}"%', limit))
+
+        return [{'name': row['artist'], 'plays': row['plays']} for row in cursor.fetchall()]
+
+    def _get_decade(self, year: int) -> str:
+        """Convierte un año a etiqueta de década"""
+        if year < 1950:
+            return "Antes de 1950"
+        elif year >= 2020:
+            return "2020s+"
+        else:
+            decade_start = (year // 10) * 10
+            return f"{decade_start}s"
+
     def close(self):
         """Cerrar conexión a la base de datos"""
         self.conn.close()
@@ -355,10 +496,19 @@ class UserStatsAnalyzer:
             user, self.from_year, self.to_year, limit=20
         )
 
-        # Procesar datos para gráficos circulares
+        # Años de lanzamiento y sellos
+        release_years = self.database.get_user_release_years_distribution(
+            user, self.from_year, self.to_year
+        )
+
+        labels_data = self.database.get_user_labels_distribution(
+            user, self.from_year, self.to_year
+        )
+
+        # Procesar datos para gráficos circulares con popups optimizados
         charts_data = self._prepare_coincidence_charts_data(
             user, other_users, artist_coincidences, album_coincidences,
-            track_coincidences, user_genres
+            track_coincidences, user_genres, release_years, labels_data
         )
 
         return {
@@ -367,54 +517,80 @@ class UserStatsAnalyzer:
 
     def _prepare_coincidence_charts_data(self, user: str, other_users: List[str],
                                        artist_coincidences: Dict, album_coincidences: Dict,
-                                       track_coincidences: Dict, user_genres: List[Tuple]) -> Dict:
+                                       track_coincidences: Dict, user_genres: List[Tuple],
+                                       release_years: Dict, labels_data: Dict) -> Dict:
         """Prepara datos para gráficos circulares de coincidencias"""
 
         # Gráfico de coincidencias de artistas
         artist_chart = self._prepare_coincidences_pie_data(
-            "Artistas", artist_coincidences, other_users
+            "Artistas", artist_coincidences, other_users, user, 'artists'
         )
 
         # Gráfico de coincidencias de álbumes
         album_chart = self._prepare_coincidences_pie_data(
-            "Álbumes", album_coincidences, other_users
+            "Álbumes", album_coincidences, other_users, user, 'albums'
         )
 
         # Gráfico de coincidencias de canciones
         track_chart = self._prepare_coincidences_pie_data(
-            "Canciones", track_coincidences, other_users
+            "Canciones", track_coincidences, other_users, user, 'tracks'
         )
 
         # Gráfico de géneros (distribución personal)
-        genres_chart = self._prepare_genres_pie_data(user_genres)
+        genres_chart = self._prepare_genres_pie_data(user_genres, user)
+
+        # Gráfico de años de lanzamiento
+        release_years_chart = self._prepare_years_labels_pie_data(
+            "Años de Lanzamiento", release_years
+        )
+
+        # Gráfico de sellos
+        labels_chart = self._prepare_years_labels_pie_data(
+            "Sellos Discográficos", labels_data
+        )
 
         return {
             'artists': artist_chart,
             'albums': album_chart,
             'tracks': track_chart,
             'genres': genres_chart,
-            'release_years': {'title': 'Años de Lanzamiento', 'data': {}, 'total': 0, 'details': {}},
-            'formation_years': {'title': 'Años de Formación', 'data': {}, 'total': 0, 'details': {}}
+            'release_years': release_years_chart,
+            'labels': labels_chart
         }
 
     def _prepare_coincidences_pie_data(self, chart_type: str, coincidences: Dict,
-                                     other_users: List[str]) -> Dict:
-        """Prepara datos para gráfico circular de coincidencias"""
+                                     other_users: List[str], user: str, data_type: str) -> Dict:
+        """Prepara datos para gráfico circular de coincidencias con popups optimizados"""
         user_data = {}
         popup_details = {}
 
         for other_user in other_users:
             if other_user in coincidences:
-                user_data[other_user] = len(coincidences[other_user])
+                count = len(coincidences[other_user])
+                user_data[other_user] = count
 
-                # Solo incluir top 20 elementos para popups
-                if coincidences[other_user]:
-                    sorted_items = sorted(
-                        coincidences[other_user].items(),
-                        key=lambda x: x[1]['total_plays'] if isinstance(x[1], dict) and 'total_plays' in x[1] else 0,
-                        reverse=True
-                    )
-                    popup_details[other_user] = dict(sorted_items[:20])  # Solo top 20
+                # Para popups: obtener datos específicos según el tipo
+                if count > 0:
+                    if data_type == 'artists':
+                        # Top 5 álbumes de estos artistas
+                        artists = list(coincidences[other_user].keys())[:10]
+                        popup_details[other_user] = self.database.get_top_albums_for_artists(
+                            user, artists, self.from_year, self.to_year, 5
+                        )
+                    elif data_type == 'albums':
+                        # Top 5 canciones de estos álbumes
+                        albums = list(coincidences[other_user].keys())[:10]
+                        popup_details[other_user] = self.database.get_top_tracks_for_albums(
+                            user, albums, self.from_year, self.to_year, 5
+                        )
+                    else:  # tracks
+                        # Solo mostrar las top 5 canciones más escuchadas
+                        sorted_tracks = sorted(
+                            coincidences[other_user].items(),
+                            key=lambda x: x[1]['user_plays'],
+                            reverse=True
+                        )[:5]
+                        popup_details[other_user] = dict(sorted_tracks)
                 else:
                     popup_details[other_user] = {}
             else:
@@ -429,23 +605,47 @@ class UserStatsAnalyzer:
             'title': f'Coincidencias en {chart_type}',
             'data': filtered_data,
             'total': sum(filtered_data.values()) if filtered_data else 0,
-            'details': filtered_details
+            'details': filtered_details,
+            'type': data_type
         }
 
-    def _prepare_genres_pie_data(self, user_genres: List[Tuple]) -> Dict:
-        """Prepara datos para gráfico circular de géneros"""
+    def _prepare_genres_pie_data(self, user_genres: List[Tuple], user: str) -> Dict:
+        """Prepara datos para gráfico circular de géneros con artistas top"""
         # Tomar solo los top 8 géneros para visualización
         top_genres = dict(user_genres[:8])
         total_plays = sum(top_genres.values()) if top_genres else 0
 
-        # Para popup, solo top 15 géneros
-        popup_genres = dict(user_genres[:15])
+        # Para popup: obtener top 5 artistas por género
+        popup_details = {}
+        for genre, plays in user_genres[:8]:
+            artists = self.database.get_top_artists_for_genre(
+                user, genre, self.from_year, self.to_year, 5
+            )
+            popup_details[genre] = artists
 
         return {
             'title': 'Distribución de Géneros',
             'data': top_genres,
             'total': total_plays,
-            'details': popup_genres
+            'details': popup_details,
+            'type': 'genres'
+        }
+
+    def _prepare_years_labels_pie_data(self, chart_type: str, data: Dict) -> Dict:
+        """Prepara datos para gráfico circular de años/sellos con artistas top"""
+        chart_data = {}
+        popup_details = {}
+
+        for category, info in data.items():
+            chart_data[category] = info['total']
+            popup_details[category] = info['artists']  # Ya limitados a top 5
+
+        return {
+            'title': chart_type,
+            'data': chart_data,
+            'total': sum(chart_data.values()) if chart_data else 0,
+            'details': popup_details,
+            'type': 'years_labels'
         }
 
     def _analyze_evolution(self, user: str, all_users: List[str]) -> Dict:
@@ -561,8 +761,6 @@ class UserStatsHTMLGenerator:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Usuarios - Estadísticas Individuales</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="icon" type="image/png" href="images/music.png">
-
     <style>
         * {{
             margin: 0;
@@ -808,6 +1006,83 @@ class UserStatsHTMLGenerator:
             color: #a6adc8;
         }}
 
+        .popup-overlay {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+        }}
+
+        .popup {{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }}
+
+        .popup-header {{
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+
+        .popup-close {{
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+        }}
+
+        .popup-close:hover {{
+            color: #cba6f7;
+        }}
+
+        .popup-content {{
+            max-height: 300px;
+            overflow-y: auto;
+        }}
+
+        .popup-item {{
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+
+        .popup-item .name {{
+            color: #cdd6f4;
+            font-weight: 600;
+        }}
+
+        .popup-item .count {{
+            color: #a6adc8;
+            font-size: 0.9em;
+        }}
+
         @media (max-width: 768px) {{
             .coincidences-grid {{
                 grid-template-columns: 1fr;
@@ -901,6 +1176,22 @@ class UserStatsHTMLGenerator:
                         </div>
                         <div class="chart-info" id="genresInfo"></div>
                     </div>
+
+                    <div class="chart-container">
+                        <h3>Años de Lanzamiento</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="releaseYearsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="releaseYearsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Sellos Discográficos</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="labelsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="labelsInfo"></div>
+                    </div>
                 </div>
             </div>
 
@@ -944,6 +1235,16 @@ class UserStatsHTMLGenerator:
                     </div>
                 </div>
             </div>
+
+        <!-- Popup para mostrar detalles -->
+        <div id="popupOverlay" class="popup-overlay" style="display: none;"></div>
+        <div id="popup" class="popup" style="display: none;">
+            <div class="popup-header">
+                <span id="popupTitle">Detalles</span>
+                <button id="popupClose" class="popup-close">×</button>
+            </div>
+            <div id="popupContent" class="popup-content"></div>
+        </div>
         </div>
     </div>
 
@@ -1034,11 +1335,15 @@ class UserStatsHTMLGenerator:
             const albumsChart = userStats.coincidences.charts.albums;
             const tracksChart = userStats.coincidences.charts.tracks;
             const genresChart = userStats.coincidences.charts.genres;
+            const releaseYearsChart = userStats.coincidences.charts.release_years;
+            const labelsChart = userStats.coincidences.charts.labels;
 
             const totalArtistCoincidences = Object.keys(artistsChart.data || {{}}).length;
             const totalAlbumCoincidences = Object.keys(albumsChart.data || {{}}).length;
             const totalTrackCoincidences = Object.keys(tracksChart.data || {{}}).length;
             const totalGenres = Object.keys(genresChart.data || {{}}).length;
+            const totalReleaseYears = Object.keys(releaseYearsChart.data || {{}}).length;
+            const totalLabels = Object.keys(labelsChart.data || {{}}).length;
 
             const summaryHTML = `
                 <div class="summary-card">
@@ -1054,12 +1359,16 @@ class UserStatsHTMLGenerator:
                     <div class="label">Usuarios (Álbumes)</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalTrackCoincidences}}</div>
-                    <div class="label">Usuarios (Canciones)</div>
-                </div>
-                <div class="summary-card">
                     <div class="number">${{totalGenres}}</div>
                     <div class="label">Géneros</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${{totalReleaseYears}}</div>
+                    <div class="label">Décadas</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${{totalLabels}}</div>
+                    <div class="label">Sellos</div>
                 </div>
             `;
 
@@ -1077,6 +1386,8 @@ class UserStatsHTMLGenerator:
             renderPieChart('albumsChart', userStats.coincidences.charts.albums, 'albumsInfo');
             renderPieChart('tracksChart', userStats.coincidences.charts.tracks, 'tracksInfo');
             renderPieChart('genresChart', userStats.coincidences.charts.genres, 'genresInfo');
+            renderPieChart('releaseYearsChart', userStats.coincidences.charts.release_years, 'releaseYearsInfo');
+            renderPieChart('labelsChart', userStats.coincidences.charts.labels, 'labelsInfo');
         }}
 
         function renderEvolutionCharts(userStats) {{
@@ -1103,7 +1414,7 @@ class UserStatsHTMLGenerator:
             }}
 
             canvas.style.display = 'block';
-            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}}`;
+            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}} | Click en una porción para ver detalles`;
 
             const data = {{
                 labels: Object.keys(chartData.data),
@@ -1137,12 +1448,105 @@ class UserStatsHTMLGenerator:
                             borderColor: '#cba6f7',
                             borderWidth: 1
                         }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const index = elements[0].index;
+                            const label = data.labels[index];
+                            showSmartPopup(chartData, label);
+                        }}
                     }}
                 }}
             }};
 
             charts[canvasId] = new Chart(canvas, config);
         }}
+
+        function showSmartPopup(chartData, selectedLabel) {{
+            const details = chartData.details[selectedLabel];
+            const chartType = chartData.type;
+
+            if (!details) return;
+
+            let title = '';
+            let content = '';
+
+            if (chartType === 'artists') {{
+                // Mostrar álbumes top para estos artistas
+                title = `Top Álbumes - ${{selectedLabel}}`;
+                Object.keys(details).slice(0, 5).forEach(artist => {{
+                    if (details[artist] && details[artist].length > 0) {{
+                        content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${{artist}}</h4>`;
+                        details[artist].forEach(album => {{
+                            content += `<div class="popup-item">
+                                <span class="name">${{album.name}}</span>
+                                <span class="count">${{album.plays}} plays</span>
+                            </div>`;
+                        }});
+                    }}
+                }});
+            }} else if (chartType === 'albums') {{
+                // Mostrar canciones top para estos álbumes
+                title = `Top Canciones - ${{selectedLabel}}`;
+                Object.keys(details).slice(0, 5).forEach(album => {{
+                    if (details[album] && details[album].length > 0) {{
+                        content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${{album}}</h4>`;
+                        details[album].forEach(track => {{
+                            content += `<div class="popup-item">
+                                <span class="name">${{track.name}}</span>
+                                <span class="count">${{track.plays}} plays</span>
+                            </div>`;
+                        }});
+                    }}
+                }});
+            }} else if (chartType === 'tracks') {{
+                // Mostrar canciones más escuchadas
+                title = `Top Canciones - ${{selectedLabel}}`;
+                Object.keys(details).slice(0, 5).forEach(track => {{
+                    const trackData = details[track];
+                    content += `<div class="popup-item">
+                        <span class="name">${{track}}</span>
+                        <span class="count">${{trackData.user_plays}} plays</span>
+                    </div>`;
+                }});
+            }} else if (chartType === 'genres') {{
+                // Mostrar artistas top para este género
+                title = `Top Artistas - ${{selectedLabel}}`;
+                details.forEach(artist => {{
+                    content += `<div class="popup-item">
+                        <span class="name">${{artist.name}}</span>
+                        <span class="count">${{artist.plays}} plays</span>
+                    </div>`;
+                }});
+            }} else if (chartType === 'years_labels') {{
+                // Mostrar artistas top para esta década/sello
+                title = `Top Artistas - ${{selectedLabel}}`;
+                details.forEach(artist => {{
+                    content += `<div class="popup-item">
+                        <span class="name">${{artist.name}}</span>
+                        <span class="count">${{artist.plays}} plays</span>
+                    </div>`;
+                }});
+            }}
+
+            if (content) {{
+                document.getElementById('popupTitle').textContent = title;
+                document.getElementById('popupContent').innerHTML = content;
+                document.getElementById('popupOverlay').style.display = 'block';
+                document.getElementById('popup').style.display = 'block';
+            }}
+        }}
+
+        // Configurar cierre de popup
+        document.getElementById('popupClose').addEventListener('click', function() {{
+            document.getElementById('popupOverlay').style.display = 'none';
+            document.getElementById('popup').style.display = 'none';
+        }});
+
+        document.getElementById('popupOverlay').addEventListener('click', function() {{
+            document.getElementById('popupOverlay').style.display = 'none';
+            document.getElementById('popup').style.display = 'none';
+        }});
 
         function renderGenresEvolution(genresData) {{
             const canvas = document.getElementById('genresEvolutionChart');
@@ -1208,6 +1612,17 @@ class UserStatsHTMLGenerator:
                             grid: {{
                                 color: '#313244'
                             }}
+                        }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const genre = this.data.datasets[datasetIndex].label;
+                            const year = this.data.labels[pointIndex];
+                            const plays = this.data.datasets[datasetIndex].data[pointIndex];
+
+                            showEvolutionPopup('género', genre, year, plays);
                         }}
                     }}
                 }}
@@ -1282,11 +1697,36 @@ class UserStatsHTMLGenerator:
                                 color: '#313244'
                             }}
                         }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const user = this.data.datasets[datasetIndex].label;
+                            const year = this.data.labels[pointIndex];
+                            const coincidences = this.data.datasets[datasetIndex].data[pointIndex];
+
+                            const typeLabel = type === 'artists' ? 'artistas' : type === 'albums' ? 'álbumes' : 'canciones';
+                            showEvolutionPopup(`coincidencias en ${{typeLabel}}`, user, year, coincidences);
+                        }}
                     }}
                 }}
             }};
 
             charts[type + 'EvolutionChart'] = new Chart(canvas, config);
+        }}
+
+        function showEvolutionPopup(dataType, item, year, value) {{
+            const title = `${{dataType.charAt(0).toUpperCase() + dataType.slice(1)}} - ${{item}} (${{year}})`;
+            const content = `<div class="popup-item">
+                <span class="name">${{item}} en ${{year}}</span>
+                <span class="count">${{value}} ${{dataType.includes('coincidencias') ? 'coincidencias' : 'reproducciones'}}</span>
+            </div>`;
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
         }}
 
         // Siguiendo el patrón de html_anual.py: eventos directos al final
@@ -1316,7 +1756,7 @@ def main():
     if args.output is None:
         current_year = datetime.now().year
         from_year = current_year - args.years_back
-        args.output = f'usuarios_{from_year}-{current_year}.html'
+        args.output = f'docs/usuarios_{from_year}-{current_year}.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]

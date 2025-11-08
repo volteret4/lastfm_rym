@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-UserStatsHTMLGenerator - Clase para generar HTML con gráficos interactivos de estadísticas de usuarios
+UserStatsHTMLGenerator - Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas de usuarios
 """
 
 import json
@@ -8,6 +8,8 @@ from typing import Dict, List
 
 
 class UserStatsHTMLGenerator:
+    """Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas de usuarios"""
+
     def __init__(self):
         self.colors = [
             '#cba6f7', '#f38ba8', '#fab387', '#f9e2af', '#a6e3a1',
@@ -16,7 +18,7 @@ class UserStatsHTMLGenerator:
         ]
 
     def generate_html(self, all_user_stats: Dict, users: List[str], years_back: int) -> str:
-        """Genera el HTML completo para estadísticas de usuarios"""
+        """Genera el HTML completo para estadÃ­sticas de usuarios"""
         users_json = json.dumps(users, ensure_ascii=False)
         stats_json = json.dumps(all_user_stats, indent=2, ensure_ascii=False)
         colors_json = json.dumps(self.colors, ensure_ascii=False)
@@ -26,9 +28,9 @@ class UserStatsHTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Usuarios - Estadísticas Individuales</title>
+    <title>Last.fm Usuarios - EstadÃ­sticas Individuales</title>
+    <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
         * {{
             margin: 0;
@@ -170,10 +172,9 @@ class UserStatsHTMLGenerator:
             display: block;
         }}
 
-        /* Estilos para vista de Coincidencias */
         .coincidences-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            grid-template-columns: 1fr;
             gap: 25px;
             margin-bottom: 30px;
         }}
@@ -204,7 +205,6 @@ class UserStatsHTMLGenerator:
             font-size: 0.9em;
         }}
 
-        /* Estilos para vista de Evolución */
         .evolution-section {{
             margin-bottom: 40px;
         }}
@@ -219,7 +219,7 @@ class UserStatsHTMLGenerator:
 
         .evolution-charts {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            grid-template-columns: 1fr;
             gap: 25px;
         }}
 
@@ -240,84 +240,6 @@ class UserStatsHTMLGenerator:
         .line-chart-wrapper {{
             position: relative;
             height: 400px;
-        }}
-
-        /* Popup para detalles */
-        .popup {{
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: #1e1e2e;
-            border: 2px solid #cba6f7;
-            border-radius: 12px;
-            padding: 20px;
-            max-width: 600px;
-            max-height: 80vh;
-            overflow-y: auto;
-            z-index: 1000;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-        }}
-
-        .popup-overlay {{
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.7);
-            z-index: 999;
-        }}
-
-        .popup-header {{
-            color: #cba6f7;
-            font-size: 1.2em;
-            font-weight: 600;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #313244;
-            padding-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }}
-
-        .popup-close {{
-            background: none;
-            border: none;
-            color: #cdd6f4;
-            font-size: 1.5em;
-            cursor: pointer;
-            padding: 0;
-        }}
-
-        .popup-close:hover {{
-            color: #cba6f7;
-        }}
-
-        .popup-content {{
-            max-height: 400px;
-            overflow-y: auto;
-        }}
-
-        .detail-item {{
-            padding: 8px 12px;
-            background: #181825;
-            margin-bottom: 5px;
-            border-radius: 6px;
-            border-left: 3px solid #45475a;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }}
-
-        .detail-item .name {{
-            color: #cdd6f4;
-            font-weight: 600;
-        }}
-
-        .detail-item .count {{
-            color: #a6adc8;
-            font-size: 0.9em;
         }}
 
         .no-data {{
@@ -354,6 +276,83 @@ class UserStatsHTMLGenerator:
             color: #a6adc8;
         }}
 
+        .popup-overlay {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+        }}
+
+        .popup {{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }}
+
+        .popup-header {{
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+
+        .popup-close {{
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+        }}
+
+        .popup-close:hover {{
+            color: #cba6f7;
+        }}
+
+        .popup-content {{
+            max-height: 300px;
+            overflow-y: auto;
+        }}
+
+        .popup-item {{
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+
+        .popup-item .name {{
+            color: #cdd6f4;
+            font-weight: 600;
+        }}
+
+        .popup-item .count {{
+            color: #a6adc8;
+            font-size: 0.9em;
+        }}
+
         @media (max-width: 768px) {{
             .coincidences-grid {{
                 grid-template-columns: 1fr;
@@ -372,11 +371,6 @@ class UserStatsHTMLGenerator:
                 justify-content: center;
             }}
 
-            .popup {{
-                max-width: 90%;
-                max-height: 80%;
-            }}
-
             .summary-stats {{
                 grid-template-columns: repeat(2, 1fr);
             }}
@@ -386,43 +380,152 @@ class UserStatsHTMLGenerator:
 <body>
     <div class="container">
         <header>
-            <h1>👤 Estadísticas Individuales</h1>
-            <p class="subtitle">Análisis detallado por usuario</p>
+            <h1>ðŸ‘¤ EstadÃ­sticas Individuales</h1>
+            <p class="subtitle">AnÃ¡lisis detallado por usuario</p>
         </header>
 
         <div class="controls">
             <div class="control-group">
                 <label for="userSelect">Usuario:</label>
                 <select id="userSelect">
-                    <!-- Se llenará dinámicamente -->
+                    <!-- Se llenarÃ¡ dinÃ¡micamente -->
                 </select>
             </div>
 
             <div class="control-group">
                 <label>Vista:</label>
                 <div class="view-buttons">
-                    <button class="view-btn active" data-view="coincidences">Coincidencias</button>
-                    <button class="view-btn" data-view="evolution">Evolución</button>
+                    <button class="view-btn active" data-view="individual">YoMiMeConMigo</button>
+                    <button class="view-btn" data-view="coincidences">Coincidencias</button>
+                    <button class="view-btn" data-view="evolution">EvoluciÃ³n</button>
                 </div>
             </div>
         </div>
 
         <div id="userHeader" class="user-header">
             <h2 id="userName">Selecciona un usuario</h2>
-            <p class="user-info" id="userInfo">Período de análisis: {years_back + 1} años</p>
-            <p class="user-info" style="font-size: 0.8em; color: #6c7086; margin-top: 5px;">
-                📊 Datos procesados inteligentemente - Solo top elementos para popups
-            </p>
+            <p class="user-info" id="userInfo">PerÃ­odo de anÃ¡lisis: {years_back + 1} aÃ±os</p>
         </div>
 
         <div class="stats-container">
-            <!-- Resumen de estadísticas -->
+            <!-- Resumen de estadÃ­sticas -->
             <div id="summaryStats" class="summary-stats">
-                <!-- Se llenará dinámicamente -->
+                <!-- Se llenarÃ¡ dinÃ¡micamente -->
+            </div>
+
+            <!-- Vista Individual (YoMiMeConMigo) -->
+            <div id="individualView" class="view active">
+                <div class="evolution-section">
+                    <h3>ðŸŽµ EvoluciÃ³n de GÃ©neros Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 GÃ©neros por AÃ±o</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualGenresChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸ·ï¸ EvoluciÃ³n de Sellos Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Sellos por AÃ±o</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualLabelsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸŽ¤ EvoluciÃ³n de Artistas Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas por AÃ±o</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualArtistsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸ’« One Hit Wonders</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas con 1 CanciÃ³n (+25 scrobbles)</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualOneHitChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸ”¥ Artistas con Mayor Streak</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas con MÃ¡s DÃ­as Consecutivos</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualStreakChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸ“š Artistas con Mayor DiscografÃ­a</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas con MÃ¡s Canciones Ãšnicas</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualTrackCountChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸŒŸ Artistas Nuevos</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas Nuevos (Sin Escuchas Previas)</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualNewArtistsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸ“ˆ Artistas en Ascenso</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas que MÃ¡s RÃ¡pido Subieron</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualRisingChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸ“‰ Artistas en Declive</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Artistas que MÃ¡s RÃ¡pido Bajaron</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualFallingChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Vista de Coincidencias -->
-            <div id="coincidencesView" class="view active">
+            <div id="coincidencesView" class="view">
                 <div class="coincidences-grid">
                     <div class="chart-container">
                         <h3>Artistas</h3>
@@ -433,7 +536,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Álbumes</h3>
+                        <h3>Ãlbumes</h3>
                         <div class="chart-wrapper">
                             <canvas id="albumsChart"></canvas>
                         </div>
@@ -449,7 +552,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Géneros</h3>
+                        <h3>GÃ©neros (Individual)</h3>
                         <div class="chart-wrapper">
                             <canvas id="genresChart"></canvas>
                         </div>
@@ -457,7 +560,23 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Años de Lanzamiento</h3>
+                        <h3>GÃ©neros (Coincidencias)</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="genreCoincidencesChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="genreCoincidencesInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Sellos DiscogrÃ¡ficos</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="labelsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="labelsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>AÃ±os de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="releaseYearsChart"></canvas>
                         </div>
@@ -465,22 +584,46 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Años de Formación</h3>
+                        <h3>ðŸ“ˆ Top 10 Artistas por Escuchas</h3>
                         <div class="chart-wrapper">
-                            <canvas id="formationYearsChart"></canvas>
+                            <canvas id="topScrobblesChart"></canvas>
                         </div>
-                        <div class="chart-info" id="formationYearsInfo"></div>
+                        <div class="chart-info" id="topScrobblesInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>ðŸ  Vuelve a Casa</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="topDaysChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topDaysInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>ðŸ“š DiscografÃ­a Completada</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="topDiscographyChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topDiscographyInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>ðŸ’« Streaks</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="topStreaksChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topStreaksInfo"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Vista de Evolución -->
+            <!-- Vista de EvoluciÃ³n -->
             <div id="evolutionView" class="view">
                 <div class="evolution-section">
-                    <h3>🎵 Evolución de Géneros</h3>
+                    <h3>ðŸŽµ EvoluciÃ³n de GÃ©neros (Coincidencias)</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 Géneros por Año</h4>
+                            <h4>Coincidencias en GÃ©neros por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="genresEvolutionChart"></canvas>
                             </div>
@@ -489,7 +632,31 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>🤝 Evolución de Coincidencias</h3>
+                    <h3>ðŸ·ï¸ EvoluciÃ³n de Sellos (Coincidencias)</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Coincidencias en Sellos por AÃ±o</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="labelsEvolutionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸ“… EvoluciÃ³n de DÃ©cadas (Coincidencias)</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Coincidencias en DÃ©cadas por AÃ±o</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="releaseYearsEvolutionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>ðŸ¤ EvoluciÃ³n de Coincidencias BÃ¡sicas</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
                             <h4>Coincidencias en Artistas</h4>
@@ -499,7 +666,7 @@ class UserStatsHTMLGenerator:
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Coincidencias en Álbumes</h4>
+                            <h4>Coincidencias en Ãlbumes</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="albumsEvolutionChart"></canvas>
                             </div>
@@ -514,6 +681,16 @@ class UserStatsHTMLGenerator:
                     </div>
                 </div>
             </div>
+
+        <!-- Popup para mostrar detalles -->
+        <div id="popupOverlay" class="popup-overlay" style="display: none;"></div>
+        <div id="popup" class="popup" style="display: none;">
+            <div class="popup-header">
+                <span id="popupTitle">Detalles</span>
+                <button id="popupClose" class="popup-close">Ã—</button>
+            </div>
+            <div id="popupContent" class="popup-content"></div>
+        </div>
         </div>
     </div>
 
@@ -523,63 +700,28 @@ class UserStatsHTMLGenerator:
         const colors = {colors_json};
 
         let currentUser = null;
-        let currentView = 'coincidences';
+        let currentView = 'individual';
         let charts = {{}};
 
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', function() {{
-            initializeUserSelector();
-            initializeViewButtons();
+        // InicializaciÃ³n simple sin DOMContentLoaded - siguiendo el patrÃ³n de html_anual.py
+        const userSelect = document.getElementById('userSelect');
 
-            if (users.length > 0) {{
-                selectUser(users[0]);
-            }}
+        // Llenar selector de usuarios
+        users.forEach(user => {{
+            const option = document.createElement('option');
+            option.value = user;
+            option.textContent = user;
+            userSelect.appendChild(option);
         }});
 
-        function initializeUserSelector() {{
-            const userSelect = document.getElementById('userSelect');
-            userSelect.innerHTML = ''; // Limpiar opciones existentes
-
-            users.forEach(user => {{
-                const option = document.createElement('option');
-                option.value = user;
-                option.textContent = user;
-                userSelect.appendChild(option);
+        // Manejar botones de vista
+        const viewButtons = document.querySelectorAll('.view-btn');
+        viewButtons.forEach(btn => {{
+            btn.addEventListener('click', function() {{
+                const view = this.dataset.view;
+                switchView(view);
             }});
-
-            userSelect.addEventListener('change', function() {{
-                selectUser(this.value);
-            }});
-        }}
-
-        function initializeViewButtons() {{
-            const viewButtons = document.querySelectorAll('.view-btn');
-            viewButtons.forEach(btn => {{
-                btn.addEventListener('click', function() {{
-                    const view = this.dataset.view;
-                    switchView(view);
-                }});
-            }});
-        }}
-
-        function selectUser(username) {{
-            currentUser = username;
-            const userStats = allStats[username];
-
-            if (!userStats) {{
-                console.error('No stats found for user:', username);
-                return;
-            }}
-
-            updateUserHeader(username, userStats);
-            updateSummaryStats(userStats);
-
-            if (currentView === 'coincidences') {{
-                renderCoincidenceCharts(userStats);
-            }} else if (currentView === 'evolution') {{
-                renderEvolutionCharts(userStats);
-            }}
-        }}
+        }});
 
         function switchView(view) {{
             currentView = view;
@@ -599,7 +741,9 @@ class UserStatsHTMLGenerator:
             // Render appropriate charts
             if (currentUser && allStats[currentUser]) {{
                 const userStats = allStats[currentUser];
-                if (view === 'coincidences') {{
+                if (view === 'individual') {{
+                    renderIndividualCharts(userStats);
+                }} else if (view === 'coincidences') {{
                     renderCoincidenceCharts(userStats);
                 }} else if (view === 'evolution') {{
                     renderEvolutionCharts(userStats);
@@ -607,25 +751,49 @@ class UserStatsHTMLGenerator:
             }}
         }}
 
+        function selectUser(username) {{
+            currentUser = username;
+            const userStats = allStats[username];
+
+            if (!userStats) {{
+                console.error('No stats found for user:', username);
+                return;
+            }}
+
+            updateUserHeader(username, userStats);
+            updateSummaryStats(userStats);
+
+            if (currentView === 'individual') {{
+                renderIndividualCharts(userStats);
+            }} else if (currentView === 'coincidences') {{
+                renderCoincidenceCharts(userStats);
+            }} else if (currentView === 'evolution') {{
+                renderEvolutionCharts(userStats);
+            }}
+        }}
+
         function updateUserHeader(username, userStats) {{
             document.getElementById('userName').textContent = username;
             document.getElementById('userInfo').innerHTML =
-                `Período: ${{userStats.period}} | Generado: ${{userStats.generated_at}}`;
+                `PerÃ­odo: ${{userStats.period}} | Generado: ${{userStats.generated_at}}`;
         }}
 
         function updateSummaryStats(userStats) {{
             const totalScrobbles = Object.values(userStats.yearly_scrobbles).reduce((a, b) => a + b, 0);
 
-            // Calcular coincidencias desde los gráficos
             const artistsChart = userStats.coincidences.charts.artists;
             const albumsChart = userStats.coincidences.charts.albums;
             const tracksChart = userStats.coincidences.charts.tracks;
             const genresChart = userStats.coincidences.charts.genres;
+            const releaseYearsChart = userStats.coincidences.charts.release_years;
+            const labelsChart = userStats.coincidences.charts.labels;
 
             const totalArtistCoincidences = Object.keys(artistsChart.data || {{}}).length;
             const totalAlbumCoincidences = Object.keys(albumsChart.data || {{}}).length;
             const totalTrackCoincidences = Object.keys(tracksChart.data || {{}}).length;
             const totalGenres = Object.keys(genresChart.data || {{}}).length;
+            const totalReleaseYears = Object.keys(releaseYearsChart.data || {{}}).length;
+            const totalLabels = Object.keys(labelsChart.data || {{}}).length;
 
             const summaryHTML = `
                 <div class="summary-card">
@@ -638,15 +806,19 @@ class UserStatsHTMLGenerator:
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalAlbumCoincidences}}</div>
-                    <div class="label">Usuarios (Álbumes)</div>
-                </div>
-                <div class="summary-card">
-                    <div class="number">${{totalTrackCoincidences}}</div>
-                    <div class="label">Usuarios (Canciones)</div>
+                    <div class="label">Usuarios (Ãlbumes)</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalGenres}}</div>
-                    <div class="label">Géneros</div>
+                    <div class="label">GÃ©neros</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${{totalReleaseYears}}</div>
+                    <div class="label">DÃ©cadas</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${{totalLabels}}</div>
+                    <div class="label">Sellos</div>
                 </div>
             `;
 
@@ -660,13 +832,22 @@ class UserStatsHTMLGenerator:
             }});
             charts = {{}};
 
+            // GrÃ¡ficos bÃ¡sicos
             renderPieChart('artistsChart', userStats.coincidences.charts.artists, 'artistsInfo');
             renderPieChart('albumsChart', userStats.coincidences.charts.albums, 'albumsInfo');
             renderPieChart('tracksChart', userStats.coincidences.charts.tracks, 'tracksInfo');
             renderPieChart('genresChart', userStats.coincidences.charts.genres, 'genresInfo');
+
+            // Nuevos grÃ¡ficos de coincidencias
+            renderPieChart('genreCoincidencesChart', userStats.coincidences.charts.genre_coincidences, 'genreCoincidencesInfo');
+            renderPieChart('labelsChart', userStats.coincidences.charts.labels, 'labelsInfo');
             renderPieChart('releaseYearsChart', userStats.coincidences.charts.release_years, 'releaseYearsInfo');
-            renderPieChart('formationYearsChart', userStats.coincidences.charts.formation_years, 'formationYearsInfo');
-        }}
+
+            // GrÃ¡ficos especiales
+            renderPieChart('topScrobblesChart', userStats.coincidences.charts.top_scrobbles, 'topScrobblesInfo');
+            renderPieChart('topDaysChart', userStats.coincidences.charts.top_days, 'topDaysInfo');
+            renderPieChart('topDiscographyChart', userStats.coincidences.charts.top_discography, 'topDiscographyInfo');
+            renderPieChart('topStreaksChart', userStats.coincidences.charts.top_streaks, 'topStreaksInfo');
         }}
 
         function renderEvolutionCharts(userStats) {{
@@ -676,7 +857,10 @@ class UserStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            renderGenresEvolution(userStats.evolution.genres);
+            // Ahora todos son de coincidencias
+            renderCoincidencesEvolution('genres', userStats.evolution.genres);
+            renderCoincidencesEvolution('labels', userStats.evolution.labels);
+            renderCoincidencesEvolution('release_years', userStats.evolution.release_years);
             renderCoincidencesEvolution('artists', userStats.evolution.coincidences);
             renderCoincidencesEvolution('albums', userStats.evolution.coincidences);
             renderCoincidencesEvolution('tracks', userStats.evolution.coincidences);
@@ -693,7 +877,7 @@ class UserStatsHTMLGenerator:
             }}
 
             canvas.style.display = 'block';
-            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}}`;
+            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}} | Click en una porciÃ³n para ver detalles`;
 
             const data = {{
                 labels: Object.keys(chartData.data),
@@ -732,7 +916,7 @@ class UserStatsHTMLGenerator:
                         if (elements.length > 0) {{
                             const index = elements[0].index;
                             const label = data.labels[index];
-                            showDetailsPopup(chartData.title, label, chartData.details);
+                            showSmartPopup(chartData, label);
                         }}
                     }}
                 }}
@@ -741,86 +925,175 @@ class UserStatsHTMLGenerator:
             charts[canvasId] = new Chart(canvas, config);
         }}
 
-        function renderGenresEvolution(genresData) {{
-            const canvas = document.getElementById('genresEvolutionChart');
+        function showSmartPopup(chartData, selectedLabel) {{
+            const details = chartData.details[selectedLabel];
+            const chartType = chartData.type;
 
-            if (!genresData || !genresData.data) {{
-                return;
+            if (!details) return;
+
+            let title = '';
+            let content = '';
+
+            if (chartType === 'artists') {{
+                // Mostrar Ã¡lbumes top para estos artistas
+                title = `Top Ãlbumes - ${{selectedLabel}}`;
+                Object.keys(details).slice(0, 5).forEach(artist => {{
+                    if (details[artist] && details[artist].length > 0) {{
+                        content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${{artist}}</h4>`;
+                        details[artist].forEach(album => {{
+                            content += `<div class="popup-item">
+                                <span class="name">${{album.name}}</span>
+                                <span class="count">${{album.plays}} plays</span>
+                            </div>`;
+                        }});
+                    }}
+                }});
+            }} else if (chartType === 'albums') {{
+                // Mostrar canciones top para estos Ã¡lbumes
+                title = `Top Canciones - ${{selectedLabel}}`;
+                Object.keys(details).slice(0, 5).forEach(album => {{
+                    if (details[album] && details[album].length > 0) {{
+                        content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${{album}}</h4>`;
+                        details[album].forEach(track => {{
+                            content += `<div class="popup-item">
+                                <span class="name">${{track.name}}</span>
+                                <span class="count">${{track.plays}} plays</span>
+                            </div>`;
+                        }});
+                    }}
+                }});
+            }} else if (chartType === 'tracks') {{
+                // Mostrar canciones mÃ¡s escuchadas
+                title = `Top Canciones - ${{selectedLabel}}`;
+                Object.keys(details).slice(0, 5).forEach(track => {{
+                    const trackData = details[track];
+                    content += `<div class="popup-item">
+                        <span class="name">${{track}}</span>
+                        <span class="count">${{trackData.user_plays}} plays</span>
+                    </div>`;
+                }});
+            }} else if (chartType === 'genres') {{
+                // Mostrar artistas top para este gÃ©nero
+                title = `Top Artistas - ${{selectedLabel}}`;
+                details.forEach(artist => {{
+                    content += `<div class="popup-item">
+                        <span class="name">${{artist.name}}</span>
+                        <span class="count">${{artist.plays}} plays</span>
+                    </div>`;
+                }});
+            }} else if (chartType === 'years_labels') {{
+                // Mostrar artistas top para esta dÃ©cada/sello
+                title = `Top Artistas - ${{selectedLabel}}`;
+                details.forEach(artist => {{
+                    content += `<div class="popup-item">
+                        <span class="name">${{artist.name}}</span>
+                        <span class="count">${{artist.plays}} plays</span>
+                    </div>`;
+                }});
+            }} else if (chartType === 'top_scrobbles') {{
+                // Mostrar top canciones del artista para ambos usuarios
+                title = `Top Artistas Coincidentes - ${{selectedLabel}}`;
+                if (details.artists) {{
+                    Object.keys(details.artists).forEach(artist => {{
+                        const artistData = details.artists[artist];
+                        content += `<div class="popup-item">
+                            <span class="name">${{artist}}</span>
+                            <span class="count">${{artistData.user_plays + artistData.other_plays}} plays totales</span>
+                        </div>`;
+                    }});
+                }}
+            }} else if (chartType === 'top_days') {{
+                // Mostrar artistas coincidentes con dÃ­as
+                title = `Artistas "Vuelve a Casa" - ${{selectedLabel}}`;
+                if (details.artists) {{
+                    Object.keys(details.artists).forEach(artist => {{
+                        const artistData = details.artists[artist];
+                        content += `<div class="popup-item">
+                            <span class="name">${{artist}}</span>
+                            <span class="count">${{artistData.user_days + artistData.other_days}} dÃ­as totales</span>
+                        </div>`;
+                    }});
+                }}
+            }} else if (chartType === 'top_discography') {{
+                // Mostrar artistas coincidentes con nÃºmero de canciones
+                title = `DiscografÃ­a Completada - ${{selectedLabel}}`;
+                if (details.artists) {{
+                    Object.keys(details.artists).forEach(artist => {{
+                        const artistData = details.artists[artist];
+                        content += `<div class="popup-item">
+                            <span class="name">${{artist}}</span>
+                            <span class="count">${{artistData.user_tracks + artistData.other_tracks}} canciones</span>
+                        </div>`;
+                    }});
+                }}
+            }} else if (chartType === 'top_streaks') {{
+                // Mostrar artistas coincidentes con streaks
+                title = `Streaks Coincidentes - ${{selectedLabel}}`;
+                if (details.artists) {{
+                    Object.keys(details.artists).forEach(artist => {{
+                        const artistData = details.artists[artist];
+                        content += `<div class="popup-item">
+                            <span class="name">${{artist}}</span>
+                            <span class="count">Max: ${{Math.max(artistData.user_streak, artistData.other_streak)}} dÃ­as</span>
+                        </div>`;
+                    }});
+                }}
             }}
 
-            const datasets = [];
-            let colorIndex = 0;
-
-            Object.keys(genresData.data).forEach(genre => {{
-                datasets.push({{
-                    label: genre,
-                    data: genresData.years.map(year => genresData.data[genre][year] || 0),
-                    borderColor: colors[colorIndex % colors.length],
-                    backgroundColor: colors[colorIndex % colors.length] + '20',
-                    tension: 0.4,
-                    fill: false
-                }});
-                colorIndex++;
-            }});
-
-            const config = {{
-                type: 'line',
-                data: {{
-                    labels: genresData.years,
-                    datasets: datasets
-                }},
-                options: {{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {{
-                        legend: {{
-                            position: 'bottom',
-                            labels: {{
-                                color: '#cdd6f4',
-                                padding: 10,
-                                usePointStyle: true
-                            }}
-                        }},
-                        tooltip: {{
-                            backgroundColor: '#1e1e2e',
-                            titleColor: '#cba6f7',
-                            bodyColor: '#cdd6f4',
-                            borderColor: '#cba6f7',
-                            borderWidth: 1
-                        }}
-                    }},
-                    scales: {{
-                        x: {{
-                            ticks: {{
-                                color: '#a6adc8'
-                            }},
-                            grid: {{
-                                color: '#313244'
-                            }}
-                        }},
-                        y: {{
-                            ticks: {{
-                                color: '#a6adc8'
-                            }},
-                            grid: {{
-                                color: '#313244'
-                            }}
-                        }}
-                    }}
-                }}
-            }};
-
-            charts['genresEvolutionChart'] = new Chart(canvas, config);
+            if (content) {{
+                document.getElementById('popupTitle').textContent = title;
+                document.getElementById('popupContent').innerHTML = content;
+                document.getElementById('popupOverlay').style.display = 'block';
+                document.getElementById('popup').style.display = 'block';
+            }}
         }}
 
-        function renderCoincidencesEvolution(type, evolutionData) {{
-            const canvas = document.getElementById(type + 'EvolutionChart');
+        // Configurar cierre de popup
+        document.getElementById('popupClose').addEventListener('click', function() {{
+            document.getElementById('popupOverlay').style.display = 'none';
+            document.getElementById('popup').style.display = 'none';
+        }});
 
-            if (!evolutionData || !evolutionData.data || !evolutionData.data[type]) {{
+        document.getElementById('popupOverlay').addEventListener('click', function() {{
+            document.getElementById('popupOverlay').style.display = 'none';
+            document.getElementById('popup').style.display = 'none';
+        }});
+
+        function renderCoincidencesEvolution(type, evolutionData) {{
+            let canvas, chartId;
+
+            // Mapear tipos a canvas IDs
+            if (type === 'genres') {{
+                canvas = document.getElementById('genresEvolutionChart');
+                chartId = 'genresEvolutionChart';
+            }} else if (type === 'labels') {{
+                canvas = document.getElementById('labelsEvolutionChart');
+                chartId = 'labelsEvolutionChart';
+            }} else if (type === 'release_years') {{
+                canvas = document.getElementById('releaseYearsEvolutionChart');
+                chartId = 'releaseYearsEvolutionChart';
+            }} else {{
+                canvas = document.getElementById(type + 'EvolutionChart');
+                chartId = type + 'EvolutionChart';
+            }}
+
+            if (!evolutionData || !evolutionData.data) {{
                 return;
             }}
 
-            const typeData = evolutionData.data[type];
+            // Para tipos bÃ¡sicos (artists, albums, tracks), usar evolutionData.data[type]
+            // Para nuevos tipos (genres, labels, release_years), usar directamente evolutionData.data
+            let typeData, detailsData;
+            if (['artists', 'albums', 'tracks'].includes(type)) {{
+                typeData = evolutionData.data[type];
+                detailsData = evolutionData.details[type];
+            }} else {{
+                typeData = evolutionData.data;
+                detailsData = evolutionData.details;
+            }}
+
+            if (!typeData) return;
+
             const datasets = [];
             let colorIndex = 0;
 
@@ -884,184 +1157,193 @@ class UserStatsHTMLGenerator:
                         if (elements.length > 0) {{
                             const datasetIndex = elements[0].datasetIndex;
                             const pointIndex = elements[0].index;
-                            const dataset = this.data.datasets[datasetIndex];
+                            const user = this.data.datasets[datasetIndex].label;
                             const year = this.data.labels[pointIndex];
-                            const user = dataset.label;
-                            const coincidences = dataset.data[pointIndex];
+                            const coincidences = this.data.datasets[datasetIndex].data[pointIndex];
 
-                            showEvolutionPopup(type, user, year, coincidences);
+                            if (coincidences > 0 && detailsData && detailsData[user] && detailsData[user][year]) {{
+                                const typeLabel = type === 'artists' ? 'Artistas' :
+                                               type === 'albums' ? 'Ãlbumes' :
+                                               type === 'tracks' ? 'Canciones' :
+                                               type === 'genres' ? 'GÃ©neros' :
+                                               type === 'labels' ? 'Sellos' :
+                                               type === 'release_years' ? 'DÃ©cadas' : type;
+
+                                // Para grÃ¡ficos bÃ¡sicos, mostrar top 10; para otros, top 5
+                                const limit = ['artists', 'albums', 'tracks'].includes(type) ? 10 : 5;
+                                const limitedDetails = detailsData[user][year].slice(0, limit);
+                                showLinearPopup(`Top ${{limit}} ${{typeLabel}} - ${{user}} (${{year}})`, limitedDetails);
+                            }}
                         }}
                     }}
                 }}
             }};
 
-            charts[type + 'EvolutionChart'] = new Chart(canvas, config);
+            charts[chartId] = new Chart(canvas, config);
         }}
 
-        function showDetailsPopup(chartTitle, selectedLabel, details) {{
-            // Crear overlay
-            const overlay = document.createElement('div');
-            overlay.className = 'popup-overlay';
+        function showLinearPopup(title, details) {{
+            if (!details || details.length === 0) return;
 
-            // Crear popup
-            const popup = document.createElement('div');
-            popup.className = 'popup';
+            let content = '';
+            details.slice(0, 5).forEach(item => {{
+                content += `<div class="popup-item">
+                    <span class="name">${{item.name}}</span>
+                    <span class="count">${{item.plays}} plays</span>
+                </div>`;
+            }});
 
-            const header = document.createElement('div');
-            header.className = 'popup-header';
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }}
 
-            const title = document.createElement('span');
-            title.textContent = `${{chartTitle}} - ${{selectedLabel}}`;
+        function renderIndividualCharts(userStats) {{
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {{
+                if (chart) chart.destroy();
+            }});
+            charts = {{}};
 
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'popup-close';
-            closeBtn.innerHTML = '×';
-            closeBtn.onclick = () => {{
-                document.body.removeChild(overlay);
-                document.body.removeChild(popup);
-            }};
+            // Renderizar todos los grÃ¡ficos individuales
+            if (userStats.individual) {{
+                renderIndividualLineChart('individualGenresChart', userStats.individual.genres, 'GÃ©neros');
+                renderIndividualLineChart('individualLabelsChart', userStats.individual.labels, 'Sellos');
+                renderIndividualLineChart('individualArtistsChart', userStats.individual.artists, 'Artistas');
+                renderIndividualLineChart('individualOneHitChart', userStats.individual.one_hit_wonders, 'One Hit Wonders');
+                renderIndividualLineChart('individualStreakChart', userStats.individual.streak_artists, 'Artistas con Mayor Streak');
+                renderIndividualLineChart('individualTrackCountChart', userStats.individual.track_count_artists, 'Artistas con Mayor DiscografÃ­a');
+                renderIndividualLineChart('individualNewArtistsChart', userStats.individual.new_artists, 'Artistas Nuevos');
+                renderIndividualLineChart('individualRisingChart', userStats.individual.rising_artists, 'Artistas en Ascenso');
+                renderIndividualLineChart('individualFallingChart', userStats.individual.falling_artists, 'Artistas en Declive');
+            }}
+        }}
 
-            header.appendChild(title);
-            header.appendChild(closeBtn);
+        function renderIndividualLineChart(canvasId, chartData, title) {{
+            const canvas = document.getElementById(canvasId);
 
-            const content = document.createElement('div');
-            content.className = 'popup-content';
+            if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {{
+                return;
+            }}
 
-            // Generar contenido - datos ya están limitados desde Python
-            let hasContent = false;
+            const datasets = [];
+            let colorIndex = 0;
 
-            if (details && typeof details === 'object') {{
-                // Si es coincidencias de usuario
-                if (details[selectedLabel]) {{
-                    const userDetails = details[selectedLabel];
-                    Object.keys(userDetails).forEach(itemKey => {{
-                        const item = document.createElement('div');
-                        item.className = 'detail-item';
+            Object.keys(chartData.data).forEach(item => {{
+                datasets.push({{
+                    label: item,
+                    data: chartData.years.map(year => chartData.data[item][year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false
+                }});
+                colorIndex++;
+            }});
 
-                        const name = document.createElement('span');
-                        name.className = 'name';
-                        name.textContent = itemKey;
-
-                        const count = document.createElement('span');
-                        count.className = 'count';
-
-                        const itemData = userDetails[itemKey];
-                        if (typeof itemData === 'object' && itemData.total_plays !== undefined) {{
-                            count.textContent = `${{itemData.total_plays}} reproducciones totales`;
-                        }} else if (typeof itemData === 'object' && itemData.plays) {{
-                            count.textContent = `${{itemData.plays}} reproducciones`;
-                        }} else if (typeof itemData === 'number') {{
-                            count.textContent = `${{itemData}} reproducciones`;
-                        }} else {{
-                            count.textContent = itemData;
+            const config = {{
+                type: 'line',
+                data: {{
+                    labels: chartData.years,
+                    datasets: datasets
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{
+                                color: '#cdd6f4',
+                                padding: 10,
+                                usePointStyle: true
+                            }}
+                        }},
+                        tooltip: {{
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
                         }}
-
-                        item.appendChild(name);
-                        item.appendChild(count);
-                        content.appendChild(item);
-                        hasContent = true;
-                    }});
-                }} else {{
-                    // Para géneros y otros datos
-                    Object.keys(details).forEach(key => {{
-                        const item = document.createElement('div');
-                        item.className = 'detail-item';
-
-                        const name = document.createElement('span');
-                        name.className = 'name';
-                        name.textContent = key;
-
-                        const count = document.createElement('span');
-                        count.className = 'count';
-
-                        const value = details[key];
-                        if (typeof value === 'object' && value.plays) {{
-                            count.textContent = `${{value.plays}} reproducciones`;
-                        }} else if (typeof value === 'number') {{
-                            count.textContent = `${{value}} reproducciones`;
-                        }} else {{
-                            count.textContent = value;
+                    }},
+                    scales: {{
+                        x: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }},
+                        y: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
                         }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const item = this.data.datasets[datasetIndex].label;
+                            const year = this.data.labels[pointIndex];
+                            const plays = this.data.datasets[datasetIndex].data[pointIndex];
 
-                        item.appendChild(name);
-                        item.appendChild(count);
-                        content.appendChild(item);
-                        hasContent = true;
-                    }});
+                            if (plays > 0) {{
+                                showIndividualPopup(title, item, year, plays);
+                            }}
+                        }}
+                    }}
                 }}
-            }}
-
-            if (!hasContent) {{
-                content.innerHTML = '<div class="no-data">No hay detalles disponibles</div>';
-            }}
-
-            popup.appendChild(header);
-            popup.appendChild(content);
-
-            // Cerrar al hacer click en overlay
-            overlay.onclick = () => {{
-                document.body.removeChild(overlay);
-                document.body.removeChild(popup);
             }};
 
-            document.body.appendChild(overlay);
-            document.body.appendChild(popup);
+            charts[canvasId] = new Chart(canvas, config);
         }}
 
-        function showEvolutionPopup(type, user, year, coincidences) {{
-            // Crear overlay
-            const overlay = document.createElement('div');
-            overlay.className = 'popup-overlay';
+        function showIndividualPopup(category, item, year, plays) {{
+            const title = `${{category}} - ${{item}} (${{year}})`;
+            const content = `<div class="popup-item">
+                <span class="name">${{item}} en ${{year}}</span>
+                <span class="count">${{plays}} reproducciones</span>
+            </div>`;
 
-            // Crear popup
-            const popup = document.createElement('div');
-            popup.className = 'popup';
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }}
 
-            const header = document.createElement('div');
-            header.className = 'popup-header';
+        function showEvolutionPopup(dataType, item, year, value) {{
+            const title = `${{dataType.charAt(0).toUpperCase() + dataType.slice(1)}} - ${{item}} (${{year}})`;
+            const content = `<div class="popup-item">
+                <span class="name">${{item}} en ${{year}}</span>
+                <span class="count">${{value}} ${{dataType.includes('coincidencias') ? 'coincidencias' : 'reproducciones'}}</span>
+            </div>`;
 
-            const title = document.createElement('span');
-            const typeLabel = type === 'artists' ? 'Artistas' : type === 'albums' ? 'Álbumes' : 'Canciones';
-            title.textContent = `Evolución - ${{typeLabel}} (${{year}})`;
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }}
 
-            const closeBtn = document.createElement('button');
-            closeBtn.className = 'popup-close';
-            closeBtn.innerHTML = '×';
-            closeBtn.onclick = () => {{
-                document.body.removeChild(overlay);
-                document.body.removeChild(popup);
-            }};
+        // Siguiendo el patrÃ³n de html_anual.py: eventos directos al final
+        userSelect.addEventListener('change', function() {{
+            selectUser(this.value);
+        }});
 
-            header.appendChild(title);
-            header.appendChild(closeBtn);
-
-            const content = document.createElement('div');
-            content.className = 'popup-content';
-
-            const info = document.createElement('div');
-            info.className = 'detail-item';
-            info.innerHTML = `
-                <span class="name">Usuario: ${{user}}</span>
-                <span class="count">${{coincidences}} coincidencias en ${{year}}</span>
-            `;
-            content.appendChild(info);
-
-            popup.appendChild(header);
-            popup.appendChild(content);
-
-            // Cerrar al hacer click en overlay
-            overlay.onclick = () => {{
-                document.body.removeChild(overlay);
-                document.body.removeChild(popup);
-            }};
-
-            document.body.appendChild(overlay);
-            document.body.appendChild(popup);
+        // Seleccionar primer usuario automÃ¡ticamente si hay usuarios
+        if (users.length > 0) {{
+            selectUser(users[0]);
         }}
     </script>
 </body>
 </html>"""
 
     def _format_number(self, number: int) -> str:
-        """Formatea números con separadores de miles"""
+        """Formatea nÃºmeros con separadores de miles"""
         return f"{number:,}".replace(",", ".")

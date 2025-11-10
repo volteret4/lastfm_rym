@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-UserStatsHTMLGenerator - Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas de usuarios
+UserStatsHTMLGenerator - Clase para generar HTML con grÃƒÂ¡ficos interactivos de estadÃƒÂ­sticas de usuarios
 """
 
 import json
@@ -8,7 +8,7 @@ from typing import Dict, List
 
 
 class UserStatsHTMLGenerator:
-    """Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas de usuarios"""
+    """Clase para generar HTML con grÃƒÂ¡ficos interactivos de estadÃƒÂ­sticas de usuarios"""
 
     def __init__(self):
         self.colors = [
@@ -18,7 +18,7 @@ class UserStatsHTMLGenerator:
         ]
 
     def generate_html(self, all_user_stats: Dict, users: List[str], years_back: int) -> str:
-        """Genera el HTML completo para estadÃ­sticas de usuarios"""
+        """Genera el HTML completo para estadÃƒÂ­sticas de usuarios"""
         users_json = json.dumps(users, ensure_ascii=False)
         stats_json = json.dumps(all_user_stats, indent=2, ensure_ascii=False)
         colors_json = json.dumps(self.colors, ensure_ascii=False)
@@ -28,7 +28,7 @@ class UserStatsHTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Usuarios - EstadÃ­sticas Individuales</title>
+    <title>Last.fm Usuarios - EstadÃƒÂ­sticas Individuales</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -380,15 +380,15 @@ class UserStatsHTMLGenerator:
 <body>
     <div class="container">
         <header>
-            <h1>ðŸ‘¤ EstadÃ­sticas Individuales</h1>
-            <p class="subtitle">AnÃ¡lisis detallado por usuario</p>
+            <h1>Ã°Å¸â€˜Â¤ EstadÃƒÂ­sticas Individuales</h1>
+            <p class="subtitle">AnÃƒÂ¡lisis detallado por usuario</p>
         </header>
 
         <div class="controls">
             <div class="control-group">
                 <label for="userSelect">Usuario:</label>
                 <select id="userSelect">
-                    <!-- Se llenarÃ¡ dinÃ¡micamente -->
+                    <!-- Se llenarÃƒÂ¡ dinÃƒÂ¡micamente -->
                 </select>
             </div>
 
@@ -397,29 +397,29 @@ class UserStatsHTMLGenerator:
                 <div class="view-buttons">
                     <button class="view-btn active" data-view="individual">YoMiMeConMigo</button>
                     <button class="view-btn" data-view="coincidences">Coincidencias</button>
-                    <button class="view-btn" data-view="evolution">EvoluciÃ³n</button>
+                    <button class="view-btn" data-view="evolution">EvoluciÃƒÂ³n</button>
                 </div>
             </div>
         </div>
 
         <div id="userHeader" class="user-header">
             <h2 id="userName">Selecciona un usuario</h2>
-            <p class="user-info" id="userInfo">PerÃ­odo de anÃ¡lisis: {years_back + 1} aÃ±os</p>
+            <p class="user-info" id="userInfo">PerÃƒÂ­odo de anÃƒÂ¡lisis: {years_back + 1} aÃƒÂ±os</p>
         </div>
 
         <div class="stats-container">
-            <!-- Resumen de estadÃ­sticas -->
+            <!-- Resumen de estadÃƒÂ­sticas -->
             <div id="summaryStats" class="summary-stats">
-                <!-- Se llenarÃ¡ dinÃ¡micamente -->
+                <!-- Se llenarÃƒÂ¡ dinÃƒÂ¡micamente -->
             </div>
 
             <!-- Vista Individual (YoMiMeConMigo) -->
             <div id="individualView" class="view active">
                 <div class="evolution-section">
-                    <h3>ðŸŽµ EvoluciÃ³n de GÃ©neros Individuales</h3>
+                    <h3>Ã°Å¸Å½Âµ EvoluciÃƒÂ³n de GÃƒÂ©neros Individuales</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 GÃ©neros por AÃ±o</h4>
+                            <h4>Top 10 GÃƒÂ©neros por AÃƒÂ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="individualGenresChart"></canvas>
                             </div>
@@ -428,10 +428,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ·ï¸ EvoluciÃ³n de Sellos Individuales</h3>
+                    <h3>Ã°Å¸ÂÂ·Ã¯Â¸Â EvoluciÃƒÂ³n de Sellos Individuales</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 Sellos por AÃ±o</h4>
+                            <h4>Top 10 Sellos por AÃƒÂ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="individualLabelsChart"></canvas>
                             </div>
@@ -440,10 +440,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸŽ¤ EvoluciÃ³n de Artistas Individuales</h3>
+                    <h3>Ã°Å¸Å½Â¤ EvoluciÃƒÂ³n de Artistas Individuales</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 Artistas por AÃ±o</h4>
+                            <h4>Top 10 Artistas por AÃƒÂ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="individualArtistsChart"></canvas>
                             </div>
@@ -452,10 +452,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ’« One Hit Wonders</h3>
+                    <h3>Ã°Å¸â€™Â« One Hit Wonders</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 Artistas con 1 CanciÃ³n (+25 scrobbles)</h4>
+                            <h4>Top 10 Artistas con 1 CanciÃƒÂ³n (+25 scrobbles)</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="individualOneHitChart"></canvas>
                             </div>
@@ -464,10 +464,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ”¥ Artistas con Mayor Streak</h3>
+                    <h3>Ã°Å¸â€Â¥ Artistas con Mayor Streak</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 Artistas con MÃ¡s DÃ­as Consecutivos</h4>
+                            <h4>Top 10 Artistas con MÃƒÂ¡s DÃƒÂ­as Consecutivos</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="individualStreakChart"></canvas>
                             </div>
@@ -476,10 +476,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ“š Artistas con Mayor DiscografÃ­a</h3>
+                    <h3>Ã°Å¸â€œÅ¡ Artistas con Mayor DiscografÃƒÂ­a</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 Artistas con MÃ¡s Canciones Ãšnicas</h4>
+                            <h4>Top 10 Artistas con MÃƒÂ¡s Canciones ÃƒÅ¡nicas</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="individualTrackCountChart"></canvas>
                             </div>
@@ -488,7 +488,7 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸŒŸ Artistas Nuevos</h3>
+                    <h3>Ã°Å¸Å’Å¸ Artistas Nuevos</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
                             <h4>Top 10 Artistas Nuevos (Sin Escuchas Previas)</h4>
@@ -500,10 +500,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ“ˆ Artistas en Ascenso</h3>
+                    <h3>Ã°Å¸â€œË† Artistas en Ascenso</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 Artistas que MÃ¡s RÃ¡pido Subieron</h4>
+                            <h4>Top 10 Artistas que MÃƒÂ¡s RÃƒÂ¡pido Subieron</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="individualRisingChart"></canvas>
                             </div>
@@ -512,10 +512,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ“‰ Artistas en Declive</h3>
+                    <h3>Ã°Å¸â€œâ€° Artistas en Declive</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 10 Artistas que MÃ¡s RÃ¡pido Bajaron</h4>
+                            <h4>Top 10 Artistas que MÃƒÂ¡s RÃƒÂ¡pido Bajaron</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="individualFallingChart"></canvas>
                             </div>
@@ -536,7 +536,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Ãlbumes</h3>
+                        <h3>ÃƒÂlbumes</h3>
                         <div class="chart-wrapper">
                             <canvas id="albumsChart"></canvas>
                         </div>
@@ -552,7 +552,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>GÃ©neros (Individual)</h3>
+                        <h3>GÃƒÂ©neros (Individual)</h3>
                         <div class="chart-wrapper">
                             <canvas id="genresChart"></canvas>
                         </div>
@@ -560,7 +560,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>GÃ©neros (Coincidencias)</h3>
+                        <h3>GÃƒÂ©neros (Coincidencias)</h3>
                         <div class="chart-wrapper">
                             <canvas id="genreCoincidencesChart"></canvas>
                         </div>
@@ -568,7 +568,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Sellos DiscogrÃ¡ficos</h3>
+                        <h3>Sellos DiscogrÃƒÂ¡ficos</h3>
                         <div class="chart-wrapper">
                             <canvas id="labelsChart"></canvas>
                         </div>
@@ -576,7 +576,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>AÃ±os de Lanzamiento</h3>
+                        <h3>AÃƒÂ±os de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="releaseYearsChart"></canvas>
                         </div>
@@ -584,7 +584,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>ðŸ“ˆ Top 10 Artistas por Escuchas</h3>
+                        <h3>Ã°Å¸â€œË† Top 10 Artistas por Escuchas</h3>
                         <div class="chart-wrapper">
                             <canvas id="topScrobblesChart"></canvas>
                         </div>
@@ -592,7 +592,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>ðŸ  Vuelve a Casa</h3>
+                        <h3>Ã°Å¸ÂÂ  Vuelve a Casa</h3>
                         <div class="chart-wrapper">
                             <canvas id="topDaysChart"></canvas>
                         </div>
@@ -600,7 +600,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>ðŸ“š DiscografÃ­a Completada</h3>
+                        <h3>Ã°Å¸â€œÅ¡ DiscografÃƒÂ­a Completada</h3>
                         <div class="chart-wrapper">
                             <canvas id="topDiscographyChart"></canvas>
                         </div>
@@ -608,7 +608,7 @@ class UserStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>ðŸ’« Streaks</h3>
+                        <h3>Ã°Å¸â€™Â« Streaks</h3>
                         <div class="chart-wrapper">
                             <canvas id="topStreaksChart"></canvas>
                         </div>
@@ -617,13 +617,13 @@ class UserStatsHTMLGenerator:
                 </div>
             </div>
 
-            <!-- Vista de EvoluciÃ³n -->
+            <!-- Vista de EvoluciÃƒÂ³n -->
             <div id="evolutionView" class="view">
                 <div class="evolution-section">
-                    <h3>ðŸŽµ EvoluciÃ³n de GÃ©neros (Coincidencias)</h3>
+                    <h3>Ã°Å¸Å½Âµ EvoluciÃƒÂ³n de GÃƒÂ©neros (Coincidencias)</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Coincidencias en GÃ©neros por AÃ±o</h4>
+                            <h4>Coincidencias en GÃƒÂ©neros por AÃƒÂ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="genresEvolutionChart"></canvas>
                             </div>
@@ -632,10 +632,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ·ï¸ EvoluciÃ³n de Sellos (Coincidencias)</h3>
+                    <h3>Ã°Å¸ÂÂ·Ã¯Â¸Â EvoluciÃƒÂ³n de Sellos (Coincidencias)</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Coincidencias en Sellos por AÃ±o</h4>
+                            <h4>Coincidencias en Sellos por AÃƒÂ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="labelsEvolutionChart"></canvas>
                             </div>
@@ -644,10 +644,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ“… EvoluciÃ³n de DÃ©cadas (Coincidencias)</h3>
+                    <h3>Ã°Å¸â€œâ€¦ EvoluciÃƒÂ³n de DÃƒÂ©cadas (Coincidencias)</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Coincidencias en DÃ©cadas por AÃ±o</h4>
+                            <h4>Coincidencias en DÃƒÂ©cadas por AÃƒÂ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="releaseYearsEvolutionChart"></canvas>
                             </div>
@@ -656,7 +656,7 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>ðŸ¤ EvoluciÃ³n de Coincidencias BÃ¡sicas</h3>
+                    <h3>Ã°Å¸Â¤Â EvoluciÃƒÂ³n de Coincidencias BÃƒÂ¡sicas</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
                             <h4>Coincidencias en Artistas</h4>
@@ -666,7 +666,7 @@ class UserStatsHTMLGenerator:
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Coincidencias en Ãlbumes</h4>
+                            <h4>Coincidencias en ÃƒÂlbumes</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="albumsEvolutionChart"></canvas>
                             </div>
@@ -687,7 +687,7 @@ class UserStatsHTMLGenerator:
         <div id="popup" class="popup" style="display: none;">
             <div class="popup-header">
                 <span id="popupTitle">Detalles</span>
-                <button id="popupClose" class="popup-close">Ã—</button>
+                <button id="popupClose" class="popup-close">Ãƒâ€”</button>
             </div>
             <div id="popupContent" class="popup-content"></div>
         </div>
@@ -703,7 +703,7 @@ class UserStatsHTMLGenerator:
         let currentView = 'individual';
         let charts = {{}};
 
-        // InicializaciÃ³n simple sin DOMContentLoaded - siguiendo el patrÃ³n de html_anual.py
+        // InicializaciÃƒÂ³n simple sin DOMContentLoaded - siguiendo el patrÃƒÂ³n de html_anual.py
         const userSelect = document.getElementById('userSelect');
 
         // Llenar selector de usuarios
@@ -775,7 +775,7 @@ class UserStatsHTMLGenerator:
         function updateUserHeader(username, userStats) {{
             document.getElementById('userName').textContent = username;
             document.getElementById('userInfo').innerHTML =
-                `PerÃ­odo: ${{userStats.period}} | Generado: ${{userStats.generated_at}}`;
+                `PerÃƒÂ­odo: ${{userStats.period}} | Generado: ${{userStats.generated_at}}`;
         }}
 
         function updateSummaryStats(userStats) {{
@@ -806,15 +806,15 @@ class UserStatsHTMLGenerator:
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalAlbumCoincidences}}</div>
-                    <div class="label">Usuarios (Ãlbumes)</div>
+                    <div class="label">Usuarios (ÃƒÂlbumes)</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalGenres}}</div>
-                    <div class="label">GÃ©neros</div>
+                    <div class="label">GÃƒÂ©neros</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalReleaseYears}}</div>
-                    <div class="label">DÃ©cadas</div>
+                    <div class="label">DÃƒÂ©cadas</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalLabels}}</div>
@@ -832,18 +832,18 @@ class UserStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // GrÃ¡ficos bÃ¡sicos
+            // GrÃƒÂ¡ficos bÃƒÂ¡sicos
             renderPieChart('artistsChart', userStats.coincidences.charts.artists, 'artistsInfo');
             renderPieChart('albumsChart', userStats.coincidences.charts.albums, 'albumsInfo');
             renderPieChart('tracksChart', userStats.coincidences.charts.tracks, 'tracksInfo');
             renderPieChart('genresChart', userStats.coincidences.charts.genres, 'genresInfo');
 
-            // Nuevos grÃ¡ficos de coincidencias
+            // Nuevos grÃƒÂ¡ficos de coincidencias
             renderPieChart('genreCoincidencesChart', userStats.coincidences.charts.genre_coincidences, 'genreCoincidencesInfo');
             renderPieChart('labelsChart', userStats.coincidences.charts.labels, 'labelsInfo');
             renderPieChart('releaseYearsChart', userStats.coincidences.charts.release_years, 'releaseYearsInfo');
 
-            // GrÃ¡ficos especiales
+            // GrÃƒÂ¡ficos especiales
             renderPieChart('topScrobblesChart', userStats.coincidences.charts.top_scrobbles, 'topScrobblesInfo');
             renderPieChart('topDaysChart', userStats.coincidences.charts.top_days, 'topDaysInfo');
             renderPieChart('topDiscographyChart', userStats.coincidences.charts.top_discography, 'topDiscographyInfo');
@@ -877,7 +877,7 @@ class UserStatsHTMLGenerator:
             }}
 
             canvas.style.display = 'block';
-            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}} | Click en una porciÃ³n para ver detalles`;
+            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}} | Click en una porciÃƒÂ³n para ver detalles`;
 
             const data = {{
                 labels: Object.keys(chartData.data),
@@ -935,8 +935,8 @@ class UserStatsHTMLGenerator:
             let content = '';
 
             if (chartType === 'artists') {{
-                // Mostrar Ã¡lbumes top para estos artistas
-                title = `Top Ãlbumes - ${{selectedLabel}}`;
+                // Mostrar ÃƒÂ¡lbumes top para estos artistas
+                title = `Top ÃƒÂlbumes - ${{selectedLabel}}`;
                 Object.keys(details).slice(0, 5).forEach(artist => {{
                     if (details[artist] && details[artist].length > 0) {{
                         content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${{artist}}</h4>`;
@@ -949,7 +949,7 @@ class UserStatsHTMLGenerator:
                     }}
                 }});
             }} else if (chartType === 'albums') {{
-                // Mostrar canciones top para estos Ã¡lbumes
+                // Mostrar canciones top para estos ÃƒÂ¡lbumes
                 title = `Top Canciones - ${{selectedLabel}}`;
                 Object.keys(details).slice(0, 5).forEach(album => {{
                     if (details[album] && details[album].length > 0) {{
@@ -963,7 +963,7 @@ class UserStatsHTMLGenerator:
                     }}
                 }});
             }} else if (chartType === 'tracks') {{
-                // Mostrar canciones mÃ¡s escuchadas
+                // Mostrar canciones mÃƒÂ¡s escuchadas
                 title = `Top Canciones - ${{selectedLabel}}`;
                 Object.keys(details).slice(0, 5).forEach(track => {{
                     const trackData = details[track];
@@ -973,7 +973,7 @@ class UserStatsHTMLGenerator:
                     </div>`;
                 }});
             }} else if (chartType === 'genres') {{
-                // Mostrar artistas top para este gÃ©nero
+                // Mostrar artistas top para este gÃƒÂ©nero
                 title = `Top Artistas - ${{selectedLabel}}`;
                 details.forEach(artist => {{
                     content += `<div class="popup-item">
@@ -982,7 +982,7 @@ class UserStatsHTMLGenerator:
                     </div>`;
                 }});
             }} else if (chartType === 'years_labels') {{
-                // Mostrar artistas top para esta dÃ©cada/sello
+                // Mostrar artistas top para esta dÃƒÂ©cada/sello
                 title = `Top Artistas - ${{selectedLabel}}`;
                 details.forEach(artist => {{
                     content += `<div class="popup-item">
@@ -1003,20 +1003,20 @@ class UserStatsHTMLGenerator:
                     }});
                 }}
             }} else if (chartType === 'top_days') {{
-                // Mostrar artistas coincidentes con dÃ­as
+                // Mostrar artistas coincidentes con dÃƒÂ­as
                 title = `Artistas "Vuelve a Casa" - ${{selectedLabel}}`;
                 if (details.artists) {{
                     Object.keys(details.artists).forEach(artist => {{
                         const artistData = details.artists[artist];
                         content += `<div class="popup-item">
                             <span class="name">${{artist}}</span>
-                            <span class="count">${{artistData.user_days + artistData.other_days}} dÃ­as totales</span>
+                            <span class="count">${{artistData.user_days + artistData.other_days}} dÃƒÂ­as totales</span>
                         </div>`;
                     }});
                 }}
             }} else if (chartType === 'top_discography') {{
-                // Mostrar artistas coincidentes con nÃºmero de canciones
-                title = `DiscografÃ­a Completada - ${{selectedLabel}}`;
+                // Mostrar artistas coincidentes con nÃƒÂºmero de canciones
+                title = `DiscografÃƒÂ­a Completada - ${{selectedLabel}}`;
                 if (details.artists) {{
                     Object.keys(details.artists).forEach(artist => {{
                         const artistData = details.artists[artist];
@@ -1034,7 +1034,7 @@ class UserStatsHTMLGenerator:
                         const artistData = details.artists[artist];
                         content += `<div class="popup-item">
                             <span class="name">${{artist}}</span>
-                            <span class="count">Max: ${{Math.max(artistData.user_streak, artistData.other_streak)}} dÃ­as</span>
+                            <span class="count">Max: ${{Math.max(artistData.user_streak, artistData.other_streak)}} dÃƒÂ­as</span>
                         </div>`;
                     }});
                 }}
@@ -1081,7 +1081,7 @@ class UserStatsHTMLGenerator:
                 return;
             }}
 
-            // Para tipos bÃ¡sicos (artists, albums, tracks), usar evolutionData.data[type]
+            // Para tipos bÃƒÂ¡sicos (artists, albums, tracks), usar evolutionData.data[type]
             // Para nuevos tipos (genres, labels, release_years), usar directamente evolutionData.data
             let typeData, detailsData;
             if (['artists', 'albums', 'tracks'].includes(type)) {{
@@ -1163,13 +1163,13 @@ class UserStatsHTMLGenerator:
 
                             if (coincidences > 0 && detailsData && detailsData[user] && detailsData[user][year]) {{
                                 const typeLabel = type === 'artists' ? 'Artistas' :
-                                               type === 'albums' ? 'Ãlbumes' :
+                                               type === 'albums' ? 'ÃƒÂlbumes' :
                                                type === 'tracks' ? 'Canciones' :
-                                               type === 'genres' ? 'GÃ©neros' :
+                                               type === 'genres' ? 'GÃƒÂ©neros' :
                                                type === 'labels' ? 'Sellos' :
-                                               type === 'release_years' ? 'DÃ©cadas' : type;
+                                               type === 'release_years' ? 'DÃƒÂ©cadas' : type;
 
-                                // Para grÃ¡ficos bÃ¡sicos, mostrar top 10; para otros, top 5
+                                // Para grÃƒÂ¡ficos bÃƒÂ¡sicos, mostrar top 10; para otros, top 5
                                 const limit = ['artists', 'albums', 'tracks'].includes(type) ? 10 : 5;
                                 const limitedDetails = detailsData[user][year].slice(0, limit);
                                 showLinearPopup(`Top ${{limit}} ${{typeLabel}} - ${{user}} (${{year}})`, limitedDetails);
@@ -1186,11 +1186,41 @@ class UserStatsHTMLGenerator:
             if (!details || details.length === 0) return;
 
             let content = '';
-            details.slice(0, 5).forEach(item => {{
-                content += `<div class="popup-item">
-                    <span class="name">${{item.name}}</span>
-                    <span class="count">${{item.plays}} plays</span>
-                </div>`;
+            details.slice(0, 10).forEach(item => {{
+                // Verificar si es un detalle de coincidencia real (con artist, album, track)
+                if (item.artist) {{
+                    // Es una coincidencia real - mostrar información completa
+                    content += `<div class="popup-item">
+                        <div style="margin-bottom: 5px;">
+                            <span class="name" style="font-weight: bold;">${{item.artist}}</span>
+                        </div>`;
+
+                    if (item.track) {{
+                        content += `<div style="margin-left: 10px; color: #a6adc8;">
+                            🎵 ${{item.track}}
+                        </div>`;
+                    }}
+
+                    if (item.album) {{
+                        content += `<div style="margin-left: 10px; color: #a6adc8;">
+                            💿 ${{item.album}}
+                        </div>`;
+                    }}
+
+                    if (item.user1_plays && item.user2_plays) {{
+                        content += `<div style="margin-left: 10px; font-size: 0.9em; color: #6c7086;">
+                            Usuario 1: ${{item.user1_plays}} plays | Usuario 2: ${{item.user2_plays}} plays
+                        </div>`;
+                    }}
+
+                    content += `</div>`;
+                }} else {{
+                    // Es un detalle simple - mostrar como antes
+                    content += `<div class="popup-item">
+                        <span class="name">${{item.name}}</span>
+                        <span class="count">${{item.plays}} plays</span>
+                    </div>`;
+                }}
             }});
 
             document.getElementById('popupTitle').textContent = title;
@@ -1206,14 +1236,14 @@ class UserStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar todos los grÃ¡ficos individuales
+            // Renderizar todos los grÃƒÂ¡ficos individuales
             if (userStats.individual) {{
-                renderIndividualLineChart('individualGenresChart', userStats.individual.genres, 'GÃ©neros');
+                renderIndividualLineChart('individualGenresChart', userStats.individual.genres, 'GÃƒÂ©neros');
                 renderIndividualLineChart('individualLabelsChart', userStats.individual.labels, 'Sellos');
                 renderIndividualLineChart('individualArtistsChart', userStats.individual.artists, 'Artistas');
                 renderIndividualLineChart('individualOneHitChart', userStats.individual.one_hit_wonders, 'One Hit Wonders');
                 renderIndividualLineChart('individualStreakChart', userStats.individual.streak_artists, 'Artistas con Mayor Streak');
-                renderIndividualLineChart('individualTrackCountChart', userStats.individual.track_count_artists, 'Artistas con Mayor DiscografÃ­a');
+                renderIndividualLineChart('individualTrackCountChart', userStats.individual.track_count_artists, 'Artistas con Mayor DiscografÃƒÂ­a');
                 renderIndividualLineChart('individualNewArtistsChart', userStats.individual.new_artists, 'Artistas Nuevos');
                 renderIndividualLineChart('individualRisingChart', userStats.individual.rising_artists, 'Artistas en Ascenso');
                 renderIndividualLineChart('individualFallingChart', userStats.individual.falling_artists, 'Artistas en Declive');
@@ -1265,7 +1295,28 @@ class UserStatsHTMLGenerator:
                             titleColor: '#cba6f7',
                             bodyColor: '#cdd6f4',
                             borderColor: '#cba6f7',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            callbacks: {{
+                                afterBody: function(tooltipItems) {{
+                                    if (tooltipItems.length > 0) {{
+                                        const item = tooltipItems[0].dataset.label;
+                                        const year = tooltipItems[0].label;
+
+                                        if (chartData.details && chartData.details[item] && chartData.details[item][year]) {{
+                                            const details = chartData.details[item][year];
+
+                                            if (title === 'One Hit Wonders' && details.track && details.artist) {{
+                                                return [`Artista: ${{details.artist}}`, `CanciÃƒÂ³n: ${{details.track}}`];
+                                            }} else if (title === 'Artistas con Mayor Streak' && details.days !== undefined) {{
+                                                return [`DÃƒÂ­as en ${{year}}: ${{details.days}}`];
+                                            }} else if (title === 'Artistas con Mayor DiscografÃƒÂ­a' && details.track_count !== undefined) {{
+                                                return [`Canciones ÃƒÅ¡nicas: ${{details.track_count}}`];
+                                            }}
+                                        }}
+                                    }}
+                                    return [];
+                                }}
+                            }}
                         }}
                     }},
                     scales: {{
@@ -1283,6 +1334,13 @@ class UserStatsHTMLGenerator:
                             }},
                             grid: {{
                                 color: '#313244'
+                            }},
+                            title: {{
+                                display: true,
+                                text: title === 'Artistas con Mayor Streak' ? 'DÃƒÂ­as' :
+                                      title === 'Artistas con Mayor DiscografÃƒÂ­a' ? 'Canciones ÃƒÅ¡nicas' :
+                                      'Reproducciones',
+                                color: '#a6adc8'
                             }}
                         }}
                     }},
@@ -1292,10 +1350,10 @@ class UserStatsHTMLGenerator:
                             const pointIndex = elements[0].index;
                             const item = this.data.datasets[datasetIndex].label;
                             const year = this.data.labels[pointIndex];
-                            const plays = this.data.datasets[datasetIndex].data[pointIndex];
+                            const value = this.data.datasets[datasetIndex].data[pointIndex];
 
-                            if (plays > 0) {{
-                                showIndividualPopup(title, item, year, plays);
+                            if (value > 0) {{
+                                showIndividualPopupDetailed(title, item, year, value, chartData);
                             }}
                         }}
                     }}
@@ -1305,12 +1363,106 @@ class UserStatsHTMLGenerator:
             charts[canvasId] = new Chart(canvas, config);
         }}
 
-        function showIndividualPopup(category, item, year, plays) {{
-            const title = `${{category}} - ${{item}} (${{year}})`;
-            const content = `<div class="popup-item">
-                <span class="name">${{item}} en ${{year}}</span>
-                <span class="count">${{plays}} reproducciones</span>
-            </div>`;
+        function showIndividualPopupDetailed(category, item, year, value, chartData) {{
+            let title = `${{category}} - ${{item}} (${{year}})`;
+            let content = '';
+
+            if (chartData.details && chartData.details[item] && chartData.details[item][year]) {{
+                const details = chartData.details[item][year];
+
+                if (category === 'One Hit Wonders') {{
+                    // Mostrar artista y canciÃ³n especÃ­fica
+                    content = `<div class="popup-item">
+                        <span class="name">Artista: ${{details.artist}}</span>
+                    </div>
+                    <div class="popup-item">
+                        <span class="name">CanciÃ³n: ${{details.track}}</span>
+                        <span class="count">${{details.plays}} reproducciones</span>
+                    </div>`;
+                }} else if (category === 'GÃ©neros') {{
+                    // Mostrar artistas que contribuyen al gÃ©nero
+                    content = `<div class="popup-item">
+                        <span class="name">${{item}} en ${{year}}</span>
+                        <span class="count">${{value}} reproducciones</span>
+                    </div>`;
+                    if (details.length > 0) {{
+                        content += '<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">Top Artistas:</h4>';
+                        details.slice(0, 5).forEach(artist => {{
+                            content += `<div class="popup-item">
+                                <span class="name">${{artist.name}}</span>
+                                <span class="count">${{artist.plays}} plays</span>
+                            </div>`;
+                        }});
+                    }}
+                }} else if (category === 'Sellos') {{
+                    // Mostrar artistas que contribuyen al sello
+                    content = `<div class="popup-item">
+                        <span class="name">${{item}} en ${{year}}</span>
+                        <span class="count">${{value}} reproducciones</span>
+                    </div>`;
+                    if (details.length > 0) {{
+                        content += '<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">Top Artistas:</h4>';
+                        details.slice(0, 5).forEach(artist => {{
+                            content += `<div class="popup-item">
+                                <span class="name">${{artist.name}}</span>
+                                <span class="count">${{artist.plays}} plays</span>
+                            </div>`;
+                        }});
+                    }}
+                }} else if (category === 'Artistas con Mayor Streak') {{
+                    // Mostrar datos de días
+                    content = `<div class="popup-item">
+                        <span class="name">${{item}} en ${{year}}</span>
+                        <span class="count">${{details.days}} dÃ­as de escucha</span>
+                    </div>
+                    <div class="popup-item">
+                        <span class="name">Streak mÃ¡ximo general</span>
+                        <span class="count">${{details.max_streak}} dÃ­as consecutivos</span>
+                    </div>`;
+                }} else if (category === 'Artistas con Mayor DiscografÃ­a') {{
+                    // Mostrar nÃºmero de canciones y Ã¡lbumes
+                    content = `<div class="popup-item">
+                        <span class="name">${{item}} en ${{year}}</span>
+                        <span class="count">${{details.track_count}} canciones ÃºÃ­as</span>
+                    </div>`;
+                    if (details.albums && details.albums.length > 0) {{
+                        content += '<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">Top 10 ÃƒÂlbumes:</h4>';
+                        details.albums.forEach(album => {{
+                            content += `<div class="popup-item">
+                                <span class="name">${{album.name}}</span>
+                                <span class="count">${{album.plays}} plays</span>
+                            </div>`;
+                        }});
+                    }}
+                }} else if (category === 'Artistas en Ascenso' || category === 'Artistas en Declive') {{
+                    // Mostrar top 10 canciones
+                    content = `<div class="popup-item">
+                        <span class="name">${{item}} en ${{year}}</span>
+                        <span class="count">${{value}} reproducciones</span>
+                    </div>`;
+                    if (details && details.length > 0) {{
+                        content += '<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">Top 10 Canciones:</h4>';
+                        details.forEach(track => {{
+                            content += `<div class="popup-item">
+                                <span class="name">${{track.name}}</span>
+                                <span class="count">${{track.plays}} plays</span>
+                            </div>`;
+                        }});
+                    }}
+                }} else {{
+                    // Fallback para otras categorÃ­as
+                    content = `<div class="popup-item">
+                        <span class="name">${{item}} en ${{year}}</span>
+                        <span class="count">${{value}} ${{category.includes('DÃ­as') ? 'dÃ­as' : category.includes('Canciones') ? 'canciones' : 'reproducciones'}}</span>
+                    </div>`;
+                }}
+            }} else {{
+                // Fallback si no hay detalles
+                content = `<div class="popup-item">
+                    <span class="name">${{item}} en ${{year}}</span>
+                    <span class="count">${{value}} ${{category.includes('DÃ­as') ? 'dÃ­as' : category.includes('Canciones') ? 'canciones' : 'reproducciones'}}</span>
+                </div>`;
+            }}
 
             document.getElementById('popupTitle').textContent = title;
             document.getElementById('popupContent').innerHTML = content;
@@ -1331,12 +1483,12 @@ class UserStatsHTMLGenerator:
             document.getElementById('popup').style.display = 'block';
         }}
 
-        // Siguiendo el patrÃ³n de html_anual.py: eventos directos al final
+        // Siguiendo el patrÃƒÂ³n de html_anual.py: eventos directos al final
         userSelect.addEventListener('change', function() {{
             selectUser(this.value);
         }});
 
-        // Seleccionar primer usuario automÃ¡ticamente si hay usuarios
+        // Seleccionar primer usuario automÃƒÂ¡ticamente si hay usuarios
         if (users.length > 0) {{
             selectUser(users[0]);
         }}
@@ -1345,5 +1497,5 @@ class UserStatsHTMLGenerator:
 </html>"""
 
     def _format_number(self, number: int) -> str:
-        """Formatea nÃºmeros con separadores de miles"""
+        """Formatea nÃƒÂºmeros con separadores de miles"""
         return f"{number:,}".replace(",", ".")

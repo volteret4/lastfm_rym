@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Last.fm Database Updater - Optimized Version
+Last.fm Database Updater - Improved Version
 Actualiza la base de datos con múltiples APIs de forma paralela y más eficiente
+Mejoras: normalización de texto, búsquedas más precisas, backfill estable, actualización de géneros
 """
 
 import os
@@ -13,8 +14,10 @@ import time
 import argparse
 import threading
 import queue
+import re
+import unicodedata
 from datetime import datetime
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 import urllib.parse
@@ -48,6 +51,86 @@ class ApiTask:
     entity_id: str
     mbid: Optional[str] = None
     extra_data: Optional[Dict] = None
+
+
+class TextNormalizer:
+    """Utilidades para normalización de texto para búsquedas más efectivas"""
+
+    @staticmethod
+    def normalize_text(text: str) -> str:
+        """Normaliza texto para comparación"""
+        if not text:
+            return ""
+
+        # Convertir a minúsculas
+        text = text.lower()
+
+        # Normalizar unicode (NFD) y remover diacríticos
+        text = unicodedata.normalize('NFD', text)
+        text = ''.join(char for char in text if unicodedata.category(char) != 'Mn')
+
+        # Remover caracteres especiales y espacios extra
+        text = re.sub(r'[^\w\s]', ' ', text)
+        text = ' '.join(text.split())
+
+        return text.strip()
+
+    @staticmethod
+    def clean_for_search(text: str) -> Tuple[str, str]:
+        """Limpia texto para búsqueda, devuelve versión limpia y original"""
+        if not text:
+            return "", ""
+
+        original = text
+        cleaned = text
+
+        # Remover información entre paréntesis, corchetes, llaves
+        cleaned = re.sub(r'\([^)]*\)', '', cleaned)
+        cleaned = re.sub(r'\[[^\]]*\]', '', cleaned)
+        cleaned = re.sub(r'\{[^}]*\}', '', cleaned)
+
+        # Remover versiones especiales comunes
+        special_versions = [
+            r'\b(remaster(?:ed)?|deluxe|expanded|special|anniversary|edition|version)\b',
+            r'\b(feat(?:uring)?|ft\.?|with)\s+[^-]*',
+            r'\b(remix|mix|radio\s+edit|extended|acoustic)\b',
+            r'\b\d+th\s+anniversary\b',
+            r'\b(mono|stereo)\b'
+        ]
+
+        for pattern in special_versions:
+            cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+
+        # Limpiar espacios extra y caracteres especiales
+        cleaned = re.sub(r'[^\w\s\-]', ' ', cleaned)
+        cleaned = ' '.join(cleaned.split())
+        cleaned = cleaned.strip()
+
+        return cleaned, original
+
+    @staticmethod
+    def generate_search_variants(text: str) -> List[str]:
+        """Genera variantes de búsqueda para un texto"""
+        if not text:
+            return []
+
+        variants = []
+        cleaned, original = TextNormalizer.clean_for_search(text)
+
+        # Versión original
+        variants.append(original.strip())
+
+        # Versión limpia si es diferente
+        if cleaned != original and cleaned:
+            variants.append(cleaned)
+
+        # Versión súper limpia (solo alfanuméricos y espacios)
+        super_clean = re.sub(r'[^\w\s]', ' ', cleaned)
+        super_clean = ' '.join(super_clean.split())
+        if super_clean and super_clean not in variants:
+            variants.append(super_clean)
+
+        return [v for v in variants if v]
 
 
 class OptimizedDatabase:
@@ -226,6 +309,19 @@ class OptimizedDatabase:
             )
         ''')
 
+        # Nueva tabla: Géneros de álbumes
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS album_genres (
+                artist TEXT NOT NULL,
+                album TEXT NOT NULL,
+                source TEXT NOT NULL,
+                genre TEXT NOT NULL,
+                weight REAL DEFAULT 1.0,
+                last_updated INTEGER NOT NULL,
+                PRIMARY KEY (artist, album, source, genre)
+            )
+        ''')
+
         # Nueva tabla: Cache de API requests
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS api_cache (
@@ -242,6 +338,7 @@ class OptimizedDatabase:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_track_details_mbid ON track_details(mbid)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_scrobbles_artist_mbid ON scrobbles(artist_mbid)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_api_cache_expires ON api_cache(expires_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_album_genres_artist_album ON album_genres(artist, album)')
 
         self.conn.commit()
 
@@ -377,6 +474,52 @@ class OptimizedDatabase:
                 ))
             self.conn.commit()
 
+    def save_album_genres(self, artist: str, album: str, source: str, genres: List[Dict]):
+        """Guarda géneros de álbum por fuente"""
+        with self.lock:
+            cursor = self.conn.cursor()
+            # Limpiar géneros existentes de esta fuente para este álbum
+            cursor.execute('DELETE FROM album_genres WHERE artist = ? AND album = ? AND source = ?',
+                         (artist, album, source))
+
+            for genre_info in genres:
+                cursor.execute('''
+                    INSERT INTO album_genres (artist, album, source, genre, weight, last_updated)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    artist, album, source,
+                    genre_info.get('name', genre_info) if isinstance(genre_info, dict) else str(genre_info),
+                    genre_info.get('weight', 1.0) if isinstance(genre_info, dict) else 1.0,
+                    int(time.time())
+                ))
+            self.conn.commit()
+
+    def get_scrobble_context_for_album(self, artist: str, album: str) -> Optional[str]:
+        """Obtiene un track representativo para mejorar búsquedas de álbum"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT track FROM scrobbles
+            WHERE artist = ? AND album = ?
+            GROUP BY track
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        ''', (artist, album))
+        result = cursor.fetchone()
+        return result['track'] if result else None
+
+    def get_scrobble_context_for_track(self, artist: str, track: str) -> Optional[str]:
+        """Obtiene un álbum representativo para mejorar búsquedas de track"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT album FROM scrobbles
+            WHERE artist = ? AND track = ? AND album IS NOT NULL AND album != ""
+            GROUP BY album
+            ORDER BY COUNT(*) DESC
+            LIMIT 1
+        ''', (artist, track))
+        result = cursor.fetchone()
+        return result['album'] if result else None
+
     # Métodos heredados de la clase Database original
     def save_album_label(self, artist: str, album: str, label: Optional[str]):
         """Guarda el sello de un álbum en la cache"""
@@ -399,7 +542,7 @@ class OptimizedDatabase:
             self.conn.commit()
 
     def save_artist_genres(self, artist: str, genres: List[str]):
-        """Guarda géneros de un artista en la cache (formato original)"""
+        """Guarda géneros de un artista en la cache (formato original) - FIXED"""
         with self.lock:
             cursor = self.conn.cursor()
             cursor.execute('''
@@ -490,7 +633,7 @@ class OptimizedDatabase:
                     pass
             self.conn.commit()
 
-    def get_entities_needing_enrichment(self) -> Dict[str, Set[str]]:
+    def get_entities_needing_enrichment(self, limit: int = 1000) -> Dict[str, Set[str]]:
         """Obtiene entidades que necesitan enriquecimiento"""
         with self.lock:
             cursor = self.conn.cursor()
@@ -501,8 +644,8 @@ class OptimizedDatabase:
                 FROM scrobbles s
                 LEFT JOIN artist_details ad ON s.artist = ad.artist
                 WHERE ad.artist IS NULL
-                LIMIT 1000
-            ''')
+                LIMIT ?
+            ''', (limit,))
             artists = {row[0] for row in cursor.fetchall()}
 
             # Álbumes sin detalles
@@ -511,8 +654,8 @@ class OptimizedDatabase:
                 FROM scrobbles s
                 LEFT JOIN album_details ald ON s.artist = ald.artist AND s.album = ald.album
                 WHERE s.album IS NOT NULL AND s.album != '' AND ald.artist IS NULL
-                LIMIT 1000
-            ''')
+                LIMIT ?
+            ''', (limit,))
             albums = {f"{row[0]}|||{row[1]}" for row in cursor.fetchall()}
 
             # Tracks sin detalles
@@ -521,8 +664,8 @@ class OptimizedDatabase:
                 FROM scrobbles s
                 LEFT JOIN track_details td ON s.artist = td.artist AND s.track = td.track
                 WHERE td.artist IS NULL
-                LIMIT 1000
-            ''')
+                LIMIT ?
+            ''', (limit,))
             tracks = {f"{row[0]}|||{row[1]}" for row in cursor.fetchall()}
 
             return {
@@ -571,13 +714,15 @@ class OptimizedDatabase:
 
 
 class ApiClient:
-    """Cliente base para APIs"""
+    """Cliente base para APIs con mejor manejo de errores"""
     def __init__(self, base_url: str, rate_limit_delay: float = 0.2):
         self.base_url = base_url
         self.rate_limit_delay = rate_limit_delay
         self.session = requests.Session()
         self.last_request_time = 0
         self.lock = threading.Lock()
+        self.consecutive_errors = 0
+        self.max_consecutive_errors = 5
 
     def _rate_limit(self):
         """Implementa rate limiting"""
@@ -587,21 +732,48 @@ class ApiClient:
                 time.sleep(self.rate_limit_delay - elapsed)
             self.last_request_time = time.time()
 
-    def get(self, url: str, params: Dict = None, headers: Dict = None, timeout: int = 10) -> Optional[Dict]:
-        """Realiza request con rate limiting"""
+    def get(self, url: str, params: Dict = None, headers: Dict = None, timeout: int = 15) -> Optional[Dict]:
+        """Realiza request con rate limiting y mejor manejo de errores"""
+        if self.consecutive_errors >= self.max_consecutive_errors:
+            print(f"   ⚠️ Demasiados errores consecutivos en {self.base_url}. Saltando...")
+            return None
+
         self._rate_limit()
         try:
             response = self.session.get(url, params=params, headers=headers, timeout=timeout)
+
             if response.status_code == 200:
+                self.consecutive_errors = 0  # Reset error counter on success
                 return response.json()
             elif response.status_code == 429:
                 retry_after = int(response.headers.get('Retry-After', 60))
                 print(f"   ⏳ Rate limit en {self.base_url}. Esperando {retry_after}s...")
                 time.sleep(retry_after)
                 return self.get(url, params, headers, timeout)
+            elif response.status_code in [502, 503, 504]:
+                # Server errors - retry once after delay
+                print(f"   ⚠️ Error de servidor ({response.status_code}) en {self.base_url}. Reintentando...")
+                time.sleep(5)
+                response = self.session.get(url, params=params, headers=headers, timeout=timeout)
+                if response.status_code == 200:
+                    self.consecutive_errors = 0
+                    return response.json()
+
+            self.consecutive_errors += 1
+            return None
+
+        except requests.exceptions.Timeout:
+            print(f"   ⏱️ Timeout en {self.base_url}")
+            self.consecutive_errors += 1
+            return None
+        except requests.exceptions.ConnectionError:
+            print(f"   🔌 Error de conexión en {self.base_url}")
+            self.consecutive_errors += 1
+            time.sleep(2)  # Brief pause before next attempt
             return None
         except Exception as e:
             print(f"   ⚠️ Error en {self.base_url}: {e}")
+            self.consecutive_errors += 1
             return None
 
 
@@ -696,49 +868,101 @@ class LastFMClient(ApiClient):
 
 class MusicBrainzClient(ApiClient):
     def __init__(self):
-        super().__init__("https://musicbrainz.org/ws/2/", 1.0)  # Rate limit más estricto
+        super().__init__("https://musicbrainz.org/ws/2/", 1.1)  # Rate limit más estricto
         self.session.headers.update({
-            'User-Agent': 'LastFM-Database-Updater/1.0 (contact@example.com)'
+            'User-Agent': 'LastFM-Database-Updater/2.0 (contact@example.com)'
         })
 
     def search_artist(self, artist_name: str) -> Optional[Dict]:
-        """Busca artista en MusicBrainz"""
-        params = {
-            'query': f'artist:"{artist_name}"',
-            'fmt': 'json',
-            'limit': 1
-        }
-        return self.get(f"{self.base_url}artist/", params)
+        """Busca artista en MusicBrainz con múltiples estrategias"""
+        search_variants = TextNormalizer.generate_search_variants(artist_name)
+
+        for variant in search_variants:
+            params = {
+                'query': f'artist:"{variant}"',
+                'fmt': 'json',
+                'limit': 5
+            }
+            result = self.get(f"{self.base_url}artist/", params)
+            if result and result.get('artists'):
+                return result
+
+        return None
 
     def get_artist_by_mbid(self, mbid: str) -> Optional[Dict]:
         """Obtiene artista por MBID"""
         params = {'fmt': 'json', 'inc': 'genres+tags'}
         return self.get(f"{self.base_url}artist/{mbid}", params)
 
-    def search_release(self, artist: str, album: str) -> Optional[Dict]:
-        """Busca release en MusicBrainz"""
-        query = f'release:"{album}" AND artist:"{artist}"'
-        params = {
-            'query': query,
-            'fmt': 'json',
-            'limit': 1
-        }
-        return self.get(f"{self.base_url}release/", params)
+    def search_release(self, artist: str, album: str, track_hint: Optional[str] = None) -> Optional[Dict]:
+        """Busca release en MusicBrainz con contexto mejorado"""
+        album_variants = TextNormalizer.generate_search_variants(album)
+        artist_variants = TextNormalizer.generate_search_variants(artist)
+
+        for album_variant in album_variants:
+            for artist_variant in artist_variants:
+                # Búsqueda básica
+                query = f'release:"{album_variant}" AND artist:"{artist_variant}"'
+                params = {
+                    'query': query,
+                    'fmt': 'json',
+                    'limit': 5
+                }
+                result = self.get(f"{self.base_url}release/", params)
+                if result and result.get('releases'):
+                    return result
+
+                # Si tenemos un track como contexto, usarlo también
+                if track_hint:
+                    track_clean, _ = TextNormalizer.clean_for_search(track_hint)
+                    if track_clean:
+                        query_with_track = f'release:"{album_variant}" AND artist:"{artist_variant}" AND recording:"{track_clean}"'
+                        params['query'] = query_with_track
+                        result = self.get(f"{self.base_url}release/", params)
+                        if result and result.get('releases'):
+                            return result
+
+        return None
 
     def get_release_by_mbid(self, mbid: str) -> Optional[Dict]:
         """Obtiene release por MBID"""
-        params = {'fmt': 'json', 'inc': 'release-groups+labels+recordings'}
+        params = {'fmt': 'json', 'inc': 'release-groups+labels+recordings+genres+tags'}
         return self.get(f"{self.base_url}release/{mbid}", params)
 
-    def search_recording(self, artist: str, track: str) -> Optional[Dict]:
-        """Busca recording en MusicBrainz"""
-        query = f'recording:"{track}" AND artist:"{artist}"'
-        params = {
-            'query': query,
-            'fmt': 'json',
-            'limit': 1
-        }
-        return self.get(f"{self.base_url}recording/", params)
+    def search_recording(self, artist: str, track: str, album_hint: Optional[str] = None) -> Optional[Dict]:
+        """Busca recording en MusicBrainz con contexto mejorado"""
+        track_variants = TextNormalizer.generate_search_variants(track)
+        artist_variants = TextNormalizer.generate_search_variants(artist)
+
+        for track_variant in track_variants:
+            for artist_variant in artist_variants:
+                # Búsqueda básica
+                query = f'recording:"{track_variant}" AND artist:"{artist_variant}"'
+                params = {
+                    'query': query,
+                    'fmt': 'json',
+                    'limit': 5
+                }
+                result = self.get(f"{self.base_url}recording/", params)
+                if result and result.get('recordings'):
+                    return result
+
+                # Si tenemos un álbum como contexto, usarlo también
+                if album_hint:
+                    album_clean, _ = TextNormalizer.clean_for_search(album_hint)
+                    if album_clean:
+                        query_with_album = f'recording:"{track_variant}" AND artist:"{artist_variant}" AND release:"{album_clean}"'
+                        params['query'] = query_with_album
+                        result = self.get(f"{self.base_url}recording/", params)
+                        if result and result.get('recordings'):
+                            return result
+
+        return None
+
+    def get_recording_by_mbid(self, mbid: str) -> Optional[Dict]:
+        """Obtiene recording por MBID"""
+        params = {'fmt': 'json', 'inc': 'releases+genres+tags'}
+        return self.get(f"{self.base_url}recording/{mbid}", params)
 
 
 class DiscogsClient(ApiClient):
@@ -751,16 +975,25 @@ class DiscogsClient(ApiClient):
             })
 
     def search_release(self, artist: str, album: str) -> Optional[Dict]:
-        """Busca release en Discogs"""
+        """Busca release en Discogs con múltiples variantes"""
         if not self.token:
             return None
 
-        params = {
-            'q': f'{artist} {album}',
-            'type': 'release',
-            'per_page': 1
-        }
-        return self.get(f"{self.base_url}database/search", params)
+        artist_variants = TextNormalizer.generate_search_variants(artist)
+        album_variants = TextNormalizer.generate_search_variants(album)
+
+        for artist_variant in artist_variants[:2]:  # Limitar variantes para evitar exceso de requests
+            for album_variant in album_variants[:2]:
+                params = {
+                    'q': f'{artist_variant} {album_variant}',
+                    'type': 'release',
+                    'per_page': 5
+                }
+                result = self.get(f"{self.base_url}database/search", params)
+                if result and result.get('results'):
+                    return result
+
+        return None
 
     def get_release_details(self, release_id: str) -> Optional[Dict]:
         """Obtiene detalles de release"""
@@ -881,9 +1114,8 @@ class OptimizedLastFMUpdater:
 
         return scrobbles
 
-
     def update_user_scrobbles_enhanced(self, user: str, download_all: bool = False, backfill: bool = False):
-        """Actualiza scrobbles con datos enriquecidos"""
+        """Actualiza scrobbles con datos enriquecidos y mejor estabilidad para backfill"""
         print(f"\n👤 Actualizando scrobbles para: {user}")
 
         if download_all:
@@ -908,46 +1140,81 @@ class OptimizedLastFMUpdater:
 
         all_scrobbles = []
         page = 1
+        consecutive_errors = 0
+        max_consecutive_errors = 5
 
         while True:
-            data = self.lastfm.get_recent_tracks_enhanced(
-                user, page, 200, from_timestamp, to_timestamp
-            )
+            try:
+                data = self.lastfm.get_recent_tracks_enhanced(
+                    user, page, 200, from_timestamp, to_timestamp
+                )
 
-            if not data or 'recenttracks' not in data:
+                if not data or 'recenttracks' not in data:
+                    consecutive_errors += 1
+                    if consecutive_errors >= max_consecutive_errors:
+                        print(f"   ⚠️ Demasiados errores consecutivos. Guardando datos obtenidos...")
+                        break
+                    print(f"   ⚠️ Error en página {page}. Reintentando en 5s...")
+                    time.sleep(5)
+                    continue
+
+                # Reset error counter on success
+                consecutive_errors = 0
+
+                total_pages = int(data['recenttracks']['@attr']['totalPages'])
+
+                if page == 1:
+                    total_tracks = int(data['recenttracks']['@attr']['total'])
+                    print(f"   🎵 {total_tracks} scrobbles a procesar ({total_pages} páginas)")
+
+                if page > total_pages:
+                    break
+
+                track_data = data['recenttracks'].get('track', [])
+                if isinstance(track_data, dict):
+                    track_data = [track_data]
+
+                # Convertir a ScrobbleData
+                page_scrobbles = self.parse_enhanced_scrobbles(track_data, user)
+                all_scrobbles.extend(page_scrobbles)
+
+                # Para backfill con muchas páginas, guardar cada cierto número de páginas
+                if backfill and len(all_scrobbles) >= 2000:  # Guardar cada 2000 scrobbles
+                    self.db.save_scrobbles_enhanced(all_scrobbles)
+                    print(f"   💾 Guardados {len(all_scrobbles)} scrobbles (página {page}/{total_pages})")
+                    all_scrobbles = []
+
+                if total_pages > 10 and page % 25 == 0:
+                    print(f"   📄 Página {page}/{total_pages} procesada")
+
+                page += 1
+
+                # Para usuarios con miles de páginas, añadir pequeña pausa cada 100 páginas
+                if page % 100 == 0:
+                    print(f"   ⏸️ Pausa breve en página {page}...")
+                    time.sleep(2)
+
+            except KeyboardInterrupt:
+                print(f"\n   ⚠️ Interrumpido por el usuario. Guardando datos obtenidos...")
                 break
+            except Exception as e:
+                consecutive_errors += 1
+                print(f"   ⚠️ Error en página {page}: {e}")
+                if consecutive_errors >= max_consecutive_errors:
+                    print(f"   ❌ Demasiados errores. Guardando datos obtenidos...")
+                    break
+                time.sleep(5)
 
-            total_pages = int(data['recenttracks']['@attr']['totalPages'])
-
-            if page == 1:
-                total_tracks = int(data['recenttracks']['@attr']['total'])
-                print(f"   🎵 {total_tracks} scrobbles a procesar ({total_pages} páginas)")
-
-            if page > total_pages:
-                break
-
-            track_data = data['recenttracks'].get('track', [])
-            if isinstance(track_data, dict):
-                track_data = [track_data]
-
-            # Convertir a ScrobbleData
-            page_scrobbles = self.parse_enhanced_scrobbles(track_data, user)
-            all_scrobbles.extend(page_scrobbles)
-
-            if total_pages > 10 and page % 10 == 0:
-                print(f"   📄 Página {page}/{total_pages} procesada")
-
-            page += 1
-
+        # Guardar scrobbles restantes
         if all_scrobbles:
             self.db.save_scrobbles_enhanced(all_scrobbles)
             print(f"   ✅ {len(all_scrobbles)} scrobbles guardados con MBIDs")
 
-    def enrich_entities_parallel(self, max_workers: int = 3):
+    def enrich_entities_parallel(self, max_workers: int = 3, limit: int = 1000):
         """Enriquece entidades usando múltiples APIs en paralelo"""
-        print(f"\n🔍 Enriqueciendo datos de entidades...")
+        print(f"\n🔍 Enriqueciendo datos de entidades (límite: {limit})...")
 
-        entities = self.db.get_entities_needing_enrichment()
+        entities = self.db.get_entities_needing_enrichment(limit=limit)
 
         print(f"   👥 {len(entities['artists'])} artistas por enriquecer")
         print(f"   💿 {len(entities['albums'])} álbumes por enriquecer")
@@ -960,7 +1227,7 @@ class OptimizedLastFMUpdater:
         # Crear tareas
         tasks = []
 
-        # Tareas de artistas
+        # Tareas de artistas (prioridad alta)
         for artist in entities['artists']:
             tasks.append(ApiTask('artist', 'artist', artist))
 
@@ -975,14 +1242,16 @@ class OptimizedLastFMUpdater:
             tasks.append(ApiTask('track', 'track', f"{artist}|||{track}"))
 
         # Procesar en paralelo
+        completed_count = 0
+        total_tasks = len(tasks)
+
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(self.process_entity_task, task) for task in tasks]
 
-            completed = 0
             for future in as_completed(futures):
-                completed += 1
-                if completed % 50 == 0:
-                    print(f"   🔄 {completed}/{len(futures)} entidades procesadas")
+                completed_count += 1
+                if completed_count % 50 == 0 or completed_count == total_tasks:
+                    print(f"   📄 {completed_count}/{total_tasks} entidades procesadas")
                 try:
                     future.result()
                 except Exception as e:
@@ -992,18 +1261,21 @@ class OptimizedLastFMUpdater:
 
     def process_entity_task(self, task: ApiTask):
         """Procesa una tarea de enriquecimiento"""
-        if task.task_type == 'artist':
-            self.enrich_artist(task.entity_id)
-        elif task.task_type == 'album':
-            artist, album = task.entity_id.split('|||')
-            self.enrich_album(artist, album)
-        elif task.task_type == 'track':
-            artist, track = task.entity_id.split('|||')
-            self.enrich_track(artist, track)
+        try:
+            if task.task_type == 'artist':
+                self.enrich_artist(task.entity_id)
+            elif task.task_type == 'album':
+                artist, album = task.entity_id.split('|||')
+                self.enrich_album(artist, album)
+            elif task.task_type == 'track':
+                artist, track = task.entity_id.split('|||')
+                self.enrich_track(artist, track)
+        except Exception as e:
+            print(f"   ⚠️ Error en tarea {task.task_type}: {e}")
 
     def enrich_artist(self, artist_name: str):
-        """Enriquece datos de artista usando múltiples APIs"""
-        cache_key = f"artist_enrich_{artist_name}"
+        """Enriquece datos de artista usando múltiples APIs con mejor búsqueda"""
+        cache_key = f"artist_enrich_v2_{artist_name}"
 
         # Verificar cache
         cached = self.db.get_cached_response(cache_key)
@@ -1011,19 +1283,26 @@ class OptimizedLastFMUpdater:
             return
 
         details = {}
+        found_genres = False
 
         # 1. Last.fm para géneros y similares
         lastfm_data = self.lastfm.get_artist_info(artist_name)
         if lastfm_data and 'artist' in lastfm_data:
             artist_info = lastfm_data['artist']
 
-            # Géneros de Last.fm
+            # Géneros de Last.fm - FIXED: Actualizar tabla artist_genres
             if 'tags' in artist_info and 'tag' in artist_info['tags']:
                 lastfm_genres = [
                     {'name': tag['name'], 'weight': float(tag.get('count', 1))}
                     for tag in artist_info['tags']['tag'][:10]
                 ]
                 self.db.save_detailed_genres(artist_name, 'lastfm', lastfm_genres)
+
+                # FIXED: También actualizar la tabla artist_genres original
+                genre_names = [genre['name'] for genre in lastfm_genres]
+                if genre_names:
+                    self.db.save_artist_genres(artist_name, genre_names)
+                    found_genres = True
 
             # Artistas similares
             similar_data = self.lastfm.get_similar_artists(artist_name)
@@ -1034,16 +1313,19 @@ class OptimizedLastFMUpdater:
                 details['similar_artists'] = similar_artists
 
             # MBID de Last.fm
-            if 'mbid' in artist_info:
+            if 'mbid' in artist_info and artist_info['mbid']:
                 details['mbid'] = artist_info['mbid']
 
         # 2. MusicBrainz para datos oficiales
+        mb_data = None
         if 'mbid' in details:
             mb_data = self.musicbrainz.get_artist_by_mbid(details['mbid'])
         else:
-            mb_data = self.musicbrainz.search_artist(artist_name)
-            if mb_data and 'artists' in mb_data and mb_data['artists']:
-                details['mbid'] = mb_data['artists'][0]['id']
+            # Búsqueda mejorada en MusicBrainz
+            search_result = self.musicbrainz.search_artist(artist_name)
+            if search_result and 'artists' in search_result and search_result['artists']:
+                best_match = search_result['artists'][0]
+                details['mbid'] = best_match['id']
                 mb_data = self.musicbrainz.get_artist_by_mbid(details['mbid'])
 
         if mb_data:
@@ -1056,12 +1338,26 @@ class OptimizedLastFMUpdater:
             })
 
             # Géneros de MusicBrainz
-            if 'genres' in mb_data:
+            mb_genres = []
+            if 'genres' in mb_data and mb_data['genres']:
                 mb_genres = [
                     {'name': g['name'], 'weight': 1.0}
                     for g in mb_data['genres']
                 ]
+            elif 'tags' in mb_data and mb_data['tags']:
+                # Si no hay géneros, usar tags
+                mb_genres = [
+                    {'name': t['name'], 'weight': float(t.get('count', 1))}
+                    for t in mb_data['tags'][:10]
+                ]
+
+            if mb_genres:
                 self.db.save_detailed_genres(artist_name, 'musicbrainz', mb_genres)
+
+                # Si no encontramos géneros en Last.fm, usar los de MusicBrainz para la tabla original
+                if not found_genres:
+                    genre_names = [genre['name'] for genre in mb_genres]
+                    self.db.save_artist_genres(artist_name, genre_names)
 
         # Guardar detalles del artista
         self.db.save_artist_details(artist_name, details)
@@ -1070,28 +1366,34 @@ class OptimizedLastFMUpdater:
         self.db.cache_response(cache_key, {'processed': True}, 86400)  # 24 horas
 
     def enrich_album(self, artist: str, album: str):
-        """Enriquece datos de álbum"""
-        cache_key = f"album_enrich_{artist}_{album}"
+        """Enriquece datos de álbum con búsqueda mejorada"""
+        cache_key = f"album_enrich_v2_{artist}_{album}"
 
         if self.db.get_cached_response(cache_key):
             return
 
         details = {}
 
+        # Obtener contexto de track para mejorar búsquedas
+        track_hint = self.db.get_scrobble_context_for_album(artist, album)
+
         # 1. Last.fm
         lastfm_data = self.lastfm.get_album_info(artist, album)
         if lastfm_data and 'album' in lastfm_data:
             album_info = lastfm_data['album']
-            if 'mbid' in album_info:
+            if 'mbid' in album_info and album_info['mbid']:
                 details['mbid'] = album_info['mbid']
 
-        # 2. MusicBrainz
+        # 2. MusicBrainz con búsqueda mejorada
+        mb_data = None
         if 'mbid' in details:
             mb_data = self.musicbrainz.get_release_by_mbid(details['mbid'])
         else:
-            mb_data = self.musicbrainz.search_release(artist, album)
-            if mb_data and 'releases' in mb_data and mb_data['releases']:
-                details['mbid'] = mb_data['releases'][0]['id']
+            # Búsqueda mejorada con contexto de track
+            search_result = self.musicbrainz.search_release(artist, album, track_hint)
+            if search_result and 'releases' in search_result and search_result['releases']:
+                best_match = search_result['releases'][0]
+                details['mbid'] = best_match['id']
                 mb_data = self.musicbrainz.get_release_by_mbid(details['mbid'])
 
         if mb_data:
@@ -1111,6 +1413,22 @@ class OptimizedLastFMUpdater:
                 label = mb_data['label-info'][0]['label']['name']
                 self.db.save_album_label(artist, album, label)
 
+            # Géneros del álbum de MusicBrainz
+            mb_album_genres = []
+            if 'genres' in mb_data and mb_data['genres']:
+                mb_album_genres = [
+                    {'name': g['name'], 'weight': 1.0}
+                    for g in mb_data['genres']
+                ]
+            elif 'tags' in mb_data and mb_data['tags']:
+                mb_album_genres = [
+                    {'name': t['name'], 'weight': float(t.get('count', 1))}
+                    for t in mb_data['tags'][:10]
+                ]
+
+            if mb_album_genres:
+                self.db.save_album_genres(artist, album, 'musicbrainz', mb_album_genres)
+
             # Guardar fecha de lanzamiento en el formato original también
             if mb_data.get('date'):
                 try:
@@ -1120,53 +1438,61 @@ class OptimizedLastFMUpdater:
                     pass
 
         # 3. Discogs como fallback
-        if not details.get('release_date'):
+        if not details.get('release_date') and self.discogs.token:
             discogs_data = self.discogs.search_release(artist, album)
             if discogs_data and 'results' in discogs_data and discogs_data['results']:
                 result = discogs_data['results'][0]
-                details['release_date'] = str(result.get('year', ''))
 
-                if 'label' in result and result['label']:
-                    self.db.save_album_label(artist, album, result['label'][0])
-
-                # Guardar fecha de lanzamiento de Discogs en formato original
                 if result.get('year'):
+                    details['release_date'] = str(result.get('year'))
+                    # Guardar fecha de lanzamiento de Discogs en formato original
                     try:
                         release_year = int(result.get('year'))
                         self.db.save_album_release_date(artist, album, release_year, str(release_year))
                     except (ValueError, TypeError):
                         pass
 
+                if 'label' in result and result['label']:
+                    self.db.save_album_label(artist, album, result['label'][0])
+
+                # Géneros de Discogs
+                if 'genre' in result and result['genre']:
+                    discogs_genres = [
+                        {'name': genre, 'weight': 1.0}
+                        for genre in result['genre'][:10]
+                    ]
+                    self.db.save_album_genres(artist, album, 'discogs', discogs_genres)
+
         self.db.save_album_details(artist, album, details)
         self.db.cache_response(cache_key, {'processed': True}, 86400)
 
     def enrich_track(self, artist: str, track: str):
-        """Enriquece datos de track"""
-        cache_key = f"track_enrich_{artist}_{track}"
+        """Enriquece datos de track con búsqueda mejorada"""
+        cache_key = f"track_enrich_v2_{artist}_{track}"
 
         if self.db.get_cached_response(cache_key):
             return
 
         details = {}
 
+        # Obtener contexto de álbum para mejorar búsquedas
+        album_hint = self.db.get_scrobble_context_for_track(artist, track)
+
         # Last.fm
         lastfm_data = self.lastfm.get_track_info(artist, track)
         if lastfm_data and 'track' in lastfm_data:
             track_info = lastfm_data['track']
             details.update({
-                'mbid': track_info.get('mbid'),
+                'mbid': track_info.get('mbid') if track_info.get('mbid') else None,
                 'duration_ms': int(track_info.get('duration', 0)),
                 'album': track_info.get('album', {}).get('title') if 'album' in track_info else None
             })
 
-        # MusicBrainz
-        if 'mbid' in details:
-            # Ya tenemos MBID, podríamos obtener más detalles si fuera necesario
-            pass
-        else:
-            mb_data = self.musicbrainz.search_recording(artist, track)
-            if mb_data and 'recordings' in mb_data and mb_data['recordings']:
-                recording = mb_data['recordings'][0]
+        # MusicBrainz con búsqueda mejorada
+        if not details.get('mbid'):
+            search_result = self.musicbrainz.search_recording(artist, track, album_hint)
+            if search_result and 'recordings' in search_result and search_result['recordings']:
+                recording = search_result['recordings'][0]
                 details.update({
                     'mbid': recording['id'],
                     'duration_ms': recording.get('length'),
@@ -1176,22 +1502,19 @@ class OptimizedLastFMUpdater:
         self.db.save_track_details(artist, track, details)
         self.db.cache_response(cache_key, {'processed': True}, 86400)
 
-    def run(self, download_all: bool = False, backfill: bool = False, enrich_only: bool = False):
+    def run(self, download_all: bool = False, backfill: bool = False,
+        enrich_only: bool = False, limit: int = 1000):
         """Ejecuta el proceso optimizado"""
         print("=" * 60)
-        print("🚀 ACTUALIZADOR OPTIMIZADO DE LAST.FM")
+        print("🚀 ACTUALIZADOR OPTIMIZADO DE LAST.FM v2.0")
         print("=" * 60)
 
         if enrich_only:
-            print("🔍 MODO --enrich: Solo enriqueciendo datos existentes")
-            self.enrich_entities_parallel()
+            self.enrich_entities_parallel(limit=limit)
         else:
-            # Actualizar scrobbles con datos enriquecidos
             for user in self.users:
                 self.update_user_scrobbles_enhanced(user, download_all, backfill)
-
-            # Enriquecer entidades en paralelo
-            self.enrich_entities_parallel()
+            self.enrich_entities_parallel(limit=limit)
 
         print("\n" + "=" * 60)
         print("✅ PROCESO COMPLETADO")
@@ -1200,13 +1523,15 @@ class OptimizedLastFMUpdater:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Actualizador optimizado de Last.fm')
+    parser = argparse.ArgumentParser(description='Actualizador optimizado de Last.fm v2.0')
     parser.add_argument('--all', action='store_true',
                        help='Descargar TODOS los scrobbles')
     parser.add_argument('--backfill', action='store_true',
                        help='Completar historial hacia atrás')
     parser.add_argument('--enrich', action='store_true',
                        help='Solo enriquecer datos existentes')
+    parser.add_argument('--limit', type=int, default=1000,
+                       help='Número máximo de entidades a enriquecer por tipo (default: 1000)')
 
     args = parser.parse_args()
 
@@ -1216,7 +1541,7 @@ def main():
 
     try:
         updater = OptimizedLastFMUpdater()
-        updater.run(download_all=args.all, backfill=args.backfill, enrich_only=args.enrich)
+        updater.run(download_all=args.all, backfill=args.backfill, enrich_only=args.enrich, limit=args.limit)
     except KeyboardInterrupt:
         print("\n⚠️ Interrumpido por el usuario")
         sys.exit(1)

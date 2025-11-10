@@ -790,8 +790,26 @@ class OptimizedLastFMUpdater:
         # Base de datos
         self.db = OptimizedDatabase()
 
-    def parse_enhanced_scrobbles(self, track_data: List[Dict], user: str) -> List[ScrobbleData]:
-        """Convierte datos de Last.fm a ScrobbleData con MBIDs"""
+    def parse_enhanced_scrobbles(self, track_data: List[Dict], user: str, fetch_name_from_mb_if_missing: bool = True) -> List[ScrobbleData]:
+        """Convierte datos de Last.fm a ScrobbleData con MBIDs.
+        Más tolerante ante diferentes formas de respuesta de la API.
+        Si fetch_name_from_mb_if_missing=True, intenta recuperar el nombre desde MusicBrainz si sólo hay MBID.
+        """
+        def extract_text(obj, prefer_keys=('#text', 'name', 'title')):
+            # obj puede ser dict o string. Intentamos varias claves en orden.
+            if isinstance(obj, dict):
+                for k in prefer_keys:
+                    v = obj.get(k)
+                    if isinstance(v, str) and v.strip():
+                        return v.strip()
+                # a veces Last.fm devuelve {'#text': '', 'mbid': '...'}
+                # en ese caso devolvemos '' y el llamador podrá intentar otro fallback
+                return ''
+            elif obj is None:
+                return ''
+            else:
+                return str(obj).strip()
+
         scrobbles = []
 
         for track in track_data:
@@ -801,29 +819,60 @@ class OptimizedLastFMUpdater:
             if 'date' not in track:
                 continue
 
-            # Extraer datos básicos
             artist_data = track.get('artist', {})
             album_data = track.get('album', {})
 
-            artist = artist_data.get('#text', '') if isinstance(artist_data, dict) else str(artist_data)
-            album = album_data.get('#text', '') if isinstance(album_data, dict) else str(album_data)
-
-            # Extraer MBIDs
-            artist_mbid = artist_data.get('mbid') if isinstance(artist_data, dict) else None
-            album_mbid = album_data.get('mbid') if isinstance(album_data, dict) else None
+            # Extraer MBIDs primero porque a veces '#text' está vacío
+            artist_mbid = None
+            album_mbid = None
+            if isinstance(artist_data, dict):
+                artist_mbid = artist_data.get('mbid')
+            if isinstance(album_data, dict):
+                album_mbid = album_data.get('mbid')
             track_mbid = track.get('mbid')
 
-            # Limpiar MBIDs vacíos
-            artist_mbid = artist_mbid if artist_mbid and artist_mbid.strip() else None
-            album_mbid = album_mbid if album_mbid and album_mbid.strip() else None
-            track_mbid = track_mbid if track_mbid and track_mbid.strip() else None
+            # Normalizar MBIDs vacíos
+            artist_mbid = artist_mbid if isinstance(artist_mbid, str) and artist_mbid.strip() else None
+            album_mbid = album_mbid if isinstance(album_mbid, str) and album_mbid.strip() else None
+            track_mbid = track_mbid if isinstance(track_mbid, str) and track_mbid.strip() else None
+
+            # Extraer nombres (varias posibilidades)
+            artist = extract_text(artist_data)
+            album = extract_text(album_data)
+            track_name = track.get('name') or extract_text(track.get('name') if isinstance(track.get('name'), (dict, str)) else None)
+            if isinstance(track_name, dict):
+                track_name = extract_text(track_name)
+
+            # Si no hay nombre de artista pero sí MBID, intentar MusicBrainz (opcional)
+            if (not artist) and artist_mbid and fetch_name_from_mb_if_missing:
+                try:
+                    mb = self.musicbrainz.get_artist_by_mbid(artist_mbid)
+                    if mb and isinstance(mb, dict):
+                        # MusicBrainz devuelve 'name'
+                        maybe_name = mb.get('name') or mb.get('sort-name')
+                        if isinstance(maybe_name, str) and maybe_name.strip():
+                            artist = maybe_name.strip()
+                except Exception:
+                    # No queremos que falle el parsing por una caída externa
+                    pass
+
+            # Si aún está vacío, como último recurso usar el mbid (útil para debug)
+            if not artist and artist_mbid:
+                artist = artist_mbid
+
+            # timestamp - safe parse
+            try:
+                timestamp = int(track['date']['uts'])
+            except Exception:
+                # si por alguna razón no existe, saltamos
+                continue
 
             scrobble = ScrobbleData(
                 user=user,
                 artist=artist,
-                track=track.get('name', ''),
+                track=track_name or '',
                 album=album,
-                timestamp=int(track['date']['uts']),
+                timestamp=timestamp,
                 artist_mbid=artist_mbid,
                 album_mbid=album_mbid,
                 track_mbid=track_mbid
@@ -831,6 +880,7 @@ class OptimizedLastFMUpdater:
             scrobbles.append(scrobble)
 
         return scrobbles
+
 
     def update_user_scrobbles_enhanced(self, user: str, download_all: bool = False, backfill: bool = False):
         """Actualiza scrobbles con datos enriquecidos"""

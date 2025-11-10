@@ -16,7 +16,8 @@ def scan_html_files(docs_dir='docs'):
         'weekly': [],
         'monthly': [],
         'yearly': [],
-        'users': []
+        'users': [],
+        'grupo': []
     }
 
     if not os.path.exists(docs_dir):
@@ -99,6 +100,25 @@ def scan_html_files(docs_dir='docs'):
                     date_obj = datetime.now()
 
                 files['users'].append({
+                    'filename': filename,
+                    'label': label,
+                    'date': date_obj
+                })
+
+        elif filename.startswith('grupo'):
+            # grupo.html, grupo_2019-2024.html
+            match = re.match(r'grupo(?:_(\d{4})-(\d{4}))?\.html', filename)
+            if match:
+                if match.group(1) and match.group(2):
+                    from_year = match.group(1)
+                    to_year = match.group(2)
+                    label = f"Grupo {from_year}-{to_year}"
+                    date_obj = datetime(int(to_year), 12, 31)
+                else:
+                    label = "Estadísticas Grupales"
+                    date_obj = datetime.now()
+
+                files['grupo'].append({
                     'filename': filename,
                     'label': label,
                     'date': date_obj
@@ -367,7 +387,7 @@ def generate_index_html(files):
     <body>
         <header>
             <div class="container">
-                <h1>🌀 RYM Hispano Estadísticas</h1>
+                <h1>🎵 RYM Hispano Estadísticas</h1>
                 <p class="subtitle">Coincidencias musicales entre usuarios</p>
             </div>
         </header>
@@ -375,37 +395,28 @@ def generate_index_html(files):
         <nav>
             <ul class="nav-tabs">
                 <li>
-                    <a href="#weekly" class="tab-link active" data-tab="weekly"
-                        >Semanal</a
+                    <a href="#temporal" class="tab-link active" data-tab="temporal"
+                        >Temporales</a
                     >
                 </li>
                 <li>
-                    <a href="#monthly" class="tab-link" data-tab="monthly"
-                        >Mensual</a
+                    <a href="#grupo" class="tab-link" data-tab="grupo"
+                        >Grupo</a
                     >
                 </li>
                 <li>
-                    <a href="#yearly" class="tab-link" data-tab="yearly"
-                        >Anual</a
-                    >
-                </li>
-                <li>
-                    <a href="#users" class="tab-link" data-tab="users"
-                        >Usuarios</a
-                    >
-                </li>
-                <li>
-                    <a href="#about" class="tab-link" data-tab="about">About</a>
+                    <a href="#about" class="tab-link" data-tab="about">Acerca de</a>
                 </li>
             </ul>
         </nav>
 
         <div class="container">
             <div class="content">
-                <!-- Tab Semanal -->
-                <div id="weekly" class="tab-content active">
+                <!-- Tab Temporal -->
+                <div id="temporal" class="tab-content active">
+                    <!-- Estadísticas Semanales -->
                     <div class="period-selector">
-                        <h2>🌀 Estadísticas Semanales<span class="stats-badge">""" + str(len(files['weekly'])) + """</span></h2>
+                        <h2>📀 Estadísticas Semanales<span class="stats-badge">""" + str(len(files['weekly'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces semanales
@@ -419,7 +430,7 @@ def generate_index_html(files):
     else:
         html += """
                             <div class="empty-state">
-                                <div class="empty-state-icon">🌀</div>
+                                <div class="empty-state-icon">📀</div>
                                 <p>No hay estadísticas semanales disponibles</p>
                                 <p style="font-size: 0.9em;">Ejecuta <code>python3 html_semanal.py</code></p>
                             </div>"""
@@ -427,12 +438,10 @@ def generate_index_html(files):
     html += """
                         </div>
                     </div>
-                </div>
 
-                <!-- Tab Mensual -->
-                <div id="monthly" class="tab-content">
+                    <!-- Estadísticas Mensuales -->
                     <div class="period-selector">
-                        <h2>🌀 Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>
+                        <h2>📅 Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces mensuales
@@ -454,12 +463,10 @@ def generate_index_html(files):
     html += """
                         </div>
                     </div>
-                </div>
 
-                <!-- Tab Anual -->
-                <div id="yearly" class="tab-content">
+                    <!-- Estadísticas Anuales -->
                     <div class="period-selector">
-                        <h2>🌀 Estadísticas Anuales<span class="stats-badge">""" + str(len(files['yearly'])) + """</span></h2>
+                        <h2>📆 Estadísticas Anuales<span class="stats-badge">""" + str(len(files['yearly'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces anuales
@@ -473,7 +480,7 @@ def generate_index_html(files):
     else:
         html += """
                             <div class="empty-state">
-                                <div class="empty-state-icon">🌀</div>
+                                <div class="empty-state-icon">📆</div>
                                 <p>No hay estadísticas anuales disponibles</p>
                                 <p style="font-size: 0.9em;">Ejecuta <code>python3 html_anual.py</code></p>
                             </div>"""
@@ -481,10 +488,8 @@ def generate_index_html(files):
     html += """
                         </div>
                     </div>
-                </div>
 
-                <!-- Tab Usuarios -->
-                <div id="users" class="tab-content">
+                    <!-- Estadísticas de Usuarios -->
                     <div class="period-selector">
                         <h2>👤 Estadísticas de Usuarios<span class="stats-badge">""" + str(len(files['users'])) + """</span></h2>
                         <div class="period-grid">"""
@@ -503,6 +508,33 @@ def generate_index_html(files):
                                 <div class="empty-state-icon">👤</div>
                                 <p>No hay estadísticas de usuarios disponibles</p>
                                 <p style="font-size: 0.9em;">Ejecuta <code>python3 html_usuarios.py</code></p>
+                            </div>"""
+
+    html += """
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Grupo -->
+                <div id="grupo" class="tab-content">
+                    <div class="period-selector">
+                        <h2>👥 Estadísticas Grupales<span class="stats-badge">""" + str(len(files['grupo'])) + """</span></h2>
+                        <div class="period-grid">"""
+
+    # Agregar enlaces de grupo
+    if files['grupo']:
+        for file_info in files['grupo']:
+            html += f"""
+                            <a href="{file_info['filename']}" class="period-link">
+                                <div class="period-name">{file_info['label']}</div>
+                                <div class="period-date">Análisis grupal</div>
+                            </a>"""
+    else:
+        html += """
+                            <div class="empty-state">
+                                <div class="empty-state-icon">👥</div>
+                                <p>No hay estadísticas grupales disponibles</p>
+                                <p style="font-size: 0.9em;">Ejecuta <code>python3 html_grupo.py</code></p>
                             </div>"""
 
     html += """
@@ -538,6 +570,10 @@ def generate_index_html(files):
                             <li>
                                 <strong>Estadísticas de Usuarios:</strong> Análisis
                                 individual con gráficos de coincidencias y evolución
+                            </li>
+                            <li>
+                                <strong>Estadísticas Grupales:</strong> Análisis
+                                global del grupo con coincidencias y tendencias
                             </li>
                             <li>
                                 <strong>Coincidencias:</strong> Muestra solo
@@ -594,6 +630,10 @@ def generate_index_html(files):
                             <li>
                                 <code>python3 html_usuarios.py --years-back 3</code>
                                 - Análisis de los últimos 3 años
+                            </li>
+                            <li>
+                                <code>python3 html_grupo.py</code> - Genera
+                                estadísticas grupales globales
                             </li>
                         </ul>
                         <p><strong>Generación del índice:</strong></p>
@@ -686,6 +726,7 @@ def main():
     print(f"Mensuales: {len(files['monthly'])}")
     print(f"Anuales: {len(files['yearly'])}")
     print(f"Usuarios: {len(files['users'])}")
+    print(f"Grupo: {len(files['grupo'])}")
 
     # Generar HTML
     print(f"Generando index.html...")

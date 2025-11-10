@@ -1,0 +1,6196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last.fm Grupo - Estadísticas Grupales</title>
+    <link rel="icon" type="image/png" href="images/music.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: #181825;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: #1e1e2e;
+            padding: 30px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        h1 {
+            font-size: 2em;
+            color: #cba6f7;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #a6adc8;
+            font-size: 1em;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #1e1e2e;
+            border-bottom: 1px solid #313244;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        label {
+            color: #cba6f7;
+            font-weight: 600;
+        }
+
+        .view-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .view-btn {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .view-btn:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+        }
+
+        .view-btn.active {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .group-header {
+            background: #1e1e2e;
+            padding: 25px 30px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .group-header h2 {
+            color: #cba6f7;
+            font-size: 1.5em;
+            margin-bottom: 8px;
+        }
+
+        .group-info {
+            color: #a6adc8;
+            font-size: 0.9em;
+        }
+
+        .stats-container {
+            padding: 30px;
+        }
+
+        .view {
+            display: none;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #313244;
+        }
+
+        .chart-container h3 {
+            color: #cba6f7;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+            margin-bottom: 10px;
+        }
+
+        .chart-info {
+            text-align: center;
+            color: #a6adc8;
+            font-size: 0.9em;
+        }
+
+        .evolution-section {
+            margin-bottom: 40px;
+        }
+
+        .evolution-section h3 {
+            color: #cba6f7;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #cba6f7;
+            padding-bottom: 10px;
+        }
+
+        .evolution-charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 25px;
+        }
+
+        .evolution-chart {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #313244;
+        }
+
+        .evolution-chart h4 {
+            color: #cba6f7;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .line-chart-wrapper {
+            position: relative;
+            height: 400px;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c7086;
+            font-style: italic;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .summary-card {
+            background: #1e1e2e;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #313244;
+            text-align: center;
+        }
+
+        .summary-card .number {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: #cba6f7;
+            margin-bottom: 5px;
+        }
+
+        .summary-card .label {
+            font-size: 0.9em;
+            color: #a6adc8;
+        }
+
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+        }
+
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .popup-header {
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .popup-close {
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .popup-close:hover {
+            color: #cba6f7;
+        }
+
+        .popup-content {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .popup-item {
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+        }
+
+        .popup-item .name {
+            color: #cdd6f4;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .popup-item .details {
+            color: #a6adc8;
+            font-size: 0.9em;
+        }
+
+        .popup-item .users {
+            color: #6c7086;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .evolution-charts {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .view-buttons {
+                justify-content: center;
+            }
+
+            .summary-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>👥 Estadísticas Grupales</h1>
+            <p class="subtitle">Análisis global del grupo</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Vista:</label>
+                <div class="view-buttons">
+                    <button class="view-btn active" data-view="shared">Por Usuarios Compartidos</button>
+                    <button class="view-btn" data-view="scrobbles">Por Scrobbles Totales</button>
+                    <button class="view-btn" data-view="evolution">Evolución Temporal</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="groupHeader" class="group-header">
+            <h2 id="groupTitle">Análisis Grupal</h2>
+            <p class="group-info" id="groupInfo">Período de análisis: 20 años</p>
+        </div>
+
+        <div class="stats-container">
+            <!-- Resumen de estadísticas -->
+            <div id="summaryStats" class="summary-stats">
+                <!-- Se llenará dinámicamente -->
+            </div>
+
+            <!-- Vista Por Usuarios Compartidos -->
+            <div id="sharedView" class="view active">
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3>🎤 Top 15 Artistas</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="sharedArtistsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="sharedArtistsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>💿 Top 15 Álbumes</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="sharedAlbumsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="sharedAlbumsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>🎵 Top 15 Canciones</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="sharedTracksChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="sharedTracksInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>🎭 Top 15 Géneros</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="sharedGenresChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="sharedGenresInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>🏷️ Top 15 Sellos</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="sharedLabelsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="sharedLabelsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>📅 Top 15 Años de Lanzamiento</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="sharedReleaseYearsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="sharedReleaseYearsInfo"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista Por Scrobbles Totales -->
+            <div id="scribblesView" class="view">
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h3>🎤 Top 15 Artistas</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="scrobblesArtistsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="scrobblesArtistsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>💿 Top 15 Álbumes</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="scrobblesAlbumsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="scrobblesAlbumsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>🎵 Top 15 Canciones</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="scrobblesTracksChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="scrobblesTracksInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>🎭 Top 15 Géneros</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="scrobblesGenresChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="scrobblesGenresInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>🏷️ Top 15 Sellos</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="scrobblesLabelsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="scrobblesLabelsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>📅 Top 15 Años de Lanzamiento</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="scrobblesReleaseYearsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="scrobblesReleaseYearsInfo"></div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>🌟 Top 15 Global</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="scrobblesAllCombinedChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="scrobblesAllCombinedInfo"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista de Evolución -->
+            <div id="evolutionView" class="view">
+                <div class="evolution-section">
+                    <h3>📈 Evolución Temporal por Scrobbles</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>🎤 Top 15 Artistas por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionArtistsChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>💿 Top 15 Álbumes por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionAlbumsChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>🎵 Top 15 Canciones por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionTracksChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>🎭 Top 15 Géneros por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionGenresChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>🏷️ Top 15 Sellos por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionLabelsChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>📅 Top 15 Años de Lanzamiento por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionReleaseYearsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Popup para mostrar detalles -->
+            <div id="popupOverlay" class="popup-overlay" style="display: none;"></div>
+            <div id="popup" class="popup" style="display: none;">
+                <div class="popup-header">
+                    <span id="popupTitle">Detalles</span>
+                    <button id="popupClose" class="popup-close">✕</button>
+                </div>
+                <div id="popupContent" class="popup-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const groupStats = {
+  "period": "2006-2025",
+  "users": [
+    "paqueradejere",
+    "sdecandelario",
+    "GabredMared",
+    "Nubis84",
+    "alberto_gu",
+    "Frikomid",
+    "Rocky_stereo",
+    "EliasJ72",
+    "Lonsonxd"
+  ],
+  "user_count": 9,
+  "shared_charts": {
+    "artists": {
+      "title": "Artistas (Por Usuarios Compartidos)",
+      "data": {
+        "Arca": 9,
+        "The Cure": 9,
+        "Pink Floyd": 9,
+        "Björk": 9,
+        "The Beatles": 9,
+        "The Smiths": 9,
+        "David Bowie": 9,
+        "Death Grips": 9,
+        "Mogwai": 9,
+        "JPEGMAFIA": 9,
+        "Daft Punk": 9,
+        "Taylor Swift": 9,
+        "Sigur Rós": 9,
+        "Grimes": 9,
+        "Black Sabbath": 9
+      },
+      "total": 135,
+      "details": {
+        "Arca": {
+          "user_count": 9,
+          "total_scrobbles": 11828,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "The Cure": {
+          "user_count": 9,
+          "total_scrobbles": 9102,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Pink Floyd": {
+          "user_count": 9,
+          "total_scrobbles": 6184,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Björk": {
+          "user_count": 9,
+          "total_scrobbles": 6043,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "The Beatles": {
+          "user_count": 9,
+          "total_scrobbles": 5828,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "The Smiths": {
+          "user_count": 9,
+          "total_scrobbles": 5459,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "David Bowie": {
+          "user_count": 9,
+          "total_scrobbles": 5377,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Death Grips": {
+          "user_count": 9,
+          "total_scrobbles": 4581,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Mogwai": {
+          "user_count": 9,
+          "total_scrobbles": 4048,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "JPEGMAFIA": {
+          "user_count": 9,
+          "total_scrobbles": 3973,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Daft Punk": {
+          "user_count": 9,
+          "total_scrobbles": 3719,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Taylor Swift": {
+          "user_count": 9,
+          "total_scrobbles": 3653,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Sigur Rós": {
+          "user_count": 9,
+          "total_scrobbles": 3650,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Grimes": {
+          "user_count": 9,
+          "total_scrobbles": 3611,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Black Sabbath": {
+          "user_count": 9,
+          "total_scrobbles": 3083,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        }
+      },
+      "type": "shared"
+    },
+    "albums": {
+      "title": "Álbumes (Por Usuarios Compartidos)",
+      "data": {
+        "Daft Punk - Discovery": 9,
+        "Madvillain - Madvillainy": 9,
+        "Slowdive - Souvlaki": 9,
+        "Have a Nice Life - Deathconsciousness": 9,
+        "my bloody valentine - Loveless": 9,
+        "Pink Floyd - The Dark Side of the Moon": 9,
+        "Tyler, The Creator - IGOR": 9,
+        "Pink Floyd - The Wall": 9,
+        "Daft Punk - Random Access Memories": 9,
+        "Pink Floyd - Wish You Were Here": 9,
+        "Boards of Canada - Music Has the Right to Children": 9,
+        "Kendrick Lamar - Mr. Morale & the Big Steppers": 9,
+        "Aphex Twin - Drukqs": 9,
+        "DJ Shadow - Endtroducing.....": 9,
+        "ROSALÍA - MOTOMAMI": 8
+      },
+      "total": 134,
+      "details": {
+        "Daft Punk - Discovery": {
+          "user_count": 9,
+          "total_scrobbles": 1661,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Daft Punk",
+          "album": "Discovery",
+          "track": ""
+        },
+        "Madvillain - Madvillainy": {
+          "user_count": 9,
+          "total_scrobbles": 1506,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Madvillain",
+          "album": "Madvillainy",
+          "track": ""
+        },
+        "Slowdive - Souvlaki": {
+          "user_count": 9,
+          "total_scrobbles": 1269,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Slowdive",
+          "album": "Souvlaki",
+          "track": ""
+        },
+        "Have a Nice Life - Deathconsciousness": {
+          "user_count": 9,
+          "total_scrobbles": 1016,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Have a Nice Life",
+          "album": "Deathconsciousness",
+          "track": ""
+        },
+        "my bloody valentine - Loveless": {
+          "user_count": 9,
+          "total_scrobbles": 1001,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "my bloody valentine",
+          "album": "Loveless",
+          "track": ""
+        },
+        "Pink Floyd - The Dark Side of the Moon": {
+          "user_count": 9,
+          "total_scrobbles": 863,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Pink Floyd",
+          "album": "The Dark Side of the Moon",
+          "track": ""
+        },
+        "Tyler, The Creator - IGOR": {
+          "user_count": 9,
+          "total_scrobbles": 742,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Tyler, The Creator",
+          "album": "IGOR",
+          "track": ""
+        },
+        "Pink Floyd - The Wall": {
+          "user_count": 9,
+          "total_scrobbles": 602,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Pink Floyd",
+          "album": "The Wall",
+          "track": ""
+        },
+        "Daft Punk - Random Access Memories": {
+          "user_count": 9,
+          "total_scrobbles": 523,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Daft Punk",
+          "album": "Random Access Memories",
+          "track": ""
+        },
+        "Pink Floyd - Wish You Were Here": {
+          "user_count": 9,
+          "total_scrobbles": 443,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Pink Floyd",
+          "album": "Wish You Were Here",
+          "track": ""
+        },
+        "Boards of Canada - Music Has the Right to Children": {
+          "user_count": 9,
+          "total_scrobbles": 403,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Boards of Canada",
+          "album": "Music Has the Right to Children",
+          "track": ""
+        },
+        "Kendrick Lamar - Mr. Morale & the Big Steppers": {
+          "user_count": 9,
+          "total_scrobbles": 330,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Kendrick Lamar",
+          "album": "Mr. Morale & the Big Steppers",
+          "track": ""
+        },
+        "Aphex Twin - Drukqs": {
+          "user_count": 9,
+          "total_scrobbles": 262,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Aphex Twin",
+          "album": "Drukqs",
+          "track": ""
+        },
+        "DJ Shadow - Endtroducing.....": {
+          "user_count": 9,
+          "total_scrobbles": 139,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "DJ Shadow",
+          "album": "Endtroducing.....",
+          "track": ""
+        },
+        "ROSALÍA - MOTOMAMI": {
+          "user_count": 8,
+          "total_scrobbles": 2393,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "ROSALÍA",
+          "album": "MOTOMAMI",
+          "track": ""
+        }
+      },
+      "type": "shared"
+    },
+    "tracks": {
+      "title": "Canciones (Por Usuarios Compartidos)",
+      "data": {
+        "Nirvana - Come as You Are": 9,
+        "my bloody valentine - Sometimes": 9,
+        "Car Seat Headrest - Sober to Death": 9,
+        "Madvillain - Accordion": 9,
+        "Pink Floyd - The Great Gig in the Sky": 9,
+        "Slowdive - When the Sun Hits": 9,
+        "my bloody valentine - When You Sleep": 9,
+        "Tyler, The Creator - NEW MAGIC WAND": 9,
+        "Have a Nice Life - Bloodhail": 9,
+        "Björk - Hidden Place": 9,
+        "Madvillain - All Caps": 9,
+        "my bloody valentine - Only Shallow": 9,
+        "Have a Nice Life - Holy Fucking Shit: 40,000": 9,
+        "Pink Floyd - Brain Damage": 9,
+        "Have a Nice Life - The Future": 9
+      },
+      "total": 135,
+      "details": {
+        "Nirvana - Come as You Are": {
+          "user_count": 9,
+          "total_scrobbles": 242,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Nirvana",
+          "album": "",
+          "track": "Come as You Are"
+        },
+        "my bloody valentine - Sometimes": {
+          "user_count": 9,
+          "total_scrobbles": 219,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "my bloody valentine",
+          "album": "",
+          "track": "Sometimes"
+        },
+        "Car Seat Headrest - Sober to Death": {
+          "user_count": 9,
+          "total_scrobbles": 215,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Car Seat Headrest",
+          "album": "",
+          "track": "Sober to Death"
+        },
+        "Madvillain - Accordion": {
+          "user_count": 9,
+          "total_scrobbles": 210,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Madvillain",
+          "album": "",
+          "track": "Accordion"
+        },
+        "Pink Floyd - The Great Gig in the Sky": {
+          "user_count": 9,
+          "total_scrobbles": 148,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Pink Floyd",
+          "album": "",
+          "track": "The Great Gig in the Sky"
+        },
+        "Slowdive - When the Sun Hits": {
+          "user_count": 9,
+          "total_scrobbles": 146,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Slowdive",
+          "album": "",
+          "track": "When the Sun Hits"
+        },
+        "my bloody valentine - When You Sleep": {
+          "user_count": 9,
+          "total_scrobbles": 142,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "my bloody valentine",
+          "album": "",
+          "track": "When You Sleep"
+        },
+        "Tyler, The Creator - NEW MAGIC WAND": {
+          "user_count": 9,
+          "total_scrobbles": 137,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Tyler, The Creator",
+          "album": "",
+          "track": "NEW MAGIC WAND"
+        },
+        "Have a Nice Life - Bloodhail": {
+          "user_count": 9,
+          "total_scrobbles": 132,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Have a Nice Life",
+          "album": "",
+          "track": "Bloodhail"
+        },
+        "Björk - Hidden Place": {
+          "user_count": 9,
+          "total_scrobbles": 132,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Björk",
+          "album": "",
+          "track": "Hidden Place"
+        },
+        "Madvillain - All Caps": {
+          "user_count": 9,
+          "total_scrobbles": 131,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Madvillain",
+          "album": "",
+          "track": "All Caps"
+        },
+        "my bloody valentine - Only Shallow": {
+          "user_count": 9,
+          "total_scrobbles": 128,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "my bloody valentine",
+          "album": "",
+          "track": "Only Shallow"
+        },
+        "Have a Nice Life - Holy Fucking Shit: 40,000": {
+          "user_count": 9,
+          "total_scrobbles": 119,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Have a Nice Life",
+          "album": "",
+          "track": "Holy Fucking Shit: 40,000"
+        },
+        "Pink Floyd - Brain Damage": {
+          "user_count": 9,
+          "total_scrobbles": 115,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Pink Floyd",
+          "album": "",
+          "track": "Brain Damage"
+        },
+        "Have a Nice Life - The Future": {
+          "user_count": 9,
+          "total_scrobbles": 105,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Have a Nice Life",
+          "album": "",
+          "track": "The Future"
+        }
+      },
+      "type": "shared"
+    },
+    "genres": {
+      "title": "Géneros (Por Usuarios Compartidos)",
+      "data": {
+        "jazz": 7,
+        "electronic": 6,
+        "soul": 6,
+        "female vocalists": 6,
+        "60s": 6,
+        "techno": 5,
+        "pop": 5,
+        "USA": 5,
+        "indie pop": 5,
+        "House": 4,
+        "heavy metal": 4,
+        "art pop": 4,
+        "metal": 4,
+        "indie": 4,
+        "Power metal": 4
+      },
+      "total": 75,
+      "details": {
+        "jazz": {
+          "user_count": 7,
+          "total_scrobbles": 61,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "electronic": {
+          "user_count": 6,
+          "total_scrobbles": 564,
+          "shared_users": [
+            "sdecandelario",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "soul": {
+          "user_count": 6,
+          "total_scrobbles": 98,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "female vocalists": {
+          "user_count": 6,
+          "total_scrobbles": 82,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "60s": {
+          "user_count": 6,
+          "total_scrobbles": 71,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "techno": {
+          "user_count": 5,
+          "total_scrobbles": 357,
+          "shared_users": [
+            "sdecandelario",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "pop": {
+          "user_count": 5,
+          "total_scrobbles": 63,
+          "shared_users": [
+            "sdecandelario",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "USA": {
+          "user_count": 5,
+          "total_scrobbles": 25,
+          "shared_users": [
+            "sdecandelario",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "indie pop": {
+          "user_count": 5,
+          "total_scrobbles": 16,
+          "shared_users": [
+            "sdecandelario",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "House": {
+          "user_count": 4,
+          "total_scrobbles": 387,
+          "shared_users": [
+            "Nubis84",
+            "paqueradejere",
+            "Frikomid",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "heavy metal": {
+          "user_count": 4,
+          "total_scrobbles": 339,
+          "shared_users": [
+            "Nubis84",
+            "Frikomid",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "art pop": {
+          "user_count": 4,
+          "total_scrobbles": 327,
+          "shared_users": [
+            "Frikomid",
+            "EliasJ72",
+            "GabredMared",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "metal": {
+          "user_count": 4,
+          "total_scrobbles": 269,
+          "shared_users": [
+            "Nubis84",
+            "Frikomid",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "indie": {
+          "user_count": 4,
+          "total_scrobbles": 253,
+          "shared_users": [
+            "Nubis84",
+            "GabredMared",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Power metal": {
+          "user_count": 4,
+          "total_scrobbles": 250,
+          "shared_users": [
+            "Nubis84",
+            "Frikomid",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        }
+      },
+      "type": "shared"
+    },
+    "labels": {
+      "title": "Sellos (Por Usuarios Compartidos)",
+      "data": {
+        "XL Recordings": 9,
+        "4AD": 9,
+        "Sony Music": 9,
+        "Atlantic": 9,
+        "Columbia": 9,
+        "[no label]": 9,
+        "Polydor": 9,
+        "Warner Bros. Records": 9,
+        "Epic": 9,
+        "Capitol Records": 9,
+        "Virgin": 9,
+        "MCA Records": 9,
+        "Parlophone": 8,
+        "EMI": 8,
+        "Microfon": 8
+      },
+      "total": 132,
+      "details": {
+        "XL Recordings": {
+          "user_count": 9,
+          "total_scrobbles": 4941,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "4AD": {
+          "user_count": 9,
+          "total_scrobbles": 3054,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Sony Music": {
+          "user_count": 9,
+          "total_scrobbles": 2013,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Atlantic": {
+          "user_count": 9,
+          "total_scrobbles": 1978,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Columbia": {
+          "user_count": 9,
+          "total_scrobbles": 1937,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "[no label]": {
+          "user_count": 9,
+          "total_scrobbles": 1809,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Polydor": {
+          "user_count": 9,
+          "total_scrobbles": 1220,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Warner Bros. Records": {
+          "user_count": 9,
+          "total_scrobbles": 1206,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Epic": {
+          "user_count": 9,
+          "total_scrobbles": 1031,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Capitol Records": {
+          "user_count": 9,
+          "total_scrobbles": 870,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Virgin": {
+          "user_count": 9,
+          "total_scrobbles": 781,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "MCA Records": {
+          "user_count": 9,
+          "total_scrobbles": 324,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Parlophone": {
+          "user_count": 8,
+          "total_scrobbles": 2888,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "EMI": {
+          "user_count": 8,
+          "total_scrobbles": 1487,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Microfon": {
+          "user_count": 8,
+          "total_scrobbles": 1074,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        }
+      },
+      "type": "shared"
+    },
+    "release_years": {
+      "title": "Años de Lanzamiento (Por Usuarios Compartidos)",
+      "data": {
+        "2010s": 9,
+        "2000s": 9,
+        "2020s+": 9,
+        "1990s": 9,
+        "1970s": 9,
+        "1980s": 9,
+        "1960s": 8,
+        "1950s": 4
+      },
+      "total": 66,
+      "details": {
+        "2010s": {
+          "user_count": 9,
+          "total_scrobbles": 52875,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "2000s": {
+          "user_count": 9,
+          "total_scrobbles": 25435,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "2020s+": {
+          "user_count": 9,
+          "total_scrobbles": 21675,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1990s": {
+          "user_count": 9,
+          "total_scrobbles": 17179,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1970s": {
+          "user_count": 9,
+          "total_scrobbles": 6262,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1980s": {
+          "user_count": 9,
+          "total_scrobbles": 4997,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1960s": {
+          "user_count": 8,
+          "total_scrobbles": 663,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1950s": {
+          "user_count": 4,
+          "total_scrobbles": 65,
+          "shared_users": [
+            "Nubis84",
+            "Rocky_stereo",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        }
+      },
+      "type": "shared"
+    }
+  },
+  "scrobbles_charts": {
+    "artists": {
+      "title": "Artistas (Por Scrobbles)",
+      "data": {
+        "Radiohead": 12175,
+        "Arca": 11828,
+        "Lana Del Rey": 10233,
+        "The Cure": 9102,
+        "Nine Inch Nails": 7155,
+        "Iron Maiden": 6381,
+        "Pink Floyd": 6184,
+        "Björk": 6043,
+        "Marillion": 5934,
+        "The Beatles": 5828,
+        "The Smiths": 5459,
+        "David Bowie": 5377,
+        "Silvio Rodríguez": 5331,
+        "ROSALÍA": 5171,
+        "Extremoduro": 4718
+      },
+      "total": 106919,
+      "details": {
+        "Radiohead": {
+          "user_count": 8,
+          "total_scrobbles": 12175,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Arca": {
+          "user_count": 9,
+          "total_scrobbles": 11828,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Lana Del Rey": {
+          "user_count": 6,
+          "total_scrobbles": 10233,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "The Cure": {
+          "user_count": 9,
+          "total_scrobbles": 9102,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Nine Inch Nails": {
+          "user_count": 8,
+          "total_scrobbles": 7155,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Iron Maiden": {
+          "user_count": 7,
+          "total_scrobbles": 6381,
+          "shared_users": [
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Pink Floyd": {
+          "user_count": 9,
+          "total_scrobbles": 6184,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Björk": {
+          "user_count": 9,
+          "total_scrobbles": 6043,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Marillion": {
+          "user_count": 4,
+          "total_scrobbles": 5934,
+          "shared_users": [
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "The Beatles": {
+          "user_count": 9,
+          "total_scrobbles": 5828,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "The Smiths": {
+          "user_count": 9,
+          "total_scrobbles": 5459,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "David Bowie": {
+          "user_count": 9,
+          "total_scrobbles": 5377,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Silvio Rodríguez": {
+          "user_count": 6,
+          "total_scrobbles": 5331,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "ROSALÍA": {
+          "user_count": 8,
+          "total_scrobbles": 5171,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Extremoduro": {
+          "user_count": 6,
+          "total_scrobbles": 4718,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        }
+      },
+      "type": "scrobbles"
+    },
+    "albums": {
+      "title": "Álbumes (Por Scrobbles)",
+      "data": {
+        "Lana Del Rey - Norman Fucking Rockwell!": 3216,
+        "Arca - Arca": 2873,
+        "Silvio Rodríguez - Al final de este viaje...": 2825,
+        "C. Tangana - El Madrileño": 2480,
+        "Arca - KiCk i": 2435,
+        "ROSALÍA - MOTOMAMI": 2393,
+        "Grimes - Art Angels": 2180,
+        "Radiohead - In Rainbows": 2105,
+        "Los Jaivas - Los Jaivas": 2065,
+        "Arca - KICK ii": 2005,
+        "Lana Del Rey - Chemtrails Over the Country Club": 1993,
+        "Beyoncé - Lemonade": 1891,
+        "The Smiths - The Smiths": 1815,
+        "Zayn - Icarus Falls": 1784,
+        "Radiohead - OK Computer": 1735
+      },
+      "total": 33795,
+      "details": {
+        "Lana Del Rey - Norman Fucking Rockwell!": {
+          "user_count": 6,
+          "total_scrobbles": 3216,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "Lana Del Rey",
+          "album": "Norman Fucking Rockwell!",
+          "track": ""
+        },
+        "Arca - Arca": {
+          "user_count": 6,
+          "total_scrobbles": 2873,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Nubis84",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "Arca",
+          "album": "Arca",
+          "track": ""
+        },
+        "Silvio Rodríguez - Al final de este viaje...": {
+          "user_count": 6,
+          "total_scrobbles": 2825,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "sdecandelario"
+          ],
+          "artist": "Silvio Rodríguez",
+          "album": "Al final de este viaje...",
+          "track": ""
+        },
+        "C. Tangana - El Madrileño": {
+          "user_count": 7,
+          "total_scrobbles": 2480,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "C. Tangana",
+          "album": "El Madrileño",
+          "track": ""
+        },
+        "Arca - KiCk i": {
+          "user_count": 7,
+          "total_scrobbles": 2435,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "Arca",
+          "album": "KiCk i",
+          "track": ""
+        },
+        "ROSALÍA - MOTOMAMI": {
+          "user_count": 8,
+          "total_scrobbles": 2393,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "ROSALÍA",
+          "album": "MOTOMAMI",
+          "track": ""
+        },
+        "Grimes - Art Angels": {
+          "user_count": 7,
+          "total_scrobbles": 2180,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "Grimes",
+          "album": "Art Angels",
+          "track": ""
+        },
+        "Radiohead - In Rainbows": {
+          "user_count": 8,
+          "total_scrobbles": 2105,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "Radiohead",
+          "album": "In Rainbows",
+          "track": ""
+        },
+        "Los Jaivas - Los Jaivas": {
+          "user_count": 6,
+          "total_scrobbles": 2065,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "sdecandelario"
+          ],
+          "artist": "Los Jaivas",
+          "album": "Los Jaivas",
+          "track": ""
+        },
+        "Arca - KICK ii": {
+          "user_count": 7,
+          "total_scrobbles": 2005,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu"
+          ],
+          "artist": "Arca",
+          "album": "KICK ii",
+          "track": ""
+        },
+        "Lana Del Rey - Chemtrails Over the Country Club": {
+          "user_count": 3,
+          "total_scrobbles": 1993,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Nubis84"
+          ],
+          "artist": "Lana Del Rey",
+          "album": "Chemtrails Over the Country Club",
+          "track": ""
+        },
+        "Beyoncé - Lemonade": {
+          "user_count": 4,
+          "total_scrobbles": 1891,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Nubis84",
+            "alberto_gu"
+          ],
+          "artist": "Beyoncé",
+          "album": "Lemonade",
+          "track": ""
+        },
+        "The Smiths - The Smiths": {
+          "user_count": 8,
+          "total_scrobbles": 1815,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "The Smiths",
+          "album": "The Smiths",
+          "track": ""
+        },
+        "Zayn - Icarus Falls": {
+          "user_count": 2,
+          "total_scrobbles": 1784,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared"
+          ],
+          "artist": "Zayn",
+          "album": "Icarus Falls",
+          "track": ""
+        },
+        "Radiohead - OK Computer": {
+          "user_count": 8,
+          "total_scrobbles": 1735,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "Radiohead",
+          "album": "OK Computer",
+          "track": ""
+        }
+      },
+      "type": "scrobbles"
+    },
+    "tracks": {
+      "title": "Canciones (Por Scrobbles)",
+      "data": {
+        "Arca - Machote": 923,
+        "Silvio Rodríguez - Ojalá": 873,
+        "Drake - Legend": 829,
+        "Lana Del Rey - Chemtrails Over the Country Club": 820,
+        "Lana Del Rey - Cinnamon Girl": 770,
+        "Arca - Rakata": 695,
+        "Arca - Desafío": 669,
+        "Beyoncé - ALIEN SUPERSTAR": 660,
+        "Silvio Rodríguez - Óleo de mujer con sombrero": 608,
+        "Arca - Tiro": 607,
+        "Lana Del Rey - Tulsa Jesus Freak": 605,
+        "The 1975 - Somebody Else": 577,
+        "Travis Scott - Nightcrawler (feat. Swae Lee & Chief Keef)": 577,
+        "Silvio Rodríguez - La Familia, La Propiedad Privada Y El Amor": 555,
+        "Los Jaivas - En Tus Horas": 543
+      },
+      "total": 10311,
+      "details": {
+        "Arca - Machote": {
+          "user_count": 6,
+          "total_scrobbles": 923,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "Arca",
+          "album": "",
+          "track": "Machote"
+        },
+        "Silvio Rodríguez - Ojalá": {
+          "user_count": 6,
+          "total_scrobbles": 873,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "sdecandelario"
+          ],
+          "artist": "Silvio Rodríguez",
+          "album": "",
+          "track": "Ojalá"
+        },
+        "Drake - Legend": {
+          "user_count": 1,
+          "total_scrobbles": 829,
+          "shared_users": [
+            "alberto_gu"
+          ],
+          "artist": "Drake",
+          "album": "",
+          "track": "Legend"
+        },
+        "Lana Del Rey - Chemtrails Over the Country Club": {
+          "user_count": 3,
+          "total_scrobbles": 820,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Nubis84"
+          ],
+          "artist": "Lana Del Rey",
+          "album": "",
+          "track": "Chemtrails Over the Country Club"
+        },
+        "Lana Del Rey - Cinnamon Girl": {
+          "user_count": 3,
+          "total_scrobbles": 770,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Rocky_stereo"
+          ],
+          "artist": "Lana Del Rey",
+          "album": "",
+          "track": "Cinnamon Girl"
+        },
+        "Arca - Rakata": {
+          "user_count": 6,
+          "total_scrobbles": 695,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu"
+          ],
+          "artist": "Arca",
+          "album": "",
+          "track": "Rakata"
+        },
+        "Arca - Desafío": {
+          "user_count": 5,
+          "total_scrobbles": 669,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "Arca",
+          "album": "",
+          "track": "Desafío"
+        },
+        "Beyoncé - ALIEN SUPERSTAR": {
+          "user_count": 5,
+          "total_scrobbles": 660,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Nubis84",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "Beyoncé",
+          "album": "",
+          "track": "ALIEN SUPERSTAR"
+        },
+        "Silvio Rodríguez - Óleo de mujer con sombrero": {
+          "user_count": 5,
+          "total_scrobbles": 608,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Rocky_stereo",
+            "sdecandelario"
+          ],
+          "artist": "Silvio Rodríguez",
+          "album": "",
+          "track": "Óleo de mujer con sombrero"
+        },
+        "Arca - Tiro": {
+          "user_count": 4,
+          "total_scrobbles": 607,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "alberto_gu"
+          ],
+          "artist": "Arca",
+          "album": "",
+          "track": "Tiro"
+        },
+        "Lana Del Rey - Tulsa Jesus Freak": {
+          "user_count": 2,
+          "total_scrobbles": 605,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared"
+          ],
+          "artist": "Lana Del Rey",
+          "album": "",
+          "track": "Tulsa Jesus Freak"
+        },
+        "The 1975 - Somebody Else": {
+          "user_count": 3,
+          "total_scrobbles": 577,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "sdecandelario"
+          ],
+          "artist": "The 1975",
+          "album": "",
+          "track": "Somebody Else"
+        },
+        "Travis Scott - Nightcrawler (feat. Swae Lee & Chief Keef)": {
+          "user_count": 2,
+          "total_scrobbles": 577,
+          "shared_users": [
+            "EliasJ72",
+            "alberto_gu"
+          ],
+          "artist": "Travis Scott",
+          "album": "",
+          "track": "Nightcrawler (feat. Swae Lee & Chief Keef)"
+        },
+        "Silvio Rodríguez - La Familia, La Propiedad Privada Y El Amor": {
+          "user_count": 5,
+          "total_scrobbles": 555,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Rocky_stereo",
+            "sdecandelario"
+          ],
+          "artist": "Silvio Rodríguez",
+          "album": "",
+          "track": "La Familia, La Propiedad Privada Y El Amor"
+        },
+        "Los Jaivas - En Tus Horas": {
+          "user_count": 4,
+          "total_scrobbles": 543,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "Los Jaivas",
+          "album": "",
+          "track": "En Tus Horas"
+        }
+      },
+      "type": "scrobbles"
+    },
+    "genres": {
+      "title": "Géneros (Por Scrobbles)",
+      "data": {
+        "electronic": 564,
+        "House": 387,
+        "techno": 357,
+        "heavy metal": 339,
+        "art pop": 327,
+        "hard rock": 321,
+        "cloud rap": 320,
+        "alternative rnb": 320,
+        "metal": 269,
+        "indie": 253,
+        "Power metal": 250,
+        "ambient": 220,
+        "slowcore": 196,
+        "sadcore": 195,
+        "rock": 188
+      },
+      "total": 4506,
+      "details": {
+        "electronic": {
+          "user_count": 6,
+          "total_scrobbles": 564,
+          "shared_users": [
+            "sdecandelario",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "House": {
+          "user_count": 4,
+          "total_scrobbles": 387,
+          "shared_users": [
+            "Nubis84",
+            "paqueradejere",
+            "Frikomid",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "techno": {
+          "user_count": 5,
+          "total_scrobbles": 357,
+          "shared_users": [
+            "sdecandelario",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "heavy metal": {
+          "user_count": 4,
+          "total_scrobbles": 339,
+          "shared_users": [
+            "Nubis84",
+            "Frikomid",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "art pop": {
+          "user_count": 4,
+          "total_scrobbles": 327,
+          "shared_users": [
+            "Frikomid",
+            "EliasJ72",
+            "GabredMared",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "hard rock": {
+          "user_count": 3,
+          "total_scrobbles": 321,
+          "shared_users": [
+            "Nubis84",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "cloud rap": {
+          "user_count": 3,
+          "total_scrobbles": 320,
+          "shared_users": [
+            "EliasJ72",
+            "GabredMared",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "alternative rnb": {
+          "user_count": 3,
+          "total_scrobbles": 320,
+          "shared_users": [
+            "EliasJ72",
+            "GabredMared",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "metal": {
+          "user_count": 4,
+          "total_scrobbles": 269,
+          "shared_users": [
+            "Nubis84",
+            "Frikomid",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "indie": {
+          "user_count": 4,
+          "total_scrobbles": 253,
+          "shared_users": [
+            "Nubis84",
+            "GabredMared",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Power metal": {
+          "user_count": 4,
+          "total_scrobbles": 250,
+          "shared_users": [
+            "Nubis84",
+            "Frikomid",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "ambient": {
+          "user_count": 4,
+          "total_scrobbles": 220,
+          "shared_users": [
+            "Nubis84",
+            "paqueradejere",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "slowcore": {
+          "user_count": 1,
+          "total_scrobbles": 196,
+          "shared_users": [
+            "Nubis84"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "sadcore": {
+          "user_count": 1,
+          "total_scrobbles": 195,
+          "shared_users": [
+            "Nubis84"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "rock": {
+          "user_count": 4,
+          "total_scrobbles": 188,
+          "shared_users": [
+            "Nubis84",
+            "Frikomid",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        }
+      },
+      "type": "scrobbles"
+    },
+    "labels": {
+      "title": "Sellos (Por Scrobbles)",
+      "data": {
+        "XL Recordings": 4941,
+        "4AD": 3054,
+        "Movieplay": 2891,
+        "Parlophone": 2888,
+        "Sony Music": 2013,
+        "Atlantic": 1978,
+        "Columbia": 1937,
+        "[no label]": 1809,
+        "EMI": 1487,
+        "DRO": 1368,
+        "Ariola": 1319,
+        "Polydor": 1220,
+        "Warner Bros. Records": 1206,
+        "Fool’s Gold Records": 1141,
+        "Inside Out Music": 1113
+      },
+      "total": 30365,
+      "details": {
+        "XL Recordings": {
+          "user_count": 9,
+          "total_scrobbles": 4941,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "4AD": {
+          "user_count": 9,
+          "total_scrobbles": 3054,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Movieplay": {
+          "user_count": 6,
+          "total_scrobbles": 2891,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Parlophone": {
+          "user_count": 8,
+          "total_scrobbles": 2888,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Sony Music": {
+          "user_count": 9,
+          "total_scrobbles": 2013,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Atlantic": {
+          "user_count": 9,
+          "total_scrobbles": 1978,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Columbia": {
+          "user_count": 9,
+          "total_scrobbles": 1937,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "[no label]": {
+          "user_count": 9,
+          "total_scrobbles": 1809,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "EMI": {
+          "user_count": 8,
+          "total_scrobbles": 1487,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "DRO": {
+          "user_count": 6,
+          "total_scrobbles": 1368,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Ariola": {
+          "user_count": 7,
+          "total_scrobbles": 1319,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Polydor": {
+          "user_count": 9,
+          "total_scrobbles": 1220,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Warner Bros. Records": {
+          "user_count": 9,
+          "total_scrobbles": 1206,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Fool’s Gold Records": {
+          "user_count": 4,
+          "total_scrobbles": 1141,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "Nubis84",
+            "alberto_gu"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "Inside Out Music": {
+          "user_count": 3,
+          "total_scrobbles": 1113,
+          "shared_users": [
+            "Lonsonxd",
+            "Nubis84",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        }
+      },
+      "type": "scrobbles"
+    },
+    "release_years": {
+      "title": "Años de Lanzamiento (Por Scrobbles)",
+      "data": {
+        "2010s": 52875,
+        "2000s": 25435,
+        "2020s+": 21675,
+        "1990s": 17179,
+        "1970s": 6262,
+        "1980s": 4997,
+        "1960s": 663,
+        "1950s": 65
+      },
+      "total": 129151,
+      "details": {
+        "2010s": {
+          "user_count": 9,
+          "total_scrobbles": 52875,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "2000s": {
+          "user_count": 9,
+          "total_scrobbles": 25435,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "2020s+": {
+          "user_count": 9,
+          "total_scrobbles": 21675,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1990s": {
+          "user_count": 9,
+          "total_scrobbles": 17179,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1970s": {
+          "user_count": 9,
+          "total_scrobbles": 6262,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1980s": {
+          "user_count": 9,
+          "total_scrobbles": 4997,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1960s": {
+          "user_count": 8,
+          "total_scrobbles": 663,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        },
+        "1950s": {
+          "user_count": 4,
+          "total_scrobbles": 65,
+          "shared_users": [
+            "Nubis84",
+            "Rocky_stereo",
+            "Lonsonxd",
+            "sdecandelario"
+          ],
+          "artist": "",
+          "album": "",
+          "track": ""
+        }
+      },
+      "type": "scrobbles"
+    },
+    "all_combined": {
+      "title": "Top 15 Global por Scrobbles",
+      "data": {
+        "Release_years: 2010s": 52875,
+        "Release_years: 2000s": 25435,
+        "Release_years: 2020s+": 21675,
+        "Release_years: 1990s": 17179,
+        "Artists: Radiohead": 12175,
+        "Artists: Arca": 11828,
+        "Artists: Lana Del Rey": 10233,
+        "Artists: The Cure": 9102,
+        "Artists: Nine Inch Nails": 7155,
+        "Release_years: 1970s": 6262,
+        "Labels: XL Recordings": 4941,
+        "Albums: Lana Del Rey - Norman Fucking Rockwell!": 3216,
+        "Labels: 4AD": 3054,
+        "Labels: Movieplay": 2891,
+        "Labels: Parlophone": 2888
+      },
+      "total": 190909,
+      "details": {
+        "Release_years: 2010s": {
+          "original_name": "2010s",
+          "category": "release_years",
+          "user_count": 9,
+          "total_scrobbles": 52875,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ]
+        },
+        "Release_years: 2000s": {
+          "original_name": "2000s",
+          "category": "release_years",
+          "user_count": 9,
+          "total_scrobbles": 25435,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ]
+        },
+        "Release_years: 2020s+": {
+          "original_name": "2020s+",
+          "category": "release_years",
+          "user_count": 9,
+          "total_scrobbles": 21675,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ]
+        },
+        "Release_years: 1990s": {
+          "original_name": "1990s",
+          "category": "release_years",
+          "user_count": 9,
+          "total_scrobbles": 17179,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ]
+        },
+        "Artists: Radiohead": {
+          "original_name": "Radiohead",
+          "category": "artists",
+          "user_count": 8,
+          "total_scrobbles": 12175,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ]
+        },
+        "Artists: Arca": {
+          "original_name": "Arca",
+          "category": "artists",
+          "user_count": 9,
+          "total_scrobbles": 11828,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ]
+        },
+        "Artists: Lana Del Rey": {
+          "original_name": "Lana Del Rey",
+          "category": "artists",
+          "user_count": 6,
+          "total_scrobbles": 10233,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ]
+        },
+        "Artists: The Cure": {
+          "original_name": "The Cure",
+          "category": "artists",
+          "user_count": 9,
+          "total_scrobbles": 9102,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ]
+        },
+        "Artists: Nine Inch Nails": {
+          "original_name": "Nine Inch Nails",
+          "category": "artists",
+          "user_count": 8,
+          "total_scrobbles": 7155,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ]
+        },
+        "Release_years: 1970s": {
+          "original_name": "1970s",
+          "category": "release_years",
+          "user_count": 9,
+          "total_scrobbles": 6262,
+          "shared_users": [
+            "sdecandelario",
+            "alberto_gu",
+            "Rocky_stereo",
+            "GabredMared",
+            "Frikomid",
+            "Lonsonxd",
+            "Nubis84",
+            "EliasJ72",
+            "paqueradejere"
+          ]
+        },
+        "Labels: XL Recordings": {
+          "original_name": "XL Recordings",
+          "category": "labels",
+          "user_count": 9,
+          "total_scrobbles": 4941,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ]
+        },
+        "Albums: Lana Del Rey - Norman Fucking Rockwell!": {
+          "original_name": "Lana Del Rey - Norman Fucking Rockwell!",
+          "category": "albums",
+          "user_count": 6,
+          "total_scrobbles": 3216,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ]
+        },
+        "Labels: 4AD": {
+          "original_name": "4AD",
+          "category": "labels",
+          "user_count": 9,
+          "total_scrobbles": 3054,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "paqueradejere",
+            "sdecandelario"
+          ]
+        },
+        "Labels: Movieplay": {
+          "original_name": "Movieplay",
+          "category": "labels",
+          "user_count": 6,
+          "total_scrobbles": 2891,
+          "shared_users": [
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "sdecandelario"
+          ]
+        },
+        "Labels: Parlophone": {
+          "original_name": "Parlophone",
+          "category": "labels",
+          "user_count": 8,
+          "total_scrobbles": 2888,
+          "shared_users": [
+            "EliasJ72",
+            "Frikomid",
+            "GabredMared",
+            "Lonsonxd",
+            "Nubis84",
+            "Rocky_stereo",
+            "alberto_gu",
+            "sdecandelario"
+          ]
+        }
+      },
+      "type": "combined"
+    }
+  },
+  "evolution": {
+    "artists": {
+      "title": "Top 15 Artistas por Año",
+      "data": {
+        "Radiohead": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 458,
+          "2014": 1011,
+          "2015": 771,
+          "2016": 1433,
+          "2017": 624,
+          "2018": 392,
+          "2019": 0,
+          "2020": 830,
+          "2021": 1113,
+          "2022": 1033,
+          "2023": 2176,
+          "2024": 983,
+          "2025": 592
+        },
+        "Arca": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 375,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 1113,
+          "2022": 5597,
+          "2023": 2381,
+          "2024": 1037,
+          "2025": 571
+        },
+        "Lana Del Rey": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 280,
+          "2016": 0,
+          "2017": 311,
+          "2018": 0,
+          "2019": 1177,
+          "2020": 652,
+          "2021": 3502,
+          "2022": 1356,
+          "2023": 1460,
+          "2024": 0,
+          "2025": 0
+        },
+        "The Cure": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 241,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 338,
+          "2019": 527,
+          "2020": 428,
+          "2021": 0,
+          "2022": 1319,
+          "2023": 2617,
+          "2024": 1237,
+          "2025": 673
+        },
+        "Nine Inch Nails": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 216,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 336,
+          "2019": 0,
+          "2020": 1004,
+          "2021": 1665,
+          "2022": 1157,
+          "2023": 0,
+          "2024": 0,
+          "2025": 576
+        },
+        "The Smiths": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 1009,
+          "2022": 0,
+          "2023": 2278,
+          "2024": 807,
+          "2025": 0
+        },
+        "Marillion": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 870,
+          "2021": 1760,
+          "2022": 1426,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Iron Maiden": {
+          "2006": 0,
+          "2007": 154,
+          "2008": 264,
+          "2009": 304,
+          "2010": 528,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 673,
+          "2021": 1549,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 524
+        },
+        "ROSALÍA": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1682,
+          "2023": 1541,
+          "2024": 0,
+          "2025": 651
+        },
+        "Silvio Rodríguez": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1803,
+          "2023": 1997,
+          "2024": 0,
+          "2025": 0
+        },
+        "Death Grips": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1490,
+          "2023": 1314,
+          "2024": 0,
+          "2025": 627
+        },
+        "Björk": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 432,
+          "2015": 677,
+          "2016": 265,
+          "2017": 515,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1408,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Zayn": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 552,
+          "2021": 2739,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Beyoncé": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1774,
+          "2023": 1347,
+          "2024": 0,
+          "2025": 0
+        },
+        "JPEGMAFIA": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 1522,
+          "2024": 1089,
+          "2025": 0
+        }
+      },
+      "years": [
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "names": [
+        "Radiohead",
+        "Arca",
+        "Lana Del Rey",
+        "The Cure",
+        "Nine Inch Nails",
+        "The Smiths",
+        "Marillion",
+        "Iron Maiden",
+        "ROSALÍA",
+        "Silvio Rodríguez",
+        "Death Grips",
+        "Björk",
+        "Zayn",
+        "Beyoncé",
+        "JPEGMAFIA"
+      ]
+    },
+    "albums": {
+      "title": "Top 15 Álbumes por Año",
+      "data": {
+        "Lana Del Rey - Norman Fucking Rockwell!": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 324,
+          "2020": 251,
+          "2021": 1370,
+          "2022": 552,
+          "2023": 519,
+          "2024": 0,
+          "2025": 0
+        },
+        "Arca - Arca": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 199,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1631,
+          "2023": 545,
+          "2024": 0,
+          "2025": 0
+        },
+        "C. Tangana - El Madrileño": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 1759,
+          "2022": 478,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Silvio Rodríguez - Al final de este viaje...": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1096,
+          "2023": 1123,
+          "2024": 0,
+          "2025": 0
+        },
+        "ROSALÍA - MOTOMAMI": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1179,
+          "2023": 892,
+          "2024": 0,
+          "2025": 0
+        },
+        "Los Jaivas - Los Jaivas": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 1291,
+          "2024": 400,
+          "2025": 0
+        },
+        "Arca - KiCk i": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 194,
+          "2021": 0,
+          "2022": 1319,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Grimes - Art Angels": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 108,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 1339,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Beyoncé - Lemonade": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 709,
+          "2023": 717,
+          "2024": 0,
+          "2025": 0
+        },
+        "Zayn - Icarus Falls": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 278,
+          "2021": 1141,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Talk Talk - Laughing Stock": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 1010,
+          "2025": 358
+        },
+        "Lana Del Rey - Chemtrails Over the Country Club": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 1214,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Charli xcx - BRAT": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 692,
+          "2025": 518
+        },
+        "Radiohead - In Rainbows": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 144,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 627,
+          "2024": 330,
+          "2025": 0
+        },
+        "The Smiths - The Smiths": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 440,
+          "2022": 0,
+          "2023": 622,
+          "2024": 0,
+          "2025": 0
+        }
+      },
+      "years": [
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "names": [
+        "Lana Del Rey - Norman Fucking Rockwell!",
+        "Arca - Arca",
+        "C. Tangana - El Madrileño",
+        "Silvio Rodríguez - Al final de este viaje...",
+        "ROSALÍA - MOTOMAMI",
+        "Los Jaivas - Los Jaivas",
+        "Arca - KiCk i",
+        "Grimes - Art Angels",
+        "Beyoncé - Lemonade",
+        "Zayn - Icarus Falls",
+        "Talk Talk - Laughing Stock",
+        "Lana Del Rey - Chemtrails Over the Country Club",
+        "Charli xcx - BRAT",
+        "Radiohead - In Rainbows",
+        "The Smiths - The Smiths"
+      ]
+    },
+    "tracks": {
+      "title": "Top 15 Canciones por Año",
+      "data": {
+        "Arca - Machote": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 550,
+          "2023": 245,
+          "2024": 0,
+          "2025": 0
+        },
+        "Drake - Legend": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 706,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Silvio Rodríguez - Ojalá": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 394,
+          "2023": 284,
+          "2024": 0,
+          "2025": 0
+        },
+        "Beyoncé - ALIEN SUPERSTAR": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 347,
+          "2023": 261,
+          "2024": 0,
+          "2025": 0
+        },
+        "Travis Scott - Nightcrawler (feat. Swae Lee & Chief Keef)": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 531,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Lana Del Rey - Chemtrails Over the Country Club": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 516,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Arca - Rakata": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 238,
+          "2022": 274,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Silvio Rodríguez - La Familia, La Propiedad Privada Y El Amor": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 254,
+          "2023": 236,
+          "2024": 0,
+          "2025": 0
+        },
+        "Bad Gyal - Fiebre (prod. King Doudou)": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 299,
+          "2024": 161,
+          "2025": 0
+        },
+        "Arca - Desafío": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 446,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Talk Talk - New Grass": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 325,
+          "2025": 78
+        },
+        "Migos - Bad and Boujee (feat. Lil Uzi Vert)": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 394,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "The 1975 - Somebody Else": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 370,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Arca - Tiro": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 366,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Addison Rae - Diet Pepsi": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 219,
+          "2025": 134
+        }
+      },
+      "years": [
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "names": [
+        "Arca - Machote",
+        "Drake - Legend",
+        "Silvio Rodríguez - Ojalá",
+        "Beyoncé - ALIEN SUPERSTAR",
+        "Travis Scott - Nightcrawler (feat. Swae Lee & Chief Keef)",
+        "Lana Del Rey - Chemtrails Over the Country Club",
+        "Arca - Rakata",
+        "Silvio Rodríguez - La Familia, La Propiedad Privada Y El Amor",
+        "Bad Gyal - Fiebre (prod. King Doudou)",
+        "Arca - Desafío",
+        "Talk Talk - New Grass",
+        "Migos - Bad and Boujee (feat. Lil Uzi Vert)",
+        "The 1975 - Somebody Else",
+        "Arca - Tiro",
+        "Addison Rae - Diet Pepsi"
+      ]
+    },
+    "genres": {
+      "title": "Top 15 Géneros por Año",
+      "data": {
+        "electronic": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 8,
+          "2012": 33,
+          "2013": 0,
+          "2014": 26,
+          "2015": 24,
+          "2016": 29,
+          "2017": 2,
+          "2018": 18,
+          "2019": 13,
+          "2020": 38,
+          "2021": 35,
+          "2022": 49,
+          "2023": 29,
+          "2024": 51,
+          "2025": 200
+        },
+        "House": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 2,
+          "2018": 15,
+          "2019": 13,
+          "2020": 17,
+          "2021": 23,
+          "2022": 48,
+          "2023": 28,
+          "2024": 34,
+          "2025": 193
+        },
+        "techno": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 2,
+          "2018": 15,
+          "2019": 12,
+          "2020": 17,
+          "2021": 23,
+          "2022": 48,
+          "2023": 9,
+          "2024": 26,
+          "2025": 190
+        },
+        "art pop": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 70,
+          "2023": 65,
+          "2024": 143,
+          "2025": 49
+        },
+        "cloud rap": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 68,
+          "2023": 65,
+          "2024": 138,
+          "2025": 49
+        },
+        "alternative rnb": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 68,
+          "2023": 65,
+          "2024": 138,
+          "2025": 49
+        },
+        "heavy metal": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 66,
+          "2011": 111,
+          "2012": 21,
+          "2013": 0,
+          "2014": 0,
+          "2015": 14,
+          "2016": 0,
+          "2017": 3,
+          "2018": 0,
+          "2019": 31,
+          "2020": 0,
+          "2021": 0,
+          "2022": 4,
+          "2023": 0,
+          "2024": 26,
+          "2025": 29
+        },
+        "hard rock": {
+          "2006": 0,
+          "2007": 2,
+          "2008": 14,
+          "2009": 0,
+          "2010": 25,
+          "2011": 117,
+          "2012": 42,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 3,
+          "2018": 0,
+          "2019": 31,
+          "2020": 0,
+          "2021": 0,
+          "2022": 4,
+          "2023": 0,
+          "2024": 26,
+          "2025": 29
+        },
+        "Power metal": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 193,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 43,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "metal": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 114,
+          "2012": 22,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 3,
+          "2018": 0,
+          "2019": 31,
+          "2020": 0,
+          "2021": 0,
+          "2022": 5,
+          "2023": 0,
+          "2024": 28,
+          "2025": 29
+        },
+        "indie": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 24,
+          "2013": 5,
+          "2014": 163,
+          "2015": 0,
+          "2016": 0,
+          "2017": 3,
+          "2018": 0,
+          "2019": 12,
+          "2020": 6,
+          "2021": 16,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "ambient": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 29,
+          "2010": 29,
+          "2011": 14,
+          "2012": 0,
+          "2013": 0,
+          "2014": 65,
+          "2015": 32,
+          "2016": 17,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 5,
+          "2021": 19,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "slowcore": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 5,
+          "2014": 158,
+          "2015": 0,
+          "2016": 0,
+          "2017": 3,
+          "2018": 0,
+          "2019": 12,
+          "2020": 6,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "sadcore": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 5,
+          "2014": 158,
+          "2015": 0,
+          "2016": 0,
+          "2017": 3,
+          "2018": 0,
+          "2019": 12,
+          "2020": 6,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "rock": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 10,
+          "2009": 0,
+          "2010": 0,
+          "2011": 53,
+          "2012": 27,
+          "2013": 19,
+          "2014": 0,
+          "2015": 15,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 0,
+          "2024": 11,
+          "2025": 8
+        }
+      },
+      "years": [
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "names": [
+        "electronic",
+        "House",
+        "techno",
+        "art pop",
+        "cloud rap",
+        "alternative rnb",
+        "heavy metal",
+        "hard rock",
+        "Power metal",
+        "metal",
+        "indie",
+        "ambient",
+        "slowcore",
+        "sadcore",
+        "rock"
+      ]
+    },
+    "labels": {
+      "title": "Top 15 Sellos por Año",
+      "data": {
+        "XL Recordings": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 28,
+          "2012": 0,
+          "2013": 0,
+          "2014": 140,
+          "2015": 130,
+          "2016": 508,
+          "2017": 361,
+          "2018": 161,
+          "2019": 138,
+          "2020": 197,
+          "2021": 0,
+          "2022": 1762,
+          "2023": 860,
+          "2024": 284,
+          "2025": 214
+        },
+        "Movieplay": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 190,
+          "2022": 1117,
+          "2023": 1141,
+          "2024": 308,
+          "2025": 0
+        },
+        "4AD": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 48,
+          "2014": 0,
+          "2015": 147,
+          "2016": 141,
+          "2017": 122,
+          "2018": 111,
+          "2019": 79,
+          "2020": 175,
+          "2021": 0,
+          "2022": 1376,
+          "2023": 330,
+          "2024": 0,
+          "2025": 221
+        },
+        "Parlophone": {
+          "2006": 0,
+          "2007": 6,
+          "2008": 23,
+          "2009": 30,
+          "2010": 71,
+          "2011": 0,
+          "2012": 51,
+          "2013": 59,
+          "2014": 262,
+          "2015": 211,
+          "2016": 254,
+          "2017": 145,
+          "2018": 85,
+          "2019": 251,
+          "2020": 244,
+          "2021": 297,
+          "2022": 0,
+          "2023": 345,
+          "2024": 231,
+          "2025": 174
+        },
+        "Sony Music": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 76,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 378,
+          "2022": 302,
+          "2023": 607,
+          "2024": 195,
+          "2025": 209
+        },
+        "Atlantic": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 91,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 231,
+          "2024": 781,
+          "2025": 606
+        },
+        "Columbia": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 105,
+          "2015": 0,
+          "2016": 0,
+          "2017": 58,
+          "2018": 0,
+          "2019": 97,
+          "2020": 98,
+          "2021": 212,
+          "2022": 0,
+          "2023": 357,
+          "2024": 303,
+          "2025": 353
+        },
+        "[no label]": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 134,
+          "2018": 68,
+          "2019": 118,
+          "2020": 107,
+          "2021": 0,
+          "2022": 199,
+          "2023": 423,
+          "2024": 240,
+          "2025": 240
+        },
+        "EMI": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 77,
+          "2014": 88,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 213,
+          "2021": 438,
+          "2022": 247,
+          "2023": 0,
+          "2024": 0,
+          "2025": 0
+        },
+        "Fool’s Gold Records": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 523,
+          "2023": 289,
+          "2024": 171,
+          "2025": 0
+        },
+        "Ariola": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 328,
+          "2022": 492,
+          "2023": 0,
+          "2024": 0,
+          "2025": 116
+        },
+        "DRO": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 63,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 343,
+          "2022": 211,
+          "2023": 0,
+          "2024": 271,
+          "2025": 0
+        },
+        "Ninja Tune": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 231,
+          "2023": 220,
+          "2024": 174,
+          "2025": 227
+        },
+        "Microfon": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 0,
+          "2022": 247,
+          "2023": 522,
+          "2024": 0,
+          "2025": 0
+        },
+        "Polydor": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 0,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 42,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 0,
+          "2018": 0,
+          "2019": 0,
+          "2020": 0,
+          "2021": 168,
+          "2022": 0,
+          "2023": 318,
+          "2024": 184,
+          "2025": 0
+        }
+      },
+      "years": [
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "names": [
+        "XL Recordings",
+        "Movieplay",
+        "4AD",
+        "Parlophone",
+        "Sony Music",
+        "Atlantic",
+        "Columbia",
+        "[no label]",
+        "EMI",
+        "Fool’s Gold Records",
+        "Ariola",
+        "DRO",
+        "Ninja Tune",
+        "Microfon",
+        "Polydor"
+      ]
+    },
+    "release_years": {
+      "title": "Top 15 Años de Lanzamiento por Año",
+      "data": {
+        "2010s": {
+          "2006": 0,
+          "2007": 23,
+          "2008": 44,
+          "2009": 142,
+          "2010": 448,
+          "2011": 251,
+          "2012": 577,
+          "2013": 1114,
+          "2014": 2711,
+          "2015": 2422,
+          "2016": 3340,
+          "2017": 2671,
+          "2018": 2571,
+          "2019": 3794,
+          "2020": 3487,
+          "2021": 4677,
+          "2022": 7873,
+          "2023": 7465,
+          "2024": 5442,
+          "2025": 3823
+        },
+        "2000s": {
+          "2006": 0,
+          "2007": 37,
+          "2008": 186,
+          "2009": 519,
+          "2010": 909,
+          "2011": 615,
+          "2012": 1105,
+          "2013": 1040,
+          "2014": 2136,
+          "2015": 1232,
+          "2016": 849,
+          "2017": 1065,
+          "2018": 920,
+          "2019": 1099,
+          "2020": 1394,
+          "2021": 2456,
+          "2022": 2729,
+          "2023": 2708,
+          "2024": 2529,
+          "2025": 1907
+        },
+        "2020s+": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 67,
+          "2009": 25,
+          "2010": 23,
+          "2011": 43,
+          "2012": 17,
+          "2013": 15,
+          "2014": 150,
+          "2015": 198,
+          "2016": 115,
+          "2017": 113,
+          "2018": 89,
+          "2019": 148,
+          "2020": 1744,
+          "2021": 3241,
+          "2022": 3614,
+          "2023": 4095,
+          "2024": 4204,
+          "2025": 3774
+        },
+        "1990s": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 175,
+          "2009": 319,
+          "2010": 603,
+          "2011": 289,
+          "2012": 466,
+          "2013": 270,
+          "2014": 349,
+          "2015": 221,
+          "2016": 399,
+          "2017": 565,
+          "2018": 715,
+          "2019": 806,
+          "2020": 970,
+          "2021": 2632,
+          "2022": 2737,
+          "2023": 2452,
+          "2024": 1991,
+          "2025": 1220
+        },
+        "1970s": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 124,
+          "2009": 10,
+          "2010": 41,
+          "2011": 1,
+          "2012": 18,
+          "2013": 7,
+          "2014": 55,
+          "2015": 27,
+          "2016": 43,
+          "2017": 82,
+          "2018": 93,
+          "2019": 78,
+          "2020": 167,
+          "2021": 870,
+          "2022": 1697,
+          "2023": 1696,
+          "2024": 661,
+          "2025": 592
+        },
+        "1980s": {
+          "2006": 0,
+          "2007": 61,
+          "2008": 100,
+          "2009": 145,
+          "2010": 241,
+          "2011": 151,
+          "2012": 81,
+          "2013": 95,
+          "2014": 69,
+          "2015": 44,
+          "2016": 54,
+          "2017": 66,
+          "2018": 73,
+          "2019": 147,
+          "2020": 213,
+          "2021": 658,
+          "2022": 896,
+          "2023": 796,
+          "2024": 537,
+          "2025": 570
+        },
+        "1960s": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 1,
+          "2009": 41,
+          "2010": 2,
+          "2011": 38,
+          "2012": 4,
+          "2013": 19,
+          "2014": 73,
+          "2015": 19,
+          "2016": 34,
+          "2017": 43,
+          "2018": 8,
+          "2019": 23,
+          "2020": 59,
+          "2021": 65,
+          "2022": 67,
+          "2023": 53,
+          "2024": 81,
+          "2025": 33
+        },
+        "1950s": {
+          "2006": 0,
+          "2007": 0,
+          "2008": 0,
+          "2009": 19,
+          "2010": 0,
+          "2011": 0,
+          "2012": 0,
+          "2013": 0,
+          "2014": 0,
+          "2015": 0,
+          "2016": 0,
+          "2017": 1,
+          "2018": 3,
+          "2019": 10,
+          "2020": 0,
+          "2021": 0,
+          "2022": 0,
+          "2023": 6,
+          "2024": 19,
+          "2025": 7
+        }
+      },
+      "years": [
+        2006,
+        2007,
+        2008,
+        2009,
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025
+      ],
+      "names": [
+        "2010s",
+        "2000s",
+        "2020s+",
+        "1990s",
+        "1970s",
+        "1980s",
+        "1960s",
+        "1950s"
+      ]
+    }
+  },
+  "generated_at": "2025-11-10 21:49:05"
+};
+        const colors = ["#cba6f7", "#f38ba8", "#fab387", "#f9e2af", "#a6e3a1", "#94e2d5", "#89dceb", "#74c7ec", "#89b4fa", "#b4befe", "#f5c2e7", "#f2cdcd", "#ddb6f2", "#ffc6ff", "#caffbf"];
+
+        let currentView = 'shared';
+        let charts = {};
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            updateGroupHeader();
+            updateSummaryStats();
+
+            // Manejar botones de vista
+            const viewButtons = document.querySelectorAll('.view-btn');
+            viewButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const view = this.dataset.view;
+                    switchView(view);
+                });
+            });
+
+            // Cargar vista inicial
+            switchView('shared');
+        });
+
+        function switchView(view) {
+            currentView = view;
+
+            // Update buttons
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-view="${view}"]`).classList.add('active');
+
+            // Update views
+            document.querySelectorAll('.view').forEach(v => {
+                v.classList.remove('active');
+            });
+
+            if (view === 'scrobbles') {
+                document.getElementById('scribblesView').classList.add('active');
+            } else {
+                document.getElementById(view + 'View').classList.add('active');
+            }
+
+            // Render appropriate charts
+            if (view === 'shared') {
+                renderSharedCharts();
+            } else if (view === 'scrobbles') {
+                renderScrobblesCharts();
+            } else if (view === 'evolution') {
+                renderEvolutionCharts();
+            }
+        }
+
+        function updateGroupHeader() {
+            const users = groupStats.users.join(', ');
+            document.getElementById('groupTitle').textContent = `Grupo: ${users}`;
+            document.getElementById('groupInfo').innerHTML =
+                `Período: ${groupStats.period} | ${groupStats.user_count} usuarios | Generado: ${groupStats.generated_at}`;
+        }
+
+        function updateSummaryStats() {
+            // Calcular estadísticas de resumen
+            const sharedCharts = groupStats.shared_charts;
+            const scrobblesCharts = groupStats.scrobbles_charts;
+
+            const totalSharedArtists = Object.keys(sharedCharts.artists.data || {}).length;
+            const totalSharedAlbums = Object.keys(sharedCharts.albums.data || {}).length;
+            const totalSharedTracks = Object.keys(sharedCharts.tracks.data || {}).length;
+            const totalSharedGenres = Object.keys(sharedCharts.genres.data || {}).length;
+
+            const totalScrobblesArtists = scrobblesCharts.artists.total || 0;
+            const totalScrobblesAll = scrobblesCharts.all_combined.total || 0;
+
+            const summaryHTML = `
+                <div class="summary-card">
+                    <div class="number">${groupStats.user_count}</div>
+                    <div class="label">Usuarios</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalSharedArtists}</div>
+                    <div class="label">Artistas Compartidos</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalSharedAlbums}</div>
+                    <div class="label">Álbumes Compartidos</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalSharedTracks}</div>
+                    <div class="label">Canciones Compartidas</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalScrobblesArtists.toLocaleString()}</div>
+                    <div class="label">Scrobbles (Artistas)</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalScrobblesAll.toLocaleString()}</div>
+                    <div class="label">Scrobbles (Total)</div>
+                </div>
+            `;
+
+            document.getElementById('summaryStats').innerHTML = summaryHTML;
+        }
+
+        function renderSharedCharts() {
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+
+            // Renderizar gráficos por usuarios compartidos
+            renderPieChart('sharedArtistsChart', groupStats.shared_charts.artists, 'sharedArtistsInfo');
+            renderPieChart('sharedAlbumsChart', groupStats.shared_charts.albums, 'sharedAlbumsInfo');
+            renderPieChart('sharedTracksChart', groupStats.shared_charts.tracks, 'sharedTracksInfo');
+            renderPieChart('sharedGenresChart', groupStats.shared_charts.genres, 'sharedGenresInfo');
+            renderPieChart('sharedLabelsChart', groupStats.shared_charts.labels, 'sharedLabelsInfo');
+            renderPieChart('sharedReleaseYearsChart', groupStats.shared_charts.release_years, 'sharedReleaseYearsInfo');
+        }
+
+        function renderScrobblesCharts() {
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+
+            // Renderizar gráficos por scrobbles totales
+            renderPieChart('scrobblesArtistsChart', groupStats.scrobbles_charts.artists, 'scrobblesArtistsInfo');
+            renderPieChart('scrobblesAlbumsChart', groupStats.scrobbles_charts.albums, 'scrobblesAlbumsInfo');
+            renderPieChart('scrobblesTracksChart', groupStats.scrobbles_charts.tracks, 'scrobblesTracksInfo');
+            renderPieChart('scrobblesGenresChart', groupStats.scrobbles_charts.genres, 'scrobblesGenresInfo');
+            renderPieChart('scrobblesLabelsChart', groupStats.scrobbles_charts.labels, 'scrobblesLabelsInfo');
+            renderPieChart('scrobblesReleaseYearsChart', groupStats.scrobbles_charts.release_years, 'scrobblesReleaseYearsInfo');
+            renderPieChart('scrobblesAllCombinedChart', groupStats.scrobbles_charts.all_combined, 'scrobblesAllCombinedInfo');
+        }
+
+        function renderEvolutionCharts() {
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+
+            // Renderizar gráficos de evolución
+            renderLineChart('evolutionArtistsChart', groupStats.evolution.artists);
+            renderLineChart('evolutionAlbumsChart', groupStats.evolution.albums);
+            renderLineChart('evolutionTracksChart', groupStats.evolution.tracks);
+            renderLineChart('evolutionGenresChart', groupStats.evolution.genres);
+            renderLineChart('evolutionLabelsChart', groupStats.evolution.labels);
+            renderLineChart('evolutionReleaseYearsChart', groupStats.evolution.release_years);
+        }
+
+        function renderPieChart(canvasId, chartData, infoId) {
+            const canvas = document.getElementById(canvasId);
+            const info = document.getElementById(infoId);
+
+            if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {
+                canvas.style.display = 'none';
+                info.innerHTML = '<div class="no-data">No hay datos disponibles</div>';
+                return;
+            }
+
+            canvas.style.display = 'block';
+            const unit = chartData.type === 'shared' ? 'usuarios' : 'scrobbles';
+            info.innerHTML = `Total: ${chartData.total.toLocaleString()} ${unit} | Click para detalles`;
+
+            const data = {
+                labels: Object.keys(chartData.data),
+                datasets: [{
+                    data: Object.values(chartData.data),
+                    backgroundColor: colors.slice(0, Object.keys(chartData.data).length),
+                    borderColor: '#181825',
+                    borderWidth: 2
+                }]
+            };
+
+            const config = {
+                type: 'pie',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#cdd6f4',
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }
+                    },
+                    onClick: function(event, elements) {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const label = data.labels[index];
+                            showGroupPopup(chartData, label);
+                        }
+                    }
+                }
+            };
+
+            charts[canvasId] = new Chart(canvas, config);
+        }
+
+        function renderLineChart(canvasId, chartData) {
+            const canvas = document.getElementById(canvasId);
+
+            if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {
+                return;
+            }
+
+            const datasets = [];
+            let colorIndex = 0;
+
+            Object.keys(chartData.data).forEach(item => {
+                datasets.push({
+                    label: item,
+                    data: chartData.years.map(year => chartData.data[item][year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false
+                });
+                colorIndex++;
+            });
+
+            const config = {
+                type: 'line',
+                data: {
+                    labels: chartData.years,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#cdd6f4',
+                                padding: 10,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#a6adc8'
+                            },
+                            grid: {
+                                color: '#313244'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#a6adc8'
+                            },
+                            grid: {
+                                color: '#313244'
+                            }
+                        }
+                    }
+                }
+            };
+
+            charts[canvasId] = new Chart(canvas, config);
+        }
+
+        function showGroupPopup(chartData, selectedLabel) {
+            const details = chartData.details[selectedLabel];
+            if (!details) return;
+
+            let title = `${selectedLabel}`;
+            let content = '';
+
+            content += `<div class="popup-item">
+                <div class="name">${selectedLabel}</div>
+                <div class="details">
+                    Usuarios: ${details.user_count} |
+                    Scrobbles: ${details.total_scrobbles.toLocaleString()}
+                </div>`;
+
+            if (details.shared_users && details.shared_users.length > 0) {
+                content += `<div class="users">Compartido por: ${details.shared_users.join(', ')}</div>`;
+            }
+
+            if (details.artist && details.album) {
+                content += `<div class="details">Artista: ${details.artist} | Álbum: ${details.album}</div>`;
+            } else if (details.artist && details.track) {
+                content += `<div class="details">Artista: ${details.artist} | Canción: ${details.track}</div>`;
+            }
+
+            if (chartData.type === 'combined') {
+                content += `<div class="details">Categoría: ${details.category}</div>`;
+            }
+
+            content += `</div>`;
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }
+
+        // Configurar cierre de popup
+        document.getElementById('popupClose').addEventListener('click', function() {
+            document.getElementById('popupOverlay').style.display = 'none';
+            document.getElementById('popup').style.display = 'none';
+        });
+
+        document.getElementById('popupOverlay').addEventListener('click', function() {
+            document.getElementById('popupOverlay').style.display = 'none';
+            document.getElementById('popup').style.display = 'none';
+        });
+    </script>
+</body>
+</html>

@@ -13,7 +13,7 @@ from collections import defaultdict
 class GroupStatsDatabase:
     """Base de datos para estadísticas grupales con optimizaciones y caching"""
 
-    def __init__(self, db_path='db/lastfm_cache.db'):
+    def __init__(self, db_path='lastfm_cache.db'):
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
@@ -61,29 +61,42 @@ class GroupStatsDatabase:
         mbid_filter = self._get_mbid_filter(mbid_only)
 
         cursor.execute(f'''
-            SELECT artist,
-                   COUNT(DISTINCT user) as user_count,
-                   COUNT(*) as total_scrobbles,
-                   GROUP_CONCAT(DISTINCT user) as shared_users
+            SELECT artist, user, COUNT(*) as plays
             FROM scrobbles s
             WHERE user IN ({','.join(['?'] * len(users))})
               AND timestamp >= ? AND timestamp <= ?
             {mbid_filter}
-            GROUP BY artist
-            HAVING user_count >= 2
-            ORDER BY user_count DESC, total_scrobbles DESC
-            LIMIT ?
-        ''', users + [from_timestamp, to_timestamp, limit])
+            GROUP BY artist, user
+        ''', users + [from_timestamp, to_timestamp])
 
-        return [
-            {
-                'name': row['artist'],
-                'user_count': row['user_count'],
-                'total_scrobbles': row['total_scrobbles'],
-                'shared_users': row['shared_users'].split(',') if row['shared_users'] else []
-            }
-            for row in cursor.fetchall()
-        ]
+        # Procesar por artista con user_plays
+        artist_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            artist = row['artist']
+            user = row['user']
+            plays = row['plays']
+            artist_stats[artist]['users'].add(user)
+            artist_stats[artist]['total_scrobbles'] += plays
+            artist_stats[artist]['user_plays'][user] += plays
+
+        # Filtrar y ordenar
+        result = []
+        max_users = len(users)
+
+        for artist, stats in artist_stats.items():
+            if len(stats['users']) >= 2:  # Solo artistas compartidos
+                result.append({
+                    'name': artist,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        # Ordenar: primero por usuarios compartidos (desc), luego por scrobbles (desc)
+        result.sort(key=lambda x: (x['user_count'], x['total_scrobbles']), reverse=True)
+        return result[:limit]
 
     def get_top_albums_by_shared_users(self, users: List[str], from_year: int, to_year: int,
                                      limit: int = 15, mbid_only: bool = False) -> List[Dict]:
@@ -97,31 +110,46 @@ class GroupStatsDatabase:
             SELECT (artist || ' - ' || album) as album_name,
                    artist,
                    album,
-                   COUNT(DISTINCT user) as user_count,
-                   COUNT(*) as total_scrobbles,
-                   GROUP_CONCAT(DISTINCT user) as shared_users
+                   user,
+                   COUNT(*) as plays
             FROM scrobbles s
             WHERE user IN ({','.join(['?'] * len(users))})
               AND timestamp >= ? AND timestamp <= ?
               AND album IS NOT NULL AND album != ''
             {mbid_filter}
-            GROUP BY artist, album
-            HAVING user_count >= 2
-            ORDER BY user_count DESC, total_scrobbles DESC
-            LIMIT ?
-        ''', users + [from_timestamp, to_timestamp, limit])
+            GROUP BY artist, album, user
+        ''', users + [from_timestamp, to_timestamp])
 
-        return [
-            {
-                'name': row['album_name'],
-                'artist': row['artist'],
-                'album': row['album'],
-                'user_count': row['user_count'],
-                'total_scrobbles': row['total_scrobbles'],
-                'shared_users': row['shared_users'].split(',') if row['shared_users'] else []
-            }
-            for row in cursor.fetchall()
-        ]
+        # Procesar por álbum con user_plays
+        album_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'artist': '', 'album': ''})
+
+        for row in cursor.fetchall():
+            album_key = row['album_name']
+            user = row['user']
+            plays = row['plays']
+            album_stats[album_key]['users'].add(user)
+            album_stats[album_key]['total_scrobbles'] += plays
+            album_stats[album_key]['user_plays'][user] += plays
+            album_stats[album_key]['artist'] = row['artist']
+            album_stats[album_key]['album'] = row['album']
+
+        # Filtrar y ordenar
+        result = []
+        for album_name, stats in album_stats.items():
+            if len(stats['users']) >= 2:  # Solo álbumes compartidos
+                result.append({
+                    'name': album_name,
+                    'artist': stats['artist'],
+                    'album': stats['album'],
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        # Ordenar: primero por usuarios compartidos (desc), luego por scrobbles (desc)
+        result.sort(key=lambda x: (x['user_count'], x['total_scrobbles']), reverse=True)
+        return result[:limit]
 
     def get_top_tracks_by_shared_users(self, users: List[str], from_year: int, to_year: int,
                                      limit: int = 15, mbid_only: bool = False) -> List[Dict]:
@@ -135,30 +163,45 @@ class GroupStatsDatabase:
             SELECT (artist || ' - ' || track) as track_name,
                    artist,
                    track,
-                   COUNT(DISTINCT user) as user_count,
-                   COUNT(*) as total_scrobbles,
-                   GROUP_CONCAT(DISTINCT user) as shared_users
+                   user,
+                   COUNT(*) as plays
             FROM scrobbles s
             WHERE user IN ({','.join(['?'] * len(users))})
               AND timestamp >= ? AND timestamp <= ?
             {mbid_filter}
-            GROUP BY artist, track
-            HAVING user_count >= 2
-            ORDER BY user_count DESC, total_scrobbles DESC
-            LIMIT ?
-        ''', users + [from_timestamp, to_timestamp, limit])
+            GROUP BY artist, track, user
+        ''', users + [from_timestamp, to_timestamp])
 
-        return [
-            {
-                'name': row['track_name'],
-                'artist': row['artist'],
-                'track': row['track'],
-                'user_count': row['user_count'],
-                'total_scrobbles': row['total_scrobbles'],
-                'shared_users': row['shared_users'].split(',') if row['shared_users'] else []
-            }
-            for row in cursor.fetchall()
-        ]
+        # Procesar por canción con user_plays
+        track_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'artist': '', 'track': ''})
+
+        for row in cursor.fetchall():
+            track_key = row['track_name']
+            user = row['user']
+            plays = row['plays']
+            track_stats[track_key]['users'].add(user)
+            track_stats[track_key]['total_scrobbles'] += plays
+            track_stats[track_key]['user_plays'][user] += plays
+            track_stats[track_key]['artist'] = row['artist']
+            track_stats[track_key]['track'] = row['track']
+
+        # Filtrar y ordenar
+        result = []
+        for track_name, stats in track_stats.items():
+            if len(stats['users']) >= 2:  # Solo canciones compartidas
+                result.append({
+                    'name': track_name,
+                    'artist': stats['artist'],
+                    'track': stats['track'],
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        # Ordenar: primero por usuarios compartidos (desc), luego por scrobbles (desc)
+        result.sort(key=lambda x: (x['user_count'], x['total_scrobbles']), reverse=True)
+        return result[:limit]
 
     def get_top_genres_by_shared_users(self, users: List[str], from_year: int, to_year: int,
                                      limit: int = 15, mbid_only: bool = False) -> List[Dict]:
@@ -184,7 +227,7 @@ class GroupStatsDatabase:
         for row in cursor.fetchall():
             try:
                 genres_list = json.loads(row['genres']) if row['genres'] else []
-                for genre in genres_list[:3]:  # Solo primeros 3 géneros
+                for genre in genres_list[:3]:  # Solo primeros 3 géneros por artista
                     genre_stats[genre]['users'].add(row['user'])
                     genre_stats[genre]['total_scrobbles'] += row['plays']
                     genre_stats[genre]['user_plays'][row['user']] += row['plays']
@@ -199,9 +242,11 @@ class GroupStatsDatabase:
                     'name': genre,
                     'user_count': len(stats['users']),
                     'total_scrobbles': stats['total_scrobbles'],
-                    'shared_users': list(stats['users'])
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
                 })
 
+        # Ordenar: primero por usuarios compartidos (desc), luego por scrobbles (desc)
         result.sort(key=lambda x: (x['user_count'], x['total_scrobbles']), reverse=True)
         return result[:limit]
 
@@ -214,35 +259,46 @@ class GroupStatsDatabase:
         mbid_filter = self._get_mbid_filter(mbid_only)
 
         cursor.execute(f'''
-            SELECT al.label,
-                   COUNT(DISTINCT s.user) as user_count,
-                   COUNT(*) as total_scrobbles,
-                   GROUP_CONCAT(DISTINCT s.user) as shared_users
+            SELECT al.label, s.user, COUNT(*) as plays
             FROM scrobbles s
             JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
             WHERE s.user IN ({','.join(['?'] * len(users))})
               AND s.timestamp >= ? AND s.timestamp <= ?
               AND al.label IS NOT NULL AND al.label != ''
             {mbid_filter}
-            GROUP BY al.label
-            HAVING user_count >= 2
-            ORDER BY user_count DESC, total_scrobbles DESC
-            LIMIT ?
-        ''', users + [from_timestamp, to_timestamp, limit])
+            GROUP BY al.label, s.user
+        ''', users + [from_timestamp, to_timestamp])
 
-        return [
-            {
-                'name': row['label'],
-                'user_count': row['user_count'],
-                'total_scrobbles': row['total_scrobbles'],
-                'shared_users': row['shared_users'].split(',') if row['shared_users'] else []
-            }
-            for row in cursor.fetchall()
-        ]
+        # Procesar por sello con user_plays
+        label_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            label = row['label']
+            user = row['user']
+            plays = row['plays']
+            label_stats[label]['users'].add(user)
+            label_stats[label]['total_scrobbles'] += plays
+            label_stats[label]['user_plays'][user] += plays
+
+        # Filtrar y ordenar
+        result = []
+        for label, stats in label_stats.items():
+            if len(stats['users']) >= 2:  # Solo sellos compartidos
+                result.append({
+                    'name': label,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        # Ordenar: primero por usuarios compartidos (desc), luego por scrobbles (desc)
+        result.sort(key=lambda x: (x['user_count'], x['total_scrobbles']), reverse=True)
+        return result[:limit]
 
     def get_top_release_years_by_shared_users(self, users: List[str], from_year: int, to_year: int,
-                                            limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top décadas de lanzamiento por usuarios compartidos y scrobbles totales"""
+                                            limit: int = 15, mbid_only: bool = False, use_decades: bool = True) -> List[Dict]:
+        """Top años/décadas de lanzamiento por usuarios compartidos y scrobbles totales"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -259,27 +315,52 @@ class GroupStatsDatabase:
             GROUP BY ard.release_year, user
         ''', users + [from_timestamp, to_timestamp])
 
-        # Procesar por décadas
-        decade_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0})
+        if use_decades:
+            # Procesar por décadas
+            period_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
 
-        for row in cursor.fetchall():
-            decade = self._get_decade(row['release_year'])
-            decade_stats[decade]['users'].add(row['user'])
-            decade_stats[decade]['total_scrobbles'] += row['plays']
+            for row in cursor.fetchall():
+                decade = self._get_decade(row['release_year'])
+                period_stats[decade]['users'].add(row['user'])
+                period_stats[decade]['total_scrobbles'] += row['plays']
+                period_stats[decade]['user_plays'][row['user']] += row['plays']
+        else:
+            # Procesar por años individuales
+            period_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
 
-        # Filtrar y ordenar
+            for row in cursor.fetchall():
+                year = str(row['release_year'])
+                period_stats[year]['users'].add(row['user'])
+                period_stats[year]['total_scrobbles'] += row['plays']
+                period_stats[year]['user_plays'][row['user']] += row['plays']
+
+        # Filtrar y ordenar por usuarios compartidos primero, luego por scrobbles
         result = []
-        for decade, stats in decade_stats.items():
-            if len(stats['users']) >= 2:  # Solo décadas compartidas
+        max_users = len(users)
+
+        for period, stats in period_stats.items():
+            if len(stats['users']) >= 2:  # Solo períodos compartidos
                 result.append({
-                    'name': decade,
+                    'name': period,
                     'user_count': len(stats['users']),
                     'total_scrobbles': stats['total_scrobbles'],
-                    'shared_users': list(stats['users'])
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
                 })
 
+        # Ordenar: primero por usuarios compartidos (desc), luego por scrobbles (desc)
         result.sort(key=lambda x: (x['user_count'], x['total_scrobbles']), reverse=True)
         return result[:limit]
+
+    def get_top_release_decades_by_shared_users(self, users: List[str], from_year: int, to_year: int,
+                                              limit: int = 15, mbid_only: bool = False) -> List[Dict]:
+        """Top décadas de lanzamiento por usuarios compartidos"""
+        return self.get_top_release_years_by_shared_users(users, from_year, to_year, limit, mbid_only, use_decades=True)
+
+    def get_top_individual_years_by_shared_users(self, users: List[str], from_year: int, to_year: int,
+                                                limit: int = 15, mbid_only: bool = False) -> List[Dict]:
+        """Top años individuales de lanzamiento por usuarios compartidos"""
+        return self.get_top_release_years_by_shared_users(users, from_year, to_year, limit, mbid_only, use_decades=False)
 
     def get_top_by_total_scrobbles(self, users: List[str], from_year: int, to_year: int,
                                  limit: int = 15, mbid_only: bool = False) -> Dict[str, List[Dict]]:
@@ -587,6 +668,208 @@ class GroupStatsDatabase:
             evolution[category] = {item: evolution[category][item] for item, _ in top_items}
 
         return evolution
+
+    def get_total_shared_counts(self, users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, int]:
+        """Obtiene el número total real de elementos compartidos por TODOS los usuarios"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        results = {}
+
+        # Total artistas compartidos
+        cursor.execute(f'''
+            SELECT COUNT(DISTINCT artist) as count
+            FROM scrobbles s
+            WHERE user IN ({','.join(['?'] * len(users))})
+              AND timestamp >= ? AND timestamp <= ?
+            {mbid_filter}
+            GROUP BY artist
+            HAVING COUNT(DISTINCT user) = ?
+        ''', users + [from_timestamp, to_timestamp, len(users)])
+
+        max_shared_artists = cursor.fetchone()
+        results['max_shared_artists'] = max_shared_artists['count'] if max_shared_artists else 0
+
+        # Total artistas con coincidencias (2+ usuarios)
+        cursor.execute(f'''
+            SELECT COUNT(*) as count
+            FROM (
+                SELECT artist
+                FROM scrobbles s
+                WHERE user IN ({','.join(['?'] * len(users))})
+                  AND timestamp >= ? AND timestamp <= ?
+                {mbid_filter}
+                GROUP BY artist
+                HAVING COUNT(DISTINCT user) >= 2
+            )
+        ''', users + [from_timestamp, to_timestamp])
+
+        result = cursor.fetchone()
+        results['shared_artists'] = result['count'] if result else 0
+
+        # Similar para álbumes
+        cursor.execute(f'''
+            SELECT COUNT(*) as count
+            FROM (
+                SELECT artist, album
+                FROM scrobbles s
+                WHERE user IN ({','.join(['?'] * len(users))})
+                  AND timestamp >= ? AND timestamp <= ?
+                  AND album IS NOT NULL AND album != ''
+                {mbid_filter}
+                GROUP BY artist, album
+                HAVING COUNT(DISTINCT user) >= 2
+            )
+        ''', users + [from_timestamp, to_timestamp])
+
+        result = cursor.fetchone()
+        results['shared_albums'] = result['count'] if result else 0
+
+        # Similar para canciones
+        cursor.execute(f'''
+            SELECT COUNT(*) as count
+            FROM (
+                SELECT artist, track
+                FROM scrobbles s
+                WHERE user IN ({','.join(['?'] * len(users))})
+                  AND timestamp >= ? AND timestamp <= ?
+                {mbid_filter}
+                GROUP BY artist, track
+                HAVING COUNT(DISTINCT user) >= 2
+            )
+        ''', users + [from_timestamp, to_timestamp])
+
+        result = cursor.fetchone()
+        results['shared_tracks'] = result['count'] if result else 0
+
+        return results
+
+    def get_top_artists_for_genre(self, genre: str, users: List[str], from_year: int, to_year: int,
+                                 limit: int = 5, mbid_only: bool = False) -> List[Dict]:
+        """Obtiene top artistas que más contribuyen a un género específico"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT s.artist,
+                   COUNT(DISTINCT s.user) as user_count,
+                   COUNT(*) as total_scrobbles,
+                   GROUP_CONCAT(DISTINCT s.user) as shared_users
+            FROM scrobbles s
+            JOIN artist_genres ag ON s.artist = ag.artist
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+              AND ag.genres LIKE ?
+            {mbid_filter}
+            GROUP BY s.artist
+            HAVING user_count >= 2
+            ORDER BY user_count DESC, total_scrobbles DESC
+            LIMIT ?
+        ''', users + [from_timestamp, to_timestamp, f'%"{genre}"%', limit])
+
+        return [
+            {
+                'name': row['artist'],
+                'user_count': row['user_count'],
+                'total_scrobbles': row['total_scrobbles'],
+                'shared_users': row['shared_users'].split(',') if row['shared_users'] else []
+            }
+            for row in cursor.fetchall()
+        ]
+
+    def get_top_albums_for_label(self, label: str, users: List[str], from_year: int, to_year: int,
+                                limit: int = 5, mbid_only: bool = False) -> List[Dict]:
+        """Obtiene top álbumes que más contribuyen a un sello específico"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT (s.artist || ' - ' || s.album) as album_name,
+                   s.artist,
+                   s.album,
+                   COUNT(DISTINCT s.user) as user_count,
+                   COUNT(*) as total_scrobbles,
+                   GROUP_CONCAT(DISTINCT s.user) as shared_users
+            FROM scrobbles s
+            JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+              AND al.label = ?
+              AND s.album IS NOT NULL AND s.album != ''
+            {mbid_filter}
+            GROUP BY s.artist, s.album
+            HAVING user_count >= 2
+            ORDER BY user_count DESC, total_scrobbles DESC
+            LIMIT ?
+        ''', users + [from_timestamp, to_timestamp, label, limit])
+
+        return [
+            {
+                'name': row['album_name'],
+                'artist': row['artist'],
+                'album': row['album'],
+                'user_count': row['user_count'],
+                'total_scrobbles': row['total_scrobbles'],
+                'shared_users': row['shared_users'].split(',') if row['shared_users'] else []
+            }
+            for row in cursor.fetchall()
+        ]
+
+    def get_top_artists_for_period(self, period: str, users: List[str], from_year: int, to_year: int,
+                                  limit: int = 5, mbid_only: bool = False, use_decades: bool = True) -> List[Dict]:
+        """Obtiene top artistas que más contribuyen a un período específico (década o año)"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        if use_decades:
+            # Convertir década a rango de años
+            if period == "Antes de 1950":
+                year_condition = "ard.release_year < 1950"
+            elif period == "2020s+":
+                year_condition = "ard.release_year >= 2020"
+            else:
+                decade_start = int(period.replace('s', ''))
+                decade_end = decade_start + 9
+                year_condition = f"ard.release_year BETWEEN {decade_start} AND {decade_end}"
+        else:
+            # Año individual
+            year_condition = f"ard.release_year = {int(period)}"
+
+        cursor.execute(f'''
+            SELECT s.artist,
+                   COUNT(DISTINCT s.user) as user_count,
+                   COUNT(*) as total_scrobbles,
+                   GROUP_CONCAT(DISTINCT s.user) as shared_users
+            FROM scrobbles s
+            JOIN album_release_dates ard ON s.artist = ard.artist AND s.album = ard.album
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+              AND {year_condition}
+            {mbid_filter}
+            GROUP BY s.artist
+            HAVING user_count >= 2
+            ORDER BY user_count DESC, total_scrobbles DESC
+            LIMIT ?
+        ''', users + [from_timestamp, to_timestamp, limit])
+
+        return [
+            {
+                'name': row['artist'],
+                'user_count': row['user_count'],
+                'total_scrobbles': row['total_scrobbles'],
+                'shared_users': row['shared_users'].split(',') if row['shared_users'] else []
+            }
+            for row in cursor.fetchall()
+        ]
+-e
 
     def _get_decade(self, year: int) -> str:
         """Convierte un año a etiqueta de década"""

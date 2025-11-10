@@ -20,6 +20,9 @@ class GroupStatsAnalyzer:
 
     def analyze_group_stats(self, users: List[str]) -> Dict:
         """Analiza completamente las estadísticas grupales y devuelve todos los datos"""
+        print(f"    • Obteniendo totales reales...")
+        total_counts = self.database.get_total_shared_counts(users, self.from_year, self.to_year, self.mbid_only)
+
         print(f"    • Analizando top por usuarios compartidos...")
         shared_stats = self._analyze_shared_stats(users)
 
@@ -33,6 +36,7 @@ class GroupStatsAnalyzer:
             'period': f"{self.from_year}-{self.to_year}",
             'users': users,
             'user_count': len(users),
+            'total_counts': total_counts,
             'shared_charts': shared_stats,
             'scrobbles_charts': scrobbles_stats,
             'evolution': evolution_stats,
@@ -71,8 +75,13 @@ class GroupStatsAnalyzer:
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
-        # Top 15 años de lanzamiento por usuarios compartidos
-        top_release_years = self.database.get_top_release_years_by_shared_users(
+        # Top 15 décadas de lanzamiento por usuarios compartidos
+        top_release_decades = self.database.get_top_release_decades_by_shared_users(
+            users, self.from_year, self.to_year, 15, self.mbid_only
+        )
+
+        # Top 15 años individuales de lanzamiento por usuarios compartidos
+        top_release_years = self.database.get_top_individual_years_by_shared_users(
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
@@ -82,6 +91,7 @@ class GroupStatsAnalyzer:
             'tracks': self._prepare_pie_chart_data('Canciones (Por Usuarios Compartidos)', top_tracks, 'shared'),
             'genres': self._prepare_pie_chart_data('Géneros (Por Usuarios Compartidos)', top_genres, 'shared'),
             'labels': self._prepare_pie_chart_data('Sellos (Por Usuarios Compartidos)', top_labels, 'shared'),
+            'release_decades': self._prepare_pie_chart_data('Décadas de Lanzamiento (Por Usuarios Compartidos)', top_release_decades, 'shared'),
             'release_years': self._prepare_pie_chart_data('Años de Lanzamiento (Por Usuarios Compartidos)', top_release_years, 'shared')
         }
 
@@ -95,13 +105,19 @@ class GroupStatsAnalyzer:
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
+        # También obtener años individuales
+        top_individual_years = self.database.get_top_release_years_by_scrobbles_only(
+            users, self.from_year, self.to_year, 15, self.mbid_only
+        )
+
         return {
             'artists': self._prepare_pie_chart_data('Artistas (Por Scrobbles)', scrobbles_data['artists'], 'scrobbles'),
             'albums': self._prepare_pie_chart_data('Álbumes (Por Scrobbles)', scrobbles_data['albums'], 'scrobbles'),
             'tracks': self._prepare_pie_chart_data('Canciones (Por Scrobbles)', scrobbles_data['tracks'], 'scrobbles'),
             'genres': self._prepare_pie_chart_data('Géneros (Por Scrobbles)', scrobbles_data['genres'], 'scrobbles'),
             'labels': self._prepare_pie_chart_data('Sellos (Por Scrobbles)', scrobbles_data['labels'], 'scrobbles'),
-            'release_years': self._prepare_pie_chart_data('Años de Lanzamiento (Por Scrobbles)', scrobbles_data['release_years'], 'scrobbles'),
+            'release_decades': self._prepare_pie_chart_data('Décadas de Lanzamiento (Por Scrobbles)', scrobbles_data['release_years'], 'scrobbles'),
+            'release_years': self._prepare_pie_chart_data('Años de Lanzamiento (Por Scrobbles)', top_individual_years, 'scrobbles'),
             'all_combined': self._prepare_combined_chart_data(scrobbles_data)
         }
 
@@ -141,13 +157,14 @@ class GroupStatsAnalyzer:
             chart_data = {item['name']: item['total_scrobbles'] for item in raw_data}
             total = sum(item['total_scrobbles'] for item in raw_data)
 
-        # Detalles para popups
+        # Detalles para popups con user_plays incluido
         details = {}
         for item in raw_data:
             details[item['name']] = {
                 'user_count': item['user_count'],
                 'total_scrobbles': item['total_scrobbles'],
                 'shared_users': item.get('shared_users', []),
+                'user_plays': item.get('user_plays', {}),
                 'artist': item.get('artist', ''),
                 'album': item.get('album', ''),
                 'track': item.get('track', '')

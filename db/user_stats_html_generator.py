@@ -687,7 +687,7 @@ class UserStatsHTMLGenerator:
         <div id="popup" class="popup" style="display: none;">
             <div class="popup-header">
                 <span id="popupTitle">Detalles</span>
-                <button id="popupClose" class="popup-close">Ãƒâ€”</button>
+                <button id="popupClose" class="popup-close">X</button>
             </div>
             <div id="popupContent" class="popup-content"></div>
         </div>
@@ -1015,7 +1015,7 @@ class UserStatsHTMLGenerator:
                     }});
                 }}
             }} else if (chartType === 'top_discography') {{
-                // Mostrar artistas coincidentes con nÃƒÂºmero de canciones
+                // Mostrar artistas coincidentes con número de canciones
                 title = `Discografía Completada - ${{selectedLabel}}`;
                 if (details.artists) {{
                     Object.keys(details.artists).forEach(artist => {{
@@ -1497,5 +1497,5 @@ class UserStatsHTMLGenerator:
 </html>"""
 
     def _format_number(self, number: int) -> str:
-        """Formatea nÃƒÂºmeros con separadores de miles"""
+        """Formatea números con separadores de miles"""
         return f"{number:,}".replace(",", ".")

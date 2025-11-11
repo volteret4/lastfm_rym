@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-GroupDataAnalyzer - Analizador para datos de coincidencias por nivel de usuarios
-Permite obtener TOPs de elementos compartidos por N usuarios o más
+GroupDataAnalyzer - Analizador para datos de coincidencias por nivel de usuarios CORREGIDO
+Permite obtener TOPs de elementos compartidos por N usuarios EXACTAMENTE
 """
 
 from datetime import datetime
@@ -64,59 +64,317 @@ class GroupDataAnalyzer:
     def _get_data_for_level(self, users: List[str], min_users: int) -> Dict:
         """Obtiene datos para un nivel específico de usuarios"""
 
-        # Top 25 artistas
-        top_artists = self.database.get_top_artists_by_shared_users(
-            users, self.from_year, self.to_year, 50, self.mbid_only  # Obtenemos 50 para filtrar después
-        )
-        filtered_artists = [item for item in top_artists if item['user_count'] >= min_users][:25]
+        # CORRIGIDO: Usar las funciones específicas para niveles exactos
+        # Top 25 artistas con exactamente min_users
+        top_artists = self._get_top_artists_by_exact_users(users, min_users, 25)
 
-        # Top 25 álbumes
-        top_albums = self.database.get_top_albums_by_shared_users(
-            users, self.from_year, self.to_year, 50, self.mbid_only
-        )
-        filtered_albums = [item for item in top_albums if item['user_count'] >= min_users][:25]
+        # Top 25 álbumes con exactamente min_users
+        top_albums = self._get_top_albums_by_exact_users(users, min_users, 25)
 
-        # Top 25 canciones
-        top_tracks = self.database.get_top_tracks_by_shared_users(
-            users, self.from_year, self.to_year, 50, self.mbid_only
-        )
-        filtered_tracks = [item for item in top_tracks if item['user_count'] >= min_users][:25]
+        # Top 25 canciones con exactamente min_users
+        top_tracks = self._get_top_tracks_by_exact_users(users, min_users, 25)
 
-        # Top 25 géneros
-        top_genres = self.database.get_top_genres_by_shared_users(
-            users, self.from_year, self.to_year, 50, self.mbid_only
-        )
-        filtered_genres = [item for item in top_genres if item['user_count'] >= min_users][:25]
+        # Top 25 géneros con exactamente min_users
+        top_genres = self._get_top_genres_by_exact_users(users, min_users, 25)
 
-        # Top 25 sellos
-        top_labels = self.database.get_top_labels_by_shared_users(
-            users, self.from_year, self.to_year, 50, self.mbid_only
-        )
-        filtered_labels = [item for item in top_labels if item['user_count'] >= min_users][:25]
+        # Top 25 sellos con exactamente min_users
+        top_labels = self._get_top_labels_by_exact_users(users, min_users, 25)
 
-        # Top 25 décadas
-        top_decades = self.database.get_top_release_decades_by_shared_users(
-            users, self.from_year, self.to_year, 50, self.mbid_only
-        )
-        filtered_decades = [item for item in top_decades if item['user_count'] >= min_users][:25]
+        # Top 25 décadas con exactamente min_users
+        top_decades = self._get_top_release_decades_by_exact_users(users, min_users, 25)
 
         return {
             'min_users': min_users,
-            'artists': self._prepare_data_items(filtered_artists),
-            'albums': self._prepare_data_items(filtered_albums),
-            'tracks': self._prepare_data_items(filtered_tracks),
-            'genres': self._prepare_data_items(filtered_genres),
-            'labels': self._prepare_data_items(filtered_labels),
-            'decades': self._prepare_data_items(filtered_decades),
+            'artists': self._prepare_data_items(top_artists),
+            'albums': self._prepare_data_items(top_albums),
+            'tracks': self._prepare_data_items(top_tracks),
+            'genres': self._prepare_data_items(top_genres),
+            'labels': self._prepare_data_items(top_labels),
+            'decades': self._prepare_data_items(top_decades),
             'counts': {
-                'artists': len(filtered_artists),
-                'albums': len(filtered_albums),
-                'tracks': len(filtered_tracks),
-                'genres': len(filtered_genres),
-                'labels': len(filtered_labels),
-                'decades': len(filtered_decades)
+                'artists': len(top_artists),
+                'albums': len(top_albums),
+                'tracks': len(top_tracks),
+                'genres': len(top_genres),
+                'labels': len(top_labels),
+                'decades': len(top_decades)
             }
         }
+
+    def _get_top_artists_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
+        """Obtiene artistas compartidos por EXACTAMENTE el número especificado de usuarios"""
+        cursor = self.database.conn.cursor()
+        from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self.database._get_mbid_filter(self.mbid_only)
+
+        cursor.execute(f'''
+            SELECT artist, user, COUNT(*) as plays
+            FROM scrobbles s
+            WHERE user IN ({','.join(['?'] * len(users))})
+              AND timestamp >= ? AND timestamp <= ?
+            {mbid_filter}
+            GROUP BY artist, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        # Procesar por artista con user_plays
+        artist_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            artist = row['artist']
+            user = row['user']
+            plays = row['plays']
+            artist_stats[artist]['users'].add(user)
+            artist_stats[artist]['total_scrobbles'] += plays
+            artist_stats[artist]['user_plays'][user] += plays
+
+        # Filtrar por número EXACTO de usuarios
+        result = []
+        for artist, stats in artist_stats.items():
+            if len(stats['users']) == exact_users:  # EXACTAMENTE el número de usuarios
+                result.append({
+                    'name': artist,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        # Ordenar por scrobbles totales (descendente)
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result[:limit]
+
+    def _get_top_albums_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
+        """Obtiene álbumes compartidos por EXACTAMENTE el número especificado de usuarios"""
+        cursor = self.database.conn.cursor()
+        from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self.database._get_mbid_filter(self.mbid_only)
+
+        cursor.execute(f'''
+            SELECT (artist || ' - ' || album) as album_name,
+                   artist,
+                   album,
+                   user,
+                   COUNT(*) as plays
+            FROM scrobbles s
+            WHERE user IN ({','.join(['?'] * len(users))})
+              AND timestamp >= ? AND timestamp <= ?
+              AND album IS NOT NULL AND album != ''
+            {mbid_filter}
+            GROUP BY artist, album, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        album_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'artist': '', 'album': ''})
+
+        for row in cursor.fetchall():
+            album_key = row['album_name']
+            user = row['user']
+            plays = row['plays']
+            album_stats[album_key]['users'].add(user)
+            album_stats[album_key]['total_scrobbles'] += plays
+            album_stats[album_key]['user_plays'][user] += plays
+            album_stats[album_key]['artist'] = row['artist']
+            album_stats[album_key]['album'] = row['album']
+
+        result = []
+        for album_name, stats in album_stats.items():
+            if len(stats['users']) == exact_users:
+                result.append({
+                    'name': album_name,
+                    'artist': stats['artist'],
+                    'album': stats['album'],
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result[:limit]
+
+    def _get_top_tracks_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
+        """Obtiene canciones compartidas por EXACTAMENTE el número especificado de usuarios"""
+        cursor = self.database.conn.cursor()
+        from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self.database._get_mbid_filter(self.mbid_only)
+
+        cursor.execute(f'''
+            SELECT (artist || ' - ' || track) as track_name,
+                   artist,
+                   track,
+                   user,
+                   COUNT(*) as plays
+            FROM scrobbles s
+            WHERE user IN ({','.join(['?'] * len(users))})
+              AND timestamp >= ? AND timestamp <= ?
+            {mbid_filter}
+            GROUP BY artist, track, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        track_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'artist': '', 'track': ''})
+
+        for row in cursor.fetchall():
+            track_key = row['track_name']
+            user = row['user']
+            plays = row['plays']
+            track_stats[track_key]['users'].add(user)
+            track_stats[track_key]['total_scrobbles'] += plays
+            track_stats[track_key]['user_plays'][user] += plays
+            track_stats[track_key]['artist'] = row['artist']
+            track_stats[track_key]['track'] = row['track']
+
+        result = []
+        for track_name, stats in track_stats.items():
+            if len(stats['users']) == exact_users:
+                result.append({
+                    'name': track_name,
+                    'artist': stats['artist'],
+                    'track': stats['track'],
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result[:limit]
+
+    def _get_top_genres_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
+        """Obtiene géneros compartidos por EXACTAMENTE el número especificado de usuarios"""
+        cursor = self.database.conn.cursor()
+        from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self.database._get_mbid_filter(self.mbid_only)
+
+        cursor.execute(f'''
+            SELECT ag.genres, user, COUNT(*) as plays
+            FROM scrobbles s
+            JOIN artist_genres ag ON s.artist = ag.artist
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+            {mbid_filter}
+            GROUP BY ag.genres, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        genre_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            try:
+                genres_list = json.loads(row['genres']) if row['genres'] else []
+                for genre in genres_list[:3]:  # Solo primeros 3 géneros por artista
+                    genre_stats[genre]['users'].add(row['user'])
+                    genre_stats[genre]['total_scrobbles'] += row['plays']
+                    genre_stats[genre]['user_plays'][row['user']] += row['plays']
+            except json.JSONDecodeError:
+                continue
+
+        result = []
+        for genre, stats in genre_stats.items():
+            if len(stats['users']) == exact_users:
+                result.append({
+                    'name': genre,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result[:limit]
+
+    def _get_top_labels_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
+        """Obtiene sellos compartidos por EXACTAMENTE el número especificado de usuarios"""
+        cursor = self.database.conn.cursor()
+        from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self.database._get_mbid_filter(self.mbid_only)
+
+        cursor.execute(f'''
+            SELECT al.label, s.user, COUNT(*) as plays
+            FROM scrobbles s
+            JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+              AND al.label IS NOT NULL AND al.label != ''
+            {mbid_filter}
+            GROUP BY al.label, s.user
+        ''', users + [from_timestamp, to_timestamp])
+
+        label_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            label = row['label']
+            user = row['user']
+            plays = row['plays']
+            label_stats[label]['users'].add(user)
+            label_stats[label]['total_scrobbles'] += plays
+            label_stats[label]['user_plays'][user] += plays
+
+        result = []
+        for label, stats in label_stats.items():
+            if len(stats['users']) == exact_users:
+                result.append({
+                    'name': label,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result[:limit]
+
+    def _get_top_release_decades_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
+        """Obtiene décadas compartidas por EXACTAMENTE el número especificado de usuarios"""
+        cursor = self.database.conn.cursor()
+        from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self.database._get_mbid_filter(self.mbid_only)
+
+        cursor.execute(f'''
+            SELECT ard.release_year, user, COUNT(*) as plays
+            FROM scrobbles s
+            JOIN album_release_dates ard ON s.artist = ard.artist AND s.album = ard.album
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+              AND ard.release_year IS NOT NULL
+            {mbid_filter}
+            GROUP BY ard.release_year, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        decade_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            decade = self._get_decade(row['release_year'])
+            decade_stats[decade]['users'].add(row['user'])
+            decade_stats[decade]['total_scrobbles'] += row['plays']
+            decade_stats[decade]['user_plays'][row['user']] += row['plays']
+
+        result = []
+        for decade, stats in decade_stats.items():
+            if len(stats['users']) == exact_users:
+                result.append({
+                    'name': decade,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result[:limit]
+
+    def _get_decade(self, year: int) -> str:
+        """Convierte un año a etiqueta de década"""
+        if year < 1950:
+            return "Antes de 1950"
+        elif year >= 2020:
+            return "2020s+"
+        else:
+            decade_start = (year // 10) * 10
+            return f"{decade_start}s"
 
     def _prepare_data_items(self, raw_data: List[Dict]) -> List[Dict]:
         """Prepara los elementos para mostrar en formato compatible con html_semanal.py"""

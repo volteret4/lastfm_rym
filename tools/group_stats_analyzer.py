@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GroupStatsAnalyzer - Analizador para estadísticas grupales
+GroupStatsAnalyzer - Analizador para estadÃ­sticas grupales
 """
 
 from datetime import datetime
@@ -8,7 +8,7 @@ from typing import List, Dict
 
 
 class GroupStatsAnalyzer:
-    """Clase para analizar estadísticas grupales del grupo de usuarios"""
+    """Clase para analizar estadÃ­sticas grupales del grupo de usuarios"""
 
     def __init__(self, database, years_back: int = 5, mbid_only: bool = False):
         self.database = database
@@ -19,17 +19,17 @@ class GroupStatsAnalyzer:
         self.to_year = self.current_year
 
     def analyze_group_stats(self, users: List[str]) -> Dict:
-        """Analiza completamente las estadísticas grupales y devuelve todos los datos"""
-        print(f"    • Obteniendo totales reales...")
+        """Analiza completamente las estadÃ­sticas grupales y devuelve todos los datos"""
+        print(f"    â€¢ Obteniendo totales reales...")
         total_counts = self.database.get_total_shared_counts(users, self.from_year, self.to_year, self.mbid_only)
 
-        print(f"    • Analizando top por usuarios compartidos...")
+        print(f"    â€¢ Analizando top por usuarios compartidos...")
         shared_stats = self._analyze_shared_stats(users)
 
-        print(f"    • Analizando top por scrobbles totales...")
+        print(f"    â€¢ Analizando top por scrobbles totales...")
         scrobbles_stats = self._analyze_scrobbles_stats(users)
 
-        print(f"    • Analizando evolución temporal...")
+        print(f"    â€¢ Analizando evoluciÃ³n temporal...")
         evolution_stats = self._analyze_evolution_stats(users)
 
         return {
@@ -45,9 +45,9 @@ class GroupStatsAnalyzer:
 
     def _analyze_shared_stats(self, users: List[str]) -> Dict:
         """
-        Analiza estadísticas basadas en usuarios compartidos
-        Top 15 de cada categoría ordenado por:
-        1. Número de usuarios que lo comparten (prioridad)
+        Analiza estadÃ­sticas basadas en usuarios compartidos
+        Top 15 de cada categorÃ­a ordenado por:
+        1. NÃºmero de usuarios que lo comparten (prioridad)
         2. Total de scrobbles (desempate)
         """
         # Top 15 artistas por usuarios compartidos
@@ -55,7 +55,7 @@ class GroupStatsAnalyzer:
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
-        # Top 15 álbumes por usuarios compartidos
+        # Top 15 Ã¡lbumes por usuarios compartidos
         top_albums = self.database.get_top_albums_by_shared_users(
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
@@ -65,7 +65,7 @@ class GroupStatsAnalyzer:
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
-        # Top 15 géneros por usuarios compartidos
+        # Top 15 gÃ©neros por usuarios compartidos
         top_genres = self.database.get_top_genres_by_shared_users(
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
@@ -75,69 +75,69 @@ class GroupStatsAnalyzer:
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
-        # Top 15 décadas de lanzamiento por usuarios compartidos
+        # Top 15 dÃ©cadas de lanzamiento por usuarios compartidos
         top_release_decades = self.database.get_top_release_decades_by_shared_users(
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
-        # Top 15 años individuales de lanzamiento por usuarios compartidos
+        # Top 15 aÃ±os individuales de lanzamiento por usuarios compartidos
         top_release_years = self.database.get_top_individual_years_by_shared_users(
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
         return {
             'artists': self._prepare_pie_chart_data('Artistas (Por Usuarios Compartidos)', top_artists, 'shared'),
-            'albums': self._prepare_pie_chart_data('Álbumes (Por Usuarios Compartidos)', top_albums, 'shared'),
+            'albums': self._prepare_pie_chart_data('Ãlbumes (Por Usuarios Compartidos)', top_albums, 'shared'),
             'tracks': self._prepare_pie_chart_data('Canciones (Por Usuarios Compartidos)', top_tracks, 'shared'),
-            'genres': self._prepare_pie_chart_data('Géneros (Por Usuarios Compartidos)', top_genres, 'shared'),
+            'genres': self._prepare_pie_chart_data('GÃ©neros (Por Usuarios Compartidos)', top_genres, 'shared'),
             'labels': self._prepare_pie_chart_data('Sellos (Por Usuarios Compartidos)', top_labels, 'shared'),
-            'release_decades': self._prepare_pie_chart_data('Décadas de Lanzamiento (Por Usuarios Compartidos)', top_release_decades, 'shared'),
-            'release_years': self._prepare_pie_chart_data('Años de Lanzamiento (Por Usuarios Compartidos)', top_release_years, 'shared')
+            'release_decades': self._prepare_pie_chart_data('DÃ©cadas de Lanzamiento (Por Usuarios Compartidos)', top_release_decades, 'shared'),
+            'release_years': self._prepare_pie_chart_data('AÃ±os de Lanzamiento (Por Usuarios Compartidos)', top_release_years, 'shared')
         }
 
     def _analyze_scrobbles_stats(self, users: List[str]) -> Dict:
         """
-        Analiza estadísticas basadas solo en scrobbles totales
-        Top 15 de cada categoría ordenado solo por total de scrobbles
+        Analiza estadÃ­sticas basadas solo en scrobbles totales
+        Top 15 de cada categorÃ­a ordenado solo por total de scrobbles
         """
         # Obtener todos los tops por scrobbles
         scrobbles_data = self.database.get_top_by_total_scrobbles(
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
-        # También obtener años individuales
+        # TambiÃ©n obtener aÃ±os individuales
         top_individual_years = self.database.get_top_release_years_by_scrobbles_only(
             users, self.from_year, self.to_year, 15, self.mbid_only
         )
 
         return {
             'artists': self._prepare_pie_chart_data('Artistas (Por Scrobbles)', scrobbles_data['artists'], 'scrobbles'),
-            'albums': self._prepare_pie_chart_data('Álbumes (Por Scrobbles)', scrobbles_data['albums'], 'scrobbles'),
+            'albums': self._prepare_pie_chart_data('Ãlbumes (Por Scrobbles)', scrobbles_data['albums'], 'scrobbles'),
             'tracks': self._prepare_pie_chart_data('Canciones (Por Scrobbles)', scrobbles_data['tracks'], 'scrobbles'),
-            'genres': self._prepare_pie_chart_data('Géneros (Por Scrobbles)', scrobbles_data['genres'], 'scrobbles'),
+            'genres': self._prepare_pie_chart_data('GÃ©neros (Por Scrobbles)', scrobbles_data['genres'], 'scrobbles'),
             'labels': self._prepare_pie_chart_data('Sellos (Por Scrobbles)', scrobbles_data['labels'], 'scrobbles'),
-            'release_decades': self._prepare_pie_chart_data('Décadas de Lanzamiento (Por Scrobbles)', scrobbles_data['release_years'], 'scrobbles'),
-            'release_years': self._prepare_pie_chart_data('Años de Lanzamiento (Por Scrobbles)', top_individual_years, 'scrobbles'),
+            'release_decades': self._prepare_pie_chart_data('DÃ©cadas de Lanzamiento (Por Scrobbles)', scrobbles_data['release_years'], 'scrobbles'),
+            'release_years': self._prepare_pie_chart_data('AÃ±os de Lanzamiento (Por Scrobbles)', top_individual_years, 'scrobbles'),
             'all_combined': self._prepare_combined_chart_data(scrobbles_data)
         }
 
     def _analyze_evolution_stats(self, users: List[str]) -> Dict:
-        """Analiza evolución temporal para gráficos lineales"""
+        """Analiza evoluciÃ³n temporal para grÃ¡ficos lineales"""
         evolution_data = self.database.get_evolution_data(
             users, self.from_year, self.to_year, self.mbid_only
         )
 
         return {
-            'artists': self._prepare_line_chart_data('Top 15 Artistas por Año', evolution_data['artists'], evolution_data['years']),
-            'albums': self._prepare_line_chart_data('Top 15 Álbumes por Año', evolution_data['albums'], evolution_data['years']),
-            'tracks': self._prepare_line_chart_data('Top 15 Canciones por Año', evolution_data['tracks'], evolution_data['years']),
-            'genres': self._prepare_line_chart_data('Top 15 Géneros por Año', evolution_data['genres'], evolution_data['years']),
-            'labels': self._prepare_line_chart_data('Top 15 Sellos por Año', evolution_data['labels'], evolution_data['years']),
-            'release_years': self._prepare_line_chart_data('Top 15 Años de Lanzamiento por Año', evolution_data['release_years'], evolution_data['years'])
+            'artists': self._prepare_line_chart_data('Top 15 Artistas por AÃ±o', evolution_data['artists'], evolution_data['years']),
+            'albums': self._prepare_line_chart_data('Top 15 Ãlbumes por AÃ±o', evolution_data['albums'], evolution_data['years']),
+            'tracks': self._prepare_line_chart_data('Top 15 Canciones por AÃ±o', evolution_data['tracks'], evolution_data['years']),
+            'genres': self._prepare_line_chart_data('Top 15 GÃ©neros por AÃ±o', evolution_data['genres'], evolution_data['years']),
+            'labels': self._prepare_line_chart_data('Top 15 Sellos por AÃ±o', evolution_data['labels'], evolution_data['years']),
+            'release_years': self._prepare_line_chart_data('Top 15 AÃ±os de Lanzamiento por AÃ±o', evolution_data['release_years'], evolution_data['years'])
         }
 
     def _prepare_pie_chart_data(self, title: str, raw_data: List[Dict], chart_type: str) -> Dict:
-        """Prepara datos para gráficos circulares"""
+        """Prepara datos para grÃ¡ficos circulares"""
         if not raw_data:
             return {
                 'title': title,
@@ -147,15 +147,9 @@ class GroupStatsAnalyzer:
                 'type': chart_type
             }
 
-        # Para gráficos circulares usamos user_count como valor principal
-        if chart_type == 'shared':
-            # Para gráficos de usuarios compartidos, usar user_count
-            chart_data = {item['name']: item['user_count'] for item in raw_data}
-            total = sum(item['user_count'] for item in raw_data)
-        else:
-            # Para gráficos de scrobbles, usar total_scrobbles
-            chart_data = {item['name']: item['total_scrobbles'] for item in raw_data}
-            total = sum(item['total_scrobbles'] for item in raw_data)
+        # Siempre usar scrobbles para el tamaño de las porciones
+        chart_data = {item['name']: item['total_scrobbles'] for item in raw_data}
+        total = sum(item['total_scrobbles'] for item in raw_data)
 
         # Detalles para popups con user_plays incluido
         details = {}
@@ -179,12 +173,12 @@ class GroupStatsAnalyzer:
         }
 
     def _prepare_combined_chart_data(self, scrobbles_data: Dict) -> Dict:
-        """Prepara datos combinados para el gráfico de "Todo por Scrobbles"""
+        """Prepara datos combinados para el grÃ¡fico de "Todo por Scrobbles"""
         all_items = []
 
-        # Combinar todos los tops con prefijo de categoría
+        # Combinar todos los tops con prefijo de categorÃ­a
         for category, items in scrobbles_data.items():
-            for item in items[:5]:  # Solo top 5 de cada categoría para evitar saturación
+            for item in items[:5]:  # Solo top 5 de cada categorÃ­a para evitar saturaciÃ³n
                 prefixed_name = f"{category.capitalize()}: {item['name']}"
                 all_items.append({
                     'name': prefixed_name,
@@ -221,7 +215,7 @@ class GroupStatsAnalyzer:
         }
 
     def _prepare_line_chart_data(self, title: str, evolution_data: Dict, years: List[int]) -> Dict:
-        """Prepara datos para gráficos lineales de evolución"""
+        """Prepara datos para grÃ¡ficos lineales de evoluciÃ³n"""
         if not evolution_data:
             return {
                 'title': title,

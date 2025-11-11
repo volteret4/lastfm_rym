@@ -8,6 +8,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
+from collections import defaultdict
 
 
 def scan_html_files(docs_dir='docs'):
@@ -69,7 +70,9 @@ def scan_html_files(docs_dir='docs'):
                 files['monthly'].append({
                     'filename': filename,
                     'label': label,
-                    'date': date_obj
+                    'date': date_obj,
+                    'year': year,
+                    'month': month_name
                 })
 
         elif filename.startswith('yearly'):
@@ -131,8 +134,26 @@ def scan_html_files(docs_dir='docs'):
     return files
 
 
+def group_monthly_by_year(monthly_files):
+    """Agrupa los archivos mensuales por año"""
+    years = defaultdict(list)
+    for file_info in monthly_files:
+        if 'year' in file_info:
+            years[file_info['year']].append(file_info)
+
+    # Ordenar meses dentro de cada año
+    for year in years:
+        years[year].sort(key=lambda x: x['date'], reverse=True)
+
+    return dict(years)
+
+
 def generate_index_html(files):
     """Genera el contenido del index.html"""
+
+    # Agrupar archivos mensuales por año
+    monthly_by_year = group_monthly_by_year(files['monthly'])
+    available_years = sorted(monthly_by_year.keys(), reverse=True)
 
     html = """<!doctype html>
 <html lang="es">
@@ -365,6 +386,47 @@ def generate_index_html(files):
                 margin-left: 10px;
             }
 
+            /* Estilos para el selector de año */
+            .year-selector {
+                margin-bottom: 20px;
+                text-align: center;
+            }
+
+            .year-selector label {
+                color: #a6adc8;
+                margin-right: 10px;
+                font-weight: 600;
+            }
+
+            .year-selector select {
+                background: #1e1e2e;
+                border: 2px solid #313244;
+                border-radius: 8px;
+                color: #cdd6f4;
+                padding: 8px 12px;
+                font-size: 1em;
+                transition: all 0.3s;
+            }
+
+            .year-selector select:focus {
+                border-color: #cba6f7;
+                outline: none;
+            }
+
+            .year-selector select:hover {
+                border-color: #cba6f7;
+            }
+
+            .monthly-year-section {
+                display: none;
+                margin-top: 20px;
+            }
+
+            .monthly-year-section.active {
+                display: block;
+                animation: fadeIn 0.3s;
+            }
+
             @media (max-width: 768px) {
                 h1 {
                     font-size: 2em;
@@ -380,6 +442,16 @@ def generate_index_html(files):
 
                 .period-grid {
                     grid-template-columns: 1fr;
+                }
+
+                .year-selector {
+                    margin-bottom: 15px;
+                }
+
+                .year-selector label {
+                    display: block;
+                    margin-bottom: 5px;
+                    margin-right: 0;
                 }
             }
         </style>
@@ -441,27 +513,55 @@ def generate_index_html(files):
 
                     <!-- Estadísticas Mensuales -->
                     <div class="period-selector">
-                        <h2>📅 Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>
-                        <div class="period-grid">"""
+                        <h2>📅 Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>"""
 
-    # Agregar enlaces mensuales
-    if files['monthly']:
-        for file_info in files['monthly']:
+    # Agregar selector de año si hay archivos mensuales
+    if monthly_by_year:
+        html += """
+                        <div class="year-selector">
+                            <label for="year-select">Seleccionar año:</label>
+                            <select id="year-select" onchange="changeMonthlyYear(this.value)">"""
+
+        # Agregar opción por defecto
+        html += """
+                                <option value="">-- Selecciona un año --</option>"""
+
+        # Agregar opciones de años
+        for year in available_years:
             html += f"""
-                            <a href="{file_info['filename']}" class="period-link">
-                                <div class="period-name">{file_info['label']}</div>
-                                <div class="period-date">Mes completo</div>
-                            </a>"""
+                                <option value="{year}">{year}</option>"""
+
+        html += """
+                            </select>
+                        </div>"""
+
+        # Agregar secciones por año
+        for year in available_years:
+            html += f"""
+                        <div class="monthly-year-section" id="year-{year}">
+                            <div class="period-grid">"""
+
+            for file_info in monthly_by_year[year]:
+                html += f"""
+                                <a href="{file_info['filename']}" class="period-link">
+                                    <div class="period-name">{file_info['label']}</div>
+                                    <div class="period-date">Mes completo</div>
+                                </a>"""
+
+            html += """
+                            </div>
+                        </div>"""
     else:
         html += """
+                        <div class="period-grid">
                             <div class="empty-state">
                                 <div class="empty-state-icon">📅</div>
                                 <p>No hay estadísticas mensuales disponibles</p>
                                 <p style="font-size: 0.9em;">Ejecuta <code>python3 html_mensual.py</code></p>
-                            </div>"""
+                            </div>
+                        </div>"""
 
     html += """
-                        </div>
                     </div>
 
                     <!-- Estadísticas Anuales -->
@@ -488,7 +588,10 @@ def generate_index_html(files):
     html += """
                         </div>
                     </div>
+                </div>
 
+                <!-- Tab Grupo -->
+                <div id="grupo" class="tab-content">
                     <!-- Estadísticas de Usuarios -->
                     <div class="period-selector">
                         <h2>👤 Estadísticas de Usuarios<span class="stats-badge">""" + str(len(files['users'])) + """</span></h2>
@@ -513,10 +616,8 @@ def generate_index_html(files):
     html += """
                         </div>
                     </div>
-                </div>
 
-                <!-- Tab Grupo -->
-                <div id="grupo" class="tab-content">
+                    <!-- Estadísticas Grupales -->
                     <div class="period-selector">
                         <h2>👥 Estadísticas Grupales<span class="stats-badge">""" + str(len(files['grupo'])) + """</span></h2>
                         <div class="period-grid">"""
@@ -561,7 +662,7 @@ def generate_index_html(files):
                             </li>
                             <li>
                                 <strong>Estadísticas Mensuales:</strong>
-                                Análisis de meses completos
+                                Análisis de meses completos organizados por año
                             </li>
                             <li>
                                 <strong>Estadísticas Anuales:</strong> Análisis
@@ -699,6 +800,34 @@ def generate_index_html(files):
                     targetLink.click();
                 }
             }
+
+            // Sistema de selector de año para estadísticas mensuales
+            function changeMonthlyYear(year) {
+                // Ocultar todas las secciones de años
+                const yearSections = document.querySelectorAll('.monthly-year-section');
+                yearSections.forEach(section => {
+                    section.classList.remove('active');
+                });
+
+                // Mostrar la sección del año seleccionado
+                if (year) {
+                    const selectedSection = document.getElementById(`year-${year}`);
+                    if (selectedSection) {
+                        selectedSection.classList.add('active');
+                    }
+                }
+            }
+
+            // Mostrar el primer año por defecto si existe
+            document.addEventListener('DOMContentLoaded', function() {
+                const yearSelect = document.getElementById('year-select');
+                if (yearSelect && yearSelect.options.length > 1) {
+                    // Seleccionar el primer año disponible (más reciente)
+                    const firstYear = yearSelect.options[1].value;
+                    yearSelect.value = firstYear;
+                    changeMonthlyYear(firstYear);
+                }
+            });
         </script>
     </body>
 </html>"""

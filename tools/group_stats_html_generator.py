@@ -1340,9 +1340,7 @@ class GroupStatsHTMLGenerator:
                 console.log(`Creando div para ${{categoryKey}}, className: ${{categoryDiv.className}}`); // Debug
 
                 const title = document.createElement('h4');
-                const firstArtist = levelData[categoryKey].length > 0 ? levelData[categoryKey][0].name : 'Sin datos';
-                title.textContent = `${{categoryTitles[categoryKey]}} (${{levelData[categoryKey].length}}) - Nivel: ${{currentUserLevel}} - Top: ${{firstArtist}}`;
-                title.style.color = '#f38ba8'; // Color temporal para destacar cambios
+                title.textContent = `${{categoryTitles[categoryKey]}} (${{levelData[categoryKey].length}})`;
                 categoryDiv.appendChild(title);
                 console.log(`Título agregado: ${{title.textContent}}`); // Debug
 

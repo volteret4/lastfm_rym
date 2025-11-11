@@ -1297,7 +1297,9 @@ class GroupStatsHTMLGenerator:
             console.log('data_by_levels keys:', Object.keys(groupStats.data_by_levels || {{}})); // Debug
 
             const dataDisplay = document.getElementById('dataDisplay');
+            console.log('dataDisplay element:', dataDisplay); // Debug
             dataDisplay.innerHTML = '';
+            console.log('innerHTML cleared'); // Debug
 
             if (!currentUserLevel || !groupStats.data_by_levels || !groupStats.data_by_levels[currentUserLevel]) {{
                 console.log('No hay datos para el nivel:', currentUserLevel); // Debug
@@ -1321,6 +1323,7 @@ class GroupStatsHTMLGenerator:
             }};
 
             let hasVisibleData = false;
+            let elementsAdded = 0;
 
             categoryOrder.forEach(categoryKey => {{
                 console.log(`Procesando categoría: ${{categoryKey}}`); // Debug
@@ -1334,11 +1337,14 @@ class GroupStatsHTMLGenerator:
 
                 const categoryDiv = document.createElement('div');
                 categoryDiv.className = 'data-category visible';
+                console.log(`Creando div para ${{categoryKey}}, className: ${{categoryDiv.className}}`); // Debug
 
                 const title = document.createElement('h4');
                 title.textContent = `${{categoryTitles[categoryKey]}} (${{levelData[categoryKey].length}})`;
                 categoryDiv.appendChild(title);
+                console.log(`Título agregado: ${{title.textContent}}`); // Debug
 
+                let itemsAdded = 0;
                 levelData[categoryKey].forEach(item => {{
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'data-item';
@@ -1377,17 +1383,35 @@ class GroupStatsHTMLGenerator:
 
                     itemDiv.appendChild(itemMeta);
                     categoryDiv.appendChild(itemDiv);
+                    itemsAdded++;
                 }});
 
+                console.log(`Items agregados a ${{categoryKey}}: ${{itemsAdded}}`); // Debug
                 dataDisplay.appendChild(categoryDiv);
+                elementsAdded++;
+                console.log(`CategoryDiv agregado al DOM. Total elementos en dataDisplay: ${{dataDisplay.children.length}}`); // Debug
             }});
 
             console.log('hasVisibleData:', hasVisibleData); // Debug
+            console.log('elementsAdded:', elementsAdded); // Debug
+            console.log('dataDisplay final innerHTML length:', dataDisplay.innerHTML.length); // Debug
+            console.log('dataDisplay final children count:', dataDisplay.children.length); // Debug
+
             if (!hasVisibleData) {{
-                dataDisplay.innerHTML = activeDataCategories.size === 0
-                    ? '<div class="data-no-data">Selecciona al menos una categoría para ver los datos</div>'
-                    : '<div class="data-no-data">No hay datos disponibles para este nivel</div>';
+                const noDataDiv = document.createElement('div');
+                noDataDiv.className = 'data-no-data';
+                noDataDiv.textContent = activeDataCategories.size === 0
+                    ? 'Selecciona al menos una categoría para ver los datos'
+                    : 'No hay datos disponibles para este nivel';
+                dataDisplay.appendChild(noDataDiv);
+                console.log('Agregado mensaje de no data'); // Debug
             }}
+
+            // Forzar un repaint
+            dataDisplay.style.display = 'none';
+            dataDisplay.offsetHeight; // trigger reflow
+            dataDisplay.style.display = '';
+            console.log('Repaint forzado'); // Debug
         }}
     </script>
 </body>

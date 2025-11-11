@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GroupStatsHTMLGenerator - Clase para generar HTML con gráficos interactivos de estadísticas grupales
+GroupStatsHTMLGenerator - Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas grupales
 """
 
 import json
@@ -8,7 +8,7 @@ from typing import Dict, List
 
 
 class GroupStatsHTMLGenerator:
-    """Clase para generar HTML con gráficos interactivos de estadísticas grupales"""
+    """Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas grupales"""
 
     def __init__(self):
         self.colors = [
@@ -18,7 +18,7 @@ class GroupStatsHTMLGenerator:
         ]
 
     def generate_html(self, group_stats: Dict, years_back: int) -> str:
-        """Genera el HTML completo para estadísticas grupales"""
+        """Genera el HTML completo para estadÃ­sticas grupales"""
         stats_json = json.dumps(group_stats, indent=2, ensure_ascii=False)
         colors_json = json.dumps(self.colors, ensure_ascii=False)
 
@@ -27,7 +27,7 @@ class GroupStatsHTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Grupo - Estadísticas Grupales</title>
+    <title>Last.fm Grupo - EstadÃ­sticas Grupales</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -362,8 +362,8 @@ class GroupStatsHTMLGenerator:
 <body>
     <div class="container">
         <header>
-            <h1>👥 Estadísticas Grupales</h1>
-            <p class="subtitle">Análisis global del grupo</p>
+            <h1>ðŸ‘¥ EstadÃ­sticas Grupales</h1>
+            <p class="subtitle">AnÃ¡lisis global del grupo</p>
         </header>
 
         <div class="controls">
@@ -372,27 +372,27 @@ class GroupStatsHTMLGenerator:
                 <div class="view-buttons">
                     <button class="view-btn active" data-view="shared">Por Usuarios Compartidos</button>
                     <button class="view-btn" data-view="scrobbles">Por Scrobbles Totales</button>
-                    <button class="view-btn" data-view="evolution">Evolución Temporal</button>
+                    <button class="view-btn" data-view="evolution">EvoluciÃ³n Temporal</button>
                 </div>
             </div>
         </div>
 
         <div id="groupHeader" class="group-header">
-            <h2 id="groupTitle">Análisis Grupal</h2>
-            <p class="group-info" id="groupInfo">Período de análisis: {years_back + 1} años</p>
+            <h2 id="groupTitle">AnÃ¡lisis Grupal</h2>
+            <p class="group-info" id="groupInfo">PerÃ­odo de anÃ¡lisis: {years_back + 1} aÃ±os</p>
         </div>
 
         <div class="stats-container">
-            <!-- Resumen de estadísticas -->
+            <!-- Resumen de estadÃ­sticas -->
             <div id="summaryStats" class="summary-stats">
-                <!-- Se llenará dinámicamente -->
+                <!-- Se llenarÃ¡ dinÃ¡micamente -->
             </div>
 
             <!-- Vista Por Usuarios Compartidos -->
             <div id="sharedView" class="view active">
                 <div class="charts-grid">
                     <div class="chart-container">
-                        <h3>🎤 Top 15 Artistas</h3>
+                        <h3>ðŸŽ¤ Top 15 Artistas</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedArtistsChart"></canvas>
                         </div>
@@ -400,7 +400,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>💿 Top 15 Álbumes</h3>
+                        <h3>ðŸ’¿ Top 15 Ãlbumes</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedAlbumsChart"></canvas>
                         </div>
@@ -408,7 +408,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>🎵 Top 15 Canciones</h3>
+                        <h3>ðŸŽµ Top 15 Canciones</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedTracksChart"></canvas>
                         </div>
@@ -416,7 +416,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>🎭 Top 15 Géneros</h3>
+                        <h3>ðŸŽ­ Top 15 GÃ©neros</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedGenresChart"></canvas>
                         </div>
@@ -424,7 +424,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>🏷️ Top 15 Sellos</h3>
+                        <h3>ðŸ·ï¸ Top 15 Sellos</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedLabelsChart"></canvas>
                         </div>
@@ -432,7 +432,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>📅 Top 15 Años de Lanzamiento</h3>
+                        <h3>ðŸ“… Top 15 AÃ±os de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedReleaseYearsChart"></canvas>
                         </div>
@@ -445,7 +445,7 @@ class GroupStatsHTMLGenerator:
             <div id="scribblesView" class="view">
                 <div class="charts-grid">
                     <div class="chart-container">
-                        <h3>🎤 Top 15 Artistas</h3>
+                        <h3>ðŸŽ¤ Top 15 Artistas</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesArtistsChart"></canvas>
                         </div>
@@ -453,7 +453,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>💿 Top 15 Álbumes</h3>
+                        <h3>ðŸ’¿ Top 15 Ãlbumes</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesAlbumsChart"></canvas>
                         </div>
@@ -461,7 +461,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>🎵 Top 15 Canciones</h3>
+                        <h3>ðŸŽµ Top 15 Canciones</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesTracksChart"></canvas>
                         </div>
@@ -469,7 +469,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>🎭 Top 15 Géneros</h3>
+                        <h3>ðŸŽ­ Top 15 GÃ©neros</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesGenresChart"></canvas>
                         </div>
@@ -477,7 +477,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>🏷️ Top 15 Sellos</h3>
+                        <h3>ðŸ·ï¸ Top 15 Sellos</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesLabelsChart"></canvas>
                         </div>
@@ -485,7 +485,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>📅 Top 15 Años de Lanzamiento</h3>
+                        <h3>ðŸ“… Top 15 AÃ±os de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesReleaseYearsChart"></canvas>
                         </div>
@@ -493,7 +493,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>🌟 Top 15 Global</h3>
+                        <h3>ðŸŒŸ Top 15 Global</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesAllCombinedChart"></canvas>
                         </div>
@@ -502,48 +502,48 @@ class GroupStatsHTMLGenerator:
                 </div>
             </div>
 
-            <!-- Vista de Evolución -->
+            <!-- Vista de EvoluciÃ³n -->
             <div id="evolutionView" class="view">
                 <div class="evolution-section">
-                    <h3>📈 Evolución Temporal por Scrobbles</h3>
+                    <h3>ðŸ“ˆ EvoluciÃ³n Temporal por Scrobbles</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>🎤 Top 15 Artistas por Año</h4>
+                            <h4>ðŸŽ¤ Top 15 Artistas por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionArtistsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>💿 Top 15 Álbumes por Año</h4>
+                            <h4>ðŸ’¿ Top 15 Ãlbumes por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionAlbumsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>🎵 Top 15 Canciones por Año</h4>
+                            <h4>ðŸŽµ Top 15 Canciones por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionTracksChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>🎭 Top 15 Géneros por Año</h4>
+                            <h4>ðŸŽ­ Top 15 GÃ©neros por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionGenresChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>🏷️ Top 15 Sellos por Año</h4>
+                            <h4>ðŸ·ï¸ Top 15 Sellos por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionLabelsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>📅 Top 15 Años de Lanzamiento por Año</h4>
+                            <h4>ðŸ“… Top 15 AÃ±os de Lanzamiento por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionReleaseYearsChart"></canvas>
                             </div>
@@ -557,7 +557,7 @@ class GroupStatsHTMLGenerator:
             <div id="popup" class="popup" style="display: none;">
                 <div class="popup-header">
                     <span id="popupTitle">Detalles</span>
-                    <button id="popupClose" class="popup-close">✕</button>
+                    <button id="popupClose" class="popup-close">âœ•</button>
                 </div>
                 <div id="popupContent" class="popup-content"></div>
             </div>
@@ -571,7 +571,7 @@ class GroupStatsHTMLGenerator:
         let currentView = 'shared';
         let charts = {{}};
 
-        // Inicialización
+        // InicializaciÃ³n
         document.addEventListener('DOMContentLoaded', function() {{
             updateGroupHeader();
             updateSummaryStats();
@@ -623,18 +623,20 @@ class GroupStatsHTMLGenerator:
             const users = groupStats.users.join(', ');
             document.getElementById('groupTitle').textContent = `Grupo: ${{users}}`;
             document.getElementById('groupInfo').innerHTML =
-                `Período: ${{groupStats.period}} | ${{groupStats.user_count}} usuarios | Generado: ${{groupStats.generated_at}}`;
+                `PerÃ­odo: ${{groupStats.period}} | ${{groupStats.user_count}} usuarios | Generado: ${{groupStats.generated_at}}`;
         }}
 
         function updateSummaryStats() {{
-            // Calcular estadísticas de resumen
-            const sharedCharts = groupStats.shared_charts;
+            // Usar los totales reales de elementos compartidos por TODOS los usuarios
+            const totalCounts = groupStats.total_counts || {{}};
             const scrobblesCharts = groupStats.scrobbles_charts;
 
-            const totalSharedArtists = Object.keys(sharedCharts.artists.data || {{}}).length;
-            const totalSharedAlbums = Object.keys(sharedCharts.albums.data || {{}}).length;
-            const totalSharedTracks = Object.keys(sharedCharts.tracks.data || {{}}).length;
-            const totalSharedGenres = Object.keys(sharedCharts.genres.data || {{}}).length;
+            const totalSharedArtists = totalCounts.shared_artists || 0;
+            const totalSharedAlbums = totalCounts.shared_albums || 0;
+            const totalSharedTracks = totalCounts.shared_tracks || 0;
+            const totalSharedGenres = totalCounts.shared_genres || 0;
+            const totalSharedLabels = totalCounts.shared_labels || 0;
+            const totalSharedReleaseYears = totalCounts.shared_release_years || 0;
 
             const totalScrobblesArtists = scrobblesCharts.artists.total || 0;
             const totalScrobblesAll = scrobblesCharts.all_combined.total || 0;
@@ -646,15 +648,23 @@ class GroupStatsHTMLGenerator:
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedArtists}}</div>
-                    <div class="label">Artistas Compartidos</div>
+                    <div class="label">Artistas Compartidos (Todos)</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedAlbums}}</div>
-                    <div class="label">Álbumes Compartidos</div>
+                    <div class="label">Ãlbumes Compartidos</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedTracks}}</div>
-                    <div class="label">Canciones Compartidas</div>
+                    <div class="label">Canciones Compartidas (Todos)</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${{totalSharedGenres}}</div>
+                    <div class="label">Géneros Compartidos (Todos)</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${{totalSharedLabels}}</div>
+                    <div class="label">Sellos Compartidos (Todos)</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalScrobblesArtists.toLocaleString()}}</div>
@@ -676,7 +686,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar gráficos por usuarios compartidos
+            // Renderizar grÃ¡ficos por usuarios compartidos
             renderPieChart('sharedArtistsChart', groupStats.shared_charts.artists, 'sharedArtistsInfo');
             renderPieChart('sharedAlbumsChart', groupStats.shared_charts.albums, 'sharedAlbumsInfo');
             renderPieChart('sharedTracksChart', groupStats.shared_charts.tracks, 'sharedTracksInfo');
@@ -692,7 +702,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar gráficos por scrobbles totales
+            // Renderizar grÃ¡ficos por scrobbles totales
             renderPieChart('scrobblesArtistsChart', groupStats.scrobbles_charts.artists, 'scrobblesArtistsInfo');
             renderPieChart('scrobblesAlbumsChart', groupStats.scrobbles_charts.albums, 'scrobblesAlbumsInfo');
             renderPieChart('scrobblesTracksChart', groupStats.scrobbles_charts.tracks, 'scrobblesTracksInfo');
@@ -709,7 +719,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar gráficos de evolución
+            // Renderizar grÃ¡ficos de evoluciÃ³n
             renderLineChart('evolutionArtistsChart', groupStats.evolution.artists);
             renderLineChart('evolutionAlbumsChart', groupStats.evolution.albums);
             renderLineChart('evolutionTracksChart', groupStats.evolution.tracks);
@@ -791,11 +801,17 @@ class GroupStatsHTMLGenerator:
             Object.keys(chartData.data).forEach(item => {{
                 datasets.push({{
                     label: item,
-                    data: chartData.years.map(year => chartData.data[item][year] || 0),
+                    data: chartData.years.map(year => {{
+                        if (chartData.data[item][year]) {{
+                            return chartData.data[item][year].total || chartData.data[item][year] || 0;
+                        }}
+                        return 0;
+                    }}),
                     borderColor: colors[colorIndex % colors.length],
                     backgroundColor: colors[colorIndex % colors.length] + '20',
                     tension: 0.4,
-                    fill: false
+                    fill: false,
+                    userData: chartData.data[item] // Guardar datos de usuario para tooltips
                 }});
                 colorIndex++;
             }});
@@ -823,7 +839,24 @@ class GroupStatsHTMLGenerator:
                             titleColor: '#cba6f7',
                             bodyColor: '#cdd6f4',
                             borderColor: '#cba6f7',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            callbacks: {{
+                                afterBody: function(context) {{
+                                    const datasetIndex = context[0].datasetIndex;
+                                    const dataset = datasets[datasetIndex];
+                                    const year = chartData.years[context[0].dataIndex];
+                                    const userData = dataset.userData[year];
+
+                                    if (userData && userData.users && Object.keys(userData.users).length > 0) {{
+                                        const userList = Object.entries(userData.users)
+                                            .sort((a, b) => b[1] - a[1])
+                                            .map(([user, plays]) => `${{user}}: ${{plays}}`)
+                                            .join('\\n');
+                                        return '\\nDesglose por usuario:\\n' + userList;
+                                    }}
+                                    return '';
+                                }}
+                            }}
                         }}
                     }},
                     scales: {{
@@ -841,6 +874,19 @@ class GroupStatsHTMLGenerator:
                             }},
                             grid: {{
                                 color: '#313244'
+                            }}
+                        }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const dataset = datasets[datasetIndex];
+                            const year = chartData.years[pointIndex];
+                            const userData = dataset.userData[year];
+
+                            if (userData && userData.users) {{
+                                showEvolutionPopup(dataset.label, year, userData);
                             }}
                         }}
                     }}
@@ -869,13 +915,51 @@ class GroupStatsHTMLGenerator:
             }}
 
             if (details.artist && details.album) {{
-                content += `<div class="details">Artista: ${{details.artist}} | Álbum: ${{details.album}}</div>`;
+                content += `<div class="details">Artista: ${{details.artist}} | Ãlbum: ${{details.album}}</div>`;
             }} else if (details.artist && details.track) {{
-                content += `<div class="details">Artista: ${{details.artist}} | Canción: ${{details.track}}</div>`;
+                content += `<div class="details">Artista: ${{details.artist}} | CanciÃ³n: ${{details.track}}</div>`;
             }}
 
             if (chartData.type === 'combined') {{
-                content += `<div class="details">Categoría: ${{details.category}}</div>`;
+                content += `<div class="details">CategorÃ­a: ${{details.category}}</div>`;
+            }}
+
+            // Agregar desglose por usuario si está disponible
+            if (details.user_plays && Object.keys(details.user_plays).length > 0) {{
+                content += `<div class="details" style="margin-top: 10px; font-weight: bold;">Desglose por usuario:</div>`;
+                const userPlays = Object.entries(details.user_plays)
+                    .sort((a, b) => b[1] - a[1]) // Ordenar por scrobbles desc
+                    .map(([user, plays]) => `${{user}} (${{plays.toLocaleString()}})`)
+                    .join(', ');
+                content += `<div class="users">${{userPlays}}</div>`;
+            }}
+
+            content += `</div>`;
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }}
+
+        function showEvolutionPopup(itemName, year, userData) {{
+            let title = `${{itemName}} en ${{year}}`;
+            let content = '';
+
+            content += `<div class="popup-item">
+                <div class="name">${{itemName}}</div>
+                <div class="details">
+                    Año: ${{year}} |
+                    Scrobbles: ${{userData.total.toLocaleString()}}
+                </div>`;
+
+            if (userData.users && Object.keys(userData.users).length > 0) {{
+                content += `<div class="details" style="margin-top: 10px; font-weight: bold;">Desglose por usuario:</div>`;
+                const userPlays = Object.entries(userData.users)
+                    .sort((a, b) => b[1] - a[1]) // Ordenar por scrobbles desc
+                    .map(([user, plays]) => `${{user}} (${{plays.toLocaleString()}})`)
+                    .join(', ');
+                content += `<div class="users">${{userPlays}}</div>`;
             }}
 
             content += `</div>`;
@@ -901,5 +985,5 @@ class GroupStatsHTMLGenerator:
 </html>"""
 
     def _format_number(self, number: int) -> str:
-        """Formatea números con separadores de miles"""
+        """Formatea nÃºmeros con separadores de miles"""
         return f"{number:,}".replace(",", ".")

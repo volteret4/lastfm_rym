@@ -869,7 +869,7 @@ class GroupStatsDatabase:
             }
             for row in cursor.fetchall()
         ]
--e
+
 
     def _get_decade(self, year: int) -> str:
         """Convierte un año a etiqueta de década"""

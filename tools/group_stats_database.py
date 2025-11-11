@@ -612,69 +612,104 @@ class GroupStatsDatabase:
             'years': years
         }
 
-        # Para cada aÃ±o, obtener top 15 y construir evoluciÃ³n
+        # Recopilar todos los elementos únicos por categoría primero
+        all_items = {
+            'artists': set(),
+            'albums': set(),
+            'tracks': set(),
+            'genres': set(),
+            'labels': set(),
+            'release_years': set()
+        }
+
+        # Para cada año, obtener tops y recopilar elementos únicos
         for year in years:
             # Artistas
             top_artists = self.get_top_artists_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_artists:
-                if item['name'] not in evolution['artists']:
-                    evolution['artists'][item['name']] = {y: {'total': 0, 'users': {}} for y in years}
-                evolution['artists'][item['name']][year]['total'] = item['total_scrobbles']
-                # Obtener detalles por usuario para este artista en este año
-                user_details = self._get_user_breakdown_for_artist(users, item['name'], year, year, mbid_only)
-                evolution['artists'][item['name']][year]['users'] = user_details
+                all_items['artists'].add(item['name'])
 
-            # Ãlbumes
+            # Álbumes
             top_albums = self.get_top_albums_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_albums:
-                if item['name'] not in evolution['albums']:
-                    evolution['albums'][item['name']] = {y: {'total': 0, 'users': {}} for y in years}
-                evolution['albums'][item['name']][year]['total'] = item['total_scrobbles']
-                # Obtener detalles por usuario para este álbum en este año
-                user_details = self._get_user_breakdown_for_album(users, item['artist'], item['album'], year, year, mbid_only)
-                evolution['albums'][item['name']][year]['users'] = user_details
+                all_items['albums'].add(item['name'])
 
             # Canciones
             top_tracks = self.get_top_tracks_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_tracks:
-                if item['name'] not in evolution['tracks']:
-                    evolution['tracks'][item['name']] = {y: {'total': 0, 'users': {}} for y in years}
-                evolution['tracks'][item['name']][year]['total'] = item['total_scrobbles']
-                # Obtener detalles por usuario para esta canción en este año
-                user_details = self._get_user_breakdown_for_track(users, item['artist'], item['track'], year, year, mbid_only)
-                evolution['tracks'][item['name']][year]['users'] = user_details
+                all_items['tracks'].add(item['name'])
 
-            # GÃ©neros
+            # Géneros
             top_genres = self.get_top_genres_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_genres:
-                if item['name'] not in evolution['genres']:
-                    evolution['genres'][item['name']] = {y: {'total': 0, 'users': {}} for y in years}
-                evolution['genres'][item['name']][year]['total'] = item['total_scrobbles']
-                # Obtener detalles por usuario para este género en este año
-                user_details = self._get_user_breakdown_for_genre(users, item['name'], year, year, mbid_only)
-                evolution['genres'][item['name']][year]['users'] = user_details
+                all_items['genres'].add(item['name'])
 
             # Sellos
             top_labels = self.get_top_labels_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_labels:
-                if item['name'] not in evolution['labels']:
-                    evolution['labels'][item['name']] = {y: {'total': 0, 'users': {}} for y in years}
-                evolution['labels'][item['name']][year]['total'] = item['total_scrobbles']
-                # Obtener detalles por usuario para este sello en este año
-                user_details = self._get_user_breakdown_for_label(users, item['name'], year, year, mbid_only)
-                evolution['labels'][item['name']][year]['users'] = user_details
+                all_items['labels'].add(item['name'])
 
-            # AÃ±os de lanzamiento
+            # Años de lanzamiento
             top_years = self.get_top_release_years_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_years:
-                if item['name'] not in evolution['release_years']:
-                    evolution['release_years'][item['name']] = {y: {'total': 0, 'users': {}} for y in years}
-                evolution['release_years'][item['name']][year]['total'] = item['total_scrobbles']
-                # Obtener detalles por usuario para este período en este año
-                user_details = self._get_user_breakdown_for_release_year(users, item['name'], year, year, mbid_only)
-                evolution['release_years'][item['name']][year]['users'] = user_details
+                all_items['release_years'].add(item['name'])
 
-        # Reducir a top 15 por categorÃ­a para visualizaciÃ³n
+        # Inicializar estructura completa para todos los elementos
+        for category in ['artists', 'albums', 'tracks', 'genres', 'labels', 'release_years']:
+            for item_name in all_items[category]:
+                evolution[category][item_name] = {y: {'total': 0, 'users': {}} for y in years}
+
+        # Ahora llenar con datos reales año por año
+        for year in years:
+            # Procesar artistas para este año
+            top_artists = self.get_top_artists_by_scrobbles_only(users, year, year, 15, mbid_only)
+            for item in top_artists:
+                if item['name'] in evolution['artists']:
+                    evolution['artists'][item['name']][year]['total'] = item['total_scrobbles']
+                    user_details = self._get_user_breakdown_for_artist(users, item['name'], year, year, mbid_only)
+                    evolution['artists'][item['name']][year]['users'] = user_details
+
+            # Procesar álbumes para este año
+            top_albums = self.get_top_albums_by_scrobbles_only(users, year, year, 15, mbid_only)
+            for item in top_albums:
+                if item['name'] in evolution['albums']:
+                    evolution['albums'][item['name']][year]['total'] = item['total_scrobbles']
+                    user_details = self._get_user_breakdown_for_album(users, item['artist'], item['album'], year, year, mbid_only)
+                    evolution['albums'][item['name']][year]['users'] = user_details
+
+            # Procesar canciones para este año
+            top_tracks = self.get_top_tracks_by_scrobbles_only(users, year, year, 15, mbid_only)
+            for item in top_tracks:
+                if item['name'] in evolution['tracks']:
+                    evolution['tracks'][item['name']][year]['total'] = item['total_scrobbles']
+                    user_details = self._get_user_breakdown_for_track(users, item['artist'], item['track'], year, year, mbid_only)
+                    evolution['tracks'][item['name']][year]['users'] = user_details
+
+            # Procesar géneros para este año
+            top_genres = self.get_top_genres_by_scrobbles_only(users, year, year, 15, mbid_only)
+            for item in top_genres:
+                if item['name'] in evolution['genres']:
+                    evolution['genres'][item['name']][year]['total'] = item['total_scrobbles']
+                    user_details = self._get_user_breakdown_for_genre(users, item['name'], year, year, mbid_only)
+                    evolution['genres'][item['name']][year]['users'] = user_details
+
+            # Procesar sellos para este año
+            top_labels = self.get_top_labels_by_scrobbles_only(users, year, year, 15, mbid_only)
+            for item in top_labels:
+                if item['name'] in evolution['labels']:
+                    evolution['labels'][item['name']][year]['total'] = item['total_scrobbles']
+                    user_details = self._get_user_breakdown_for_label(users, item['name'], year, year, mbid_only)
+                    evolution['labels'][item['name']][year]['users'] = user_details
+
+            # Procesar años de lanzamiento para este año
+            top_years = self.get_top_release_years_by_scrobbles_only(users, year, year, 15, mbid_only)
+            for item in top_years:
+                if item['name'] in evolution['release_years']:
+                    evolution['release_years'][item['name']][year]['total'] = item['total_scrobbles']
+                    user_details = self._get_user_breakdown_for_release_year(users, item['name'], year, year, mbid_only)
+                    evolution['release_years'][item['name']][year]['users'] = user_details
+
+        # Reducir a top 15 por categoría para visualización
         for category in ['artists', 'albums', 'tracks', 'genres', 'labels', 'release_years']:
             # Calcular total por elemento
             totals = {}

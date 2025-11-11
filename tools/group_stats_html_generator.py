@@ -802,8 +802,16 @@ class GroupStatsHTMLGenerator:
                 datasets.push({{
                     label: item,
                     data: chartData.years.map(year => {{
-                        if (chartData.data[item][year]) {{
-                            return chartData.data[item][year].total || chartData.data[item][year] || 0;
+                        const yearData = chartData.data[item][year];
+                        if (yearData !== undefined && yearData !== null) {{
+                            // Si es la nueva estructura con objetos total: X, users:
+                            if (typeof yearData === 'object' && 'total' in yearData) {{
+                                return yearData.total;
+                            }}
+                            // Si es la estructura antigua con números directos
+                            if (typeof yearData === 'number') {{
+                                return yearData;
+                            }}
                         }}
                         return 0;
                     }}),
@@ -847,7 +855,8 @@ class GroupStatsHTMLGenerator:
                                     const year = chartData.years[context[0].dataIndex];
                                     const userData = dataset.userData[year];
 
-                                    if (userData && userData.users && Object.keys(userData.users).length > 0) {{
+                                    // Solo mostrar desglose si es la nueva estructura con datos de usuario
+                                    if (userData && typeof userData === 'object' && userData.users && Object.keys(userData.users).length > 0) {{
                                         const userList = Object.entries(userData.users)
                                             .sort((a, b) => b[1] - a[1])
                                             .map(([user, plays]) => `${{user}}: ${{plays}}`)
@@ -885,7 +894,8 @@ class GroupStatsHTMLGenerator:
                             const year = chartData.years[pointIndex];
                             const userData = dataset.userData[year];
 
-                            if (userData && userData.users) {{
+                            // Solo mostrar popup si es la nueva estructura con datos de usuario
+                            if (userData && typeof userData === 'object' && userData.users && Object.keys(userData.users).length > 0) {{
                                 showEvolutionPopup(dataset.label, year, userData);
                             }}
                         }}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Last.fm Group Stats Generator
-Genera estadísticas grupales con gráficos de coincidencias y evolución temporal
+Genera estadÃ­sticas grupales con grÃ¡ficos de coincidencias y evoluciÃ³n temporal
 """
 
 import os
@@ -20,14 +20,19 @@ try:
 except ImportError:
     pass
 
+# Agregar el directorio actual al path para importar los módulos
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
+
+# Importar los módulos necesarios
 from tools.group_stats_analyzer import GroupStatsAnalyzer
 from tools.group_stats_database import GroupStatsDatabase
 from tools.group_stats_html_generator import GroupStatsHTMLGenerator
 
 
 def main():
-    """Función principal para generar estadísticas grupales"""
-    parser = argparse.ArgumentParser(description='Generador de estadísticas grupales de Last.fm')
+    """Función principal para generar estadÃ­sticas grupales"""
+    parser = argparse.ArgumentParser(description='Generador de estadÃ­sticas grupales de Last.fm')
     parser.add_argument('--years-back', type=int, default=5,
                        help='Número de años hacia atrás para analizar (por defecto: 5)')
     parser.add_argument('--output', type=str, default=None,
@@ -48,7 +53,7 @@ def main():
             raise ValueError("LASTFM_USERS no encontrada en las variables de entorno")
 
         if len(users) < 2:
-            raise ValueError("Se necesitan al menos 2 usuarios para generar estadísticas grupales")
+            raise ValueError("Se necesitan al menos 2 usuarios para generar estadÃ­sticas grupales")
 
         print("📊 Iniciando análisis grupal...")
         print(f"👥 Usuarios: {', '.join(users)}")
@@ -60,8 +65,8 @@ def main():
         analyzer = GroupStatsAnalyzer(database, years_back=args.years_back, mbid_only=args.mbid_only)
         html_generator = GroupStatsHTMLGenerator()
 
-        # Analizar estadísticas grupales
-        print(f"🔍 Analizando estadísticas grupales...")
+        # Analizar estadÃ­sticas grupales
+        print(f"🔍 Analizando estadÃ­sticas grupales...")
         group_stats = analyzer.analyze_group_stats(users)
 
         # Generar HTML
@@ -80,11 +85,20 @@ def main():
         print(f"✅ Archivo generado: {args.output}")
 
         # Mostrar resumen
-        print(f"\n📈 Resumen de estadísticas grupales:")
+        print(f"\n📈 Resumen de estadÃ­sticas grupales:")
         print(f"  • Usuarios analizados: {group_stats['user_count']}")
         print(f"  • Período: {group_stats['period']}")
 
-        # Estadísticas de usuarios compartidos
+        # Estadísticas de datos por niveles
+        if 'data_by_levels' in group_stats:
+            data_levels = group_stats['data_by_levels']
+            print(f"  • Niveles de coincidencia disponibles: {len(data_levels)}")
+            for level_key, level_data in data_levels.items():
+                level_label = get_level_label(level_key, group_stats['user_count'])
+                total_items = sum(level_data['counts'].values())
+                print(f"    - {level_label}: {total_items} elementos totales")
+
+        # EstadÃ­sticas de usuarios compartidos
         shared_stats = group_stats['shared_charts']
         print(f"  • Artistas compartidos: {len(shared_stats['artists']['data'])}")
         print(f"  • Álbumes compartidos: {len(shared_stats['albums']['data'])}")
@@ -92,7 +106,7 @@ def main():
         print(f"  • Géneros compartidos: {len(shared_stats['genres']['data'])}")
         print(f"  • Sellos compartidos: {len(shared_stats['labels']['data'])}")
 
-        # Estadísticas de scrobbles
+        # EstadÃ­sticas de scrobbles
         scrobbles_stats = group_stats['scrobbles_charts']
         print(f"  • Total scrobbles (artistas): {scrobbles_stats['artists']['total']:,}")
         print(f"  • Total scrobbles (global): {scrobbles_stats['all_combined']['total']:,}")
@@ -133,6 +147,16 @@ def main():
         import traceback
         traceback.print_exc()
         sys.exit(1)
+
+
+def get_level_label(level_key: str, total_users: int) -> str:
+    """Genera la etiqueta descriptiva para mostrar"""
+    if level_key == "total_usuarios":
+        return f"Total de usuarios ({total_users})"
+    else:
+        missing = int(level_key.replace("total_menos_", ""))
+        remaining = total_users - missing
+        return f"Total menos {missing} ({remaining} usuarios)"
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-UserStatsDatabase - Versión optimizada con soporte MBID y mejor rendimiento
+UserStatsDatabase - VersiÃ³n optimizada con soporte MBID y mejor rendimiento
 """
 
 import sqlite3
@@ -12,7 +12,7 @@ from collections import defaultdict
 
 
 class UserStatsDatabase:
-    """Versión optimizada con soporte para filtros MBID y mejor rendimiento"""
+    """VersiÃ³n optimizada con soporte para filtros MBID y mejor rendimiento"""
 
     def __init__(self, db_path='lastfm_cache.db'):
         self.db_path = db_path
@@ -20,7 +20,7 @@ class UserStatsDatabase:
         self.conn.row_factory = sqlite3.Row
 
     def _get_mbid_filter(self, mbid_only: bool, table_alias: str = 's') -> str:
-        """Genera filtro MBID según los parámetros"""
+        """Genera filtro MBID segÃºn los parÃ¡metros"""
         if not mbid_only:
             return ""
 
@@ -31,7 +31,7 @@ class UserStatsDatabase:
         )"""
 
     def get_user_scrobbles_by_year(self, user: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict[int, int]:
-        """Obtiene conteo de scrobbles del usuario agrupados por año - con filtro MBID"""
+        """Obtiene conteo de scrobbles del usuario agrupados por aÃ±o - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -114,7 +114,7 @@ class UserStatsDatabase:
         return common_artists
 
     def get_common_albums_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, Dict[str, int]]:
-        """Obtiene álbumes comunes entre el usuario y otros usuarios - con filtro MBID"""
+        """Obtiene Ã¡lbumes comunes entre el usuario y otros usuarios - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -122,7 +122,7 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's1')
 
-        # Obtener álbumes del usuario principal
+        # Obtener Ã¡lbumes del usuario principal
         cursor.execute(f'''
             SELECT (artist || ' - ' || album) as album_key, COUNT(*) as plays
             FROM scrobbles s1
@@ -230,7 +230,7 @@ class UserStatsDatabase:
         return common_tracks
 
     def get_common_genres_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, Dict[str, int]]:
-        """Obtiene géneros comunes entre el usuario y otros usuarios - con filtro MBID"""
+        """Obtiene gÃ©neros comunes entre el usuario y otros usuarios - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -238,7 +238,7 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
-        # Obtener géneros del usuario principal
+        # Obtener gÃ©neros del usuario principal
         cursor.execute(f'''
             SELECT ag.genres, COUNT(*) as plays
             FROM scrobbles s
@@ -253,7 +253,7 @@ class UserStatsDatabase:
             genres_json = row['genres']
             try:
                 genres_list = json.loads(genres_json) if genres_json else []
-                for genre in genres_list[:3]:  # Solo primeros 3 géneros por artista
+                for genre in genres_list[:3]:  # Solo primeros 3 gÃ©neros por artista
                     user_genres[genre] += row['plays']
             except json.JSONDecodeError:
                 continue
@@ -361,7 +361,7 @@ class UserStatsDatabase:
         return common_labels
 
     def get_common_release_years_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, Dict[str, int]]:
-        """Obtiene décadas de lanzamiento comunes entre el usuario y otros usuarios - con filtro MBID"""
+        """Obtiene dÃ©cadas de lanzamiento comunes entre el usuario y otros usuarios - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -369,7 +369,7 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
-        # Obtener décadas del usuario principal
+        # Obtener dÃ©cadas del usuario principal
         cursor.execute(f'''
             SELECT ard.release_year, COUNT(*) as plays
             FROM scrobbles s
@@ -425,10 +425,10 @@ class UserStatsDatabase:
         return common_decades
 
     def get_user_top_genres(self, user: str, from_year: int, to_year: int, limit: int = 10, mbid_only: bool = False) -> List[Tuple[str, int]]:
-        """Obtiene los géneros más escuchados por el usuario - con filtro MBID"""
+        """Obtiene los gÃ©neros mÃ¡s escuchados por el usuario - con filtro MBID"""
         genres_by_year = self.get_user_genres_by_year(user, from_year, to_year, limit=20, mbid_only=mbid_only)
 
-        # Sumar todos los años
+        # Sumar todos los aÃ±os
         total_genres = defaultdict(int)
         for year_genres in genres_by_year.values():
             for genre, plays in year_genres.items():
@@ -439,7 +439,7 @@ class UserStatsDatabase:
         return sorted_genres[:limit]
 
     def get_user_genres_by_year(self, user: str, from_year: int, to_year: int, limit: int = 10, mbid_only: bool = False) -> Dict[int, Dict[str, int]]:
-        """Obtiene géneros del usuario por año - con filtro MBID"""
+        """Obtiene gÃ©neros del usuario por aÃ±o - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -463,7 +463,7 @@ class UserStatsDatabase:
         if not top_artists:
             return {}
 
-        # Obtener géneros solo para estos artistas
+        # Obtener gÃ©neros solo para estos artistas
         cursor.execute(f'''
             SELECT ag.genres,
                    strftime('%Y', datetime(s.timestamp, 'unixepoch')) as year,
@@ -486,12 +486,12 @@ class UserStatsDatabase:
 
             try:
                 genres_list = json.loads(genres_json) if genres_json else []
-                for genre in genres_list[:3]:  # Solo primeros 3 géneros por artista
+                for genre in genres_list[:3]:  # Solo primeros 3 gÃ©neros por artista
                     genres_by_year[year][genre] += plays
             except json.JSONDecodeError:
                 continue
 
-        # Limitar géneros por año
+        # Limitar gÃ©neros por aÃ±o
         limited_genres_by_year = {}
         for year, genres in genres_by_year.items():
             sorted_genres = sorted(genres.items(), key=lambda x: x[1], reverse=True)
@@ -526,7 +526,7 @@ class UserStatsDatabase:
         return users_top_artists
 
     def get_top_artists_by_days(self, users: List[str], from_year: int, to_year: int, limit: int = 10, mbid_only: bool = False) -> Dict[str, List]:
-        """Obtiene top artistas por número de días diferentes en que fueron escuchados - con filtro MBID"""
+        """Obtiene top artistas por nÃºmero de dÃ­as diferentes en que fueron escuchados - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -552,7 +552,7 @@ class UserStatsDatabase:
         return users_top_artists
 
     def get_top_artists_by_track_count(self, users: List[str], from_year: int, to_year: int, limit: int = 10, mbid_only: bool = False) -> Dict[str, List]:
-        """Obtiene top artistas por número de canciones diferentes escuchadas - con filtro MBID"""
+        """Obtiene top artistas por nÃºmero de canciones diferentes escuchadas - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -581,7 +581,7 @@ class UserStatsDatabase:
         return users_top_artists
 
     def get_top_artists_by_streaks(self, users: List[str], from_year: int, to_year: int, limit: int = 5, mbid_only: bool = False) -> Dict[str, List]:
-        """Obtiene top artistas por streaks (días consecutivos) - con filtro MBID"""
+        """Obtiene top artistas por streaks (dÃ­as consecutivos) - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -655,7 +655,7 @@ class UserStatsDatabase:
         return users_top_artists
 
     def get_top_artists_for_genre(self, user: str, genre: str, from_year: int, to_year: int, limit: int = 5, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene top artistas para un género específico - con filtro MBID"""
+        """Obtiene top artistas para un gÃ©nero especÃ­fico - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -678,7 +678,7 @@ class UserStatsDatabase:
         return [{'name': row['artist'], 'plays': row['plays']} for row in cursor.fetchall()]
 
     def get_one_hit_wonders_for_user(self, user: str, from_year: int, to_year: int, min_scrobbles: int = 25, limit: int = 10, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene artistas con una sola canción y más de min_scrobbles reproducciones - con filtro MBID"""
+        """Obtiene artistas con una sola canciÃ³n y mÃ¡s de min_scrobbles reproducciones - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -700,7 +700,7 @@ class UserStatsDatabase:
         return [{'name': row['artist'], 'track': row['track'], 'plays': row['total_plays']} for row in cursor.fetchall()]
 
     def get_new_artists_for_user(self, user: str, from_year: int, to_year: int, limit: int = 10, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene artistas nuevos (sin scrobbles antes del período) - con filtro MBID"""
+        """Obtiene artistas nuevos (sin scrobbles antes del perÃ­odo) - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -708,7 +708,7 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
-        # Obtener artistas del período actual
+        # Obtener artistas del perÃ­odo actual
         cursor.execute(f'''
             SELECT artist, COUNT(*) as plays
             FROM scrobbles s
@@ -719,7 +719,7 @@ class UserStatsDatabase:
 
         current_artists = {row['artist']: row['plays'] for row in cursor.fetchall()}
 
-        # Obtener artistas de períodos anteriores
+        # Obtener artistas de perÃ­odos anteriores
         cursor.execute(f'''
             SELECT DISTINCT artist
             FROM scrobbles s
@@ -779,7 +779,7 @@ class UserStatsDatabase:
         return dict(artist_rankings)
 
     def get_fastest_rising_artists(self, user: str, from_year: int, to_year: int, limit: int = 10, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene artistas que más rápido han subido en rankings mensuales - con filtro MBID"""
+        """Obtiene artistas que mÃ¡s rÃ¡pido han subido en rankings mensuales - con filtro MBID"""
         rankings = self.get_artist_monthly_ranks(user, from_year, to_year, mbid_only=mbid_only)
 
         rising_artists = []
@@ -800,7 +800,7 @@ class UserStatsDatabase:
                 improvement = prev_rank - curr_rank
                 if improvement > max_improvement:
                     max_improvement = improvement
-                    best_period = f"{months[i-1]} → {months[i]}"
+                    best_period = f"{months[i-1]} â†’ {months[i]}"
 
             if max_improvement > 0:
                 rising_artists.append({
@@ -814,7 +814,7 @@ class UserStatsDatabase:
         return rising_artists[:limit]
 
     def get_fastest_falling_artists(self, user: str, from_year: int, to_year: int, limit: int = 10, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene artistas que más rápido han bajado en rankings mensuales - con filtro MBID"""
+        """Obtiene artistas que mÃ¡s rÃ¡pido han bajado en rankings mensuales - con filtro MBID"""
         rankings = self.get_artist_monthly_ranks(user, from_year, to_year, mbid_only=mbid_only)
 
         falling_artists = []
@@ -823,7 +823,7 @@ class UserStatsDatabase:
             if len(months) < 2:
                 continue
 
-            # Algoritmo diferente: calcular la peor caída consecutiva
+            # Algoritmo diferente: calcular la peor caÃ­da consecutiva
             max_decline = 0
             worst_streak = 0
             current_decline = 0
@@ -833,17 +833,17 @@ class UserStatsDatabase:
                 prev_rank = monthly_ranks[months[i-1]]['rank']
                 curr_rank = monthly_ranks[months[i]]['rank']
 
-                # Si empeoró el ranking
+                # Si empeorÃ³ el ranking
                 if curr_rank > prev_rank:
                     current_decline += (curr_rank - prev_rank)
                     worst_streak += 1
 
-                    # Si es la peor caída hasta ahora
+                    # Si es la peor caÃ­da hasta ahora
                     if current_decline > max_decline:
                         max_decline = current_decline
-                        worst_period = f"{months[i-worst_streak]} → {months[i]}"
+                        worst_period = f"{months[i-worst_streak]} â†’ {months[i]}"
                 else:
-                    # Reset streak si mejoró
+                    # Reset streak si mejorÃ³
                     current_decline = 0
                     worst_streak = 0
 
@@ -856,12 +856,12 @@ class UserStatsDatabase:
                     'streak_months': worst_streak
                 })
 
-        # Ordenar por caída total y luego por duración del streak
+        # Ordenar por caÃ­da total y luego por duraciÃ³n del streak
         falling_artists.sort(key=lambda x: (x['decline'], x['streak_months']), reverse=True)
         return falling_artists[:limit]
 
     def get_user_individual_evolution_data(self, user: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict:
-        """Obtiene todos los datos de evolución individual del usuario con detalles mejorados - con filtro MBID"""
+        """Obtiene todos los datos de evoluciÃ³n individual del usuario con detalles mejorados - con filtro MBID"""
         cursor = self.conn.cursor()
 
         evolution_data = {}
@@ -869,7 +869,7 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
-        # 1. Top 10 géneros por año - CON ARTISTAS QUE CONTRIBUYEN
+        # 1. Top 10 gÃ©neros por aÃ±o - CON ARTISTAS QUE CONTRIBUYEN
         top_genres = self.get_user_top_genres(user, from_year, to_year, 10, mbid_only)
         top_genre_names = [genre for genre, _ in top_genres]
 
@@ -890,7 +890,7 @@ class UserStatsDatabase:
                 result = cursor.fetchone()
                 genres_evolution[genre][year] = result['plays'] if result else 0
 
-                # Obtener top 5 artistas para este género en este año
+                # Obtener top 5 artistas para este gÃ©nero en este aÃ±o
                 cursor.execute(f'''
                     SELECT s.artist, COUNT(*) as plays
                     FROM scrobbles s
@@ -911,7 +911,7 @@ class UserStatsDatabase:
             'names': top_genre_names
         }
 
-        # 2. Top 10 sellos por año - CON ARTISTAS QUE CONTRIBUYEN
+        # 2. Top 10 sellos por aÃ±o - CON ARTISTAS QUE CONTRIBUYEN
         cursor.execute(f'''
             SELECT al.label, COUNT(*) as total_plays
             FROM scrobbles s
@@ -943,7 +943,7 @@ class UserStatsDatabase:
                 result = cursor.fetchone()
                 labels_evolution[label][year] = result['plays'] if result else 0
 
-                # Obtener top 5 artistas para este sello en este año
+                # Obtener top 5 artistas para este sello en este aÃ±o
                 cursor.execute(f'''
                     SELECT s.artist, COUNT(*) as plays
                     FROM scrobbles s
@@ -964,7 +964,7 @@ class UserStatsDatabase:
             'names': top_labels
         }
 
-        # 3. Top 10 artistas por año
+        # 3. Top 10 artistas por aÃ±o
         cursor.execute(f'''
             SELECT artist, COUNT(*) as total_plays
             FROM scrobbles s
@@ -996,7 +996,7 @@ class UserStatsDatabase:
             'names': top_artists
         }
 
-        # 4. One hit wonders con detalles de la canción ESPECÍFICA
+        # 4. One hit wonders con detalles de la canciÃ³n ESPECÃFICA
         one_hit_wonders = self.get_one_hit_wonders_for_user(user, from_year, to_year, 25, 10, mbid_only)
         one_hit_evolution = {}
         one_hit_details = {}
@@ -1014,7 +1014,7 @@ class UserStatsDatabase:
                 result = cursor.fetchone()
                 one_hit_evolution[artist][year] = result['plays'] if result else 0
 
-                # Obtener la canción única
+                # Obtener la canciÃ³n Ãºnica
                 cursor.execute(f'''
                     SELECT track, COUNT(*) as plays
                     FROM scrobbles s
@@ -1045,7 +1045,7 @@ class UserStatsDatabase:
             'names': [artist['name'] for artist in one_hit_wonders]
         }
 
-        # 5. Streaks - datos en DÍAS, no scrobbles
+        # 5. Streaks - datos en DÃAS, no scrobbles
         top_streak_artists_data = self.get_top_artists_by_streaks([user], from_year, to_year, 10, mbid_only).get(user, [])[:10]
         streak_evolution = {}
         streak_details = {}
@@ -1054,7 +1054,7 @@ class UserStatsDatabase:
             streak_evolution[artist] = {}
             streak_details[artist] = {}
             for year in years:
-                # Calcular días únicos por año
+                # Calcular dÃ­as Ãºnicos por aÃ±o
                 cursor.execute(f'''
                     SELECT COUNT(DISTINCT date(datetime(timestamp, 'unixepoch'))) as days_count
                     FROM scrobbles s
@@ -1077,7 +1077,7 @@ class UserStatsDatabase:
             'names': [artist['name'] for artist in top_streak_artists_data]
         }
 
-        # 6. Track count - datos en número de canciones ÚNICAS, no scrobbles
+        # 6. Track count - datos en nÃºmero de canciones ÃšNICAS, no scrobbles
         top_track_count_artists_data = self.get_top_artists_by_track_count([user], from_year, to_year, 10, mbid_only).get(user, [])[:10]
         track_count_evolution = {}
         track_count_details = {}
@@ -1096,7 +1096,7 @@ class UserStatsDatabase:
                 track_count = result['track_count'] if result else 0
                 track_count_evolution[artist][year] = track_count
 
-                # Obtener top 10 álbumes para este año
+                # Obtener top 10 Ã¡lbumes para este aÃ±o
                 cursor.execute(f'''
                     SELECT album, COUNT(*) as plays
                     FROM scrobbles s
@@ -1163,6 +1163,372 @@ class UserStatsDatabase:
                     result = cursor.fetchone()
                     category_evolution[artist][year] = result['plays'] if result else 0
 
+                    # Obtener top 10 canciones para este aÃ±o
+                    cursor.execute(f'''
+                        SELECT track, COUNT(*) as plays
+                        FROM scrobbles s
+                        WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                        {mbid_filter}
+                        GROUP BY track
+                        ORDER BY plays DESC
+                        LIMIT 10
+                    ''', (user, artist, str(year)))
+                    tracks = [{'name': row['track'], 'plays': row['plays']} for row in cursor.fetchall()]
+                    category_details[artist][year] = tracks
+
+            evolution_data[category] = {
+                'data': category_evolution,
+                'details': category_details,
+                'years': years,
+                'names': [artist['name'] for artist in artists_list]
+            }
+
+        return evolution_data
+
+    def get_user_individual_evolution_data_cumulative(self, user: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict:
+        """Obtiene todos los datos de evoluciÃ³n individual del usuario de forma ACUMULATIVA - con filtro MBID"""
+        cursor = self.conn.cursor()
+
+        evolution_data = {}
+        years = list(range(from_year, to_year + 1))
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        # 1. Top 10 gÃ©neros por aÃ±o - ACUMULATIVO
+        top_genres = self.get_user_top_genres(user, from_year, to_year, 10, mbid_only)
+        top_genre_names = [genre for genre, _ in top_genres]
+
+        genres_evolution = {}
+        genres_details = {}
+        for genre in top_genre_names:
+            genres_evolution[genre] = {}
+            genres_details[genre] = {}
+            cumulative_count = 0
+            for year in years:
+                # Obtener datos del año actual
+                cursor.execute(f'''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND strftime('%Y', datetime(s.timestamp, 'unixepoch')) = ?
+                      AND ag.genres LIKE ?
+                    {mbid_filter}
+                ''', (user, str(year), f'%"{genre}"%'))
+                result = cursor.fetchone()
+                year_plays = result['plays'] if result else 0
+
+                # Acumular
+                cumulative_count += year_plays
+                genres_evolution[genre][year] = cumulative_count
+
+                # Obtener top 5 artistas para este género en este año (no acumulativo)
+                cursor.execute(f'''
+                    SELECT s.artist, COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND strftime('%Y', datetime(s.timestamp, 'unixepoch')) = ?
+                      AND ag.genres LIKE ?
+                    {mbid_filter}
+                    GROUP BY s.artist
+                    ORDER BY plays DESC
+                    LIMIT 5
+                ''', (user, str(year), f'%"{genre}"%'))
+                genres_details[genre][year] = [{'name': row['artist'], 'plays': row['plays']} for row in cursor.fetchall()]
+
+        evolution_data['genres'] = {
+            'data': genres_evolution,
+            'details': genres_details,
+            'years': years,
+            'names': top_genre_names
+        }
+
+        # 2. Top 10 sellos por año - ACUMULATIVO
+        cursor.execute(f'''
+            SELECT al.label, COUNT(*) as total_plays
+            FROM scrobbles s
+            LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+              AND al.label IS NOT NULL AND al.label != ''
+            {mbid_filter}
+            GROUP BY al.label
+            ORDER BY total_plays DESC
+            LIMIT 10
+        ''', (user, int(datetime(from_year, 1, 1).timestamp()), int(datetime(to_year + 1, 1, 1).timestamp()) - 1))
+
+        top_labels = [row['label'] for row in cursor.fetchall()]
+
+        labels_evolution = {}
+        labels_details = {}
+        for label in top_labels:
+            labels_evolution[label] = {}
+            labels_details[label] = {}
+            cumulative_count = 0
+            for year in years:
+                cursor.execute(f'''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles s
+                    LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                    WHERE s.user = ? AND strftime('%Y', datetime(s.timestamp, 'unixepoch')) = ?
+                      AND al.label = ?
+                    {mbid_filter}
+                ''', (user, str(year), label))
+                result = cursor.fetchone()
+                year_plays = result['plays'] if result else 0
+
+                # Acumular
+                cumulative_count += year_plays
+                labels_evolution[label][year] = cumulative_count
+
+                # Obtener top 5 artistas para este sello en este año (no acumulativo)
+                cursor.execute(f'''
+                    SELECT s.artist, COUNT(*) as plays
+                    FROM scrobbles s
+                    LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                    WHERE s.user = ? AND strftime('%Y', datetime(s.timestamp, 'unixepoch')) = ?
+                      AND al.label = ?
+                    {mbid_filter}
+                    GROUP BY s.artist
+                    ORDER BY plays DESC
+                    LIMIT 5
+                ''', (user, str(year), label))
+                labels_details[label][year] = [{'name': row['artist'], 'plays': row['plays']} for row in cursor.fetchall()]
+
+        evolution_data['labels'] = {
+            'data': labels_evolution,
+            'details': labels_details,
+            'years': years,
+            'names': top_labels
+        }
+
+        # 3. Top 10 artistas por año - ACUMULATIVO
+        cursor.execute(f'''
+            SELECT artist, COUNT(*) as total_plays
+            FROM scrobbles s
+            WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+            {mbid_filter}
+            GROUP BY artist
+            ORDER BY total_plays DESC
+            LIMIT 10
+        ''', (user, int(datetime(from_year, 1, 1).timestamp()), int(datetime(to_year + 1, 1, 1).timestamp()) - 1))
+
+        top_artists = [row['artist'] for row in cursor.fetchall()]
+
+        artists_evolution = {}
+        for artist in top_artists:
+            artists_evolution[artist] = {}
+            cumulative_count = 0
+            for year in years:
+                cursor.execute(f'''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles s
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    {mbid_filter}
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                year_plays = result['plays'] if result else 0
+
+                # Acumular
+                cumulative_count += year_plays
+                artists_evolution[artist][year] = cumulative_count
+
+        evolution_data['artists'] = {
+            'data': artists_evolution,
+            'years': years,
+            'names': top_artists
+        }
+
+        # 4. One hit wonders - ACUMULATIVO
+        one_hit_wonders = self.get_one_hit_wonders_for_user(user, from_year, to_year, 25, 10, mbid_only)
+        one_hit_evolution = {}
+        one_hit_details = {}
+        for artist_data in one_hit_wonders:
+            artist = artist_data['name']
+            one_hit_evolution[artist] = {}
+            one_hit_details[artist] = {}
+            cumulative_count = 0
+            for year in years:
+                cursor.execute(f'''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles s
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    {mbid_filter}
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                year_plays = result['plays'] if result else 0
+
+                # Acumular
+                cumulative_count += year_plays
+                one_hit_evolution[artist][year] = cumulative_count
+
+                # Obtener la canción única
+                cursor.execute(f'''
+                    SELECT track, COUNT(*) as plays
+                    FROM scrobbles s
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    {mbid_filter}
+                    GROUP BY track
+                    ORDER BY plays DESC
+                    LIMIT 1
+                ''', (user, artist, str(year)))
+                track_result = cursor.fetchone()
+                if track_result:
+                    one_hit_details[artist][year] = {
+                        'track': track_result['track'],
+                        'plays': track_result['plays'],
+                        'artist': artist
+                    }
+                else:
+                    one_hit_details[artist][year] = {
+                        'track': artist_data.get('track', 'N/A'),
+                        'plays': 0,
+                        'artist': artist
+                    }
+
+        evolution_data['one_hit_wonders'] = {
+            'data': one_hit_evolution,
+            'details': one_hit_details,
+            'years': years,
+            'names': [artist['name'] for artist in one_hit_wonders]
+        }
+
+        # 5. Streaks - ACUMULATIVO (días únicos)
+        top_streak_artists_data = self.get_top_artists_by_streaks([user], from_year, to_year, 10, mbid_only).get(user, [])[:10]
+        streak_evolution = {}
+        streak_details = {}
+        for artist_data in top_streak_artists_data:
+            artist = artist_data['name']
+            streak_evolution[artist] = {}
+            streak_details[artist] = {}
+            cumulative_days = 0
+            for year in years:
+                # Calcular días únicos por año
+                cursor.execute(f'''
+                    SELECT COUNT(DISTINCT date(datetime(timestamp, 'unixepoch'))) as days_count
+                    FROM scrobbles s
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    {mbid_filter}
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                year_days = result['days_count'] if result else 0
+
+                # Acumular días únicos
+                cumulative_days += year_days
+                streak_evolution[artist][year] = cumulative_days
+
+                streak_details[artist][year] = {
+                    'days': year_days,
+                    'max_streak': artist_data.get('max_streak', 0),
+                    'total_days': artist_data.get('total_days', 0)
+                }
+
+        evolution_data['streak_artists'] = {
+            'data': streak_evolution,
+            'details': streak_details,
+            'years': years,
+            'names': [artist['name'] for artist in top_streak_artists_data]
+        }
+
+        # 6. Track count - ACUMULATIVO (canciones únicas)
+        top_track_count_artists_data = self.get_top_artists_by_track_count([user], from_year, to_year, 10, mbid_only).get(user, [])[:10]
+        track_count_evolution = {}
+        track_count_details = {}
+        for artist_data in top_track_count_artists_data:
+            artist = artist_data['name']
+            track_count_evolution[artist] = {}
+            track_count_details[artist] = {}
+            # Para track count acumulativo, necesitamos contar todas las canciones únicas hasta ese año
+            all_tracks_so_far = set()
+            for year in years:
+                # Obtener canciones de este año
+                cursor.execute(f'''
+                    SELECT DISTINCT track
+                    FROM scrobbles s
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    {mbid_filter}
+                ''', (user, artist, str(year)))
+                year_tracks = {row['track'] for row in cursor.fetchall()}
+
+                # Agregar al conjunto acumulativo
+                all_tracks_so_far.update(year_tracks)
+                track_count_evolution[artist][year] = len(all_tracks_so_far)
+
+                # Obtener top 10 álbumes para este año
+                cursor.execute(f'''
+                    SELECT album, COUNT(*) as plays
+                    FROM scrobbles s
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                      AND album IS NOT NULL AND album != ''
+                    {mbid_filter}
+                    GROUP BY album
+                    ORDER BY plays DESC
+                    LIMIT 10
+                ''', (user, artist, str(year)))
+                albums = [{'name': row['album'], 'plays': row['plays']} for row in cursor.fetchall()]
+                track_count_details[artist][year] = {'track_count': len(year_tracks), 'albums': albums}
+
+        evolution_data['track_count_artists'] = {
+            'data': track_count_evolution,
+            'details': track_count_details,
+            'years': years,
+            'names': [artist['name'] for artist in top_track_count_artists_data]
+        }
+
+        # 7. New artists - ACUMULATIVO
+        new_artists = self.get_new_artists_for_user(user, from_year, to_year, 10, mbid_only)
+        new_artists_evolution = {}
+        for artist_data in new_artists:
+            artist = artist_data['name']
+            new_artists_evolution[artist] = {}
+            cumulative_count = 0
+            for year in years:
+                cursor.execute(f'''
+                    SELECT COUNT(*) as plays
+                    FROM scrobbles s
+                    WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                    {mbid_filter}
+                ''', (user, artist, str(year)))
+                result = cursor.fetchone()
+                year_plays = result['plays'] if result else 0
+
+                # Acumular
+                cumulative_count += year_plays
+                new_artists_evolution[artist][year] = cumulative_count
+
+        evolution_data['new_artists'] = {
+            'data': new_artists_evolution,
+            'years': years,
+            'names': [artist['name'] for artist in new_artists]
+        }
+
+        # 8. & 9. Rising and falling artists - ACUMULATIVO
+        rising_artists = self.get_fastest_rising_artists(user, from_year, to_year, 10, mbid_only)
+        falling_artists = self.get_fastest_falling_artists(user, from_year, to_year, 10, mbid_only)
+
+        for category, artists_list in [
+            ('rising_artists', rising_artists),
+            ('falling_artists', falling_artists)
+        ]:
+            category_evolution = {}
+            category_details = {}
+            for artist_data in artists_list:
+                artist = artist_data['name']
+                category_evolution[artist] = {}
+                category_details[artist] = {}
+                cumulative_count = 0
+                for year in years:
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as plays
+                        FROM scrobbles s
+                        WHERE user = ? AND artist = ? AND strftime('%Y', datetime(timestamp, 'unixepoch')) = ?
+                        {mbid_filter}
+                    ''', (user, artist, str(year)))
+                    result = cursor.fetchone()
+                    year_plays = result['plays'] if result else 0
+
+                    # Acumular
+                    cumulative_count += year_plays
+                    category_evolution[artist][year] = cumulative_count
+
                     # Obtener top 10 canciones para este año
                     cursor.execute(f'''
                         SELECT track, COUNT(*) as plays
@@ -1186,7 +1552,7 @@ class UserStatsDatabase:
         return evolution_data
 
     def get_top_albums_for_artists(self, user: str, artists: List[str], from_year: int, to_year: int, limit: int = 5) -> Dict[str, List]:
-        """Obtiene top álbumes para artistas específicos"""
+        """Obtiene top Ã¡lbumes para artistas especÃ­ficos"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -1209,15 +1575,15 @@ class UserStatsDatabase:
         return albums_data
 
     def get_top_tracks_for_albums(self, user: str, albums: List[str], from_year: int, to_year: int, limit: int = 5) -> Dict[str, List]:
-        """Obtiene top canciones para álbumes específicos"""
+        """Obtiene top canciones para Ã¡lbumes especÃ­ficos"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
 
         tracks_data = {}
-        for album in albums[:10]:  # Limitar álbumes
-            # Separar artista y álbum
+        for album in albums[:10]:  # Limitar Ã¡lbumes
+            # Separar artista y Ã¡lbum
             if ' - ' in album:
                 artist, album_name = album.split(' - ', 1)
                 cursor.execute('''
@@ -1234,7 +1600,7 @@ class UserStatsDatabase:
         return tracks_data
 
     def _get_decade(self, year: int) -> str:
-        """Convierte un año a etiqueta de década"""
+        """Convierte un aÃ±o a etiqueta de dÃ©cada"""
         if year < 1950:
             return "Antes de 1950"
         elif year >= 2020:
@@ -1244,5 +1610,5 @@ class UserStatsDatabase:
             return f"{decade_start}s"
 
     def close(self):
-        """Cerrar conexión a la base de datos"""
+        """Cerrar conexiÃ³n a la base de datos"""
         self.conn.close()

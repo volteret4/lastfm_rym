@@ -178,13 +178,23 @@ def generate_weekly_stats(weeks_ago: int = 0):
     labels_user_artists = defaultdict(lambda: defaultdict(set))
     years_user_artists = defaultdict(lambda: defaultdict(set))
 
+    # Para almacenar álbumes que contribuyen a cada categoría (para análisis detallado)
+    genres_albums = defaultdict(lambda: defaultdict(int))  # género -> álbum -> count
+    labels_albums = defaultdict(lambda: defaultdict(int))  # sello -> álbum -> count
+    years_albums = defaultdict(lambda: defaultdict(int))   # año -> álbum -> count
+
+    # Para almacenar artistas que contribuyen a cada categoría (para análisis detallado)
+    genres_artists = defaultdict(lambda: defaultdict(int))  # género -> artista -> count
+    labels_artists = defaultdict(lambda: defaultdict(int))  # sello -> artista -> count
+    years_artists = defaultdict(lambda: defaultdict(int))   # año -> artista -> count
+
     processed_artists = set()
     processed_albums = set()
 
     def get_year_label(year):
         """Convierte un año a etiqueta de año específico"""
         if year is None:
-            return "Desconocido"
+            return None
 
         if year < 1950:
             return "Antes de 1950"
@@ -205,7 +215,7 @@ def generate_weekly_stats(weeks_ago: int = 0):
         tracks_users[track_name].add(user)
         tracks_user_counts[track_name][user] += 1
 
-        if album:
+        if album and album.strip():  # Solo procesar álbumes que no estén vacíos
             # Mostrar álbum como "artista - álbum"
             album_display = f"{artist} - {album}"
             albums_counter[album_display] += 1
@@ -223,15 +233,22 @@ def generate_weekly_stats(weeks_ago: int = 0):
                     if user_track['artist'] == artist:
                         genres_user_counts[genre][user] += 1
                         genres_user_artists[genre][user].add(artist)
+                        # Recopilar información detallada para el análisis
+                        genres_artists[genre][artist] += 1
+                        if user_track['album'] and user_track['album'].strip():
+                            album_display = f"{artist} - {user_track['album']}"
+                            genres_albums[genre][album_display] += 1
             processed_artists.add(artist)
 
         # Sellos y Años (procesar solo una vez por álbum único - artista+album)
-        if album:
+        if album and album.strip():
             album_key = f"{artist}|{album}"
             if album_key not in processed_albums:
+                album_display = f"{artist} - {album}"
+
                 # Sellos
                 label = db.get_album_label(artist, album)
-                if label:
+                if label and label.strip():  # Solo procesar sellos que no estén vacíos
                     labels_counter[label] += 1
                     labels_users[label].add(user)
                     # Para sellos, contamos scrobbles de todos los álbumes de ese sello del usuario
@@ -239,21 +256,28 @@ def generate_weekly_stats(weeks_ago: int = 0):
                         if user_track['album'] == album and user_track['artist'] == artist:
                             labels_user_counts[label][user] += 1
                             labels_user_artists[label][user].add(artist)
+                            # Recopilar información detallada
+                            labels_artists[label][artist] += 1
+                            labels_albums[label][album_display] += 1
 
                 # Años
                 release_year = db.get_album_release_year(artist, album)
                 year_label = get_year_label(release_year)
-                years_counter[year_label] += 1
-                years_users[year_label].add(user)
-                # Para años, contamos scrobbles de todos los álbumes de ese año del usuario
-                for user_track in user_scrobbles[user]:
-                    if user_track['album'] == album and user_track['artist'] == artist:
-                        years_user_counts[year_label][user] += 1
-                        years_user_artists[year_label][user].add(artist)
+                if year_label is not None:  # Solo procesar años válidos
+                    years_counter[year_label] += 1
+                    years_users[year_label].add(user)
+                    # Para años, contamos scrobbles de todos los álbumes de ese año del usuario
+                    for user_track in user_scrobbles[user]:
+                        if user_track['album'] == album and user_track['artist'] == artist:
+                            years_user_counts[year_label][user] += 1
+                            years_user_artists[year_label][user].add(artist)
+                            # Recopilar información detallada
+                            years_artists[year_label][artist] += 1
+                            years_albums[year_label][album_display] += 1
 
                 processed_albums.add(album_key)
 
-    def filter_common(counter, users_dict, user_counts_dict, user_artists_dict=None):
+    def filter_common(counter, users_dict, user_counts_dict, user_artists_dict=None, detailed_artists=None, detailed_albums=None):
         result = []
         for item, count in counter.most_common(50):
             if len(users_dict[item]) >= 2:
@@ -265,6 +289,14 @@ def generate_weekly_stats(weeks_ago: int = 0):
                 }
                 if user_artists_dict:
                     entry['user_artists'] = {user: list(artists) for user, artists in user_artists_dict[item].items()}
+                if detailed_artists:
+                    # Top 10 artistas que más contribuyen a esta categoría
+                    top_artists = sorted(detailed_artists[item].items(), key=lambda x: x[1], reverse=True)[:10]
+                    entry['top_artists'] = top_artists
+                if detailed_albums:
+                    # Top 10 álbumes que más contribuyen a esta categoría
+                    top_albums = sorted(detailed_albums[item].items(), key=lambda x: x[1], reverse=True)[:10]
+                    entry['top_albums'] = top_albums
                 result.append(entry)
         return result
 
@@ -278,9 +310,9 @@ def generate_weekly_stats(weeks_ago: int = 0):
         'artists': filter_common(artists_counter, artists_users, artists_user_counts),
         'tracks': filter_common(tracks_counter, tracks_users, tracks_user_counts),
         'albums': filter_common(albums_counter, albums_users, albums_user_counts),
-        'genres': filter_common(genres_counter, genres_users, genres_user_counts, genres_user_artists),
-        'labels': filter_common(labels_counter, labels_users, labels_user_counts, labels_user_artists),
-        'years': filter_common(years_counter, years_users, years_user_counts, years_user_artists)
+        'genres': filter_common(genres_counter, genres_users, genres_user_counts, genres_user_artists, genres_artists, genres_albums),
+        'labels': filter_common(labels_counter, labels_users, labels_user_counts, labels_user_artists, labels_artists, labels_albums),
+        'years': filter_common(years_counter, years_users, years_user_counts, years_user_artists, years_artists, years_albums)
     }
 
     db.close()
@@ -522,6 +554,105 @@ def create_html(stats: Dict, users: List[str]) -> str:
             font-weight: 600;
         }}
 
+        .item.expandable {{
+            cursor: pointer;
+            position: relative;
+        }}
+
+        .item.expandable:hover {{
+            background: #1e1e2e;
+        }}
+
+        .item.expandable::after {{
+            content: '▼';
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.8em;
+            color: #6c7086;
+            transition: transform 0.3s;
+        }}
+
+        .item.expandable.expanded::after {{
+            transform: translateY(-50%) rotate(180deg);
+        }}
+
+        .item-details {{
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: #11111b;
+            border-radius: 8px;
+            border-left: 3px solid #cba6f7;
+        }}
+
+        .item-details.visible {{
+            display: block;
+        }}
+
+        .details-tabs {{
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }}
+
+        .detail-tab {{
+            padding: 6px 12px;
+            background: #313244;
+            color: #a6adc8;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.3s;
+        }}
+
+        .detail-tab:hover {{
+            background: #45475a;
+        }}
+
+        .detail-tab.active {{
+            background: #cba6f7;
+            color: #1e1e2e;
+        }}
+
+        .detail-content {{
+            display: none;
+        }}
+
+        .detail-content.visible {{
+            display: block;
+        }}
+
+        .detail-list {{
+            list-style: none;
+            padding: 0;
+        }}
+
+        .detail-item {{
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 2px solid #45475a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+
+        .detail-item-name {{
+            color: #cdd6f4;
+            font-size: 0.9em;
+        }}
+
+        .detail-item-count {{
+            color: #a6adc8;
+            font-size: 0.8em;
+            background: #313244;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }}
+
         .artists-popup {{
             position: fixed;
             top: 50%;
@@ -755,6 +886,129 @@ def create_html(stats: Dict, users: List[str]) -> str:
             document.body.appendChild(popup);
         }}
 
+        function toggleItemDetails(itemDiv, item, category) {{
+            const detailsDiv = itemDiv.querySelector('.item-details');
+
+            if (detailsDiv.classList.contains('visible')) {{
+                // Colapsar
+                detailsDiv.classList.remove('visible');
+                itemDiv.classList.remove('expanded');
+            }} else {{
+                // Expandir
+                detailsDiv.classList.add('visible');
+                itemDiv.classList.add('expanded');
+
+                // Generar contenido si no existe
+                if (detailsDiv.children.length === 0) {{
+                    generateDetailContent(detailsDiv, item, category);
+                }}
+            }}
+        }}
+
+        function generateDetailContent(detailsDiv, item, category) {{
+            // Crear tabs
+            const tabsDiv = document.createElement('div');
+            tabsDiv.className = 'details-tabs';
+
+            const artistsTab = document.createElement('button');
+            artistsTab.className = 'detail-tab active';
+            artistsTab.textContent = 'Artistas';
+            artistsTab.onclick = () => switchDetailTab(detailsDiv, 'artists');
+
+            const albumsTab = document.createElement('button');
+            albumsTab.className = 'detail-tab';
+            albumsTab.textContent = 'Álbumes';
+            albumsTab.onclick = () => switchDetailTab(detailsDiv, 'albums');
+
+            tabsDiv.appendChild(artistsTab);
+            tabsDiv.appendChild(albumsTab);
+
+            // Crear contenidos
+            const artistsContent = document.createElement('div');
+            artistsContent.className = 'detail-content visible';
+            artistsContent.id = 'artists-content';
+
+            const albumsContent = document.createElement('div');
+            albumsContent.className = 'detail-content';
+            albumsContent.id = 'albums-content';
+
+            // Llenar contenido de artistas
+            if (item.top_artists && item.top_artists.length > 0) {{
+                const artistsList = document.createElement('ul');
+                artistsList.className = 'detail-list';
+
+                item.top_artists.forEach(([artist, count]) => {{
+                    const li = document.createElement('li');
+                    li.className = 'detail-item';
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'detail-item-name';
+                    nameSpan.textContent = artist;
+
+                    const countSpan = document.createElement('span');
+                    countSpan.className = 'detail-item-count';
+                    countSpan.textContent = `${{count}} plays`;
+
+                    li.appendChild(nameSpan);
+                    li.appendChild(countSpan);
+                    artistsList.appendChild(li);
+                }});
+
+                artistsContent.appendChild(artistsList);
+            }} else {{
+                artistsContent.innerHTML = '<p style="color: #6c7086; text-align: center;">No hay datos de artistas</p>';
+            }}
+
+            // Llenar contenido de álbumes
+            if (item.top_albums && item.top_albums.length > 0) {{
+                const albumsList = document.createElement('ul');
+                albumsList.className = 'detail-list';
+
+                item.top_albums.forEach(([album, count]) => {{
+                    const li = document.createElement('li');
+                    li.className = 'detail-item';
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'detail-item-name';
+                    nameSpan.textContent = album;
+
+                    const countSpan = document.createElement('span');
+                    countSpan.className = 'detail-item-count';
+                    countSpan.textContent = `${{count}} plays`;
+
+                    li.appendChild(nameSpan);
+                    li.appendChild(countSpan);
+                    albumsList.appendChild(li);
+                }});
+
+                albumsContent.appendChild(albumsList);
+            }} else {{
+                albumsContent.innerHTML = '<p style="color: #6c7086; text-align: center;">No hay datos de álbumes</p>';
+            }}
+
+            detailsDiv.appendChild(tabsDiv);
+            detailsDiv.appendChild(artistsContent);
+            detailsDiv.appendChild(albumsContent);
+        }}
+
+        function switchDetailTab(detailsDiv, tabType) {{
+            // Actualizar tabs
+            const tabs = detailsDiv.querySelectorAll('.detail-tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            const activeTab = Array.from(tabs).find(tab =>
+                tab.textContent.toLowerCase() === (tabType === 'artists' ? 'artistas' : 'álbumes')
+            );
+            if (activeTab) activeTab.classList.add('active');
+
+            // Actualizar contenido
+            const contents = detailsDiv.querySelectorAll('.detail-content');
+            contents.forEach(content => content.classList.remove('visible'));
+
+            const targetContent = detailsDiv.querySelector(`#${{tabType}}-content`);
+            if (targetContent) targetContent.classList.add('visible');
+        }}
+
         function renderStats() {{
             const selectedUser = userSelect.value;
             const container = document.getElementById('categoriesContainer');
@@ -797,22 +1051,38 @@ def create_html(stats: Dict, users: List[str]) -> str:
                         itemDiv.classList.add('highlighted');
                     }}
 
-                    // Hacer clickeable si es género, año o sello y hay usuario seleccionado
-                    const isClickable = ['genres', 'labels', 'years'].includes(categoryKey) &&
+                    // Hacer clickeable si es género, año o sello y hay usuario seleccionado (para ver artistas por usuario)
+                    const isClickableForUser = ['genres', 'labels', 'years'].includes(categoryKey) &&
                                        selectedUser &&
                                        item.users.includes(selectedUser) &&
                                        item.user_artists &&
                                        item.user_artists[selectedUser];
 
-                    if (isClickable) {{
-                        itemDiv.classList.add('clickable');
-                        itemDiv.onclick = () => showArtistsPopup(item.name, categoryKey, selectedUser);
-                        itemDiv.title = `Click para ver artistas de ${{selectedUser}}`;
-                    }}
+                    // Hacer expandible si tiene información detallada (para ver top artistas/álbumes)
+                    const isExpandable = ['genres', 'labels', 'years'].includes(categoryKey) &&
+                                         ((item.top_artists && item.top_artists.length > 0) ||
+                                          (item.top_albums && item.top_albums.length > 0));
 
                     const itemName = document.createElement('div');
                     itemName.className = 'item-name';
                     itemName.textContent = item.name;
+
+                    // Añadir indicadores de funcionalidad
+                    if (isClickableForUser) {{
+                        const userIndicator = document.createElement('span');
+                        userIndicator.style.cssText = 'color: #cba6f7; font-size: 0.8em; margin-left: 8px;';
+                        userIndicator.textContent = `[Ver artistas de ${{selectedUser}}]`;
+                        itemName.appendChild(userIndicator);
+                    }}
+
+                    if (isExpandable) {{
+                        itemDiv.classList.add('expandable');
+                        const expandIndicator = document.createElement('span');
+                        expandIndicator.style.cssText = 'color: #6c7086; font-size: 0.8em; margin-left: 8px;';
+                        expandIndicator.textContent = '[Ver detalles]';
+                        itemName.appendChild(expandIndicator);
+                    }}
+
                     itemDiv.appendChild(itemName);
 
                     const itemMeta = document.createElement('div');
@@ -833,10 +1103,38 @@ def create_html(stats: Dict, users: List[str]) -> str:
                         // Mostrar usuario con número de scrobbles entre paréntesis
                         const userScrobbles = item.user_counts[user] || 0;
                         userBadge.textContent = `${{user}} (${{userScrobbles}})`;
+
+                        // Click en usuario para ver sus artistas
+                        if (isClickableForUser && user === selectedUser) {{
+                            userBadge.style.cursor = 'pointer';
+                            userBadge.title = `Click para ver artistas de ${{selectedUser}}`;
+                            userBadge.onclick = (e) => {{
+                                e.stopPropagation();
+                                showArtistsPopup(item.name, categoryKey, selectedUser);
+                            }};
+                        }}
+
                         itemMeta.appendChild(userBadge);
                     }});
 
                     itemDiv.appendChild(itemMeta);
+
+                    // Añadir contenedor de detalles si es expandible
+                    if (isExpandable) {{
+                        const detailsDiv = document.createElement('div');
+                        detailsDiv.className = 'item-details';
+                        itemDiv.appendChild(detailsDiv);
+
+                        // Click en el item para expandir/colapsar
+                        itemDiv.onclick = (e) => {{
+                            // No expandir si se hizo click en un badge de usuario
+                            if (e.target.classList.contains('user-badge')) {{
+                                return;
+                            }}
+                            toggleItemDetails(itemDiv, item, categoryKey);
+                        }};
+                    }}
+
                     categoryDiv.appendChild(itemDiv);
                 }});
 

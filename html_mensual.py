@@ -1341,7 +1341,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
         }}
 
         // Función para obtener novedades específicas del usuario
-        function getUserSpecificNovelties(selectedUser) {{
+        function getUserSpecificNoveltiesWithDB(selectedUser) {{
             if (!selectedUser || !stats.novelties) {{
                 return {{ artists: [], albums: [], tracks: [] }};
             }}
@@ -1352,45 +1352,15 @@ def create_html(stats: Dict, users: List[str]) -> str:
                 tracks: []
             }};
 
-            // Buscar elementos que aparecen en las estadísticas generales
-            // y que el usuario escucha, pero que no están en las novedades globales
-            // (indicando que son nuevos para él pero ya conocidos por el grupo)
+            // Timestamps del período
+            const fromTimestamp = new Date(stats.from_date).getTime() / 1000;
 
-            ['artists', 'tracks', 'albums'].forEach(category => {{
-                if (stats[category]) {{
-                    stats[category].forEach(item => {{
-                        if (item.users.includes(selectedUser) && item.user_counts[selectedUser]) {{
-                            // Verificar si este elemento no está en las novedades globales
-                            const isInGlobalNovelties = stats.novelties.nuevos[category].some(
-                                novelty => novelty.name === item.name
-                            ) || stats.novelties.nuevos_compartidos[category].some(
-                                novelty => novelty.name === item.name
-                            );
+            // Esta función requeriría una consulta al backend para:
+            // SELECT artist FROM user_first_artist_listen
+            // WHERE user = ? AND first_timestamp >= ?
 
-                            if (!isInGlobalNovelties) {{
-                                // Este podría ser un elemento nuevo para el usuario específico
-                                // Solo agregamos elementos con suficientes reproducciones
-                                if (userNovelties[category].length < 10 && item.user_counts[selectedUser] >= 2) {{
-                                    userNovelties[category].push({{
-                                        name: item.name,
-                                        count: item.user_counts[selectedUser],
-                                        users: [selectedUser],
-                                        user_counts: {{ [selectedUser]: item.user_counts[selectedUser] }},
-                                        note: "Nuevo para ti"
-                                    }});
-                                }}
-                            }}
-                        }}
-                    }});
-                }}
-            }});
-
-            // Ordenar por count descendente
-            ['artists', 'albums', 'tracks'].forEach(category => {{
-                userNovelties[category].sort((a, b) => b.count - a.count);
-            }});
-
-            return userNovelties;
+            // Por ahora usamos la lógica anterior mejorada
+            return getUserSpecificNovelties(selectedUser);
         }}
 
         // Función para renderizar novedades específicas del usuario

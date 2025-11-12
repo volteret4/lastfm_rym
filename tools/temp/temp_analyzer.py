@@ -163,7 +163,6 @@ class StatsAnalyzer:
             print("   🆕 Analizando novedades...")
             novelties = self._analyze_novelties(users, from_timestamp, to_timestamp)
             stats['novelties'] = novelties
-            print(f"   🆕 Novedades encontradas: {len(novelties['nuevos']['artists'])} artistas, {len(novelties['nuevos']['albums'])} álbumes, {len(novelties['nuevos']['tracks'])} canciones")
 
         print(f"   ✅ Análisis completado: {len(all_scrobbles):,} scrobbles procesados")
         return stats
@@ -214,105 +213,149 @@ class StatsAnalyzer:
 
     def _analyze_novelties(self, users: List[str], from_timestamp: int, to_timestamp: int) -> Dict:
         """
-        Analiza las novedades en el período especificado
+        Analiza las novedades en el período especificado usando la lógica original mejorada
         """
-        all_scrobbles = []
+        print("🔍 Analizando novedades...")
+
+        # Obtener todos los scrobbles del período actual
+        all_current_scrobbles = []
         for user in users:
             user_scrobbles = self.db.get_scrobbles(user, from_timestamp, to_timestamp)
             for scrobble in user_scrobbles:
                 scrobble['user'] = user
-            all_scrobbles.extend(user_scrobbles)
+            all_current_scrobbles.extend(user_scrobbles)
 
-        # Elementos únicos por tipo en el período
-        period_artists = set()
-        period_albums = set()
-        period_tracks = set()
+        if not all_current_scrobbles:
+            return {
+                'nuevos': {'artists': [], 'albums': [], 'tracks': []},
+                'nuevos_compartidos': {'artists': [], 'albums': [], 'tracks': []},
+                'nuevos_para_usuario': {'artists': [], 'albums': [], 'tracks': []}
+            }
 
-        for scrobble in all_scrobbles:
-            period_artists.add(scrobble['artist'])
-            if scrobble['album']:
-                period_albums.add((scrobble['artist'], scrobble['album']))
-            period_tracks.add((scrobble['artist'], scrobble['track']))
+        # Contadores para elementos del período actual
+        current_artists = Counter()
+        current_albums = Counter()
+        current_tracks_counter = Counter()
 
-        # Nuevos compartidos (>= 50% del grupo los ha escuchado en este período)
-        min_users_for_shared = max(1, len(users) // 2)
+        # Usuarios que han escuchado cada elemento en el período actual
+        current_artists_users = defaultdict(set)
+        current_albums_users = defaultdict(set)
+        current_tracks_users = defaultdict(set)
+
+        # Procesar scrobbles actuales
+        for scrobble in all_current_scrobbles:
+            artist = scrobble['artist']
+            album = scrobble['album']
+            track_name = f"{artist} - {scrobble['track']}"
+            user = scrobble['user']
+
+            current_artists[artist] += 1
+            current_artists_users[artist].add(user)
+
+            current_tracks_counter[track_name] += 1
+            current_tracks_users[track_name].add(user)
+
+            if album and album.strip():
+                album_display = f"{artist} - {album}"
+                current_albums[album_display] += 1
+                current_albums_users[album_display].add(user)
+
+        # Analizar novedades
+        total_users = len(users)
+        majority_threshold = max(1, total_users // 2)  # Al menos 50% de usuarios
 
         nuevos_artists = []
         nuevos_albums = []
         nuevos_tracks = []
+
         nuevos_compartidos_artists = []
         nuevos_compartidos_albums = []
         nuevos_compartidos_tracks = []
 
-        # Verificar artistas
-        for artist in period_artists:
-            global_first = self.db.get_global_first_scrobble_date(artist=artist)
-            if global_first and global_first >= from_timestamp:
-                users_listening = set()
-                for scrobble in all_scrobbles:
-                    if scrobble['artist'] == artist:
-                        users_listening.add(scrobble['user'])
-
-                item_data = {
+        # NUEVOS ARTISTAS
+        print("   🎵 Analizando artistas nuevos...")
+        for artist, count in current_artists.most_common(20):
+            first_global = self.db.get_global_first_scrobble_date(artist=artist)
+            if first_global and first_global >= from_timestamp:
+                nuevos_artists.append({
                     'name': artist,
-                    'users': list(users_listening),
-                    'first_date': global_first
-                }
+                    'count': count,
+                    'users': list(current_artists_users[artist]),
+                    'first_date': first_global
+                })
 
-                nuevos_artists.append(item_data)
+                # ¿Es compartido por la mayoría?
+                if len(current_artists_users[artist]) >= majority_threshold:
+                    nuevos_compartidos_artists.append({
+                        'name': artist,
+                        'count': count,
+                        'users': list(current_artists_users[artist]),
+                        'first_date': first_global
+                    })
 
-                if len(users_listening) >= min_users_for_shared:
-                    nuevos_compartidos_artists.append(item_data)
+        # NUEVOS ÁLBUMES
+        print("   💿 Analizando álbumes nuevos...")
+        for album_display, count in current_albums.most_common(20):
+            # Extraer artista y álbum
+            parts = album_display.split(' - ', 1)
+            if len(parts) == 2:
+                artist, album = parts
+                first_global = self.db.get_global_first_scrobble_date(artist=artist, album=album)
+                if first_global and first_global >= from_timestamp:
+                    nuevos_albums.append({
+                        'name': album_display,
+                        'artist': artist,
+                        'album': album,
+                        'count': count,
+                        'users': list(current_albums_users[album_display]),
+                        'first_date': first_global
+                    })
 
-        # Verificar álbumes
-        for artist, album in period_albums:
-            global_first = self.db.get_global_first_scrobble_date(artist=artist, album=album)
-            if global_first and global_first >= from_timestamp:
-                users_listening = set()
-                for scrobble in all_scrobbles:
-                    if scrobble['artist'] == artist and scrobble['album'] == album:
-                        users_listening.add(scrobble['user'])
+                    # ¿Es compartido por la mayoría?
+                    if len(current_albums_users[album_display]) >= majority_threshold:
+                        nuevos_compartidos_albums.append({
+                            'name': album_display,
+                            'artist': artist,
+                            'album': album,
+                            'count': count,
+                            'users': list(current_albums_users[album_display]),
+                            'first_date': first_global
+                        })
 
-                item_data = {
-                    'name': f"{artist} - {album}",
-                    'artist': artist,
-                    'album': album,
-                    'users': list(users_listening),
-                    'first_date': global_first
-                }
+        # NUEVAS CANCIONES
+        print("   🎶 Analizando canciones nuevas...")
+        for track_name, count in current_tracks_counter.most_common(20):
+            # Extraer artista y canción
+            parts = track_name.split(' - ', 1)
+            if len(parts) == 2:
+                artist, track = parts
+                first_global = self.db.get_global_first_scrobble_date(artist=artist, track=track)
+                if first_global and first_global >= from_timestamp:
+                    nuevos_tracks.append({
+                        'name': track_name,
+                        'artist': artist,
+                        'track': track,
+                        'count': count,
+                        'users': list(current_tracks_users[track_name]),
+                        'first_date': first_global
+                    })
 
-                nuevos_albums.append(item_data)
-
-                if len(users_listening) >= min_users_for_shared:
-                    nuevos_compartidos_albums.append(item_data)
-
-        # Verificar canciones
-        for artist, track in period_tracks:
-            global_first = self.db.get_global_first_scrobble_date(artist=artist, track=track)
-            if global_first and global_first >= from_timestamp:
-                users_listening = set()
-                for scrobble in all_scrobbles:
-                    if scrobble['artist'] == artist and scrobble['track'] == track:
-                        users_listening.add(scrobble['user'])
-
-                item_data = {
-                    'name': f"{artist} - {track}",
-                    'artist': artist,
-                    'track': track,
-                    'users': list(users_listening),
-                    'first_date': global_first
-                }
-
-                nuevos_tracks.append(item_data)
-
-                if len(users_listening) >= min_users_for_shared:
-                    nuevos_compartidos_tracks.append(item_data)
+                    # ¿Es compartido por la mayoría?
+                    if len(current_tracks_users[track_name]) >= majority_threshold:
+                        nuevos_compartidos_tracks.append({
+                            'name': track_name,
+                            'artist': artist,
+                            'track': track,
+                            'count': count,
+                            'users': list(current_tracks_users[track_name]),
+                            'first_date': first_global
+                        })
 
         # Ordenar por fecha de primer scrobble (más reciente primero)
         def sort_by_first_date(items):
             return sorted(items, key=lambda x: x['first_date'], reverse=True)
 
-        return {
+        result = {
             'nuevos': {
                 'artists': sort_by_first_date(nuevos_artists),
                 'albums': sort_by_first_date(nuevos_albums),
@@ -322,5 +365,20 @@ class StatsAnalyzer:
                 'artists': sort_by_first_date(nuevos_compartidos_artists),
                 'albums': sort_by_first_date(nuevos_compartidos_albums),
                 'tracks': sort_by_first_date(nuevos_compartidos_tracks)
+            },
+            'nuevos_para_usuario': {
+                'artists': [],  # Se calculará dinámicamente en el frontend
+                'albums': [],
+                'tracks': []
             }
         }
+
+        print(f"   ✅ Novedades encontradas:")
+        print(f"     - Artistas nuevos: {len(nuevos_artists)}")
+        print(f"     - Álbumes nuevos: {len(nuevos_albums)}")
+        print(f"     - Canciones nuevas: {len(nuevos_tracks)}")
+        print(f"     - Artistas compartidos: {len(nuevos_compartidos_artists)}")
+        print(f"     - Álbumes compartidos: {len(nuevos_compartidos_albums)}")
+        print(f"     - Canciones compartidas: {len(nuevos_compartidos_tracks)}")
+
+        return result

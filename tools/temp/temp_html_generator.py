@@ -43,7 +43,11 @@ class HTMLGenerator:
                 'novelties': 'Novedades'
             }.get(category, category.title())
 
-            active_class = 'active' if category == 'artists' else ''
+            # Activar "artistas" por defecto, o "novelties" si no hay artistas
+            active_class = ''
+            if category == 'artists':
+                active_class = 'active'
+
             category_filters_html += f'<button class="category-filter {active_class}" data-category="{category}">{label}</button>'
 
         return f"""<!DOCTYPE html>
@@ -806,6 +810,14 @@ class HTMLGenerator:
 
             const itemMeta = document.createElement('div');
             itemMeta.className = 'item-meta';
+
+            // Conteo de plays si existe
+            if (item.count) {{
+                const countBadge = document.createElement('span');
+                countBadge.className = 'badge';
+                countBadge.textContent = `${{item.count}} plays`;
+                itemMeta.appendChild(countBadge);
+            }}
 
             // Fecha de primer scrobble
             const date = new Date(item.first_date * 1000);

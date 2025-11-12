@@ -25,8 +25,9 @@ class GroupDataJSONGenerator:
     def generate_all_user_combinations_data(self, users: List[str], output_dir: str = "docs/data") -> Dict:
         """Genera datos JSON para todas las combinaciones relevantes de usuarios"""
         print("    • Generando datos JSON para filtros de usuarios...")
+        print(f"    • Directorio de salida: {output_dir}")
 
-        # Crear directorio de salida si no existe
+        # Crear directorio de salida si no existe (incluyendo subcarpetas del período)
         os.makedirs(output_dir, exist_ok=True)
 
         # Mapeo de archivos generados
@@ -37,12 +38,16 @@ class GroupDataJSONGenerator:
         }
 
         # Generar para todas las combinaciones de 2 o más usuarios
+        total_combinations = sum(1 for r in range(2, len(users) + 1) for _ in combinations(users, r))
+        current_combination = 0
+
         for r in range(2, len(users) + 1):
             for user_combo in combinations(users, r):
                 user_list = list(user_combo)
                 user_key = "_".join(sorted(user_list))
+                current_combination += 1
 
-                print(f"      • Procesando combinación: {', '.join(user_list)}")
+                print(f"      • Procesando combinación {current_combination}/{total_combinations}: {', '.join(user_list)}")
 
                 # Datos por usuarios compartidos
                 shared_data = self._generate_shared_charts_data(user_list)
@@ -87,6 +92,10 @@ class GroupDataJSONGenerator:
 
         print(f"      • Archivos JSON generados en: {output_dir}")
         print(f"      • Combinaciones procesadas: {len(index_data['user_combinations'])}")
+        print(f"      • Archivos por tipo:")
+        print(f"        - Shared charts: {len(generated_files['shared_charts'])}")
+        print(f"        - Scrobbles charts: {len(generated_files['scrobbles_charts'])}")
+        print(f"        - Evolution data: {len(generated_files['evolution'])}")
 
         return index_data
 

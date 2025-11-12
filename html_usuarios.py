@@ -20,9 +20,9 @@ try:
 except ImportError:
     pass
 
-from db.user_stats_analyzer import UserStatsAnalyzer
-from db.user_stats_database import UserStatsDatabase
-from db.user_stats_html_generator import UserStatsHTMLGenerator
+from tools.users.user_stats_analyzer import UserStatsAnalyzer
+from tools.users.user_stats_database import UserStatsDatabase
+from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
 
 
 def main():

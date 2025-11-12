@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GroupStatsHTMLGenerator - Clase para generar HTML con gráficos interactivos de estadísticas grupales
+GroupStatsHTMLGenerator - Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas grupales
 """
 
 import json
@@ -8,7 +8,7 @@ from typing import Dict, List
 
 
 class GroupStatsHTMLGenerator:
-    """Clase para generar HTML con gráficos interactivos de estadísticas grupales"""
+    """Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas grupales"""
 
     def __init__(self):
         self.colors = [
@@ -18,7 +18,7 @@ class GroupStatsHTMLGenerator:
         ]
 
     def generate_html(self, group_stats: Dict, years_back: int) -> str:
-        """Genera el HTML completo para estadísticas grupales"""
+        """Genera el HTML completo para estadÃ­sticas grupales"""
         stats_json = json.dumps(group_stats, indent=2, ensure_ascii=False)
         colors_json = json.dumps(self.colors, ensure_ascii=False)
 
@@ -27,7 +27,7 @@ class GroupStatsHTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Grupo - Estadísticas Grupales</title>
+    <title>Last.fm Grupo - EstadÃ­sticas Grupales</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -335,7 +335,7 @@ class GroupStatsHTMLGenerator:
             margin-top: 5px;
         }}
 
-        /* Estilos para la sección de datos */
+        /* Estilos para la secciÃ³n de datos */
         .data-section {{
             margin-bottom: 40px;
         }}
@@ -495,6 +495,72 @@ class GroupStatsHTMLGenerator:
             grid-column: 1 / -1;
         }}
 
+        /* Estilos para filtros de usuarios */
+        .user-filters {{
+            padding: 20px 30px;
+            background: #1e1e2e;
+            border-bottom: 1px solid #313244;
+            display: none; /* Oculto por defecto, se muestra solo en vistas específicas */
+        }}
+
+        .user-filters.active {{
+            display: block;
+        }}
+
+        .user-filters h4 {{
+            color: #cba6f7;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }}
+
+        .user-filter-buttons {{
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }}
+
+        .user-filter-btn {{
+            padding: 8px 16px;
+            background: #cba6f7;
+            color: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+        }}
+
+        .user-filter-btn:hover {{
+            background: #ddb6f2;
+            border-color: #ddb6f2;
+        }}
+
+        .user-filter-btn:not(.active) {{
+            background: #313244;
+            color: #cdd6f4;
+            border-color: #45475a;
+        }}
+
+        .user-filter-btn:not(.active):hover {{
+            border-color: #cba6f7;
+            background: #45475a;
+        }}
+
+        .filter-info {{
+            margin-left: 20px;
+            color: #a6adc8;
+            font-size: 0.9em;
+        }}
+
+        .loading-message {{
+            text-align: center;
+            padding: 20px;
+            color: #cba6f7;
+            font-style: italic;
+        }}
+
         @media (max-width: 768px) {{
             .charts-grid {{
                 grid-template-columns: 1fr;
@@ -536,8 +602,8 @@ class GroupStatsHTMLGenerator:
 <body>
     <div class="container">
         <header>
-            <h1>Estadísticas Grupales</h1>
-            <p class="subtitle">Análisis global del grupo</p>
+            <h1>EstadÃ­sticas Grupales</h1>
+            <p class="subtitle">AnÃ¡lisis global del grupo</p>
         </header>
 
         <div class="controls">
@@ -547,20 +613,31 @@ class GroupStatsHTMLGenerator:
                     <button class="view-btn active" data-view="data">Datos</button>
                     <button class="view-btn" data-view="shared">Por Usuarios Compartidos</button>
                     <button class="view-btn" data-view="scrobbles">Por Scrobbles Totales</button>
-                    <button class="view-btn" data-view="evolution">Evolución Temporal</button>
+                    <button class="view-btn" data-view="evolution">EvoluciÃ³n Temporal</button>
                 </div>
             </div>
         </div>
 
+        <!-- Filtros de usuarios para vistas específicas -->
+        <div id="userFilters" class="user-filters">
+            <h4>Filtrar por usuarios activos:</h4>
+            <div class="user-filter-buttons" id="userFilterButtons">
+                <!-- Se llenarán dinámicamente -->
+            </div>
+            <div class="filter-info" id="filterInfo">
+                Selecciona al menos 2 usuarios para mostrar los gráficos
+            </div>
+        </div>
+
         <div id="groupHeader" class="group-header">
-            <h2 id="groupTitle">Análisis Grupal</h2>
-            <p class="group-info" id="groupInfo">Período de análisis: {years_back + 1} años</p>
+            <h2 id="groupTitle">AnÃ¡lisis Grupal</h2>
+            <p class="group-info" id="groupInfo">PerÃ­odo de anÃ¡lisis: {years_back + 1} aÃ±os</p>
         </div>
 
         <div class="stats-container">
-            <!-- Resumen de estadísticas -->
+            <!-- Resumen de estadÃ­sticas -->
             <div id="summaryStats" class="summary-stats">
-                <!-- Se llenará dinámicamente -->
+                <!-- Se llenarÃ¡ dinÃ¡micamente -->
             </div>
 
             <!-- Vista de Datos -->
@@ -570,7 +647,7 @@ class GroupStatsHTMLGenerator:
                         <div class="data-control-group">
                             <label for="userLevelSelect">Nivel de coincidencia:</label>
                             <select id="userLevelSelect" class="data-select">
-                                <!-- Se llenará dinámicamente -->
+                                <!-- Se llenarÃ¡ dinÃ¡micamente -->
                             </select>
                         </div>
 
@@ -578,25 +655,25 @@ class GroupStatsHTMLGenerator:
                             <label for="highlightUserSelect">Destacar usuario:</label>
                             <select id="highlightUserSelect" class="data-select">
                                 <option value="">Ninguno</option>
-                                <!-- Se llenará dinámicamente -->
+                                <!-- Se llenarÃ¡ dinÃ¡micamente -->
                             </select>
                         </div>
 
                         <div class="data-control-group">
-                            <label>Mostrar categorías:</label>
+                            <label>Mostrar categorÃ­as:</label>
                             <div class="data-categories">
                                 <button class="data-category-filter active" data-category="artists">Artistas</button>
-                                <button class="data-category-filter" data-category="albums">Álbumes</button>
+                                <button class="data-category-filter" data-category="albums">Ãlbumes</button>
                                 <button class="data-category-filter" data-category="tracks">Canciones</button>
-                                <button class="data-category-filter" data-category="genres">Géneros</button>
+                                <button class="data-category-filter" data-category="genres">GÃ©neros</button>
                                 <button class="data-category-filter" data-category="labels">Sellos</button>
-                                <button class="data-category-filter" data-category="decades">Décadas</button>
+                                <button class="data-category-filter" data-category="decades">DÃ©cadas</button>
                             </div>
                         </div>
                     </div>
 
                     <div class="data-display" id="dataDisplay">
-                        <!-- Se llenará dinámicamente -->
+                        <!-- Se llenarÃ¡ dinÃ¡micamente -->
                     </div>
                 </div>
             </div>
@@ -613,7 +690,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 Álbumes</h3>
+                        <h3>Top 15 Ãlbumes</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedAlbumsChart"></canvas>
                         </div>
@@ -629,7 +706,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 Géneros</h3>
+                        <h3>Top 15 GÃ©neros</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedGenresChart"></canvas>
                         </div>
@@ -645,7 +722,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 Años de Lanzamiento</h3>
+                        <h3>Top 15 AÃ±os de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedReleaseYearsChart"></canvas>
                         </div>
@@ -666,7 +743,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 Álbumes</h3>
+                        <h3>Top 15 Ãlbumes</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesAlbumsChart"></canvas>
                         </div>
@@ -682,7 +759,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 Géneros</h3>
+                        <h3>Top 15 GÃ©neros</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesGenresChart"></canvas>
                         </div>
@@ -698,7 +775,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 Años de Lanzamiento</h3>
+                        <h3>Top 15 AÃ±os de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesReleaseYearsChart"></canvas>
                         </div>
@@ -715,48 +792,48 @@ class GroupStatsHTMLGenerator:
                 </div>
             </div>
 
-            <!-- Vista de Evolución -->
+            <!-- Vista de EvoluciÃ³n -->
             <div id="evolutionView" class="view">
                 <div class="evolution-section">
-                    <h3>Evolución Temporal por Scrobbles</h3>
+                    <h3>EvoluciÃ³n Temporal por Scrobbles</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 15 Artistas por Año</h4>
+                            <h4>Top 15 Artistas por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionArtistsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 Álbumes por Año</h4>
+                            <h4>Top 15 Ãlbumes por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionAlbumsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 Canciones por Año</h4>
+                            <h4>Top 15 Canciones por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionTracksChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 Géneros por Año</h4>
+                            <h4>Top 15 GÃ©neros por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionGenresChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 Sellos por Año</h4>
+                            <h4>Top 15 Sellos por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionLabelsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 Años de Lanzamiento por Año</h4>
+                            <h4>Top 15 AÃ±os de Lanzamiento por AÃ±o</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionReleaseYearsChart"></canvas>
                             </div>
@@ -770,7 +847,7 @@ class GroupStatsHTMLGenerator:
             <div id="popup" class="popup" style="display: none;">
                 <div class="popup-header">
                     <span id="popupTitle">Detalles</span>
-                    <button id="popupClose" class="popup-close">❌</button>
+                    <button id="popupClose" class="popup-close">âŒ</button>
                 </div>
                 <div id="popupContent" class="popup-content"></div>
             </div>
@@ -784,12 +861,17 @@ class GroupStatsHTMLGenerator:
         let currentView = 'data';
         let charts = {{}};
 
-        // Variables para la sección de datos
+        // Variables para la secciÃ³n de datos
         let activeDataCategories = new Set(['artists']); // Por defecto mostrar artistas
         let currentUserLevel = '';
         let selectedHighlightUser = '';
 
-        // Inicialización
+        // Variables para filtrado de usuarios dinámico
+        let activeUsers = new Set(groupStats.users); // Por defecto todos los usuarios activos
+        let dynamicDataCache = {{}}; // Cache para datos cargados dinámicamente
+        let isLoadingData = false;
+
+        // InicializaciÃ³n
         document.addEventListener('DOMContentLoaded', function() {{
             updateGroupHeader();
             updateSummaryStats();
@@ -806,6 +888,9 @@ class GroupStatsHTMLGenerator:
             // Inicializar controles de datos
             initializeDataControls();
 
+            // Inicializar filtros de usuarios
+            initializeUserFilters();
+
             // Cargar vista inicial
             switchView('data');
         }});
@@ -818,6 +903,14 @@ class GroupStatsHTMLGenerator:
                 btn.classList.remove('active');
             }});
             document.querySelector(`[data-view="${{view}}"]`).classList.add('active');
+
+            // Mostrar/ocultar filtros de usuarios según la vista
+            const userFilters = document.getElementById('userFilters');
+            if (view === 'shared' || view === 'scrobbles' || view === 'evolution') {{
+                userFilters.classList.add('active');
+            }} else {{
+                userFilters.classList.remove('active');
+            }}
 
             // Update views
             document.querySelectorAll('.view').forEach(v => {{
@@ -834,17 +927,17 @@ class GroupStatsHTMLGenerator:
             if (view === 'data') {{
                 renderDataView();
             }} else if (view === 'shared') {{
-                renderSharedCharts();
+                renderSharedChartsWithFilter();
             }} else if (view === 'scrobbles') {{
-                renderScrobblesCharts();
+                renderScrobblesChartsWithFilter();
             }} else if (view === 'evolution') {{
-                renderEvolutionCharts();
+                renderEvolutionChartsWithFilter();
             }}
         }}
 
         function updateGroupHeader() {{
             document.getElementById('groupInfo').innerHTML =
-                `Período: ${{groupStats.period}} | ${{groupStats.user_count}} usuarios | Generado: ${{groupStats.generated_at}}`;
+                `PerÃ­odo: ${{groupStats.period}} | ${{groupStats.user_count}} usuarios | Generado: ${{groupStats.generated_at}}`;
         }}
 
         function updateSummaryStats() {{
@@ -873,7 +966,7 @@ class GroupStatsHTMLGenerator:
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedAlbums}}</div>
-                    <div class="label">Álbumes Compartidos</div>
+                    <div class="label">Ãlbumes Compartidos</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedTracks}}</div>
@@ -881,7 +974,7 @@ class GroupStatsHTMLGenerator:
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedGenres}}</div>
-                    <div class="label">Géneros Compartidos (Todos)</div>
+                    <div class="label">GÃ©neros Compartidos (Todos)</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedLabels}}</div>
@@ -907,7 +1000,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar gráficos por usuarios compartidos
+            // Renderizar grÃ¡ficos por usuarios compartidos
             renderPieChart('sharedArtistsChart', groupStats.shared_charts.artists, 'sharedArtistsInfo');
             renderPieChart('sharedAlbumsChart', groupStats.shared_charts.albums, 'sharedAlbumsInfo');
             renderPieChart('sharedTracksChart', groupStats.shared_charts.tracks, 'sharedTracksInfo');
@@ -923,7 +1016,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar gráficos por scrobbles totales
+            // Renderizar grÃ¡ficos por scrobbles totales
             renderPieChart('scrobblesArtistsChart', groupStats.scrobbles_charts.artists, 'scrobblesArtistsInfo');
             renderPieChart('scrobblesAlbumsChart', groupStats.scrobbles_charts.albums, 'scrobblesAlbumsInfo');
             renderPieChart('scrobblesTracksChart', groupStats.scrobbles_charts.tracks, 'scrobblesTracksInfo');
@@ -940,7 +1033,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar gráficos de evolución
+            // Renderizar grÃ¡ficos de evoluciÃ³n
             renderLineChart('evolutionArtistsChart', groupStats.evolution.artists);
             renderLineChart('evolutionAlbumsChart', groupStats.evolution.albums);
             renderLineChart('evolutionTracksChart', groupStats.evolution.tracks);
@@ -1029,7 +1122,7 @@ class GroupStatsHTMLGenerator:
                             if (typeof yearData === 'object' && 'total' in yearData) {{
                                 return yearData.total;
                             }}
-                            // Si es la estructura antigua con nÃºmeros directos
+                            // Si es la estructura antigua con nÃƒÂºmeros directos
                             if (typeof yearData === 'number') {{
                                 return yearData;
                             }}
@@ -1146,16 +1239,16 @@ class GroupStatsHTMLGenerator:
             }}
 
             if (details.artist && details.album) {{
-                content += `<div class="details">Artista: ${{details.artist}} | Álbum: ${{details.album}}</div>`;
+                content += `<div class="details">Artista: ${{details.artist}} | Ãlbum: ${{details.album}}</div>`;
             }} else if (details.artist && details.track) {{
-                content += `<div class="details">Artista: ${{details.artist}} | Canción: ${{details.track}}</div>`;
+                content += `<div class="details">Artista: ${{details.artist}} | CanciÃ³n: ${{details.track}}</div>`;
             }}
 
             if (chartData.type === 'combined') {{
-                content += `<div class="details">Categoría: ${{details.category}}</div>`;
+                content += `<div class="details">CategorÃ­a: ${{details.category}}</div>`;
             }}
 
-            // Agregar desglose por usuario si estÃ¡ disponible
+            // Agregar desglose por usuario si estÃƒÂ¡ disponible
             if (details.user_plays && Object.keys(details.user_plays).length > 0) {{
                 content += `<div class="details" style="margin-top: 10px; font-weight: bold;">Desglose por usuario:</div>`;
                 const userPlays = Object.entries(details.user_plays)
@@ -1212,7 +1305,7 @@ class GroupStatsHTMLGenerator:
             document.getElementById('popup').style.display = 'none';
         }});
 
-        // Funciones para la sección de datos
+        // Funciones para la secciÃ³n de datos
         function initializeDataControls() {{
             console.log('Inicializando controles de datos...'); // Debug
             const userLevelSelect = document.getElementById('userLevelSelect');
@@ -1259,7 +1352,7 @@ class GroupStatsHTMLGenerator:
                 renderDataView();
             }});
 
-            // Manejar filtros de categorías
+            // Manejar filtros de categorÃ­as
             const dataCategoryFilters = document.querySelectorAll('.data-category-filter');
             dataCategoryFilters.forEach(filter => {{
                 filter.addEventListener('click', () => {{
@@ -1308,24 +1401,24 @@ class GroupStatsHTMLGenerator:
 
             const levelData = groupStats.data_by_levels[currentUserLevel];
             console.log('Datos del nivel seleccionado:', levelData); // Debug
-            console.log('Categorías activas:', Array.from(activeDataCategories)); // Debug
+            console.log('CategorÃ­as activas:', Array.from(activeDataCategories)); // Debug
 
             const categoryOrder = ['artists', 'albums', 'tracks', 'genres', 'labels', 'decades'];
             const categoryTitles = {{
                 artists: 'Artistas',
-                albums: 'Álbumes',
+                albums: 'Ãlbumes',
                 tracks: 'Canciones',
-                genres: 'Géneros',
+                genres: 'GÃ©neros',
                 labels: 'Sellos',
-                decades: 'Décadas'
+                decades: 'DÃ©cadas'
             }};
 
             let hasVisibleData = false;
             let elementsAdded = 0;
 
             categoryOrder.forEach(categoryKey => {{
-                console.log(`Procesando categoría: ${{categoryKey}}`); // Debug
-                console.log(`- Está activa: ${{activeDataCategories.has(categoryKey)}}`); // Debug
+                console.log(`Procesando categorÃ­a: ${{categoryKey}}`); // Debug
+                console.log(`- EstÃ¡ activa: ${{activeDataCategories.has(categoryKey)}}`); // Debug
                 console.log(`- Tiene datos: ${{levelData[categoryKey] ? levelData[categoryKey].length : 0}} items`); // Debug
 
                 if (!activeDataCategories.has(categoryKey)) return;
@@ -1340,14 +1433,14 @@ class GroupStatsHTMLGenerator:
                 const title = document.createElement('h4');
                 title.textContent = `${{categoryTitles[categoryKey]}} (${{levelData[categoryKey].length}})`;
                 categoryDiv.appendChild(title);
-                console.log(`Título agregado: ${{title.textContent}}`); // Debug
+                console.log(`TÃ­tulo agregado: ${{title.textContent}}`); // Debug
 
                 let itemsAdded = 0;
                 levelData[categoryKey].forEach(item => {{
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'data-item';
 
-                    // Destacar si el usuario seleccionado está en la lista
+                    // Destacar si el usuario seleccionado estÃ¡ en la lista
                     if (selectedHighlightUser && item.users.includes(selectedHighlightUser)) {{
                         itemDiv.classList.add('highlighted');
                     }}
@@ -1399,7 +1492,7 @@ class GroupStatsHTMLGenerator:
                 const noDataDiv = document.createElement('div');
                 noDataDiv.className = 'data-no-data';
                 noDataDiv.textContent = activeDataCategories.size === 0
-                    ? 'Selecciona al menos una categoría para ver los datos'
+                    ? 'Selecciona al menos una categorÃ­a para ver los datos'
                     : 'No hay datos disponibles para este nivel';
                 dataDisplay.appendChild(noDataDiv);
                 console.log('Agregado mensaje de no data'); // Debug
@@ -1411,10 +1504,229 @@ class GroupStatsHTMLGenerator:
             dataDisplay.style.display = '';
             console.log('Repaint forzado'); // Debug
         }}
+
+        // ==================== FUNCIONES PARA FILTRADO DINÁMICO ====================
+
+        function initializeUserFilters() {{
+            console.log('Inicializando filtros de usuarios...');
+            const userFilterButtons = document.getElementById('userFilterButtons');
+
+            // Crear botones para cada usuario
+            groupStats.users.forEach(user => {{
+                const btn = document.createElement('button');
+                btn.className = 'user-filter-btn active';
+                btn.dataset.user = user;
+                btn.textContent = user;
+
+                btn.addEventListener('click', () => {{
+                    toggleUser(user);
+                }});
+
+                userFilterButtons.appendChild(btn);
+            }});
+
+            updateFilterInfo();
+        }}
+
+        function toggleUser(user) {{
+            const btn = document.querySelector(`[data-user="${{user}}"]`);
+
+            if (activeUsers.has(user)) {{
+                // Si solo queda este usuario activo, no permitir desactivarlo
+                if (activeUsers.size <= 1) {{
+                    alert('Debe haber al menos 1 usuario activo');
+                    return;
+                }}
+                activeUsers.delete(user);
+                btn.classList.remove('active');
+            }} else {{
+                activeUsers.add(user);
+                btn.classList.add('active');
+            }}
+
+            updateFilterInfo();
+
+            // Recargar gráficos si estamos en una vista filtrable
+            if (['shared', 'scrobbles', 'evolution'].includes(currentView)) {{
+                refreshCurrentView();
+            }}
+        }}
+
+        function updateFilterInfo() {{
+            const filterInfo = document.getElementById('filterInfo');
+            const activeCount = activeUsers.size;
+            const totalCount = groupStats.users.length;
+
+            if (activeCount < 2) {{
+                filterInfo.textContent = `${{activeCount}}/${{totalCount}} usuarios activos - Selecciona al menos 2 usuarios`;
+                filterInfo.style.color = '#f38ba8'; // Color de advertencia
+            }} else {{
+                filterInfo.textContent = `${{activeCount}}/${{totalCount}} usuarios activos`;
+                filterInfo.style.color = '#a6adc8'; // Color normal
+            }}
+        }}
+
+        function refreshCurrentView() {{
+            console.log('Refrescando vista actual:', currentView);
+
+            if (activeUsers.size < 2) {{
+                showLoadingMessage('Selecciona al menos 2 usuarios');
+                return;
+            }}
+
+            if (currentView === 'shared') {{
+                renderSharedChartsWithFilter();
+            }} else if (currentView === 'scrobbles') {{
+                renderScrobblesChartsWithFilter();
+            }} else if (currentView === 'evolution') {{
+                renderEvolutionChartsWithFilter();
+            }}
+        }}
+
+        function getUserKey() {{
+            return Array.from(activeUsers).sort().join('_');
+        }}
+
+        function showLoadingMessage(message) {{
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {{
+                if (chart) chart.destroy();
+            }});
+            charts = {{}};
+
+            // Mostrar mensaje en todos los contenedores de gráficos
+            const containers = document.querySelectorAll('.chart-info, .chart-wrapper canvas');
+            containers.forEach(container => {{
+                if (container.tagName === 'CANVAS') {{
+                    container.style.display = 'none';
+                }} else {{
+                    container.innerHTML = `<div class="loading-message">${{message}}</div>`;
+                }}
+            }});
+        }}
+
+        async function loadDynamicData(dataType, userKey) {{
+            if (dynamicDataCache[`${{dataType}}_${{userKey}}`]) {{
+                return dynamicDataCache[`${{dataType}}_${{userKey}}`];
+            }}
+
+            try {{
+                const response = await fetch(`data/${{dataType}}_${{userKey}}.json`);
+                if (!response.ok) {{
+                    throw new Error(`HTTP error! status: ${{response.status}}`);
+                }}
+                const data = await response.json();
+                dynamicDataCache[`${{dataType}}_${{userKey}}`] = data;
+                return data;
+            }} catch (error) {{
+                console.error(`Error cargando datos ${{dataType}}_${{userKey}}:`, error);
+                return null;
+            }}
+        }}
+
+        async function renderSharedChartsWithFilter() {{
+            if (isLoadingData) return;
+            isLoadingData = true;
+
+            console.log('Renderizando gráficos compartidos con filtro...');
+            showLoadingMessage('Cargando datos...');
+
+            const userKey = getUserKey();
+            const sharedData = await loadDynamicData('shared', userKey);
+
+            if (!sharedData) {{
+                showLoadingMessage('Error cargando datos');
+                isLoadingData = false;
+                return;
+            }}
+
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {{
+                if (chart) chart.destroy();
+            }});
+            charts = {{}};
+
+            // Renderizar gráficos por usuarios compartidos
+            renderPieChart('sharedArtistsChart', sharedData.artists, 'sharedArtistsInfo');
+            renderPieChart('sharedAlbumsChart', sharedData.albums, 'sharedAlbumsInfo');
+            renderPieChart('sharedTracksChart', sharedData.tracks, 'sharedTracksInfo');
+            renderPieChart('sharedGenresChart', sharedData.genres, 'sharedGenresInfo');
+            renderPieChart('sharedLabelsChart', sharedData.labels, 'sharedLabelsInfo');
+            renderPieChart('sharedReleaseYearsChart', sharedData.release_years, 'sharedReleaseYearsInfo');
+
+            isLoadingData = false;
+        }}
+
+        async function renderScrobblesChartsWithFilter() {{
+            if (isLoadingData) return;
+            isLoadingData = true;
+
+            console.log('Renderizando gráficos de scrobbles con filtro...');
+            showLoadingMessage('Cargando datos...');
+
+            const userKey = getUserKey();
+            const scrobblesData = await loadDynamicData('scrobbles', userKey);
+
+            if (!scrobblesData) {{
+                showLoadingMessage('Error cargando datos');
+                isLoadingData = false;
+                return;
+            }}
+
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {{
+                if (chart) chart.destroy();
+            }});
+            charts = {{}};
+
+            // Renderizar gráficos por scrobbles totales
+            renderPieChart('scrobblesArtistsChart', scrobblesData.artists, 'scrobblesArtistsInfo');
+            renderPieChart('scrobblesAlbumsChart', scrobblesData.albums, 'scrobblesAlbumsInfo');
+            renderPieChart('scrobblesTracksChart', scrobblesData.tracks, 'scrobblesTracksInfo');
+            renderPieChart('scrobblesGenresChart', scrobblesData.genres, 'scrobblesGenresInfo');
+            renderPieChart('scrobblesLabelsChart', scrobblesData.labels, 'scrobblesLabelsInfo');
+            renderPieChart('scrobblesReleaseYearsChart', scrobblesData.release_years, 'scrobblesReleaseYearsInfo');
+            renderPieChart('scrobblesAllCombinedChart', scrobblesData.all_combined, 'scrobblesAllCombinedInfo');
+
+            isLoadingData = false;
+        }}
+
+        async function renderEvolutionChartsWithFilter() {{
+            if (isLoadingData) return;
+            isLoadingData = true;
+
+            console.log('Renderizando gráficos de evolución con filtro...');
+            showLoadingMessage('Cargando datos...');
+
+            const userKey = getUserKey();
+            const evolutionData = await loadDynamicData('evolution', userKey);
+
+            if (!evolutionData) {{
+                showLoadingMessage('Error cargando datos');
+                isLoadingData = false;
+                return;
+            }}
+
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {{
+                if (chart) chart.destroy();
+            }});
+            charts = {{}};
+
+            // Renderizar gráficos de evolución
+            renderLineChart('evolutionArtistsChart', evolutionData.artists);
+            renderLineChart('evolutionAlbumsChart', evolutionData.albums);
+            renderLineChart('evolutionTracksChart', evolutionData.tracks);
+            renderLineChart('evolutionGenresChart', evolutionData.genres);
+            renderLineChart('evolutionLabelsChart', evolutionData.labels);
+            renderLineChart('evolutionReleaseYearsChart', evolutionData.release_years);
+
+            isLoadingData = false;
+        }}
     </script>
 </body>
 </html>"""
 
     def _format_number(self, number: int) -> str:
-        """Formatea nÃƒÂºmeros con separadores de miles"""
+        """Formatea nÃƒÆ’Ã‚Âºmeros con separadores de miles"""
         return f"{number:,}".replace(",", ".")

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Last.fm Group Stats Generator
-Genera estadÃ­sticas grupales con grÃ¡ficos de coincidencias y evoluciÃ³n temporal
+Genera estadÃƒÂ­sticas grupales con grÃƒÂ¡ficos de coincidencias y evoluciÃƒÂ³n temporal
 """
 
 import os
@@ -20,25 +20,26 @@ try:
 except ImportError:
     pass
 
-# Agregar el directorio actual al path para importar los módulos
+# Agregar el directorio actual al path para importar los mÃ³dulos
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
-# Importar los módulos necesarios
+# Importar los mÃ³dulos necesarios
 from tools.group_stats_analyzer import GroupStatsAnalyzer
 from tools.group_stats_database import GroupStatsDatabase
 from tools.group_stats_html_generator import GroupStatsHTMLGenerator
+from tools.group_data_json_generator import GroupDataJSONGenerator
 
 
 def main():
-    """Función principal para generar estadÃ­sticas grupales"""
-    parser = argparse.ArgumentParser(description='Generador de estadÃ­sticas grupales de Last.fm')
+    """FunciÃ³n principal para generar estadÃƒÂ­sticas grupales"""
+    parser = argparse.ArgumentParser(description='Generador de estadÃƒÂ­sticas grupales de Last.fm')
     parser.add_argument('--years-back', type=int, default=5,
-                       help='Número de años hacia atrás para analizar (por defecto: 5)')
+                       help='NÃºmero de aÃ±os hacia atrÃ¡s para analizar (por defecto: 5)')
     parser.add_argument('--output', type=str, default=None,
                        help='Archivo de salida HTML (por defecto: auto-generado con fecha)')
     parser.add_argument('--mbid-only', action='store_true',
-                       help='Solo incluir scrobbles con MBID válidos')
+                       help='Solo incluir scrobbles con MBID vÃ¡lidos')
     args = parser.parse_args()
 
     # Auto-generar nombre de archivo si no se especifica
@@ -53,24 +54,30 @@ def main():
             raise ValueError("LASTFM_USERS no encontrada en las variables de entorno")
 
         if len(users) < 2:
-            raise ValueError("Se necesitan al menos 2 usuarios para generar estadÃ­sticas grupales")
+            raise ValueError("Se necesitan al menos 2 usuarios para generar estadÃƒÂ­sticas grupales")
 
-        print("📊 Iniciando análisis grupal...")
-        print(f"👥 Usuarios: {', '.join(users)}")
-        print(f"📅 Período: {datetime.now().year - args.years_back}-{datetime.now().year}")
-        print(f"🎯 MBID Only: {'Sí' if args.mbid_only else 'No'}")
+        print("ðŸ“Š Iniciando anÃ¡lisis grupal...")
+        print(f"ðŸ‘¥ Usuarios: {', '.join(users)}")
+        print(f"ðŸ“… PerÃ­odo: {datetime.now().year - args.years_back}-{datetime.now().year}")
+        print(f"ðŸŽ¯ MBID Only: {'SÃ­' if args.mbid_only else 'No'}")
 
         # Inicializar componentes
         database = GroupStatsDatabase()
         analyzer = GroupStatsAnalyzer(database, years_back=args.years_back, mbid_only=args.mbid_only)
         html_generator = GroupStatsHTMLGenerator()
+        json_generator = GroupDataJSONGenerator(database, years_back=args.years_back, mbid_only=args.mbid_only)
 
-        # Analizar estadÃ­sticas grupales
-        print(f"🔍 Analizando estadÃ­sticas grupales...")
+        # Analizar estadÃƒÂ­sticas grupales
+        print(f"ðŸ” Analizando estadÃƒÂ­sticas grupales...")
         group_stats = analyzer.analyze_group_stats(users)
 
+        # Generar datos JSON para filtros dinámicos
+        print(f"📊 Generando datos JSON para filtros dinámicos...")
+        data_dir = os.path.join(os.path.dirname(args.output), 'data')
+        json_index = json_generator.generate_all_user_combinations_data(users, data_dir)
+
         # Generar HTML
-        print("🎨 Generando HTML...")
+        print("ðŸŽ¨ Generando HTML...")
         html_content = html_generator.generate_html(group_stats, args.years_back)
 
         # Crear directorio si no existe
@@ -82,38 +89,38 @@ def main():
         with open(args.output, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
-        print(f"✅ Archivo generado: {args.output}")
+        print(f"âœ… Archivo generado: {args.output}")
 
         # Mostrar resumen
-        print(f"\n📈 Resumen de estadÃ­sticas grupales:")
-        print(f"  • Usuarios analizados: {group_stats['user_count']}")
-        print(f"  • Período: {group_stats['period']}")
+        print(f"\nðŸ“ˆ Resumen de estadÃƒÂ­sticas grupales:")
+        print(f"  â€¢ Usuarios analizados: {group_stats['user_count']}")
+        print(f"  â€¢ PerÃ­odo: {group_stats['period']}")
 
-        # Estadísticas de datos por niveles
+        # EstadÃ­sticas de datos por niveles
         if 'data_by_levels' in group_stats:
             data_levels = group_stats['data_by_levels']
-            print(f"  • Niveles de coincidencia disponibles: {len(data_levels)}")
+            print(f"  â€¢ Niveles de coincidencia disponibles: {len(data_levels)}")
             for level_key, level_data in data_levels.items():
                 level_label = get_level_label(level_key, group_stats['user_count'])
                 total_items = sum(level_data['counts'].values())
                 print(f"    - {level_label}: {total_items} elementos totales")
 
-        # EstadÃ­sticas de usuarios compartidos
+        # EstadÃƒÂ­sticas de usuarios compartidos
         shared_stats = group_stats['shared_charts']
-        print(f"  • Artistas compartidos: {len(shared_stats['artists']['data'])}")
-        print(f"  • Álbumes compartidos: {len(shared_stats['albums']['data'])}")
-        print(f"  • Canciones compartidas: {len(shared_stats['tracks']['data'])}")
-        print(f"  • Géneros compartidos: {len(shared_stats['genres']['data'])}")
-        print(f"  • Sellos compartidos: {len(shared_stats['labels']['data'])}")
+        print(f"  â€¢ Artistas compartidos: {len(shared_stats['artists']['data'])}")
+        print(f"  â€¢ Ãlbumes compartidos: {len(shared_stats['albums']['data'])}")
+        print(f"  â€¢ Canciones compartidas: {len(shared_stats['tracks']['data'])}")
+        print(f"  â€¢ GÃ©neros compartidos: {len(shared_stats['genres']['data'])}")
+        print(f"  â€¢ Sellos compartidos: {len(shared_stats['labels']['data'])}")
 
-        # EstadÃ­sticas de scrobbles
+        # EstadÃƒÂ­sticas de scrobbles
         scrobbles_stats = group_stats['scrobbles_charts']
-        print(f"  • Total scrobbles (artistas): {scrobbles_stats['artists']['total']:,}")
-        print(f"  • Total scrobbles (global): {scrobbles_stats['all_combined']['total']:,}")
+        print(f"  â€¢ Total scrobbles (artistas): {scrobbles_stats['artists']['total']:,}")
+        print(f"  â€¢ Total scrobbles (global): {scrobbles_stats['all_combined']['total']:,}")
 
-        # Mostrar top 5 artistas más compartidos
+        # Mostrar top 5 artistas mÃ¡s compartidos
         if shared_stats['artists']['data']:
-            print(f"\n🎤 Top 5 artistas más compartidos:")
+            print(f"\nðŸŽ¤ Top 5 artistas mÃ¡s compartidos:")
             top_artists = sorted(
                 shared_stats['artists']['data'].items(),
                 key=lambda x: x[1],
@@ -127,7 +134,7 @@ def main():
 
         # Mostrar top 5 por scrobbles totales
         if scrobbles_stats['all_combined']['data']:
-            print(f"\n🌟 Top 5 global por scrobbles:")
+            print(f"\nðŸŒŸ Top 5 global por scrobbles:")
             top_global = sorted(
                 scrobbles_stats['all_combined']['data'].items(),
                 key=lambda x: x[1],
@@ -138,12 +145,12 @@ def main():
                 category = details['category']
                 users_list = details['shared_users']
                 print(f"  {i}. {item} ({scrobbles:,} scrobbles)")
-                print(f"     Categoría: {category} | Usuarios: {', '.join(users_list)}")
+                print(f"     CategorÃ­a: {category} | Usuarios: {', '.join(users_list)}")
 
         database.close()
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"âŒ Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

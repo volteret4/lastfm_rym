@@ -156,14 +156,14 @@ def generate_weekly_stats(weeks_ago: int = 0):
     albums_counter = Counter()
     genres_counter = Counter()
     labels_counter = Counter()
-    decades_counter = Counter()
+    years_counter = Counter()
 
     artists_users = defaultdict(set)
     tracks_users = defaultdict(set)
     albums_users = defaultdict(set)
     genres_users = defaultdict(set)
     labels_users = defaultdict(set)
-    decades_users = defaultdict(set)
+    years_users = defaultdict(set)
 
     # Para contar scrobbles por usuario en cada categoría
     artists_user_counts = defaultdict(lambda: defaultdict(int))
@@ -171,30 +171,25 @@ def generate_weekly_stats(weeks_ago: int = 0):
     albums_user_counts = defaultdict(lambda: defaultdict(int))
     genres_user_counts = defaultdict(lambda: defaultdict(int))
     labels_user_counts = defaultdict(lambda: defaultdict(int))
-    decades_user_counts = defaultdict(lambda: defaultdict(int))
+    years_user_counts = defaultdict(lambda: defaultdict(int))
 
     # Para almacenar artistas que contribuyen a cada categoría por usuario
     genres_user_artists = defaultdict(lambda: defaultdict(set))
     labels_user_artists = defaultdict(lambda: defaultdict(set))
-    decades_user_artists = defaultdict(lambda: defaultdict(set))
+    years_user_artists = defaultdict(lambda: defaultdict(set))
 
     processed_artists = set()
     processed_albums = set()
 
-    def get_decade_label(year):
-        """Convierte un año a etiqueta de década"""
+    def get_year_label(year):
+        """Convierte un año a etiqueta de año específico"""
         if year is None:
             return "Desconocido"
 
-        decade_start = (year // 10) * 10
-        decade_end = decade_start + 9
-
-        if decade_start < 1950:
+        if year < 1950:
             return "Antes de 1950"
-        elif decade_start >= 2020:
-            return "2020s+"
         else:
-            return f"{decade_start}s"
+            return str(year)
 
     for track in all_tracks:
         artist = track['artist']
@@ -230,7 +225,7 @@ def generate_weekly_stats(weeks_ago: int = 0):
                         genres_user_artists[genre][user].add(artist)
             processed_artists.add(artist)
 
-        # Sellos y Décadas (procesar solo una vez por álbum único - artista+album)
+        # Sellos y Años (procesar solo una vez por álbum único - artista+album)
         if album:
             album_key = f"{artist}|{album}"
             if album_key not in processed_albums:
@@ -245,16 +240,16 @@ def generate_weekly_stats(weeks_ago: int = 0):
                             labels_user_counts[label][user] += 1
                             labels_user_artists[label][user].add(artist)
 
-                # Décadas
+                # Años
                 release_year = db.get_album_release_year(artist, album)
-                decade_label = get_decade_label(release_year)
-                decades_counter[decade_label] += 1
-                decades_users[decade_label].add(user)
-                # Para décadas, contamos scrobbles de todos los álbumes de esa década del usuario
+                year_label = get_year_label(release_year)
+                years_counter[year_label] += 1
+                years_users[year_label].add(user)
+                # Para años, contamos scrobbles de todos los álbumes de ese año del usuario
                 for user_track in user_scrobbles[user]:
                     if user_track['album'] == album and user_track['artist'] == artist:
-                        decades_user_counts[decade_label][user] += 1
-                        decades_user_artists[decade_label][user].add(artist)
+                        years_user_counts[year_label][user] += 1
+                        years_user_artists[year_label][user].add(artist)
 
                 processed_albums.add(album_key)
 
@@ -285,7 +280,7 @@ def generate_weekly_stats(weeks_ago: int = 0):
         'albums': filter_common(albums_counter, albums_users, albums_user_counts),
         'genres': filter_common(genres_counter, genres_users, genres_user_counts, genres_user_artists),
         'labels': filter_common(labels_counter, labels_users, labels_user_counts, labels_user_artists),
-        'decades': filter_common(decades_counter, decades_users, decades_user_counts, decades_user_artists)
+        'years': filter_common(years_counter, years_users, years_user_counts, years_user_artists)
     }
 
     db.close()
@@ -649,7 +644,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
                     <button class="category-filter" data-category="albums">Álbumes</button>
                     <button class="category-filter" data-category="genres">Géneros</button>
                     <button class="category-filter" data-category="labels">Sellos</button>
-                    <button class="category-filter" data-category="decades">Décadas</button>
+                    <button class="category-filter" data-category="years">Años</button>
                 </div>
             </div>
         </div>
@@ -765,14 +760,14 @@ def create_html(stats: Dict, users: List[str]) -> str:
             const container = document.getElementById('categoriesContainer');
             container.innerHTML = '';
 
-            const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels', 'decades'];
+            const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels', 'years'];
             const categoryTitles = {{
                 artists: 'Artistas',
                 tracks: 'Canciones',
                 albums: 'Álbumes',
                 genres: 'Géneros',
                 labels: 'Sellos',
-                decades: 'Décadas'
+                years: 'Años'
             }};
 
             let hasData = false;
@@ -802,8 +797,8 @@ def create_html(stats: Dict, users: List[str]) -> str:
                         itemDiv.classList.add('highlighted');
                     }}
 
-                    // Hacer clickeable si es género, década o sello y hay usuario seleccionado
-                    const isClickable = ['genres', 'labels', 'decades'].includes(categoryKey) &&
+                    // Hacer clickeable si es género, año o sello y hay usuario seleccionado
+                    const isClickable = ['genres', 'labels', 'years'].includes(categoryKey) &&
                                        selectedUser &&
                                        item.users.includes(selectedUser) &&
                                        item.user_artists &&
@@ -896,7 +891,7 @@ def main():
         print(f"   - Álbumes: {len(stats['albums'])}")
         print(f"   - Géneros: {len(stats['genres'])}")
         print(f"   - Sellos: {len(stats['labels'])}")
-        print(f"   - Décadas: {len(stats['decades'])}")
+        print(f"   - Años: {len(stats['years'])}")
 
         # 3. Generar archivos para semanas anteriores (si no existen)
         week_files = [

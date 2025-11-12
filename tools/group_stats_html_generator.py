@@ -748,10 +748,6 @@ class GroupStatsHTMLGenerator:
         </div>
 
         <div class="stats-container">
-            <!-- Resumen de estadísticas -->
-            <div id="summaryStats" class="summary-stats">
-                <!-- Se llenará dinámicamente -->
-            </div>
 
             <!-- Vista de Datos -->
             <div id="dataView" class="view active">
@@ -778,6 +774,11 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="data-display" id="dataDisplay">
+                        <!-- Se llenará dinámicamente -->
+                    </div>
+
+                    <!-- Resumen de estadísticas -->
+                    <div id="summaryStats" class="summary-stats">
                         <!-- Se llenará dinámicamente -->
                     </div>
                 </div>

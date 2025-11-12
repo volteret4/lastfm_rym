@@ -6,7 +6,7 @@ Módulo analizador de estadísticas para datos de Last.fm
 
 from collections import Counter, defaultdict
 from typing import List, Dict, Optional
-from database import Database
+from tools.temp.temp_database import Database
 
 
 class StatsAnalyzer:

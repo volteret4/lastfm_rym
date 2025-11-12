@@ -881,7 +881,7 @@ class GroupStatsHTMLGenerator:
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedGenres}}</div>
-                    <div class="label">GÃ©neros Compartidos (Todos)</div>
+                    <div class="label">Géneros Compartidos (Todos)</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedLabels}}</div>

@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-ListenBrainz to Last.fm Database Importer
-Importa scrobbles desde ListenBrainz y los guarda en la base de datos con el usuario de Last.fm especificado
+ListenBrainz Local File Importer
+Importa scrobbles desde archivos JSONL locales de ListenBrainz y los guarda en la base de datos
 """
 
 import os
 import sys
-import requests
 import json
 import sqlite3
 import time
 import argparse
 import threading
+import glob
 from datetime import datetime, timezone
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional, Set, Tuple
 from dataclasses import dataclass
-import urllib.parse
+from pathlib import Path
 
 try:
     from dotenv import load_dotenv
@@ -39,7 +39,7 @@ class ListenBrainzListen:
 
 
 class ListenBrainzDatabase:
-    """Clase simplificada para manejar la base de datos"""
+    """Clase para manejar la base de datos"""
 
     def __init__(self, db_path='lastfm_cache.db'):
         self.db_path = db_path
@@ -52,7 +52,7 @@ class ListenBrainzDatabase:
         """Asegura que las tablas necesarias existan"""
         cursor = self.conn.cursor()
 
-        # Tabla principal de scrobbles (debe existir del script original)
+        # Tabla principal de scrobbles
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS scrobbles (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,17 +68,17 @@ class ListenBrainzDatabase:
             )
         ''')
 
-        # Tabla para tracking de imports de ListenBrainz
+        # Tabla para tracking de imports de archivos locales
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS listenbrainz_imports (
+            CREATE TABLE IF NOT EXISTS listenbrainz_file_imports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                listenbrainz_user TEXT NOT NULL,
+                source_directory TEXT NOT NULL,
                 lastfm_user TEXT NOT NULL,
-                last_import_timestamp INTEGER,
-                total_imported INTEGER DEFAULT 0,
+                file_path TEXT NOT NULL,
+                file_mtime INTEGER NOT NULL,
+                listens_imported INTEGER NOT NULL,
                 created_at INTEGER NOT NULL,
-                updated_at INTEGER NOT NULL,
-                UNIQUE(listenbrainz_user, lastfm_user)
+                UNIQUE(source_directory, lastfm_user, file_path)
             )
         ''')
 
@@ -88,43 +88,39 @@ class ListenBrainzDatabase:
             ON scrobbles(user, timestamp)
         ''')
         cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_listenbrainz_imports_users
-            ON listenbrainz_imports(listenbrainz_user, lastfm_user)
+            CREATE INDEX IF NOT EXISTS idx_file_imports_path
+            ON listenbrainz_file_imports(source_directory, file_path)
         ''')
 
         self.conn.commit()
 
-    def get_last_import_timestamp(self, listenbrainz_user: str, lastfm_user: str) -> int:
-        """Obtiene el timestamp del último import para este par de usuarios"""
+    def is_file_processed(self, source_dir: str, lastfm_user: str, file_path: str, file_mtime: int) -> bool:
+        """Verifica si un archivo ya fue procesado (basado en la fecha de modificación)"""
         cursor = self.conn.cursor()
         cursor.execute('''
-            SELECT last_import_timestamp FROM listenbrainz_imports
-            WHERE listenbrainz_user = ? AND lastfm_user = ?
-        ''', (listenbrainz_user, lastfm_user))
+            SELECT file_mtime FROM listenbrainz_file_imports
+            WHERE source_directory = ? AND lastfm_user = ? AND file_path = ?
+        ''', (source_dir, lastfm_user, file_path))
         result = cursor.fetchone()
-        return result['last_import_timestamp'] if result and result['last_import_timestamp'] else 0
 
-    def update_import_status(self, listenbrainz_user: str, lastfm_user: str,
-                           last_timestamp: int, imported_count: int):
-        """Actualiza el estado del import"""
+        if not result:
+            return False
+
+        return result['file_mtime'] >= file_mtime
+
+    def mark_file_processed(self, source_dir: str, lastfm_user: str, file_path: str,
+                          file_mtime: int, listens_count: int):
+        """Marca un archivo como procesado"""
         with self.lock:
             cursor = self.conn.cursor()
             cursor.execute('''
-                INSERT OR REPLACE INTO listenbrainz_imports
-                (listenbrainz_user, lastfm_user, last_import_timestamp, total_imported, created_at, updated_at)
-                VALUES (?, ?, ?,
-                    COALESCE((SELECT total_imported FROM listenbrainz_imports
-                             WHERE listenbrainz_user = ? AND lastfm_user = ?), 0) + ?,
-                    COALESCE((SELECT created_at FROM listenbrainz_imports
-                             WHERE listenbrainz_user = ? AND lastfm_user = ?), ?),
-                    ?)
-            ''', (listenbrainz_user, lastfm_user, last_timestamp, imported_count,
-                  listenbrainz_user, lastfm_user, imported_count,
-                  listenbrainz_user, lastfm_user, int(time.time()),
-                  int(time.time())))
+                INSERT OR REPLACE INTO listenbrainz_file_imports
+                (source_directory, lastfm_user, file_path, file_mtime, listens_imported, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (source_dir, lastfm_user, file_path, file_mtime, listens_count, int(time.time())))
             self.conn.commit()
 
-    def save_listens(self, listens: List[ListenBrainzListen]):
+    def save_listens(self, listens: List[ListenBrainzListen]) -> int:
         """Guarda los listens como scrobbles en la base de datos"""
         with self.lock:
             cursor = self.conn.cursor()
@@ -137,14 +133,14 @@ class ListenBrainzDatabase:
                         (user, artist, track, album, timestamp, artist_mbid, album_mbid, track_mbid)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ''', (
-                        listen.user,  # Usamos el usuario de Last.fm
+                        listen.user,
                         listen.artist,
                         listen.track,
                         listen.album,
                         listen.timestamp,
                         listen.artist_mbid,
                         listen.album_mbid,
-                        listen.recording_mbid  # En ListenBrainz el track MBID es recording MBID
+                        listen.recording_mbid
                     ))
                     if cursor.rowcount > 0:
                         imported_count += 1
@@ -162,318 +158,309 @@ class ListenBrainzDatabase:
         result = cursor.fetchone()
         return result['count'] if result else 0
 
+    def get_import_stats(self, source_dir: str, lastfm_user: str) -> Dict:
+        """Obtiene estadísticas de import"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT
+                COUNT(*) as files_processed,
+                SUM(listens_imported) as total_imported,
+                MIN(created_at) as first_import,
+                MAX(created_at) as last_import
+            FROM listenbrainz_file_imports
+            WHERE source_directory = ? AND lastfm_user = ?
+        ''', (source_dir, lastfm_user))
+
+        result = cursor.fetchone()
+        if not result or result['files_processed'] == 0:
+            return {
+                'files_processed': 0,
+                'total_imported': 0,
+                'first_import': None,
+                'last_import': None
+            }
+
+        return {
+            'files_processed': result['files_processed'],
+            'total_imported': result['total_imported'] or 0,
+            'first_import': datetime.fromtimestamp(result['first_import']) if result['first_import'] else None,
+            'last_import': datetime.fromtimestamp(result['last_import']) if result['last_import'] else None
+        }
+
     def close(self):
         self.conn.close()
 
 
-class ListenBrainzClient:
-    """Cliente para la API de ListenBrainz"""
+class ListenBrainzFileReader:
+    """Lector de archivos JSONL de ListenBrainz"""
 
-    def __init__(self):
-        self.base_url = "https://api.listenbrainz.org/1/"
-        self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'ListenBrainz-Importer/1.0'
-        })
+    def __init__(self, base_directory: str):
+        self.base_directory = Path(base_directory)
+        if not self.base_directory.exists():
+            raise FileNotFoundError(f"Directorio no encontrado: {base_directory}")
 
-    def get_listens(self, user: str, count: int = 1000, max_ts: Optional[int] = None,
-                   min_ts: Optional[int] = None) -> Optional[Dict]:
+    def find_jsonl_files(self, year_filter: Optional[int] = None, month_filter: Optional[int] = None) -> List[Tuple[Path, int]]:
         """
-        Obtiene listens de un usuario
+        Encuentra todos los archivos JSONL en la estructura listens/year/month.jsonl
 
-        Args:
-            user: Usuario de ListenBrainz
-            count: Número de listens a obtener (máximo 1000)
-            max_ts: Timestamp máximo (para obtener listens anteriores a este momento)
-            min_ts: Timestamp mínimo (para obtener listens posteriores a este momento)
+        Returns:
+            Lista de tuplas (ruta_archivo, timestamp_modificacion)
         """
-        url = f"{self.base_url}user/{user}/listens"
+        files = []
+        listens_dir = self.base_directory / "listens"
 
-        params = {
-            'count': min(count, 1000)  # ListenBrainz límite máximo es 1000
-        }
+        if not listens_dir.exists():
+            print(f"   ❌ Directorio 'listens' no encontrado en {self.base_directory}")
+            return []
 
-        if max_ts:
-            params['max_ts'] = max_ts
-        if min_ts:
-            params['min_ts'] = min_ts
+        # Buscar archivos según filtros
+        if year_filter:
+            year_dirs = [listens_dir / str(year_filter)]
+        else:
+            year_dirs = [d for d in listens_dir.iterdir() if d.is_dir() and d.name.isdigit()]
 
-        try:
-            response = self.session.get(url, params=params, timeout=30)
-
-            if response.status_code == 200:
-                return response.json()
-            elif response.status_code == 404:
-                print(f"   ❌ Usuario '{user}' no encontrado en ListenBrainz")
-                return None
-            elif response.status_code == 429:
-                retry_after = int(response.headers.get('Retry-After', 60))
-                print(f"   ⏳ Rate limit en ListenBrainz. Esperando {retry_after}s...")
-                time.sleep(retry_after)
-                return self.get_listens(user, count, max_ts, min_ts)
-            else:
-                print(f"   ⚠️ Error HTTP {response.status_code} en ListenBrainz")
-                return None
-
-        except requests.exceptions.RequestException as e:
-            print(f"   ⚠️ Error de conexión con ListenBrainz: {e}")
-            return None
-
-    def get_user_info(self, user: str) -> Optional[Dict]:
-        """Obtiene información básica de un usuario"""
-        url = f"{self.base_url}user/{user}"
-
-        try:
-            response = self.session.get(url, timeout=10)
-            if response.status_code == 200:
-                return response.json()
-            return None
-        except requests.exceptions.RequestException:
-            return None
-
-
-class ListenBrainzImporter:
-    """Importador principal de datos desde ListenBrainz"""
-
-    def __init__(self):
-        self.client = ListenBrainzClient()
-        self.db = ListenBrainzDatabase()
-
-    def parse_listens(self, listens_data: List[Dict], lastfm_user: str) -> List[ListenBrainzListen]:
-        """Convierte datos de ListenBrainz a estructura interna"""
-        parsed_listens = []
-
-        for listen_data in listens_data:
-            try:
-                # Información básica del listen
-                listened_at = listen_data.get('listened_at', 0)
-                track_metadata = listen_data.get('track_metadata', {})
-
-                # Extraer nombres
-                artist_name = track_metadata.get('artist_name', '')
-                track_name = track_metadata.get('track_name', '')
-                release_name = track_metadata.get('release_name', '')
-
-                # Extraer MBIDs
-                additional_info = track_metadata.get('additional_info', {})
-                artist_mbids = additional_info.get('artist_mbids', [])
-                release_mbid = additional_info.get('release_mbid')
-                recording_mbid = additional_info.get('recording_mbid')
-
-                # Usar el primer artist MBID si existe
-                artist_mbid = artist_mbids[0] if artist_mbids else None
-
-                # Normalizar datos vacíos
-                if not artist_name.strip():
-                    continue  # Saltar si no hay artista
-
-                if not track_name.strip():
-                    continue  # Saltar si no hay track
-
-                listen = ListenBrainzListen(
-                    user=lastfm_user,  # ¡IMPORTANTE! Usamos el usuario de Last.fm
-                    artist=artist_name.strip(),
-                    track=track_name.strip(),
-                    album=release_name.strip() if release_name else '',
-                    timestamp=listened_at,
-                    artist_mbid=artist_mbid if artist_mbid else None,
-                    album_mbid=release_mbid if release_mbid else None,
-                    recording_mbid=recording_mbid if recording_mbid else None
-                )
-
-                parsed_listens.append(listen)
-
-            except Exception as e:
-                print(f"   ⚠️ Error parseando listen: {e}")
+        for year_dir in year_dirs:
+            if not year_dir.exists():
                 continue
 
-        return parsed_listens
+            if month_filter:
+                month_files = [year_dir / f"{month_filter}.jsonl"]
+            else:
+                month_files = list(year_dir.glob("*.jsonl"))
 
-    def import_user_listens(self, listenbrainz_user: str, lastfm_user: str,
-                          import_all: bool = False, max_listens: Optional[int] = None) -> int:
+            for month_file in month_files:
+                if month_file.exists() and month_file.is_file():
+                    mtime = int(month_file.stat().st_mtime)
+                    files.append((month_file, mtime))
+
+        # Ordenar por fecha (más antiguos primero)
+        files.sort(key=lambda x: x[0].stem)  # Ordenar por nombre de archivo
+
+        return files
+
+    def parse_jsonl_file(self, file_path: Path, lastfm_user: str) -> List[ListenBrainzListen]:
+        """Parsea un archivo JSONL y convierte a estructura interna"""
+        listens = []
+        line_count = 0
+        error_count = 0
+
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                for line_num, line in enumerate(f, 1):
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    line_count += 1
+                    try:
+                        data = json.loads(line)
+                        listen = self._parse_listen_data(data, lastfm_user)
+                        if listen:
+                            listens.append(listen)
+                    except json.JSONDecodeError as e:
+                        error_count += 1
+                        if error_count <= 5:  # Solo mostrar primeros 5 errores
+                            print(f"     ⚠️ Error JSON línea {line_num}: {e}")
+                    except Exception as e:
+                        error_count += 1
+                        if error_count <= 5:
+                            print(f"     ⚠️ Error parseando línea {line_num}: {e}")
+
+        except Exception as e:
+            print(f"   ❌ Error leyendo archivo {file_path}: {e}")
+            return []
+
+        if error_count > 5:
+            print(f"     ... y {error_count - 5} errores más")
+
+        print(f"     📊 Líneas: {line_count}, Válidas: {len(listens)}, Errores: {error_count}")
+        return listens
+
+    def _parse_listen_data(self, data: Dict, lastfm_user: str) -> Optional[ListenBrainzListen]:
+        """Convierte un objeto JSON de listen a ListenBrainzListen"""
+        try:
+            # Información básica
+            listened_at = data.get('listened_at', 0)
+            track_metadata = data.get('track_metadata', {})
+
+            # Extraer nombres básicos
+            artist_name = track_metadata.get('artist_name', '').strip()
+            track_name = track_metadata.get('track_name', '').strip()
+            release_name = track_metadata.get('release_name', '').strip()
+
+            # Validar datos mínimos
+            if not artist_name or not track_name:
+                return None
+
+            # Extraer MBIDs desde mbid_mapping (formato nuevo)
+            mbid_mapping = track_metadata.get('mbid_mapping', {})
+
+            # Artist MBID
+            artist_mbid = None
+            artist_mbids = mbid_mapping.get('artist_mbids', [])
+            if artist_mbids:
+                artist_mbid = artist_mbids[0]
+
+            # Release/Album MBID
+            album_mbid = mbid_mapping.get('release_mbid')
+
+            # Recording MBID
+            recording_mbid = mbid_mapping.get('recording_mbid')
+
+            # Si no hay mbid_mapping, intentar con additional_info (formato antiguo)
+            if not any([artist_mbid, album_mbid, recording_mbid]):
+                additional_info = track_metadata.get('additional_info', {})
+                artist_mbid = additional_info.get('artist_mbid')
+                album_mbid = additional_info.get('release_mbid')
+                recording_mbid = additional_info.get('recording_mbid')
+
+            return ListenBrainzListen(
+                user=lastfm_user,
+                artist=artist_name,
+                track=track_name,
+                album=release_name,
+                timestamp=listened_at,
+                artist_mbid=artist_mbid,
+                album_mbid=album_mbid,
+                recording_mbid=recording_mbid
+            )
+
+        except Exception as e:
+            return None
+
+
+class ListenBrainzLocalImporter:
+    """Importador principal de archivos locales de ListenBrainz"""
+
+    def __init__(self, source_directory: str, db_path: str = 'lastfm_cache.db'):
+        self.reader = ListenBrainzFileReader(source_directory)
+        self.db = ListenBrainzDatabase(db_path)
+        self.source_directory = str(Path(source_directory).absolute())
+
+    def import_files(self, lastfm_user: str, force_reimport: bool = False,
+                    year_filter: Optional[int] = None, month_filter: Optional[int] = None,
+                    max_files: Optional[int] = None) -> int:
         """
-        Importa listens de un usuario de ListenBrainz
+        Importa archivos JSONL a la base de datos
 
         Args:
-            listenbrainz_user: Usuario de ListenBrainz
-            lastfm_user: Usuario de Last.fm (para guardar en la BD)
-            import_all: Si es True, importa todo el historial
-            max_listens: Máximo número de listens a importar (None = sin límite)
+            lastfm_user: Usuario de Last.fm para guardar en la BD
+            force_reimport: Si es True, reprocessa archivos ya importados
+            year_filter: Solo importar archivos de este año (YYYY)
+            month_filter: Solo importar archivos de este mes (MM)
+            max_files: Máximo número de archivos a procesar
 
         Returns:
             Número total de listens importados
         """
-        print(f"\n🎵 Importando listens de ListenBrainz...")
-        print(f"   📡 Usuario ListenBrainz: {listenbrainz_user}")
+        print(f"\n🎵 Importando archivos JSONL de ListenBrainz...")
+        print(f"   📁 Directorio: {self.source_directory}")
         print(f"   👤 Usuario Last.fm (BD): {lastfm_user}")
 
-        # Verificar que el usuario existe en ListenBrainz
-        user_info = self.client.get_user_info(listenbrainz_user)
-        if not user_info:
-            print(f"   ❌ No se pudo obtener información del usuario {listenbrainz_user}")
+        # Encontrar archivos
+        files = self.reader.find_jsonl_files(year_filter, month_filter)
+        if not files:
+            print(f"   ❌ No se encontraron archivos JSONL")
             return 0
 
-        # Determinar punto de inicio
-        if import_all:
-            print(f"   🔄 Modo: Importación completa")
-            last_timestamp = None
-            max_ts = None
-        else:
-            print(f"   🔄 Modo: Importación incremental")
-            last_timestamp = self.db.get_last_import_timestamp(listenbrainz_user, lastfm_user)
-            max_ts = None if last_timestamp == 0 else None
+        if max_files:
+            files = files[:max_files]
+
+        print(f"   📊 Archivos encontrados: {len(files)}")
 
         total_imported = 0
-        processed_batches = 0
-        latest_timestamp = 0
-        current_max_ts = max_ts
+        processed_files = 0
+        skipped_files = 0
 
-        # Obtener el primer batch para ver cuántos listens hay
-        first_batch = self.client.get_listens(listenbrainz_user, count=1000, max_ts=current_max_ts)
-        if not first_batch or 'listens' not in first_batch:
-            print(f"   ❌ No se pudieron obtener listens para {listenbrainz_user}")
-            return 0
+        for file_path, file_mtime in files:
+            relative_path = str(file_path.relative_to(self.reader.base_directory))
 
-        print(f"   📊 Iniciando importación...")
+            # Verificar si el archivo ya fue procesado
+            if not force_reimport and self.db.is_file_processed(
+                self.source_directory, lastfm_user, relative_path, file_mtime
+            ):
+                skipped_files += 1
+                if skipped_files % 10 == 1:  # Mostrar cada 10 archivos saltados
+                    print(f"   ⏭️ Saltando archivos ya procesados... ({skipped_files})")
+                continue
 
-        while True:
-            # Verificar límite máximo si está establecido
-            if max_listens and total_imported >= max_listens:
-                print(f"   🛑 Límite máximo de {max_listens} listens alcanzado")
-                break
+            print(f"\n   📄 Procesando: {relative_path}")
 
-            # Obtener batch de listens
-            data = self.client.get_listens(
-                listenbrainz_user,
-                count=min(1000, max_listens - total_imported) if max_listens else 1000,
-                max_ts=current_max_ts,
-                min_ts=last_timestamp if not import_all else None
-            )
-
-            if not data or 'listens' not in data or not data['listens']:
-                break
-
-            listens = data['listens']
-
-            # En modo incremental, filtrar listens más antiguos que el último import
-            if not import_all and last_timestamp > 0:
-                listens = [l for l in listens if l.get('listened_at', 0) > last_timestamp]
+            # Parsear archivo
+            listens = self.reader.parse_jsonl_file(file_path, lastfm_user)
 
             if not listens:
-                break
-
-            # Parsear listens
-            parsed_listens = self.parse_listens(listens, lastfm_user)
-
-            if not parsed_listens:
-                # Si no hay listens válidos, actualizar max_ts y continuar
-                oldest_ts = min(l.get('listened_at', 0) for l in listens)
-                current_max_ts = oldest_ts - 1
+                print(f"     ⚠️ No se encontraron listens válidos")
                 continue
 
             # Guardar en base de datos
-            imported_count = self.db.save_listens(parsed_listens)
+            imported_count = self.db.save_listens(listens)
             total_imported += imported_count
-            processed_batches += 1
+            processed_files += 1
 
-            # Actualizar timestamps
-            newest_timestamp = max(listen.timestamp for listen in parsed_listens)
-            oldest_timestamp = min(listen.timestamp for listen in parsed_listens)
-
-            if newest_timestamp > latest_timestamp:
-                latest_timestamp = newest_timestamp
-
-            # Log de progreso
-            if processed_batches % 5 == 0:
-                print(f"   📈 Procesados {processed_batches} batches, "
-                      f"{total_imported} listens importados")
-
-            # Preparar para el siguiente batch
-            current_max_ts = oldest_timestamp - 1
-
-            # Pequeño delay para no sobrecargar la API
-            time.sleep(0.5)
-
-        # Actualizar estado del import
-        if total_imported > 0:
-            self.db.update_import_status(
-                listenbrainz_user,
-                lastfm_user,
-                latest_timestamp,
-                total_imported
+            # Marcar archivo como procesado
+            self.db.mark_file_processed(
+                self.source_directory, lastfm_user, relative_path, file_mtime, imported_count
             )
 
-        print(f"   ✅ Importación completada: {total_imported} listens nuevos")
+            print(f"     ✅ Importados: {imported_count} nuevos listens")
+
+            # Progreso cada 5 archivos
+            if processed_files % 5 == 0:
+                print(f"\n   📈 Progreso: {processed_files} archivos procesados, "
+                      f"{total_imported} listens importados")
+
+        print(f"\n   ✅ Importación completada:")
+        print(f"     📄 Archivos procesados: {processed_files}")
+        print(f"     ⏭️ Archivos saltados: {skipped_files}")
+        print(f"     🎵 Listens importados: {total_imported}")
+
         return total_imported
-
-    def get_import_stats(self, listenbrainz_user: str, lastfm_user: str) -> Dict:
-        """Obtiene estadísticas del import"""
-        cursor = self.db.conn.cursor()
-        cursor.execute('''
-            SELECT last_import_timestamp, total_imported, created_at, updated_at
-            FROM listenbrainz_imports
-            WHERE listenbrainz_user = ? AND lastfm_user = ?
-        ''', (listenbrainz_user, lastfm_user))
-
-        result = cursor.fetchone()
-        if not result:
-            return {
-                'last_import': None,
-                'total_imported': 0,
-                'first_import': None,
-                'last_update': None
-            }
-
-        return {
-            'last_import': datetime.fromtimestamp(result['last_import_timestamp']) if result['last_import_timestamp'] else None,
-            'total_imported': result['total_imported'],
-            'first_import': datetime.fromtimestamp(result['created_at']),
-            'last_update': datetime.fromtimestamp(result['updated_at'])
-        }
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Importa scrobbles desde ListenBrainz a la base de datos de Last.fm'
+        description='Importa scrobbles desde archivos JSONL locales de ListenBrainz'
     )
 
-    parser.add_argument('--listenbrainz-user', required=True,
-                       help='Usuario de ListenBrainz desde el cual importar')
+    parser.add_argument('--source-dir', required=True,
+                       help='Directorio base con los archivos de ListenBrainz (contiene carpeta "listens")')
     parser.add_argument('--lastfm-user', required=True,
                        help='Usuario de Last.fm bajo el cual guardar los datos en la BD')
-    parser.add_argument('--all', action='store_true',
-                       help='Importar todo el historial (por defecto: solo nuevos listens)')
-    parser.add_argument('--max-listens', type=int,
-                       help='Máximo número de listens a importar')
+    parser.add_argument('--force', action='store_true',
+                       help='Reprocesar archivos ya importados')
+    parser.add_argument('--year', type=int,
+                       help='Solo importar archivos de este año (YYYY)')
+    parser.add_argument('--month', type=int,
+                       help='Solo importar archivos de este mes (MM)')
+    parser.add_argument('--max-files', type=int,
+                       help='Máximo número de archivos a procesar')
     parser.add_argument('--stats', action='store_true',
-                       help='Mostrar estadísticas del import sin importar datos')
+                       help='Mostrar estadísticas de import sin importar datos')
     parser.add_argument('--db-path', default='lastfm_cache.db',
                        help='Ruta a la base de datos (por defecto: lastfm_cache.db)')
 
     args = parser.parse_args()
 
     try:
-        importer = ListenBrainzImporter()
-        importer.db.db_path = args.db_path
+        importer = ListenBrainzLocalImporter(args.source_dir, args.db_path)
 
         if args.stats:
             # Mostrar estadísticas
-            stats = importer.get_import_stats(args.listenbrainz_user, args.lastfm_user)
+            stats = importer.db.get_import_stats(importer.source_directory, args.lastfm_user)
 
             print("=" * 60)
             print("📊 ESTADÍSTICAS DE IMPORTACIÓN")
             print("=" * 60)
-            print(f"ListenBrainz User: {args.listenbrainz_user}")
-            print(f"Last.fm User (BD): {args.lastfm_user}")
+            print(f"Directorio fuente: {args.source_dir}")
+            print(f"Usuario Last.fm (BD): {args.lastfm_user}")
+            print(f"Archivos procesados: {stats['files_processed']}")
             print(f"Total importado: {stats['total_imported']} listens")
-
-            if stats['last_import']:
-                print(f"Último import: {stats['last_import'].strftime('%Y-%m-%d %H:%M:%S')}")
-            else:
-                print("Último import: Nunca")
 
             if stats['first_import']:
                 print(f"Primer import: {stats['first_import'].strftime('%Y-%m-%d %H:%M:%S')}")
+            if stats['last_import']:
+                print(f"Último import: {stats['last_import'].strftime('%Y-%m-%d %H:%M:%S')}")
 
             # Mostrar total de scrobbles del usuario en la BD
             total_scrobbles = importer.db.get_user_scrobble_count(args.lastfm_user)
@@ -482,14 +469,15 @@ def main():
         else:
             # Realizar import
             print("=" * 60)
-            print("🎧 IMPORTADOR DE LISTENBRAINZ")
+            print("🎧 IMPORTADOR LOCAL DE LISTENBRAINZ")
             print("=" * 60)
 
-            imported = importer.import_user_listens(
-                args.listenbrainz_user,
+            imported = importer.import_files(
                 args.lastfm_user,
-                import_all=args.all,
-                max_listens=args.max_listens
+                force_reimport=args.force,
+                year_filter=args.year,
+                month_filter=args.month,
+                max_files=args.max_files
             )
 
             print("\n" + "=" * 60)

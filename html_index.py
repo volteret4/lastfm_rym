@@ -6,12 +6,19 @@ Genera el index.html dinámicamente basándose en los archivos HTML en docs/
 
 import os
 import re
+import json
 from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
-
-
 import unicodedata
+
+# Cargar variables de entorno
+try:
+    from dotenv import load_dotenv
+    if not os.getenv('LASTFM_USERS'):
+        load_dotenv()
+except ImportError:
+    pass
 
 def scan_html_files(docs_dir='docs'):
     """Escanea la carpeta docs/ en busca de archivos HTML de estadísticas.
@@ -181,6 +188,14 @@ def group_monthly_by_year(monthly_files):
 
 def generate_index_html(files):
     """Genera el contenido del index.html"""
+
+    # Leer usuarios reales del entorno
+    users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
+    if not users:
+        print("⚠️  No se encontraron usuarios en LASTFM_USERS, usando usuarios de ejemplo")
+        users = ['usuario1', 'usuario2', 'usuario3']  # Fallback
+
+    print(f"📋 Usuarios detectados para el selector: {', '.join(users)}")
 
     # Agrupar archivos mensuales por año
     monthly_by_year = group_monthly_by_year(files['monthly'])
@@ -1000,8 +1015,8 @@ def generate_index_html(files):
         </footer>
 
         <script>
-            // Lista de usuarios de ejemplo - esto deberías reemplazarlo con tus usuarios reales
-            const availableUsers = ['usuario1', 'usuario2', 'usuario3', 'usuario4']; // CAMBIA ESTOS POR TUS USUARIOS REALES
+            // Usuarios reales del entorno LASTFM_USERS
+            const availableUsers = """ + json.dumps(users, ensure_ascii=False) + """;
 
             // Funcionalidad del botón de usuario
             function initializeUserSelector() {

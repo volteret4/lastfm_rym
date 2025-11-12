@@ -595,8 +595,8 @@ class HTMLGenerator:
                 <h1>📊 RYM Hispano Estadísticas</h1>
                 <div class="nav-buttons">
                     <a href="esta-semana.html" class="nav-button">TEMPORALES</a>
-                    <a href="grupo.html" class="nav-button">GRUPO</a>
-                    <a href="index.html" class="nav-button">ACERCA DE</a>
+                    <a href="#grupo" class="nav-button">GRUPO</a>
+                    <a href="#about" class="nav-button">ACERCA DE</a>
                 </div>
             </div>
             <button class="user-button" id="userButton">👤</button>

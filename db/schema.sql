@@ -81,15 +81,40 @@ Estructura de la tabla: api_cache
 (2, 'created_at', 'INTEGER', 1, None, 0)
 (3, 'expires_at', 'INTEGER', 0, None, 0)
 
-Estructura de la tabla: sqlite_stat1
-(0, 'tbl', '', 0, None, 0)
-(1, 'idx', '', 0, None, 0)
-(2, 'stat', '', 0, None, 0)
+Estructura de la tabla: album_genres
+(0, 'artist', 'TEXT', 1, None, 1)
+(1, 'album', 'TEXT', 1, None, 2)
+(2, 'source', 'TEXT', 1, None, 3)
+(3, 'genre', 'TEXT', 1, None, 4)
+(4, 'weight', 'REAL', 0, '1.0', 0)
+(5, 'last_updated', 'INTEGER', 1, None, 0)
 
-Estructura de la tabla: sqlite_stat4
-(0, 'tbl', '', 0, None, 0)
-(1, 'idx', '', 0, None, 0)
-(2, 'neq', '', 0, None, 0)
-(3, 'nlt', '', 0, None, 0)
-(4, 'ndlt', '', 0, None, 0)
-(5, 'sample', '', 0, None, 0)
+Estructura de la tabla: group_stats
+(0, 'id', 'INTEGER', 0, None, 1)
+(1, 'stat_type', 'TEXT', 1, None, 0)
+(2, 'stat_key', 'TEXT', 1, None, 0)
+(3, 'from_year', 'INTEGER', 1, None, 0)
+(4, 'to_year', 'INTEGER', 1, None, 0)
+(5, 'user_count', 'INTEGER', 0, '0', 0)
+(6, 'total_scrobbles', 'INTEGER', 0, '0', 0)
+(7, 'shared_by_users', 'TEXT', 0, None, 0)
+(8, 'data_json', 'TEXT', 0, None, 0)
+(9, 'created_at', 'INTEGER', 1, None, 0)
+
+Estructura de la tabla: listenbrainz_imports
+(0, 'id', 'INTEGER', 0, None, 1)
+(1, 'listenbrainz_user', 'TEXT', 1, None, 0)
+(2, 'lastfm_user', 'TEXT', 1, None, 0)
+(3, 'last_import_timestamp', 'INTEGER', 0, None, 0)
+(4, 'total_imported', 'INTEGER', 0, '0', 0)
+(5, 'created_at', 'INTEGER', 1, None, 0)
+(6, 'updated_at', 'INTEGER', 1, None, 0)
+
+Estructura de la tabla: listenbrainz_file_imports
+(0, 'id', 'INTEGER', 0, None, 1)
+(1, 'source_directory', 'TEXT', 1, None, 0)
+(2, 'lastfm_user', 'TEXT', 1, None, 0)
+(3, 'file_path', 'TEXT', 1, None, 0)
+(4, 'file_mtime', 'INTEGER', 1, None, 0)
+(5, 'listens_imported', 'INTEGER', 1, None, 0)
+(6, 'created_at', 'INTEGER', 1, None, 0)

@@ -25,6 +25,14 @@ def scan_html_files(docs_dir='docs'):
         print(f"⚠️  La carpeta '{docs_dir}' no existe")
         return files
 
+    # Definir los archivos semanales esperados
+    weekly_map = {
+        "esta_semana.html": "Esta semana",
+        "semana_pasada.html": "Semana pasada",
+        "hace_dos_semanas.html": "Hace dos semanas",
+        "hace_tres_semanas.html": "Hace tres semanas"
+    }
+
     for filename in os.listdir(docs_dir):
         if not filename.endswith('.html') or filename == 'index.html':
             continue
@@ -32,33 +40,21 @@ def scan_html_files(docs_dir='docs'):
         filepath = os.path.join(docs_dir, filename)
 
         # Detectar tipo de archivo y extraer información
-        if filename.startswith('weekly'):
-            # weekly.html o weekly_2024_11_05.html
-            match = re.match(r'weekly(?:_(\d{4})_(\d{2})_(\d{2}))?\.html', filename)
-            if match:
-                if match.group(1):
-                    date_str = f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
-                    label = f"Semana del {date_str}"
-                    date_obj = datetime.strptime(date_str, '%Y-%m-%d')
-                else:
-                    label = "Última semana"
-                    date_obj = datetime.now()
-
-                files['weekly'].append({
-                    'filename': filename,
-                    'label': label,
-                    'date': date_obj
-                })
+        if filename in weekly_map:
+            label = weekly_map[filename]
+            files['weekly'].append({
+                'filename': filename,
+                'label': label,
+                'date': datetime.now()
+            })
 
         elif filename.startswith('monthly'):
-            # monthly_january_2024.html
             match = re.match(r'monthly_([a-z]+)_(\d{4})\.html', filename)
             if match:
                 month_name = match.group(1).capitalize()
                 year = match.group(2)
                 label = f"{month_name} {year}"
 
-                # Convertir nombre de mes a número
                 months = {
                     'january': 1, 'february': 2, 'march': 3, 'april': 4,
                     'may': 5, 'june': 6, 'july': 7, 'august': 8,
@@ -76,7 +72,6 @@ def scan_html_files(docs_dir='docs'):
                 })
 
         elif filename.startswith('yearly'):
-            # yearly_2024.html
             match = re.match(r'yearly_(\d{4})\.html', filename)
             if match:
                 year = match.group(1)
@@ -90,7 +85,6 @@ def scan_html_files(docs_dir='docs'):
                 })
 
         elif filename.startswith('usuarios'):
-            # usuarios.html, usuarios_2019-2024.html
             match = re.match(r'usuarios(?:_(\d{4})-(\d{4}))?\.html', filename)
             if match:
                 if match.group(1) and match.group(2):
@@ -109,7 +103,6 @@ def scan_html_files(docs_dir='docs'):
                 })
 
         elif filename.startswith('grupo'):
-            # grupo.html, grupo_2019-2024.html
             match = re.match(r'grupo(?:_(\d{4})-(\d{4}))?\.html', filename)
             if match:
                 if match.group(1) and match.group(2):
@@ -127,11 +120,16 @@ def scan_html_files(docs_dir='docs'):
                     'date': date_obj
                 })
 
-    # Ordenar por fecha (más reciente primero)
-    for category in files:
+    # Ordenar para que “esta semana” aparezca primero
+    order = ["esta_semana.html", "semana_pasada.html", "hace_dos_semanas.html", "hace_tres_semanas.html"]
+    files['weekly'].sort(key=lambda x: order.index(x['filename']) if x['filename'] in order else 99)
+
+    # Ordenar otras categorías por fecha
+    for category in ['monthly', 'yearly', 'users', 'grupo']:
         files[category].sort(key=lambda x: x['date'], reverse=True)
 
     return files
+
 
 
 def group_monthly_by_year(monthly_files):

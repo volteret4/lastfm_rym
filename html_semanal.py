@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-Last.fm Weekly Stats Generator
-Genera estadísticas semanales de coincidencias entre usuarios
+Last.fm Weekly Stats Generator - 4 Weeks Rotation
+Genera estadísticas semanales de coincidencias entre usuarios para las últimas 4 semanas
+con sistema de rotación automática de archivos
 """
 
 import os
 import sys
 import json
 import sqlite3
+import shutil
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 from typing import List, Dict
@@ -60,8 +62,52 @@ class Database:
         self.conn.close()
 
 
-def generate_weekly_stats():
-    """Genera estadísticas semanales"""
+def rotate_weekly_files():
+    """
+    Rota los archivos semanales:
+    1. Elimina 'hace-tres-semanas.html'
+    2. Renombra según el patrón de rotación
+    3. Prepara para crear el nuevo 'esta-semana.html'
+    """
+    docs_dir = 'docs'
+
+    # Mapeo de archivos (orden de rotación)
+    files = {
+        'esta-semana.html': 'semana-pasada.html',
+        'semana-pasada.html': 'hace-dos-semanas.html',
+        'hace-dos-semanas.html': 'hace-tres-semanas.html',
+        'hace-tres-semanas.html': None  # Este se elimina
+    }
+
+    print("🔄 Rotando archivos semanales...")
+
+    # 1. Eliminar el archivo más antiguo
+    oldest_file = os.path.join(docs_dir, 'hace-tres-semanas.html')
+    if os.path.exists(oldest_file):
+        os.remove(oldest_file)
+        print(f"   ❌ Eliminado: {oldest_file}")
+
+    # 2. Renombrar archivos en orden inverso (para evitar conflictos)
+    rename_order = [
+        ('hace-dos-semanas.html', 'hace-tres-semanas.html'),
+        ('semana-pasada.html', 'hace-dos-semanas.html'),
+        ('esta-semana.html', 'semana-pasada.html')
+    ]
+
+    for old_name, new_name in rename_order:
+        old_path = os.path.join(docs_dir, old_name)
+        new_path = os.path.join(docs_dir, new_name)
+
+        if os.path.exists(old_path):
+            shutil.move(old_path, new_path)
+            print(f"   ↻ Renombrado: {old_name} → {new_name}")
+
+
+def generate_weekly_stats(weeks_ago: int = 0):
+    """
+    Genera estadísticas semanales para una semana específica
+    weeks_ago: 0 = esta semana, 1 = semana pasada, etc.
+    """
     users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
 
     if not users:
@@ -69,18 +115,27 @@ def generate_weekly_stats():
 
     db = Database()
 
-    # Calcular rango semanal (últimos 7 días)
+    # Calcular rango semanal
     now = datetime.now()
-    from_date = now - timedelta(days=7)
+    from_date = now - timedelta(days=7 * (weeks_ago + 1))
+    to_date = now - timedelta(days=7 * weeks_ago)
 
     from_timestamp = int(from_date.timestamp())
-    to_timestamp = int(now.timestamp())
+    to_timestamp = int(to_date.timestamp())
 
-    period_label = f"Última semana"
+    # Etiquetas según la semana
+    week_labels = {
+        0: "Esta semana",
+        1: "Semana pasada",
+        2: "Hace dos semanas",
+        3: "Hace tres semanas"
+    }
 
-    print(f"📊 Generando estadísticas semanales")
+    period_label = week_labels.get(weeks_ago, f"Hace {weeks_ago} semanas")
+
+    print(f"📊 Generando estadísticas: {period_label}")
     print(f"   Desde: {from_date.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"   Hasta: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"   Hasta: {to_date.strftime('%Y-%m-%d %H:%M:%S')}")
 
     # Recopilar scrobbles por usuario
     user_scrobbles = {}
@@ -222,7 +277,7 @@ def generate_weekly_stats():
         'period_type': 'weekly',
         'period_label': period_label,
         'from_date': from_date.strftime('%Y-%m-%d'),
-        'to_date': now.strftime('%Y-%m-%d'),
+        'to_date': to_date.strftime('%Y-%m-%d'),
         'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'total_scrobbles': len(all_tracks),
         'artists': filter_common(artists_counter, artists_users, artists_user_counts),
@@ -812,16 +867,24 @@ def create_html(stats: Dict, users: List[str]) -> str:
 
 def main():
     try:
-        stats, period_label = generate_weekly_stats()
+        # Crear directorio docs si no existe
+        os.makedirs('docs', exist_ok=True)
+
+        # 1. Rotar archivos existentes
+        rotate_weekly_files()
+
+        # 2. Generar nuevo archivo "esta-semana.html"
+        print("\n" + "="*50)
+        stats, period_label = generate_weekly_stats(weeks_ago=0)
 
         if not stats:
-            print("❌ No se pudieron generar estadísticas")
+            print("❌ No se pudieron generar estadísticas para esta semana")
             sys.exit(1)
 
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
         html = create_html(stats, users)
 
-        output_file = 'docs/weekly.html'
+        output_file = 'docs/esta-semana.html'
 
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(html)
@@ -834,6 +897,29 @@ def main():
         print(f"   - Géneros: {len(stats['genres'])}")
         print(f"   - Sellos: {len(stats['labels'])}")
         print(f"   - Décadas: {len(stats['decades'])}")
+
+        # 3. Generar archivos para semanas anteriores (si no existen)
+        week_files = [
+            ('semana-pasada.html', 1),
+            ('hace-dos-semanas.html', 2),
+            ('hace-tres-semanas.html', 3)
+        ]
+
+        for filename, weeks_ago in week_files:
+            file_path = os.path.join('docs', filename)
+            if not os.path.exists(file_path):
+                print(f"\n📝 Generando archivo faltante: {filename}")
+                stats_old, period_label_old = generate_weekly_stats(weeks_ago=weeks_ago)
+
+                if stats_old:
+                    html_old = create_html(stats_old, users)
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(html_old)
+                    print(f"✅ Archivo creado: {file_path}")
+                else:
+                    print(f"⚠️  No hay datos para {period_label_old}")
+
+        print(f"\n🎉 Proceso completado. Archivos disponibles en la carpeta 'docs/'")
 
     except Exception as e:
         print(f"❌ Error: {e}")

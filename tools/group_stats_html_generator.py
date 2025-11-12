@@ -843,8 +843,6 @@ class GroupStatsHTMLGenerator:
         }}
 
         function updateGroupHeader() {{
-            const users = groupStats.users.join(', ');
-            document.getElementById('groupTitle').textContent = `Grupo: ${{users}}`;
             document.getElementById('groupInfo').innerHTML =
                 `Período: ${{groupStats.period}} | ${{groupStats.user_count}} usuarios | Generado: ${{groupStats.generated_at}}`;
         }}

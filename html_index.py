@@ -1176,6 +1176,16 @@ def main():
     print("GENERADOR DE INDEX.HTML")
     print("=" * 60)
 
+    # Verificar variable de entorno
+    users_env = os.getenv('LASTFM_USERS', '')
+    if users_env:
+        users_list = [u.strip() for u in users_env.split(',') if u.strip()]
+        print(f"✅ Variable LASTFM_USERS encontrada: {len(users_list)} usuarios")
+        print(f"👥 Usuarios: {', '.join(users_list)}")
+    else:
+        print("⚠️  Variable LASTFM_USERS no encontrada. El selector de usuarios usará valores por defecto.")
+        print("💡 Asegúrate de tener un archivo .env con: LASTFM_USERS=usuario1,usuario2,usuario3")
+
     docs_dir = 'docs'
 
     # Crear carpeta docs si no existe
@@ -1203,6 +1213,7 @@ def main():
         f.write(html_content)
 
     print(f"Archivo generado: {output_path}")
+    print(f"🔗 El selector de usuarios está integrado con localStorage (clave: 'lastfm_selected_user')")
     print("\n" + "=" * 60)
     print("😃 PROCESO COMPLETADO")
     print("=" * 60)

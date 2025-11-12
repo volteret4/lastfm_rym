@@ -862,7 +862,6 @@ def generate_index_html(files):
             html += f"""
                             <a href="{file_info['filename']}" class="period-link">
                                 <div class="period-name">{file_info['label']}</div>
-                                <div class="period-date">Análisis individual</div>
                             </a>"""
     else:
         html += """
@@ -887,7 +886,6 @@ def generate_index_html(files):
             html += f"""
                             <a href="{file_info['filename']}" class="period-link">
                                 <div class="period-name">{file_info['label']}</div>
-                                <div class="period-date">Análisis grupal</div>
                             </a>"""
     else:
         html += """

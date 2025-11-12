@@ -25,10 +25,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 # Importar los módulos necesarios
-from tools.group_stats_analyzer import GroupStatsAnalyzer
-from tools.group_stats_database import GroupStatsDatabase
-from tools.group_stats_html_generator import GroupStatsHTMLGenerator
-from tools.group_data_json_generator import GroupDataJSONGenerator
+from tools.group.group_stats_analyzer import GroupStatsAnalyzer
+from tools.group.group_stats_database import GroupStatsDatabase
+from tools.group.group_stats_html_generator import GroupStatsHTMLGenerator
+from tools.group.group_data_json_generator import GroupDataJSONGenerator
 
 
 def main():

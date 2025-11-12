@@ -171,8 +171,8 @@ def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, 
     db = Database()
     analyzer = StatsAnalyzer(db)
 
-    # Incluir novedades solo para semanales
-    include_novelties = (period_type == 'weekly')
+    # Incluir novedades para todos los períodos (no solo semanales)
+    include_novelties = True
     print(f"   🔍 Incluir novedades: {include_novelties} (período: {period_type})")
 
     stats = analyzer.analyze_period(users, from_timestamp, to_timestamp, include_novelties)
@@ -291,8 +291,8 @@ def main():
     print(f"🏷️ Sellos únicos: {len(stats.get('labels', []))}")
     print(f"📆 Años únicos: {len(stats.get('years', []))}")
 
-    # Mostrar novedades si es semanal
-    if args.period == 'weekly' and 'novelties' in stats:
+    # Mostrar novedades si están disponibles
+    if 'novelties' in stats:
         novelties = stats['novelties']
         print(f"\n🆕 NOVEDADES:")
         print(f"   Nuevos artistas: {len(novelties['nuevos']['artists'])}")

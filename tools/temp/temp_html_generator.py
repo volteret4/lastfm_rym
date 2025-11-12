@@ -651,6 +651,32 @@ class HTMLGenerator:
         const stats = {stats_json};
         const hasNovelties = stats.novelties !== undefined;
 
+        // Cache para novedades por usuario
+        const userNoveltiesCache = new Map();
+
+        // Función para calcular novedades de usuario (placeholder - en producción llamaría al backend)
+        function calculateUserNovelties(user) {{
+            // Cache check
+            if (userNoveltiesCache.has(user)) {{
+                return userNoveltiesCache.get(user);
+            }}
+
+            // Por ahora devolvemos placeholder con mensaje explicativo
+            // En producción, esto haría una llamada AJAX al backend
+            const placeholder = {{
+                artists: [{{
+                    name: "Cálculo en desarrollo",
+                    user_first_date: Date.now() / 1000,
+                    global_first_date: (Date.now() / 1000) - 86400 * 30
+                }}],
+                albums: [],
+                tracks: []
+            }};
+
+            userNoveltiesCache.set(user, placeholder);
+            return placeholder;
+        }}
+
         // Funcionalidad del botón de usuario
         function initializeUserSelector() {{
             const userButton = document.getElementById('userButton');
@@ -841,6 +867,39 @@ class HTMLGenerator:
             return itemDiv;
         }}
 
+        function createUserNoveltyItem(item, selectedUser) {{
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
+            itemDiv.classList.add('highlighted'); // Siempre resaltado para el usuario
+
+            const itemName = document.createElement('div');
+            itemName.className = 'item-name';
+            itemName.textContent = item.name;
+            itemDiv.appendChild(itemName);
+
+            const itemMeta = document.createElement('div');
+            itemMeta.className = 'item-meta';
+
+            // Fecha de primer scrobble del usuario
+            const userDate = new Date(item.user_first_date * 1000);
+            const userDateBadge = document.createElement('span');
+            userDateBadge.className = 'badge';
+            userDateBadge.style.background = '#cba6f7';
+            userDateBadge.style.color = '#1e1e2e';
+            userDateBadge.textContent = `Tu primera vez: ${{userDate.toLocaleDateString('es-ES')}}`;
+            itemMeta.appendChild(userDateBadge);
+
+            // Fecha de primer scrobble global (del grupo)
+            const globalDate = new Date(item.global_first_date * 1000);
+            const globalDateBadge = document.createElement('span');
+            globalDateBadge.className = 'badge';
+            globalDateBadge.textContent = `Conocido desde: ${{globalDate.toLocaleDateString('es-ES')}}`;
+            itemMeta.appendChild(globalDateBadge);
+
+            itemDiv.appendChild(itemMeta);
+            return itemDiv;
+        }}
+
         function renderStats() {{
             const container = document.getElementById('categoriesContainer');
             container.innerHTML = '';
@@ -941,7 +1000,61 @@ class HTMLGenerator:
                         compartidosSection.appendChild(subsection);
                     }});
 
-                    categoryDiv.appendChild(compartidosSection);
+                    // NUEVOS PARA USUARIO SELECCIONADO
+                    if (selectedUser) {{
+                        const usuarioSection = document.createElement('div');
+                        usuarioSection.className = 'novelty-section';
+
+                        const usuarioTitle = document.createElement('h4');
+                        usuarioTitle.textContent = `👤 Nuevos para ${{selectedUser}} (ya conocidos por el grupo)`;
+                        usuarioSection.appendChild(usuarioTitle);
+
+                        // Calcular novedades para el usuario
+                        const userNovelties = calculateUserNovelties(selectedUser);
+
+                        ['artists', 'albums', 'tracks'].forEach(type => {{
+                            const subsection = document.createElement('div');
+                            subsection.className = 'novelty-subsection';
+
+                            const subsectionTitle = document.createElement('h5');
+                            subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                         type === 'albums' ? 'Álbumes' : 'Canciones';
+                            subsection.appendChild(subsectionTitle);
+
+                            const items = userNovelties[type];
+                            if (items && items.length > 0) {{
+                                items.forEach(item => {{
+                                    const itemDiv = createUserNoveltyItem(item, selectedUser);
+                                    subsection.appendChild(itemDiv);
+                                }});
+                            }} else {{
+                                const emptyDiv = document.createElement('div');
+                                emptyDiv.className = 'novelty-empty';
+                                emptyDiv.textContent = items ?
+                                    'No hay elementos nuevos para este usuario en el período' :
+                                    'Cargando novedades del usuario...';
+                                subsection.appendChild(emptyDiv);
+                            }}
+
+                            usuarioSection.appendChild(subsection);
+                        }});
+
+                        categoryDiv.appendChild(usuarioSection);
+                    }} else {{
+                        const usuarioSection = document.createElement('div');
+                        usuarioSection.className = 'novelty-section';
+
+                        const usuarioTitle = document.createElement('h4');
+                        usuarioTitle.textContent = '👤 Nuevos para usuario específico';
+                        usuarioSection.appendChild(usuarioTitle);
+
+                        const infoDiv = document.createElement('div');
+                        infoDiv.className = 'novelty-empty';
+                        infoDiv.textContent = 'Selecciona un usuario para ver sus novedades personales';
+                        usuarioSection.appendChild(infoDiv);
+
+                        categoryDiv.appendChild(usuarioSection);
+                    }}
                     container.appendChild(categoryDiv);
                     return;
                 }}

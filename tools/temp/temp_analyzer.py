@@ -382,3 +382,79 @@ class StatsAnalyzer:
         print(f"     - Canciones compartidas: {len(nuevos_compartidos_tracks)}")
 
         return result
+
+    def calculate_user_novelties(self, user: str, from_timestamp: int, to_timestamp: int) -> Dict:
+        """
+        Calcula elementos que son nuevos para un usuario específico pero ya conocidos por el grupo
+        """
+        if not user:
+            return {'artists': [], 'albums': [], 'tracks': []}
+
+        # Obtener scrobbles del usuario en el período
+        user_scrobbles = self.db.get_scrobbles(user, from_timestamp, to_timestamp)
+
+        user_novelties = {'artists': [], 'albums': [], 'tracks': []}
+
+        # Elementos únicos del usuario en el período
+        user_artists = set()
+        user_albums = set()
+        user_tracks = set()
+
+        for scrobble in user_scrobbles:
+            user_artists.add(scrobble['artist'])
+            if scrobble['album']:
+                user_albums.add((scrobble['artist'], scrobble['album']))
+            user_tracks.add((scrobble['artist'], scrobble['track']))
+
+        # Verificar artistas
+        for artist in user_artists:
+            # Primer scrobble del usuario para este artista
+            user_first = self.db.get_first_scrobble_date(user, artist=artist)
+            # Primer scrobble global de este artista
+            global_first = self.db.get_global_first_scrobble_date(artist=artist)
+
+            # Si el usuario lo escuchó por primera vez en este período
+            # pero el artista ya era conocido por el grupo
+            if (user_first and user_first >= from_timestamp and
+                global_first and global_first < from_timestamp):
+                user_novelties['artists'].append({
+                    'name': artist,
+                    'user_first_date': user_first,
+                    'global_first_date': global_first
+                })
+
+        # Verificar álbumes
+        for artist, album in user_albums:
+            user_first = self.db.get_first_scrobble_date(user, artist=artist, album=album)
+            global_first = self.db.get_global_first_scrobble_date(artist=artist, album=album)
+
+            if (user_first and user_first >= from_timestamp and
+                global_first and global_first < from_timestamp):
+                user_novelties['albums'].append({
+                    'name': f"{artist} - {album}",
+                    'artist': artist,
+                    'album': album,
+                    'user_first_date': user_first,
+                    'global_first_date': global_first
+                })
+
+        # Verificar canciones
+        for artist, track in user_tracks:
+            user_first = self.db.get_first_scrobble_date(user, artist=artist, track=track)
+            global_first = self.db.get_global_first_scrobble_date(artist=artist, track=track)
+
+            if (user_first and user_first >= from_timestamp and
+                global_first and global_first < from_timestamp):
+                user_novelties['tracks'].append({
+                    'name': f"{artist} - {track}",
+                    'artist': artist,
+                    'track': track,
+                    'user_first_date': user_first,
+                    'global_first_date': global_first
+                })
+
+        # Ordenar por fecha del primer scrobble del usuario
+        for category in user_novelties:
+            user_novelties[category].sort(key=lambda x: x['user_first_date'], reverse=True)
+
+        return user_novelties

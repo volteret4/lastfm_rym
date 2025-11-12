@@ -11,8 +11,12 @@ from pathlib import Path
 from collections import defaultdict
 
 
+import unicodedata
+
 def scan_html_files(docs_dir='docs'):
-    """Escanea la carpeta docs/ en busca de archivos HTML de estadísticas"""
+    """Escanea la carpeta docs/ en busca de archivos HTML de estadísticas.
+    Normaliza nombres (unicode, espacios, mayúsculas) y hace debug explícito.
+    """
     files = {
         'weekly': [],
         'monthly': [],
@@ -25,36 +29,53 @@ def scan_html_files(docs_dir='docs'):
         print(f"⚠️  La carpeta '{docs_dir}' no existe")
         return files
 
-    # Definir los archivos semanales esperados
+    # Mapa de los nombres exactos esperados (normalizados a lower + NFC)
     weekly_map = {
-        "esta_semana.html": "Esta semana",
-        "semana_pasada.html": "Semana pasada",
-        "hace_dos_semanas.html": "Hace dos semanas",
-        "hace_tres_semanas.html": "Hace tres semanas"
+        "esta-semana.html": "Esta semana",
+        "semana-pasada.html": "Semana pasada",
+        "hace-dos-semanas.html": "Hace dos semanas",
+    "hace-tres-semanas.html": "Hace tres semanas"
     }
+    # normalizar las claves por si acaso
+    weekly_map_norm = {unicodedata.normalize('NFC', k).strip().lower(): v for k, v in weekly_map.items()}
 
-    for filename in os.listdir(docs_dir):
-        if not filename.endswith('.html') or filename == 'index.html':
+    found_files = os.listdir(docs_dir)
+    print(f"DEBUG: archivos en {docs_dir} -> {len(found_files)} entradas")
+    for fn in found_files:
+        print(f"  - '{fn}'")
+
+    for filename in found_files:
+        # ignorar index y no-html
+        if not filename.lower().endswith('.html') or filename.lower() == 'index.html':
             continue
 
-        filepath = os.path.join(docs_dir, filename)
+        # ignorar si es directorio (por si hay subcarpetas)
+        path = os.path.join(docs_dir, filename)
+        if os.path.isdir(path):
+            print(f"DEBUG: saltando directorio {filename}")
+            continue
 
-        # Detectar tipo de archivo y extraer información
-        if filename in weekly_map:
-            label = weekly_map[filename]
+        # normalizar nombre de archivo para comparación
+        fn_norm = unicodedata.normalize('NFC', filename).strip().lower()
+
+        # Semanales con nombres fijos
+        if fn_norm in weekly_map_norm:
+            label = weekly_map_norm[fn_norm]
             files['weekly'].append({
                 'filename': filename,
                 'label': label,
                 'date': datetime.now()
             })
+            print(f"DEBUG: detectado semanal -> {filename} como '{label}'")
+            continue
 
-        elif filename.startswith('monthly'):
-            match = re.match(r'monthly_([a-z]+)_(\d{4})\.html', filename)
+        # Mensuales: monthly_name_YYYY.html
+        if fn_norm.startswith('monthly'):
+            match = re.match(r'monthly_([a-z]+)_(\d{4})\.html', fn_norm)
             if match:
                 month_name = match.group(1).capitalize()
                 year = match.group(2)
                 label = f"{month_name} {year}"
-
                 months = {
                     'january': 1, 'february': 2, 'march': 3, 'april': 4,
                     'may': 5, 'june': 6, 'july': 7, 'august': 8,
@@ -62,7 +83,6 @@ def scan_html_files(docs_dir='docs'):
                 }
                 month_num = months.get(match.group(1).lower(), 1)
                 date_obj = datetime(int(year), month_num, 1)
-
                 files['monthly'].append({
                     'filename': filename,
                     'label': label,
@@ -70,22 +90,27 @@ def scan_html_files(docs_dir='docs'):
                     'year': year,
                     'month': month_name
                 })
+                print(f"DEBUG: detectado mensual -> {filename} como '{label}'")
+            continue
 
-        elif filename.startswith('yearly'):
-            match = re.match(r'yearly_(\d{4})\.html', filename)
+        # Anuales
+        if fn_norm.startswith('yearly'):
+            match = re.match(r'yearly_(\d{4})\.html', fn_norm)
             if match:
                 year = match.group(1)
                 label = f"Año {year}"
                 date_obj = datetime(int(year), 1, 1)
-
                 files['yearly'].append({
                     'filename': filename,
                     'label': label,
                     'date': date_obj
                 })
+                print(f"DEBUG: detectado anual -> {filename} como '{label}'")
+            continue
 
-        elif filename.startswith('usuarios'):
-            match = re.match(r'usuarios(?:_(\d{4})-(\d{4}))?\.html', filename)
+        # Usuarios
+        if fn_norm.startswith('usuarios'):
+            match = re.match(r'usuarios(?:_(\d{4})-(\d{4}))?\.html', fn_norm)
             if match:
                 if match.group(1) and match.group(2):
                     from_year = match.group(1)
@@ -95,15 +120,17 @@ def scan_html_files(docs_dir='docs'):
                 else:
                     label = "Estadísticas de Usuarios"
                     date_obj = datetime.now()
-
                 files['users'].append({
                     'filename': filename,
                     'label': label,
                     'date': date_obj
                 })
+                print(f"DEBUG: detectado usuarios -> {filename} como '{label}'")
+            continue
 
-        elif filename.startswith('grupo'):
-            match = re.match(r'grupo(?:_(\d{4})-(\d{4}))?\.html', filename)
+        # Grupo
+        if fn_norm.startswith('grupo'):
+            match = re.match(r'grupo(?:_(\d{4})-(\d{4}))?\.html', fn_norm)
             if match:
                 if match.group(1) and match.group(2):
                     from_year = match.group(1)
@@ -113,22 +140,28 @@ def scan_html_files(docs_dir='docs'):
                 else:
                     label = "Estadísticas Grupales"
                     date_obj = datetime.now()
-
                 files['grupo'].append({
                     'filename': filename,
                     'label': label,
                     'date': date_obj
                 })
+                print(f"DEBUG: detectado grupo -> {filename} como '{label}'")
+            continue
 
-    # Ordenar para que “esta semana” aparezca primero
-    order = ["esta_semana.html", "semana_pasada.html", "hace_dos_semanas.html", "hace_tres_semanas.html"]
-    files['weekly'].sort(key=lambda x: order.index(x['filename']) if x['filename'] in order else 99)
+        # Si llega aquí es un html que no encaja en patrones conocidos
+        print(f"DEBUG: archivo HTML no categorizado -> {filename}")
 
-    # Ordenar otras categorías por fecha
+    # Asegurar orden fijo si existen los cuatro semanales
+    order = ["esta-semana.html", "semana-pasada.html", "hace-dos-semanas.html", "hace-tres-semanas.html"]
+    files['weekly'].sort(key=lambda x: order.index(unicodedata.normalize('NFC', x['filename']).strip().lower()) if unicodedata.normalize('NFC', x['filename']).strip().lower() in order else 99)
+
+    # Ordenar otras categorías por fecha (más reciente primero)
     for category in ['monthly', 'yearly', 'users', 'grupo']:
         files[category].sort(key=lambda x: x['date'], reverse=True)
 
+    print(f"DEBUG: semanales detectadas -> {[f['filename'] for f in files['weekly']]}")
     return files
+
 
 
 

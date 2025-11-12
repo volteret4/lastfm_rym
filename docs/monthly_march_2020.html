@@ -1,0 +1,4874 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last.fm Stats - March 2020</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #181825;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: #1e1e2e;
+            padding: 30px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        h1 {
+            font-size: 2em;
+            color: #cba6f7;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #a6adc8;
+            font-size: 1em;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #1e1e2e;
+            border-bottom: 1px solid #313244;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        label {
+            color: #cba6f7;
+            font-weight: 600;
+        }
+
+        select {
+            padding: 8px 15px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        select:hover {
+            border-color: #cba6f7;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #cba6f7;
+            box-shadow: 0 0 0 3px rgba(203, 166, 247, 0.2);
+        }
+
+        .category-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .category-filter {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .category-filter:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+        }
+
+        .category-filter.active {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .period-header {
+            background: #1e1e2e;
+            padding: 25px 30px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .period-header h2 {
+            color: #cba6f7;
+            font-size: 1.5em;
+            margin-bottom: 8px;
+        }
+
+        .period-info {
+            color: #a6adc8;
+            font-size: 0.9em;
+        }
+
+        .stats-container {
+            padding: 30px;
+        }
+
+        .categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 25px;
+        }
+
+        .category {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #313244;
+            display: none;
+        }
+
+        .category.visible {
+            display: block;
+        }
+
+        .category h3 {
+            color: #cba6f7;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #181825;
+            border-radius: 8px;
+            border-left: 3px solid #45475a;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .item:hover {
+            transform: translateX(5px);
+            border-left-color: #cba6f7;
+        }
+
+        .item.highlighted {
+            border-left-color: #cba6f7;
+            background: #1e1e2e;
+        }
+
+        .item.clickable {
+            cursor: pointer;
+        }
+
+        .item.clickable:hover {
+            background: #1e1e2e;
+        }
+
+        .item-name {
+            color: #cdd6f4;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .item-meta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            font-size: 0.9em;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            background: #313244;
+            color: #a6adc8;
+            border-radius: 6px;
+            font-size: 0.85em;
+        }
+
+        .user-badge {
+            padding: 4px 10px;
+            background: #45475a;
+            color: #cdd6f4;
+            border-radius: 6px;
+            font-size: 0.85em;
+        }
+
+        .user-badge.highlighted-user {
+            background: #cba6f7;
+            color: #1e1e2e;
+            font-weight: 600;
+        }
+
+        .artists-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+        }
+
+        .popup-header {
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
+        }
+
+        .popup-close {
+            float: right;
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+            margin-top: -5px;
+        }
+
+        .popup-close:hover {
+            color: #cba6f7;
+        }
+
+        .artist-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .artist-list li {
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c7086;
+            font-style: italic;
+        }
+
+        .last-update {
+            text-align: center;
+            padding: 20px;
+            color: #6c7086;
+            font-size: 0.85em;
+            border-top: 1px solid #313244;
+        }
+
+        @media (max-width: 768px) {
+            .categories {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .category-filters {
+                justify-content: center;
+            }
+
+            .artists-popup {
+                max-width: 90%;
+                max-height: 80%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📅 Estadísticas Mensuales</h1>
+            <p class="subtitle">March 2020</p>
+        </header>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="userSelect">Destacar usuario:</label>
+                <select id="userSelect">
+                    <option value="">Ninguno</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Mostrar categorías:</label>
+                <div class="category-filters">
+                    <button class="category-filter active" data-category="artists">Artistas</button>
+                    <button class="category-filter" data-category="tracks">Canciones</button>
+                    <button class="category-filter" data-category="albums">Álbumes</button>
+                    <button class="category-filter" data-category="genres">Géneros</button>
+                    <button class="category-filter" data-category="labels">Sellos</button>
+                    <button class="category-filter" data-category="decades">Décadas</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="period-header">
+            <h2>March 2020</h2>
+            <p class="period-info">
+                <span id="dateRange"></span> |
+                <span id="totalScrobbles"></span> scrobbles totales
+            </p>
+        </div>
+
+        <div class="stats-container">
+            <div class="categories" id="categoriesContainer">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+
+        <div class="last-update">
+            Generado: <span id="generatedAt"></span>
+        </div>
+    </div>
+
+    <script>
+        const users = ["paqueradejere", "sdecandelario", "GabredMared", "Nubis84", "alberto_gu", "Frikomid", "Rocky_stereo", "EliasJ72", "Lonsonxd"];
+        const stats = {
+  "period_type": "monthly",
+  "period_label": "March 2020",
+  "from_date": "2020-03-01",
+  "to_date": "2020-03-31",
+  "generated_at": "2025-11-12 12:45:35",
+  "total_scrobbles": 6636,
+  "artists": [
+    {
+      "name": "Triángulo de Amor Bizarro",
+      "count": 134,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 72,
+        "Nubis84": 1,
+        "Frikomid": 61
+      }
+    },
+    {
+      "name": "Bob Dylan",
+      "count": 101,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "Frikomid": 100
+      }
+    },
+    {
+      "name": "The Magnetic Fields",
+      "count": 89,
+      "users": [
+        "Frikomid",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 87,
+        "Frikomid": 2
+      }
+    },
+    {
+      "name": "Interpol",
+      "count": 85,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 78,
+        "Frikomid": 7
+      }
+    },
+    {
+      "name": "El Columpio Asesino",
+      "count": 66,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 16,
+        "Frikomid": 50
+      }
+    },
+    {
+      "name": "New Order",
+      "count": 62,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 15,
+        "Frikomid": 47
+      }
+    },
+    {
+      "name": "The Avalanches",
+      "count": 59,
+      "users": [
+        "Frikomid",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 23,
+        "Frikomid": 36
+      }
+    },
+    {
+      "name": "Grimes",
+      "count": 57,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 2,
+        "Frikomid": 55
+      }
+    },
+    {
+      "name": "Mogwai",
+      "count": 51,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Frikomid": 49
+      }
+    },
+    {
+      "name": "The Chemical Brothers",
+      "count": 51,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 33,
+        "Frikomid": 18
+      }
+    },
+    {
+      "name": "Air",
+      "count": 35,
+      "users": [
+        "Frikomid",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 7,
+        "Frikomid": 28
+      }
+    },
+    {
+      "name": "Siouxsie and the Banshees",
+      "count": 34,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 33,
+        "Frikomid": 1
+      }
+    },
+    {
+      "name": "Austra",
+      "count": 34,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 33
+      }
+    },
+    {
+      "name": "David Bowie",
+      "count": 32,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 8,
+        "alberto_gu": 1,
+        "Frikomid": 23
+      }
+    },
+    {
+      "name": "Ramones",
+      "count": 32,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 31,
+        "Nubis84": 1
+      }
+    },
+    {
+      "name": "Caribou",
+      "count": 31,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 12,
+        "Frikomid": 19
+      }
+    },
+    {
+      "name": "Placebo",
+      "count": 27,
+      "users": [
+        "Frikomid",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 21,
+        "Frikomid": 6
+      }
+    },
+    {
+      "name": "Biznaga",
+      "count": 26,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 25,
+        "Nubis84": 1
+      }
+    },
+    {
+      "name": "Daniel Johnston",
+      "count": 25,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 24
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "name": "El Columpio Asesino - Tu Último Relato",
+      "count": 28,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Frikomid": 26
+      }
+    },
+    {
+      "name": "Triángulo de Amor Bizarro - Folía De Las Apariciones",
+      "count": 22,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "Frikomid": 17
+      }
+    },
+    {
+      "name": "New Order - Sunrise - 2015 Remaster",
+      "count": 22,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 21
+      }
+    },
+    {
+      "name": "Triángulo de Amor Bizarro - No Eres Tú",
+      "count": 15,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "Frikomid": 10
+      }
+    },
+    {
+      "name": "Triángulo de Amor Bizarro - Fukushima",
+      "count": 14,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 6,
+        "Frikomid": 8
+      }
+    },
+    {
+      "name": "Triángulo de Amor Bizarro - Vigilantes del Espejo",
+      "count": 12,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 7,
+        "Nubis84": 1,
+        "Frikomid": 4
+      }
+    },
+    {
+      "name": "El Columpio Asesino - Siempre Estás Tú",
+      "count": 11,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Frikomid": 9
+      }
+    },
+    {
+      "name": "Triángulo de Amor Bizarro - Ruptura",
+      "count": 10,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 6,
+        "Frikomid": 4
+      }
+    },
+    {
+      "name": "The Knife - Marble House",
+      "count": 10,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 9
+      }
+    }
+  ],
+  "albums": [
+    {
+      "name": "Triángulo de Amor Bizarro - Triángulo de Amor Bizarro",
+      "count": 120,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 62,
+        "Nubis84": 1,
+        "Frikomid": 57
+      }
+    },
+    {
+      "name": "The Magnetic Fields - 69 Love Songs",
+      "count": 89,
+      "users": [
+        "Frikomid",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 87,
+        "Frikomid": 2
+      }
+    },
+    {
+      "name": "El Columpio Asesino - Ataque Celeste",
+      "count": 58,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 13,
+        "Frikomid": 45
+      }
+    },
+    {
+      "name": "Air - Moon Safari",
+      "count": 32,
+      "users": [
+        "Frikomid",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 4,
+        "Frikomid": 28
+      }
+    },
+    {
+      "name": "Caribou - Suddenly",
+      "count": 31,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 12,
+        "Frikomid": 19
+      }
+    },
+    {
+      "name": "New Order - Low-Life",
+      "count": 30,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Frikomid": 28
+      }
+    },
+    {
+      "name": "The Chemical Brothers - No Geography",
+      "count": 28,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 10,
+        "Frikomid": 18
+      }
+    },
+    {
+      "name": "Biznaga - Gran Pantalla",
+      "count": 25,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 24,
+        "Nubis84": 1
+      }
+    },
+    {
+      "name": "The Avalanches - Since I Left You",
+      "count": 25,
+      "users": [
+        "Frikomid",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 23,
+        "Frikomid": 2
+      }
+    },
+    {
+      "name": "Placebo - Without You I'm Nothing",
+      "count": 23,
+      "users": [
+        "Frikomid",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "alberto_gu": 21,
+        "Frikomid": 2
+      }
+    },
+    {
+      "name": "Bob Dylan - Blood on the Tracks",
+      "count": 22,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "Frikomid": 21
+      }
+    }
+  ],
+  "genres": [
+    {
+      "name": "indie",
+      "count": 60,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 139,
+        "Nubis84": 11,
+        "alberto_gu": 3,
+        "Frikomid": 194
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Holograms",
+          "JYOCHO",
+          "Morrissey",
+          "Jutes",
+          "Lori Meyers",
+          "Mogwai",
+          "Jawbreaker",
+          "Joy Division",
+          "Louis XIV",
+          "Have A Good Season",
+          "LCD Soundsystem",
+          "Lilys",
+          "Les Savy Fav",
+          "Moving Units",
+          "Makthaverskan",
+          "Lee Ranaldo",
+          "Interpol",
+          "Joe Crepúsculo",
+          "Mini Mansions",
+          "Man or Astro-Man?",
+          "METZ",
+          "M.I.A.",
+          "Iwan Rheon",
+          "Los Planetas",
+          "Jimmy Eat World"
+        ],
+        "Nubis84": [
+          "La Dispute",
+          "Mazzy Star",
+          "Moses Sumney",
+          "Immanu El",
+          "Dakota Suite",
+          "Molly Burch",
+          "King Krule",
+          "Kyte",
+          "HAIM"
+        ],
+        "alberto_gu": [
+          "Jeff Buckley",
+          "Lacrosse"
+        ],
+        "Frikomid": [
+          "Half Moon Run",
+          "Lana Del Rey",
+          "Manel",
+          "Lorde",
+          "Foster the People",
+          "Half Waif",
+          "Hundred Waters",
+          "Lush",
+          "Javiera Mena",
+          "Kindness",
+          "I Break Horses",
+          "Hot Chip",
+          "Halsey",
+          "Mount Eerie",
+          "Mucho",
+          "MGMT",
+          "HEALTH",
+          "Imagine Dragons",
+          "Junip",
+          "Low",
+          "Katy Perry",
+          "Mitski",
+          "Maya Hawke",
+          "LA"
+        ]
+      }
+    },
+    {
+      "name": "rock",
+      "count": 53,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 141,
+        "Nubis84": 9,
+        "alberto_gu": 45,
+        "Frikomid": 42
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lou Reed",
+          "JYOCHO",
+          "Juventud Juché",
+          "La trinidad",
+          "Harlem",
+          "Morrissey",
+          "Lop Abuse On Somebody",
+          "Johnnie Guilbert",
+          "Louis XIV",
+          "Institute",
+          "GØGGS",
+          "Les Savy Fav",
+          "Las Ruinas",
+          "John Frusciante",
+          "Mark Lanegan",
+          "Interpol",
+          "Juliette and the Licks",
+          "Mujeres",
+          "Hank von Hell",
+          "Mini Mansions",
+          "Man or Astro-Man?",
+          "Mayday Parade",
+          "Hands Off Gretel",
+          "Monster Magnet",
+          "Killing Joke",
+          "Jimmy Eat World"
+        ],
+        "Nubis84": [
+          "M-Clan",
+          "Iron Maiden",
+          "Jim Croce",
+          "Johnny Cash",
+          "Journey",
+          "Harry Nilsson",
+          "Kiss",
+          "Marillion"
+        ],
+        "alberto_gu": [
+          "Mano Negra",
+          "Kelly Clarkson",
+          "Gwen Stefani",
+          "Jefferson Airplane",
+          "King Crimson",
+          "Illya Kuryaki And The Valderramas",
+          "Jeff Buckley"
+        ],
+        "Frikomid": [
+          "Half Moon Run",
+          "Katy Perry",
+          "Khruangbin",
+          "Jethro Tull",
+          "Los Brincos",
+          "Led Zeppelin",
+          "Mucho",
+          "Los Relámpagos",
+          "Harry Styles",
+          "Imagine Dragons",
+          "Madrugada",
+          "Los Bravos"
+        ]
+      }
+    },
+    {
+      "name": "electronic",
+      "count": 50,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 28,
+        "Nubis84": 33,
+        "alberto_gu": 13,
+        "Frikomid": 222
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Justice",
+          "Igorrr",
+          "Justus Köhncke",
+          "M.I.A.",
+          "Kap Bambino",
+          "Kele",
+          "Kavinsky",
+          "LCD Soundsystem",
+          "Los Ganglios",
+          "Död Mark",
+          "Moving Units",
+          "Maybeshewill",
+          "Las Bistecs"
+        ],
+        "Nubis84": [
+          "Lena Raine",
+          "Kid Simius",
+          "Last Days",
+          "Fishmans",
+          "Jacaszek",
+          "Haruka Nakamura",
+          "Maria Arnal i Marcel Bagés",
+          "Helios",
+          "Hammock",
+          "Marc Romboy",
+          "Kyte"
+        ],
+        "alberto_gu": [
+          "Jamie xx",
+          "Leftfield",
+          "M.A.N.D.Y.",
+          "Madonna"
+        ],
+        "Frikomid": [
+          "Lady Gaga",
+          "Lorde",
+          "Half Waif",
+          "Kleerup",
+          "Iva",
+          "Marnie",
+          "Kesha",
+          "Hundred Waters",
+          "Moby",
+          "Kindness",
+          "Little Big",
+          "I Break Horses",
+          "Ladytron",
+          "Hot Chip",
+          "MGMT",
+          "Home",
+          "Kiesza",
+          "La Roux",
+          "Kraftwerk",
+          "Mike Oldfield",
+          "Kate Boy",
+          "Lykke Li"
+        ]
+      }
+    },
+    {
+      "name": "pop",
+      "count": 43,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 10,
+        "Nubis84": 5,
+        "alberto_gu": 33,
+        "Frikomid": 137
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lori Meyers",
+          "Los Punsetes",
+          "Kele",
+          "Joe Crepúsculo",
+          "Los Planetas",
+          "La Casa Azul",
+          "Medalla"
+        ],
+        "Nubis84": [
+          "M-Clan",
+          "Harry Nilsson",
+          "Fishmans"
+        ],
+        "alberto_gu": [
+          "Lacrosse",
+          "Miguel Bosé",
+          "Madonna",
+          "Kelly Clarkson",
+          "J Balvin",
+          "Gwen Stefani",
+          "KAROL G",
+          "Justin Timberlake",
+          "Mecano",
+          "Kate Bush",
+          "J Alvarez"
+        ],
+        "Frikomid": [
+          "Lana Del Rey",
+          "John Maus",
+          "Lady Gaga",
+          "Lorde",
+          "Miley Cyrus",
+          "Hundred Waters",
+          "Harry Styles",
+          "Justin Bieber",
+          "Javiera Mena",
+          "Kelis",
+          "Marina",
+          "Halsey",
+          "Mucho",
+          "Kiesza",
+          "Mark Ronson",
+          "Katy Perry",
+          "Los Pekenikes",
+          "MTC",
+          "Kate Boy",
+          "Monica Naranjo",
+          "Lykke Li",
+          "LA"
+        ]
+      }
+    },
+    {
+      "name": "alternative",
+      "count": 36,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 126,
+        "Nubis84": 1,
+        "alberto_gu": 10,
+        "Frikomid": 114
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Morrissey",
+          "Lightweights",
+          "Jutes",
+          "Mogwai",
+          "Joy Division",
+          "Louis XIV",
+          "Love and Rockets",
+          "LCD Soundsystem",
+          "Institute",
+          "Moving Units",
+          "John Frusciante",
+          "Mark Lanegan",
+          "Interpol",
+          "Miss Fortune",
+          "Juliette and the Licks",
+          "Milk Teeth",
+          "METZ",
+          "Mayday Parade",
+          "Incase We Crash",
+          "Jimmy Eat World"
+        ],
+        "Nubis84": [
+          "Mazzy Star"
+        ],
+        "alberto_gu": [
+          "Jeff Buckley",
+          "Kate Bush",
+          "Mano Negra",
+          "Gwen Stefani"
+        ],
+        "Frikomid": [
+          "Low",
+          "Lana Del Rey",
+          "Janelle Monáe",
+          "Halsey",
+          "Foster the People",
+          "Moby",
+          "Harry Styles",
+          "MGMT",
+          "Imagine Dragons",
+          "Madrugada",
+          "Junip"
+        ]
+      }
+    },
+    {
+      "name": "female vocalists",
+      "count": 32,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 6,
+        "Nubis84": 7,
+        "alberto_gu": 14,
+        "Frikomid": 169
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Liliput",
+          "Los Punsetes",
+          "M.I.A.",
+          "Kap Bambino",
+          "Juliette and the Licks"
+        ],
+        "Nubis84": [
+          "Mazzy Star",
+          "Heather Woods Broderick",
+          "Molly Burch",
+          "India Martínez",
+          "HAIM",
+          "Mira"
+        ],
+        "alberto_gu": [
+          "Kelly Clarkson",
+          "Gwen Stefani",
+          "Mecano",
+          "Kate Bush",
+          "Madonna"
+        ],
+        "Frikomid": [
+          "Kelis",
+          "Marina",
+          "Lana Del Rey",
+          "Janelle Monáe",
+          "Marnie",
+          "Halsey",
+          "Katy Perry",
+          "Lady Gaga",
+          "Jenny Hval",
+          "Lykke Li",
+          "Half Waif",
+          "Kate Tempest",
+          "Javiera Mena",
+          "Kiesza",
+          "Iva",
+          "Miley Cyrus"
+        ]
+      }
+    },
+    {
+      "name": "experimental",
+      "count": 27,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 51,
+        "Nubis84": 13,
+        "alberto_gu": 8,
+        "Frikomid": 36
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lingua Ignota",
+          "Headless Horseman",
+          "Igorrr",
+          "Haisuinonasa",
+          "King Dude",
+          "Död Mark",
+          "Lightning Bolt",
+          "Maserati",
+          "Intronaut",
+          "Have a Nice Life",
+          "Maybeshewill",
+          "John Frusciante",
+          "Lee Ranaldo"
+        ],
+        "Nubis84": [
+          "Immanu El",
+          "Last Days",
+          "Jacaszek",
+          "Jambinai",
+          "King Krule",
+          "La Dispute",
+          "Hildur Guðnadóttir"
+        ],
+        "alberto_gu": [
+          "King Crimson"
+        ],
+        "Frikomid": [
+          "John Maus",
+          "Jenny Hval",
+          "Mount Eerie",
+          "Magma",
+          "HEALTH",
+          "Leya"
+        ]
+      }
+    },
+    {
+      "name": "indie pop",
+      "count": 25,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 11,
+        "Nubis84": 1,
+        "alberto_gu": 1,
+        "Frikomid": 115
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lori Meyers",
+          "Los Punsetes",
+          "Johnnie Guilbert",
+          "Joe Crepúsculo",
+          "Los Planetas",
+          "Lilys",
+          "La Casa Azul",
+          "Hidrogenesse"
+        ],
+        "Nubis84": [
+          "HAIM"
+        ],
+        "alberto_gu": [
+          "Lacrosse"
+        ],
+        "Frikomid": [
+          "I Break Horses",
+          "Marina",
+          "Lana Del Rey",
+          "Halsey",
+          "Kesha",
+          "Lorde",
+          "Mitski",
+          "Foster the People",
+          "Half Waif",
+          "Mucho",
+          "Hundred Waters",
+          "MGMT",
+          "Maya Hawke",
+          "Imagine Dragons",
+          "Lykke Li"
+        ]
+      }
+    },
+    {
+      "name": "post-punk",
+      "count": 21,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 160,
+        "Frikomid": 5
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "HEAVY LUNGS",
+          "Holograms",
+          "Juventud Juché",
+          "La trinidad",
+          "IDLES",
+          "Martin Dupont",
+          "Liliput",
+          "Led Er Est",
+          "Joy Division",
+          "Lebanon Hanover",
+          "Love and Rockets",
+          "Institute",
+          "Les Savy Fav",
+          "Makthaverskan",
+          "HMLTD",
+          "Molchat Doma",
+          "Interpol",
+          "Metal Boys",
+          "Low Life",
+          "Killing Joke"
+        ],
+        "Frikomid": [
+          "HEALTH"
+        ]
+      }
+    },
+    {
+      "name": "folk",
+      "count": 20,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 13,
+        "Nubis84": 11,
+        "alberto_gu": 17,
+        "Frikomid": 79
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Me and That Man",
+          "King Dude",
+          "Iwan Rheon",
+          "John Craigie",
+          "Mipso"
+        ],
+        "Nubis84": [
+          "Moses Sumney",
+          "Heather Woods Broderick",
+          "Dakota Suite",
+          "Molly Burch",
+          "Jim Croce",
+          "Johnny Cash",
+          "Harry Nilsson",
+          "India Martínez"
+        ],
+        "alberto_gu": [
+          "Jeff Buckley",
+          "Mamer"
+        ],
+        "Frikomid": [
+          "Manel",
+          "Mount Eerie",
+          "Message To Bears",
+          "Maya Hawke",
+          "Junip"
+        ]
+      }
+    },
+    {
+      "name": "post-rock",
+      "count": 19,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 28,
+        "Nubis84": 13,
+        "Frikomid": 10
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lite",
+          "Kyojaku.",
+          "Haisuinonasa",
+          "Mogwai",
+          "Human Impact",
+          "Maserati",
+          "Lop Abuse On Somebody",
+          "Have a Nice Life",
+          "Maybeshewill",
+          "Lonker See"
+        ],
+        "Nubis84": [
+          "Mono",
+          "Immanu El",
+          "Last Days",
+          "Isis",
+          "Hammock",
+          "Jambinai",
+          "Kyte"
+        ],
+        "Frikomid": [
+          "Low",
+          "Message To Bears"
+        ]
+      }
+    },
+    {
+      "name": "indie rock",
+      "count": 18,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 100,
+        "Nubis84": 2,
+        "Frikomid": 10
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Joyce Manor",
+          "Holograms",
+          "Interpol",
+          "Louis XIV",
+          "Hot Mulligan",
+          "Mujeres",
+          "Les Savy Fav",
+          "Moving Units",
+          "Mini Mansions",
+          "Makthaverskan"
+        ],
+        "Nubis84": [
+          "King Krule",
+          "HAIM"
+        ],
+        "Frikomid": [
+          "Half Moon Run",
+          "Low",
+          "Mitski",
+          "Foster the People",
+          "Imagine Dragons",
+          "Madrugada"
+        ]
+      }
+    },
+    {
+      "name": "ambient",
+      "count": 18,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 7,
+        "Nubis84": 33,
+        "Frikomid": 55
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Have a Nice Life",
+          "Moon Duo",
+          "Makeshift"
+        ],
+        "Nubis84": [
+          "Mono",
+          "Lena Raine",
+          "Last Days",
+          "Heather Woods Broderick",
+          "Haruka Nakamura",
+          "Jacaszek",
+          "Harold Budd",
+          "Helios",
+          "Hammock",
+          "Kyte",
+          "Hildur Guðnadóttir"
+        ],
+        "Frikomid": [
+          "Moby",
+          "Mike Oldfield",
+          "Message To Bears",
+          "Leya"
+        ]
+      }
+    },
+    {
+      "name": "spanish",
+      "count": 18,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 10,
+        "Nubis84": 4,
+        "alberto_gu": 25,
+        "Frikomid": 22
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lori Meyers",
+          "Los Punsetes",
+          "Joe Crepúsculo",
+          "Los Planetas",
+          "La Casa Azul",
+          "Hidrogenesse",
+          "Ladilla Rusa"
+        ],
+        "Nubis84": [
+          "Maria Arnal i Marcel Bagés",
+          "M-Clan",
+          "India Martínez"
+        ],
+        "alberto_gu": [
+          "Luis Eduardo Aute",
+          "Mecano",
+          "Miguel Bosé"
+        ],
+        "Frikomid": [
+          "Los Brincos",
+          "Mucho",
+          "Los Relámpagos",
+          "Los Bravos",
+          "Los Mustang"
+        ]
+      }
+    },
+    {
+      "name": "singer-songwriter",
+      "count": 17,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "Nubis84": 8,
+        "alberto_gu": 26,
+        "Frikomid": 15
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Mark Lanegan",
+          "Lou Reed",
+          "Iwan Rheon",
+          "John Frusciante",
+          "John Craigie"
+        ],
+        "Nubis84": [
+          "Moses Sumney",
+          "Heather Woods Broderick",
+          "Molly Burch",
+          "Johnny Cash",
+          "Jim Croce",
+          "Harry Nilsson"
+        ],
+        "alberto_gu": [
+          "Luis Eduardo Aute",
+          "Jeff Buckley",
+          "Kate Bush"
+        ],
+        "Frikomid": [
+          "Jenny Hval",
+          "Maya Hawke",
+          "Mitski"
+        ]
+      }
+    },
+    {
+      "name": "instrumental",
+      "count": 16,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 31,
+        "Nubis84": 2,
+        "Frikomid": 33
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lite",
+          "Kyojaku.",
+          "Mogwai",
+          "Justice Der",
+          "Monobody",
+          "Lightning Bolt",
+          "Maserati",
+          "Lop Abuse On Somebody",
+          "Maybeshewill",
+          "Man or Astro-Man?"
+        ],
+        "Nubis84": [
+          "Mono",
+          "Hammock"
+        ],
+        "Frikomid": [
+          "Los Relámpagos",
+          "Los Pekenikes",
+          "Mike Oldfield",
+          "Message To Bears"
+        ]
+      }
+    },
+    {
+      "name": "hardcore",
+      "count": 14,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 66,
+        "Nubis84": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Fang",
+          "Kvelertak",
+          "Gyoza",
+          "Kylesa",
+          "Heaven Shall Burn",
+          "Low Life",
+          "Motives",
+          "Hightime",
+          "Misfits",
+          "Leftöver Crack",
+          "Erabella",
+          "La Peste",
+          "Lars Frederiksen and the Bastards"
+        ],
+        "Nubis84": [
+          "La Dispute"
+        ]
+      }
+    },
+    {
+      "name": "alternative rock",
+      "count": 14,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 24,
+        "Frikomid": 1
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Gyoza",
+          "Mayday Parade",
+          "METZ",
+          "Hands Off Gretel",
+          "Johnnie Guilbert",
+          "Louis XIV",
+          "Miss Fortune",
+          "Have A Good Season",
+          "Juliette and the Licks",
+          "Död Mark",
+          "Institute",
+          "Jimmy Eat World",
+          "John Frusciante"
+        ],
+        "Frikomid": [
+          "Madrugada"
+        ]
+      }
+    },
+    {
+      "name": "dance",
+      "count": 13,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 7,
+        "alberto_gu": 16,
+        "Frikomid": 62
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Justice",
+          "M.I.A.",
+          "Kele",
+          "Kavinsky",
+          "LCD Soundsystem",
+          "Moving Units"
+        ],
+        "alberto_gu": [
+          "Leftfield",
+          "Gwen Stefani",
+          "Justin Timberlake",
+          "Madonna"
+        ],
+        "Frikomid": [
+          "Lady Gaga",
+          "La Roux",
+          "Miley Cyrus"
+        ]
+      }
+    },
+    {
+      "name": "Hip-Hop",
+      "count": 13,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Nubis84": 3,
+        "alberto_gu": 74,
+        "Frikomid": 19
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "M.I.A.",
+          "Jutes"
+        ],
+        "Nubis84": [
+          "Mac Miller"
+        ],
+        "alberto_gu": [
+          "Madvillain",
+          "Inspectah Deck",
+          "Kanye West",
+          "J Dilla",
+          "Justin Timberlake",
+          "Migos"
+        ],
+        "Frikomid": [
+          "Kelis",
+          "Kate Tempest",
+          "Justin Bieber",
+          "Mark Ronson"
+        ]
+      }
+    },
+    {
+      "name": "classic rock",
+      "count": 13,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Nubis84": 7,
+        "alberto_gu": 34,
+        "Frikomid": 16
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lou Reed"
+        ],
+        "Nubis84": [
+          "Jim Croce",
+          "Johnny Cash",
+          "Journey",
+          "Harry Nilsson",
+          "Kiss",
+          "Marillion"
+        ],
+        "alberto_gu": [
+          "Jefferson Airplane",
+          "King Crimson"
+        ],
+        "Frikomid": [
+          "Led Zeppelin",
+          "Jethro Tull",
+          "Los Bravos",
+          "Los Mustang"
+        ]
+      }
+    },
+    {
+      "name": "shoegaze",
+      "count": 12,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "Nubis84": 5,
+        "Frikomid": 13
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Have a Nice Life",
+          "Lilys",
+          "Have A Good Season",
+          "Milk Teeth"
+        ],
+        "Nubis84": [
+          "Mazzy Star",
+          "Immanu El",
+          "Hammock",
+          "Kyte",
+          "Mira"
+        ],
+        "Frikomid": [
+          "I Break Horses",
+          "Half Moon Run",
+          "Lush"
+        ]
+      }
+    },
+    {
+      "name": "electronica",
+      "count": 12,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "Nubis84": 2,
+        "alberto_gu": 2,
+        "Frikomid": 64
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "LCD Soundsystem",
+          "Justice"
+        ],
+        "Nubis84": [
+          "Helios"
+        ],
+        "alberto_gu": [
+          "Leftfield"
+        ],
+        "Frikomid": [
+          "Ladytron",
+          "Kraftwerk",
+          "Hot Chip",
+          "Hundred Waters",
+          "Moby",
+          "MTC",
+          "Kleerup",
+          "Kindness"
+        ]
+      }
+    },
+    {
+      "name": "Psychedelic Rock",
+      "count": 11,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 34,
+        "alberto_gu": 28,
+        "Frikomid": 7
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Meatbodies",
+          "Moon Duo",
+          "Moon Destroys",
+          "King Gizzard & The Lizard Wizard",
+          "Minami Deutsch",
+          "Lonker See"
+        ],
+        "alberto_gu": [
+          "Jefferson Airplane",
+          "Les Rallizes Dénudés"
+        ],
+        "Frikomid": [
+          "Los Relámpagos",
+          "Khruangbin",
+          "Los Pekenikes"
+        ]
+      }
+    },
+    {
+      "name": "japanese",
+      "count": 10,
+      "users": [
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 10,
+        "Nubis84": 4,
+        "alberto_gu": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Lite",
+          "Kyojaku.",
+          "Haisuinonasa",
+          "JYOCHO",
+          "Lop Abuse On Somebody",
+          "Minami Deutsch"
+        ],
+        "Nubis84": [
+          "Fishmans",
+          "Mono",
+          "Haruka Nakamura"
+        ],
+        "alberto_gu": [
+          "Les Rallizes Dénudés"
+        ]
+      }
+    },
+    {
+      "name": "techno",
+      "count": 10,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 15,
+        "Nubis84": 1,
+        "alberto_gu": 3,
+        "Frikomid": 3
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Los Ganglios",
+          "Headless Horseman",
+          "Justus Köhncke",
+          "Marvin & Guy"
+        ],
+        "Nubis84": [
+          "Marc Romboy"
+        ],
+        "alberto_gu": [
+          "Leftfield",
+          "Lemon8"
+        ],
+        "Frikomid": [
+          "Hatari",
+          "I_O",
+          "LA"
+        ]
+      }
+    },
+    {
+      "name": "Progressive rock",
+      "count": 10,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 21,
+        "Nubis84": 2,
+        "alberto_gu": 8,
+        "Frikomid": 31
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "King Gizzard & The Lizard Wizard",
+          "Monobody"
+        ],
+        "Nubis84": [
+          "Marillion",
+          "Journey"
+        ],
+        "alberto_gu": [
+          "King Crimson"
+        ],
+        "Frikomid": [
+          "Jethro Tull",
+          "Mike Oldfield",
+          "Magma",
+          "Led Zeppelin",
+          "Home"
+        ]
+      }
+    },
+    {
+      "name": "rap",
+      "count": 10,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Nubis84": 3,
+        "alberto_gu": 45,
+        "Frikomid": 14
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Jutes"
+        ],
+        "Nubis84": [
+          "Mac Miller"
+        ],
+        "alberto_gu": [
+          "Madvillain",
+          "Inspectah Deck",
+          "Kanye West",
+          "Jhay Cortez",
+          "Migos",
+          "J Alvarez"
+        ],
+        "Frikomid": [
+          "Kate Tempest",
+          "Little Big"
+        ]
+      }
+    },
+    {
+      "name": "synthpop",
+      "count": 10,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 13,
+        "Frikomid": 49
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Led Er Est",
+          "Komrads",
+          "Molchat Doma"
+        ],
+        "Frikomid": [
+          "Ladytron",
+          "Marnie",
+          "Kraftwerk",
+          "John Maus",
+          "Kate Boy",
+          "Javiera Mena",
+          "La Roux"
+        ]
+      }
+    },
+    {
+      "name": "psychedelic",
+      "count": 10,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 28,
+        "alberto_gu": 28,
+        "Frikomid": 4
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Meatbodies",
+          "Moon Duo",
+          "King Gizzard & The Lizard Wizard",
+          "Lilys",
+          "Mini Mansions",
+          "Minami Deutsch"
+        ],
+        "alberto_gu": [
+          "Jefferson Airplane",
+          "Les Rallizes Dénudés"
+        ],
+        "Frikomid": [
+          "MGMT",
+          "Khruangbin"
+        ]
+      }
+    },
+    {
+      "name": "noise rock",
+      "count": 9,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 29,
+        "alberto_gu": 2,
+        "Frikomid": 5
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "HEAVY LUNGS",
+          "METZ",
+          "Human Impact",
+          "Juventud Juché",
+          "Lightning Bolt",
+          "IDLES",
+          "Lee Ranaldo"
+        ],
+        "alberto_gu": [
+          "Les Rallizes Dénudés"
+        ],
+        "Frikomid": [
+          "HEALTH"
+        ]
+      }
+    },
+    {
+      "name": "punk rock",
+      "count": 9,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 8,
+        "Nubis84": 1
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Fang",
+          "Joyce Manor",
+          "Jawbreaker",
+          "Hightime",
+          "Misfits",
+          "Juliette and the Licks",
+          "Hank von Hell",
+          "Lars Frederiksen and the Bastards"
+        ],
+        "Nubis84": [
+          "Les Lullies"
+        ]
+      }
+    },
+    {
+      "name": "hip hop",
+      "count": 9,
+      "users": [
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Nubis84": 3,
+        "alberto_gu": 72
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Makeshift",
+          "Jutes"
+        ],
+        "Nubis84": [
+          "Mac Miller"
+        ],
+        "alberto_gu": [
+          "Madvillain",
+          "Inspectah Deck",
+          "Kanye West",
+          "J Dilla",
+          "Illya Kuryaki And The Valderramas",
+          "Migos"
+        ]
+      }
+    },
+    {
+      "name": "new wave",
+      "count": 9,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 50,
+        "Frikomid": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Martin Dupont",
+          "Molchat Doma",
+          "Liliput",
+          "Led Er Est",
+          "Joy Division",
+          "Killing Joke",
+          "Love and Rockets",
+          "Metal Boys"
+        ],
+        "Frikomid": [
+          "Marnie"
+        ]
+      }
+    },
+    {
+      "name": "80s",
+      "count": 9,
+      "users": [
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 28,
+        "Nubis84": 3,
+        "alberto_gu": 7
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Joy Division",
+          "Morrissey",
+          "Love and Rockets"
+        ],
+        "Nubis84": [
+          "Kool & the Gang",
+          "Kiss",
+          "Journey"
+        ],
+        "alberto_gu": [
+          "Mecano",
+          "Kate Bush",
+          "Madonna"
+        ]
+      }
+    },
+    {
+      "name": "swedish",
+      "count": 9,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 4,
+        "Nubis84": 1,
+        "alberto_gu": 1,
+        "Frikomid": 105
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Makthaverskan",
+          "Holograms"
+        ],
+        "Nubis84": [
+          "Immanu El"
+        ],
+        "alberto_gu": [
+          "Lacrosse"
+        ],
+        "Frikomid": [
+          "I Break Horses",
+          "Kate Boy",
+          "Kleerup",
+          "Lykke Li",
+          "Junip"
+        ]
+      }
+    },
+    {
+      "name": "Lo-Fi",
+      "count": 8,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 19,
+        "Nubis84": 1,
+        "Frikomid": 11
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Mujeres",
+          "Headless Horseman",
+          "King Dude",
+          "Las Ruinas"
+        ],
+        "Nubis84": [
+          "King Krule"
+        ],
+        "Frikomid": [
+          "John Maus",
+          "Mount Eerie",
+          "Manel"
+        ]
+      }
+    },
+    {
+      "name": "hard rock",
+      "count": 8,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 14,
+        "Nubis84": 3,
+        "Frikomid": 1
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Monster Magnet",
+          "Hank von Hell",
+          "GØGGS",
+          "Human Impact"
+        ],
+        "Nubis84": [
+          "Iron Maiden",
+          "Kiss",
+          "Journey"
+        ],
+        "Frikomid": [
+          "Led Zeppelin"
+        ]
+      }
+    },
+    {
+      "name": "electropop",
+      "count": 8,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Frikomid": 51
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Hidrogenesse",
+          "Ladilla Rusa"
+        ],
+        "Frikomid": [
+          "Ladytron",
+          "Marnie",
+          "Hot Chip",
+          "Javiera Mena",
+          "Kate Boy",
+          "La Roux"
+        ]
+      }
+    },
+    {
+      "name": "electro",
+      "count": 8,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "Nubis84": 2,
+        "alberto_gu": 1,
+        "Frikomid": 4
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Kavinsky",
+          "Justice",
+          "Kap Bambino",
+          "Kele"
+        ],
+        "Nubis84": [
+          "Kid Simius",
+          "Marc Romboy"
+        ],
+        "alberto_gu": [
+          "M.A.N.D.Y."
+        ],
+        "Frikomid": [
+          "Hot Chip"
+        ]
+      }
+    },
+    {
+      "name": "dream pop",
+      "count": 8,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Nubis84": 5,
+        "Frikomid": 4
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Makthaverskan",
+          "Lilys"
+        ],
+        "Nubis84": [
+          "Dakota Suite",
+          "Fishmans",
+          "Mazzy Star",
+          "Mira"
+        ],
+        "Frikomid": [
+          "Lush",
+          "Mitski"
+        ]
+      }
+    },
+    {
+      "name": "british",
+      "count": 7,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "Nubis84": 1,
+        "Frikomid": 6
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Iwan Rheon",
+          "Morrissey",
+          "Kele"
+        ],
+        "Nubis84": [
+          "Marillion"
+        ],
+        "Frikomid": [
+          "Harry Styles",
+          "Kindness",
+          "Mark Ronson"
+        ]
+      }
+    },
+    {
+      "name": "post-hardcore",
+      "count": 7,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 24,
+        "Nubis84": 2,
+        "Frikomid": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "HEAVY LUNGS",
+          "Human Impact",
+          "Miss Fortune",
+          "Erabella",
+          "IDLES"
+        ],
+        "Nubis84": [
+          "La Dispute"
+        ],
+        "Frikomid": [
+          "Marina"
+        ]
+      }
+    },
+    {
+      "name": "latin",
+      "count": 7,
+      "users": [
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "alberto_gu": 32
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Motives"
+        ],
+        "alberto_gu": [
+          "Mano Negra",
+          "Miguel Bosé",
+          "J Balvin",
+          "Jhay Cortez",
+          "KAROL G",
+          "J Alvarez"
+        ]
+      }
+    },
+    {
+      "name": "french",
+      "count": 7,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 5,
+        "Nubis84": 1,
+        "alberto_gu": 1,
+        "Frikomid": 15
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Kavinsky",
+          "Metal Boys",
+          "Martin Dupont",
+          "Justice"
+        ],
+        "Nubis84": [
+          "Les Lullies"
+        ],
+        "alberto_gu": [
+          "Mano Negra"
+        ],
+        "Frikomid": [
+          "Iva"
+        ]
+      }
+    }
+  ],
+  "labels": [
+    {
+      "name": "Interscope Records",
+      "count": 6,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 19
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "will.i.am"
+        ],
+        "Frikomid": [
+          "Lady Gaga",
+          "Lana Del Rey"
+        ]
+      }
+    },
+    {
+      "name": "Parlophone",
+      "count": 6,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "Frikomid": 8
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Iron Maiden"
+        ],
+        "Frikomid": [
+          "David Bowie",
+          "Kraftwerk",
+          "Coldplay",
+          "The Divine Comedy",
+          "Radiohead"
+        ]
+      }
+    },
+    {
+      "name": "Domino",
+      "count": 5,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "Frikomid": 7
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Austra",
+          "The Kills",
+          "Silver Jews"
+        ],
+        "Frikomid": [
+          "Austra",
+          "Animal Collective"
+        ]
+      }
+    },
+    {
+      "name": "XL Recordings",
+      "count": 5,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 37
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "The Prodigy"
+        ],
+        "Frikomid": [
+          "Radiohead",
+          "Sigur Rós",
+          "Arca"
+        ]
+      }
+    },
+    {
+      "name": "Epitaph",
+      "count": 4,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "Nubis84": 1
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Thick",
+          "Raised Fist",
+          "This Wild Life"
+        ],
+        "Nubis84": [
+          "Architects"
+        ]
+      }
+    },
+    {
+      "name": "Warner Bros. Records",
+      "count": 4,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 15,
+        "alberto_gu": 5,
+        "Frikomid": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Green Day",
+          "Wavves"
+        ],
+        "alberto_gu": [
+          "Madonna"
+        ],
+        "Frikomid": [
+          "R.E.M."
+        ]
+      }
+    },
+    {
+      "name": "Mushroom Pillow",
+      "count": 4,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "Frikomid": 1
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Triángulo de Amor Bizarro",
+          "Joe Crepúsculo",
+          "El Columpio Asesino"
+        ],
+        "Frikomid": [
+          "El Columpio Asesino"
+        ]
+      }
+    },
+    {
+      "name": "Columbia",
+      "count": 4,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "Frikomid": 34
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Amália Rodrigues"
+        ],
+        "Frikomid": [
+          "Harry Styles",
+          "Bob Dylan",
+          "Simon & Garfunkel"
+        ]
+      }
+    },
+    {
+      "name": "Sub Pop Records",
+      "count": 3,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 33
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Dwarves"
+        ],
+        "Frikomid": [
+          "Beach House"
+        ]
+      }
+    },
+    {
+      "name": "Polydor",
+      "count": 3,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Nubis84": 3
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Siouxsie and the Banshees"
+        ],
+        "Nubis84": [
+          "The Rolling Stones",
+          "Fishmans"
+        ]
+      }
+    },
+    {
+      "name": "[no label]",
+      "count": 3,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 17,
+        "Frikomid": 3
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Secret Shame",
+          "Boneflower"
+        ],
+        "Frikomid": [
+          "Andrew Belle"
+        ]
+      }
+    },
+    {
+      "name": "Island",
+      "count": 3,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Nubis84": 1,
+        "Frikomid": 1
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "The Killers"
+        ],
+        "Nubis84": [
+          "The Cranberries"
+        ],
+        "Frikomid": [
+          "Tom Waits"
+        ]
+      }
+    },
+    {
+      "name": "Warner Music Spain",
+      "count": 3,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Nubis84": 1,
+        "Frikomid": 1
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Fangoria"
+        ],
+        "Nubis84": [
+          "Miss Caffeina & Varry Brava"
+        ],
+        "Frikomid": [
+          "Blas Cantó"
+        ]
+      }
+    },
+    {
+      "name": "10K Projects",
+      "count": 2,
+      "users": [
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "alberto_gu": 3
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "POORSTACY"
+        ],
+        "alberto_gu": [
+          "6ix9ine"
+        ]
+      }
+    },
+    {
+      "name": "Harvest",
+      "count": 2,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "Frikomid": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Wire"
+        ],
+        "Frikomid": [
+          "Death Grips"
+        ]
+      }
+    },
+    {
+      "name": "Sony Music",
+      "count": 2,
+      "users": [
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "alberto_gu": 1
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "The Offspring"
+        ],
+        "alberto_gu": [
+          "Depeche Mode"
+        ]
+      }
+    },
+    {
+      "name": "MCA Records",
+      "count": 2,
+      "users": [
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 1,
+        "alberto_gu": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "The Damned"
+        ],
+        "alberto_gu": [
+          "Café Tacvba"
+        ]
+      }
+    },
+    {
+      "name": "Warp Records",
+      "count": 2,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "Frikomid": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Autechre"
+        ],
+        "Frikomid": [
+          "Oneohtrix Point Never"
+        ]
+      }
+    },
+    {
+      "name": "Other People",
+      "count": 2,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Frikomid": 21
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Against All Logic"
+        ],
+        "Frikomid": [
+          "Nicolas Jaar"
+        ]
+      }
+    },
+    {
+      "name": "Mexican Summer",
+      "count": 2,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 2,
+        "Frikomid": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Preoccupations"
+        ],
+        "Frikomid": [
+          "Weyes Blood"
+        ]
+      }
+    },
+    {
+      "name": "Reprise Records",
+      "count": 2,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 7,
+        "Frikomid": 2
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Mastodon"
+        ],
+        "Frikomid": [
+          "Stevie Nicks"
+        ]
+      }
+    },
+    {
+      "name": "Jagjaguwar",
+      "count": 2,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 3,
+        "Frikomid": 7
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Bon Iver"
+        ],
+        "Frikomid": [
+          "Angel Olsen"
+        ]
+      }
+    },
+    {
+      "name": "Legacy",
+      "count": 2,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 2,
+        "Frikomid": 1
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Harry Nilsson"
+        ],
+        "Frikomid": [
+          "Simon & Garfunkel"
+        ]
+      }
+    },
+    {
+      "name": "Cult Records",
+      "count": 2,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "Frikomid": 2
+      },
+      "user_artists": {
+        "Nubis84": [
+          "The Strokes"
+        ],
+        "Frikomid": [
+          "The Strokes"
+        ]
+      }
+    }
+  ],
+  "decades": [
+    {
+      "name": "Desconocido",
+      "count": 1328,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 2071,
+        "Nubis84": 224,
+        "alberto_gu": 852,
+        "Frikomid": 1691
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Parálisis Permanente",
+          "Wavves",
+          "Egyptian Blue",
+          "Fayence Dream",
+          "Jake Adkins",
+          "On Thorns I Lay",
+          "Ratatat",
+          "Panic Shack",
+          "Stonebank",
+          "The Damned",
+          "Tino Casal",
+          "Ariel Pink",
+          "Bony Macaroni",
+          "An Autumn for Crippled Children",
+          "Boards of Canada",
+          "Makthaverskan",
+          "Ulver",
+          "Fujiya & Miyagi",
+          "Bronski Beat",
+          "Four Tet",
+          "Moon Duo",
+          "Delta Sleep",
+          "Perro",
+          "Sons",
+          "Hank von Hell",
+          "Stian Westerhus",
+          "Man or Astro-Man?",
+          "Las Bistecs",
+          "Milk Teeth",
+          "Franz Ferdinand",
+          "Plutonium 74",
+          "New Found Glory",
+          "The Dead Pirates",
+          "Nazar",
+          "The Cabs",
+          "Belmont",
+          "Swingin' Utters",
+          "Teddybears",
+          "Enemies",
+          "Wipers",
+          "PUP",
+          "Fearing",
+          "Brody Dalle",
+          "Squid",
+          "Love and Rockets",
+          "NOFX",
+          "Guerilla Toss",
+          "The Rare Occasions",
+          "Bakers Eddy",
+          "Ben Harper",
+          "Cabbage",
+          "Rehasher",
+          "Nine Inch Nails",
+          "Code Orange",
+          "Sally Dige",
+          "Picket Palace",
+          "black midi",
+          "Dream Nails",
+          "...And You Will Know Us by the Trail of Dead",
+          "Död Mark",
+          "Siouxsie and the Banshees",
+          "Intronaut",
+          "Rocket From The Tombs",
+          "My Dying Bride",
+          "Solid Space",
+          "Lars Frederiksen and the Bastards",
+          "Frankie and the Witch Fingers",
+          "The Offspring",
+          "Coil",
+          "The Twilight Sad",
+          "Preoccupations",
+          "Chelsea Wolfe",
+          "Ready Steady Steroids",
+          "Justice Der",
+          "Fryturama",
+          "Nirvana",
+          "Social Distortion",
+          "Worriers",
+          "Boneflower",
+          "Pissed Jeans",
+          "Chupa Cabra",
+          "Dum Dum Girls",
+          "White Rose Movement",
+          "Nacho Vegas",
+          "Hot Mulligan",
+          "Tom Vek",
+          "Moaning",
+          "The Mr. T Experience",
+          "Drakulas",
+          "The End of Electronics",
+          "Oranssi Pazuzu",
+          "Beak>",
+          "frnd crcl",
+          "Psychedelic Porn Crumpets",
+          "Warmduscher",
+          "White Noise Sound",
+          "The BPA",
+          "Los Planetas",
+          "Death Grips",
+          "Carry The Crown",
+          "Gary Numan",
+          "At the Drive-In",
+          "Automatic",
+          "Porridge Radio",
+          "chikyunokiki",
+          "Justus Köhncke",
+          "Grave Pleasures",
+          "Combichrist",
+          "The Chameleons",
+          "The Bronx",
+          "Fangz",
+          "Velvet Condom",
+          "Parquet Courts",
+          "Dogleg",
+          "Oblivians",
+          "Cobra Man",
+          "Familia Caamagno",
+          "Neverkept",
+          "Two Trains Left",
+          "Leftöver Crack",
+          "Nick Mulvey",
+          "Ty Segall",
+          "Descendents",
+          "Die Selektion",
+          "The Gun Club",
+          "Clan of Xymox",
+          "R. Stevie Moore",
+          "Low Life",
+          "Refused",
+          "The Chemical Brothers",
+          "Second Still",
+          "Dustin Tebbutt",
+          "Alkaline Trio",
+          "Elliott Smith",
+          "The Stooges",
+          "The Hellacopters",
+          "Alcest",
+          "Eisbrecher",
+          "Hightime",
+          "Human Impact",
+          "Death Breath",
+          "Kavinsky",
+          "Daniel Johnston",
+          "Harlem",
+          "ramper",
+          "Boston Manor",
+          "Fat White Family",
+          "Lightweights",
+          "Diet Cig",
+          "Prettiest Eyes",
+          "Chromatics",
+          "El Columpio Asesino",
+          "Thurston Moore",
+          "Ski Patrol",
+          "Monolord",
+          "Futuro Terror",
+          "Oscar Isaac",
+          "Kylesa",
+          "Dead Moon",
+          "Dance Gavin Dance",
+          "Adam & The Ants",
+          "Ladilla Rusa",
+          "Geneva Jacuzzi",
+          "White Hills",
+          "Pogo",
+          "Shybits",
+          "Foie Gras",
+          "Depeche Mode",
+          "Qual",
+          "Dark Fortress",
+          "Tragedy",
+          "Cold Cave",
+          "Fang",
+          "Belgrado",
+          "Los Punsetes",
+          "Brutus",
+          "Ritual Howls",
+          "Fionn Regan",
+          "The Murder City Devils",
+          "Ringo Deathstarr",
+          "Toy",
+          "Gang of Four",
+          "Paradise Lost",
+          "Selofan",
+          "Biznaga",
+          "pizza crunch",
+          "Fields of the Nephilim",
+          "Cock Sparrer",
+          "Turia",
+          "Métal Urbain",
+          "Myōboku",
+          "Boys Noize",
+          "The Sound",
+          "Bambara",
+          "österreich",
+          "Dead or Alive",
+          "Lonker See",
+          "Battles",
+          "Belako",
+          "Five North",
+          "Red Lorry Yellow Lorry",
+          "Echo & the Bunnymen",
+          "Violent Soho",
+          "Bacchae",
+          "Pat Metheny",
+          "N0V3L",
+          "Jutes",
+          "Deeper",
+          "Heaven Shall Burn",
+          "Captives",
+          "Christmas",
+          "Tones on Tail",
+          "Slaves",
+          "Metal Boys",
+          "Two Lone Swordsmen",
+          "The Courettes",
+          "The Jesus and Mary Chain",
+          "METZ",
+          "Haisuinonasa",
+          "O. Children",
+          "Disco Dub Band",
+          "Faithless",
+          "Daso",
+          "Algiers",
+          "VNV Nation",
+          "Clever Girl",
+          "Kyojaku.",
+          "Ramones",
+          "Conversation",
+          "Cevilain",
+          "The Chats",
+          "La Casa Azul",
+          "chouchou merged syrups.",
+          "Glaciation",
+          "Komrads",
+          "Lori Meyers",
+          "Derby Motoreta’s Burrito Kachimba",
+          "Digitalism",
+          "Rotting Out",
+          "Prince Rama",
+          "The Shoes",
+          "HMLTD",
+          "Dave Van Ronk",
+          "Miss Fortune",
+          "The King Khan & BBQ Show",
+          "Cliffdiver",
+          "Ride",
+          "Fever Ray",
+          "Whispering Sons",
+          "Aphex Twin",
+          "Entombed",
+          "Astronaut Husband",
+          "Lingua Ignota",
+          "Hands Off Gretel",
+          "The Cry",
+          "WhoMadeWho",
+          "Devours",
+          "Cosmic Psychos",
+          "Spirea X",
+          "fish narc",
+          "Joyce Manor",
+          "Igorrr",
+          "Viagra Boys",
+          "Ocean Grove",
+          "Discípulos de Dionisos",
+          "The Horrors",
+          "IDLES",
+          "Autolux",
+          "Bauhaus",
+          "Soviet Soviet",
+          "Publicist UK",
+          "GoGo Penguin",
+          "Yuri Gagarin (SWE)",
+          "DIIV",
+          "LCD Soundsystem",
+          "Pears",
+          "The Smiths",
+          "Triángulo de Amor Bizarro",
+          "Mark Lanegan",
+          "Titus Andronicus",
+          "Juliette and the Licks",
+          "Balzac",
+          "Suburban Lawns",
+          "Shadow Age",
+          "Butthole Surfers",
+          "Talos",
+          "Killing Joke",
+          "Devil's Witches",
+          "Serge Gainsbourg",
+          "Iwan Rheon",
+          "Arctic Monkeys",
+          "Maserati",
+          "Rata Negra",
+          "Ultravox",
+          "Headless Horseman",
+          "Linea Aspera",
+          "People In The Box",
+          "Richard Walters",
+          "Crocodiles",
+          "Pinpilinpussies",
+          "The Knife",
+          "New Model Army",
+          "Minami Deutsch",
+          "Moon Destroys",
+          "Tracy Bryant",
+          "Lebanon Hanover",
+          "Silverstein",
+          "The Clash",
+          "Uncle Acid & the Deadbeats",
+          "Molchat Doma",
+          "Nürnberg",
+          "Vladislav Delay",
+          "Your Funeral",
+          "Turbonegro",
+          "Wand",
+          "Tiny Moving Parts",
+          "Mini Mansions",
+          "Aiming For Enrike",
+          "Caamp",
+          "Gnaw Their Tongues",
+          "Swans",
+          "Dead Boys",
+          "Drenge",
+          "Los Ganglios",
+          "GusGus",
+          "The Limiñanas",
+          "The Faint",
+          "Nightwell",
+          "The Physics House Band",
+          "Gaza",
+          "Girl Band",
+          "La trinidad",
+          "Have a Nice Life",
+          "Artery",
+          "イツエ",
+          "Justice",
+          "F.O.O.L",
+          "Single Mothers",
+          "Brazilian Girls",
+          "Johnnie Guilbert",
+          "Steven Wilson",
+          "John Frusciante",
+          "Pentagram",
+          "El Último Héroe",
+          "The Riverboat Gamblers",
+          "Omar A. Rodriguez-Lopez",
+          "Alfa Mist",
+          "The Spits",
+          "Kvelertak",
+          "Semantics",
+          "Villagers",
+          "A Step Ahead",
+          "Death Of Lovers",
+          "Incase We Crash",
+          "Enter Shikari",
+          "Medalla",
+          "The Fizzgigs",
+          "HEAVY LUNGS",
+          "Holograms",
+          "Broadside",
+          "The Psychedelic Furs",
+          "Espanto",
+          "Diveliner",
+          "Gyoza",
+          "Mogwai",
+          "Screeching Weasel",
+          "Louis XIV",
+          "Shabaka And The Ancestors",
+          "Institute",
+          "!!!",
+          "John Craigie",
+          "Mipso",
+          "Interpol",
+          "Detachments",
+          "Bad Religion",
+          "Total Control",
+          "Monster Magnet",
+          "Die Partei",
+          "Crows",
+          "The Moonlandingz",
+          "Fire in the Radio",
+          "Sore Eyelids",
+          "Santacreu",
+          "Altar de Fey",
+          "JYOCHO",
+          "Protomartyr",
+          "Lite",
+          "David Bowie",
+          "Meatbodies",
+          "OVERGROW",
+          "The Beautiful Mistake",
+          "Ought",
+          "Turbowolf",
+          "Alpha Male Tea Party",
+          "The Eighties Matchbox B-Line Disaster",
+          "Serena-Maneesh",
+          "Wardruna",
+          "Steve Aoki",
+          "She Past Away",
+          "The The",
+          "Apartamentos Acapulco",
+          "The Prodigy",
+          "El Último Vecino",
+          "Bodega",
+          "Ovlov",
+          "Sisters of Mercy",
+          "Pixies",
+          "The Comet Is Coming",
+          "Black Lips",
+          "Dwarves",
+          "The Suicide Machines",
+          "Draper",
+          "Ghost Bath",
+          "Chief State",
+          "Filmmaker",
+          "Ed Schrader's Music Beat",
+          "Sonsombre",
+          "Mayday Parade",
+          "Sparta",
+          "White Lung",
+          "Strawberry Girls",
+          "Rome",
+          "Front Line Assembly",
+          "RENHO",
+          "Western Addiction",
+          "Maybeshewill",
+          "Shame",
+          "Disparo",
+          "Black Flag",
+          "Black Mountain",
+          "Frontierer",
+          "Lou Reed",
+          "Dregg",
+          "Kele",
+          "Slowdive",
+          "Augustus Muller",
+          "Morrissey",
+          "Lop Abuse On Somebody",
+          "Talk Show",
+          "American Spring",
+          "Death from Above 1979",
+          "Martin Dupont",
+          "Ssleeping desiresS",
+          "Black Country, New Road",
+          "Joy Division",
+          "Las Ruinas",
+          "Lilys",
+          "GØGGS",
+          "Dinosaur Pile-Up",
+          "Erasure",
+          "Antony and the Johnsons",
+          "Multiple Man",
+          "Pink Turns Blue",
+          "Paul McCartney",
+          "Blitz",
+          "tricot",
+          "Covenant",
+          "Touché Amoré",
+          "Stereo Type",
+          "Makeshift",
+          "Sleaford Mods",
+          "Swain",
+          "The Cure",
+          "The Datsuns",
+          "Slift",
+          "Oneohtrix Point Never",
+          "Archive",
+          "Grauzone",
+          "Shellac",
+          "Liliput",
+          "Led Er Est",
+          "Monobody",
+          "Cocteau Twins",
+          "King Gizzard & The Lizard Wizard",
+          "Lightning Bolt",
+          "The Hives",
+          "Diät",
+          "Nachtmahr",
+          "Pedro Parque",
+          "M.I.A.",
+          "Erabella",
+          "Trono de sangre",
+          "clipping.",
+          "This Cold Night",
+          "Partner",
+          "King Dude",
+          "Juventud Juché",
+          "Daft Punk",
+          "The Cramps",
+          "Falloch",
+          "All Time Low",
+          "Public Image Ltd.",
+          "Die Nerven",
+          "Caribou",
+          "Asimov",
+          "tle",
+          "panteon rococo",
+          "Les Savy Fav",
+          "Bloodsport",
+          "Frustration",
+          "Void Vision",
+          "The Vines",
+          "The Soft Pack",
+          "Thee Oh Sees",
+          "Cala Vento",
+          "loqto",
+          "The Sisters of Mercy",
+          "Zig Zags",
+          "Pisse",
+          "Bootblacks",
+          "New Order",
+          "Sad Lovers and Giants"
+        ],
+        "Nubis84": [
+          "Ólafur Arnalds",
+          "Mono",
+          "Alcest",
+          "Les Lullies",
+          "Caspian",
+          "Big Thief",
+          "Abel Ferreira",
+          "Grimes",
+          "Tool",
+          "port-royal",
+          "Hammock",
+          "Boards of Canada",
+          "King Krule",
+          "Nils Frahm",
+          "Mazzy Star",
+          "Rachel Grimes",
+          "The Miracles",
+          "Jambinai",
+          "Waxahatchee",
+          "Neil Young",
+          "Porcupine Tree",
+          "Kool & the Gang",
+          "M-Clan",
+          "Moses Sumney",
+          "New Cool Collective",
+          "Clogs",
+          "The Album Leaf",
+          "Red House Painters",
+          "Toby Fox",
+          "Björk",
+          "Romero Lubambo",
+          "India Martínez",
+          "La Dispute",
+          "Kiss",
+          "Last Days",
+          "Smokey Robinson and The Miracles",
+          "Dorian",
+          "Envy",
+          "Gregor Samsa",
+          "Dakota Suite",
+          "王博文",
+          "Marillion",
+          "Twisted Sister",
+          "Akira Kosemura",
+          "Beck",
+          "Godspeed You! Black Emperor",
+          "Stars of the Lid",
+          "Dustin O'Halloran",
+          "Haruka Nakamura",
+          "Helios",
+          "すぎやまこういち",
+          "organic stereo",
+          "Philip Glass",
+          "Karaoke Universe",
+          "Christopher Larkin",
+          "Duke Ellington Orchestra & Count Basie Orchestra",
+          "Mägo de Oz",
+          "Frank Ocean",
+          "Port Blue",
+          "HAIM",
+          "hannu karjalainen",
+          "Stereolab",
+          "The Pretenders",
+          "Rue Royale",
+          "The Dead Texan",
+          "Wilco",
+          "enric montefusco",
+          "Jim Croce",
+          "Hildur Guðnadóttir",
+          "Yes",
+          "Nick Drake",
+          "Amália Rodrigues",
+          "Digital Underground",
+          "Cheap Trick",
+          "Van Morrison",
+          "Steven Wilson",
+          "Panda Rosa",
+          "Youssou N'Dour & Neneh Cherry",
+          "Kyte",
+          "すぎやまこういち: 東京都交響楽団",
+          "Ronan Hardiman",
+          "Jacaszek",
+          "Bob Wills",
+          "Future Islands feat. Debbie Harry",
+          "Wolf Parade",
+          "Bon Jovi",
+          "Deaf Center",
+          "Chihei Hatakeyama",
+          "The Mission",
+          "Origamibiro",
+          "Barefoot Jerry",
+          "Mira",
+          "Sewerslvt",
+          "Imagine Dragons & Khalid",
+          "Kid Simius",
+          "The Jacksons",
+          "sToa",
+          "Mahna Mahna & The Snowths",
+          "Gorillaz feat. Fatoumata Diawara",
+          "Balmorhea",
+          "Cornelius",
+          "Clint Mansell",
+          "Ramones",
+          "The Big Moon",
+          "Tame Impala",
+          "Maurice André, Jane Parker-Smith",
+          "Benn Jordan",
+          "The Cramps",
+          "Salvatore Ganacci feat. Sébastien Tellier",
+          "Bon Iver",
+          "Paul Anka",
+          "Grails",
+          "Journey",
+          "Immanu El",
+          "Anoice",
+          "張雨生",
+          "Isis",
+          "Molly Burch",
+          "Ride",
+          "Marc Romboy",
+          "Bexar Bexar",
+          "Carolina Durante",
+          "Fishmans",
+          "Heather Woods Broderick",
+          "Erik Satie",
+          "Harold Budd",
+          "Goldmund"
+        ],
+        "alberto_gu": [
+          "Camarón de la Isla",
+          "The Mars Volta",
+          "Luis Eduardo Aute",
+          "King Crimson",
+          "Kate Bush",
+          "David Bowie",
+          "Deastro",
+          "Deep Dish",
+          "Paul van Dyk",
+          "LCD Soundsystem",
+          "Garbage",
+          "Mecano",
+          "Washed Out",
+          "Ritchie",
+          "UGK",
+          "Travi$ Scott",
+          "Simon & Shaker",
+          "M.A.N.D.Y.",
+          "Gwen Stefani",
+          "The Beach Boys",
+          "Illya Kuryaki And The Valderramas",
+          "Otis Redding",
+          "Don Omar",
+          "Mamer",
+          "Rush",
+          "Phil Collins",
+          "Rockers all stars",
+          "Serge Gainsbourg",
+          "Jhay Cortez",
+          "Broken Social Scene",
+          "Beastie Boys",
+          "FRANCO D´VITA",
+          "Talking Heads",
+          "Lou Reed",
+          "Trentemøller",
+          "Charlie Aponte",
+          "J Balvin",
+          "Gustavo Cerati",
+          "Devo",
+          "El Gran Combo De Puerto Rico",
+          "Britney Spears",
+          "Drake",
+          "blink-182",
+          "Morrissey",
+          "Sinéad O'Connor",
+          "Salem",
+          "Blonde Redhead",
+          "Burzum",
+          "Louchie Lou",
+          "Placebo",
+          "Slick Rick",
+          "Les Rallizes Dénudés",
+          "Soundgarden",
+          "Paulo Londra",
+          "A$AP Rocky",
+          "Piso 21",
+          "4Mal",
+          "Charles Mingus",
+          "Celina y Reutilio",
+          "Yeah Yeah Yeahs",
+          "Sonic Youth",
+          "Darude",
+          "Dizzee Rascal",
+          "Diana Ross",
+          "KAROL G",
+          "J Alvarez",
+          "Stereolab",
+          "Augustus Pablo",
+          "Audion",
+          "Air",
+          "Madvillain",
+          "Eric B. & Rakim",
+          "Jefferson Airplane",
+          "Genesis",
+          "Sophie Ellis-Bextor",
+          "Pulp",
+          "Lemon8",
+          "Amistades Peligrosas",
+          "Belle and Sebastian",
+          "Inspectah Deck",
+          "21 Savage",
+          "Keith Hudson",
+          "Dinosaur Jr.",
+          "The Smashing Pumpkins",
+          "Suede",
+          "Christina Aguilera",
+          "DMX",
+          "Tears for Fears",
+          "Carlos Rivera",
+          "Blur",
+          "OutKast",
+          "Young Eiby",
+          "Jamie xx",
+          "Smif-n-Wessun",
+          "Animal Collective",
+          "U2",
+          "Amy Winehouse",
+          "Travis Scott",
+          "Silver Apples",
+          "Plan B",
+          "Jackie McLean",
+          "Camilo",
+          "Gnarls Barkley",
+          "Caetano Veloso",
+          "The Avalanches",
+          "Rauw Alejandro",
+          "Róisín Murphy",
+          "The Velvet Underground",
+          "CunninLynguists",
+          "J Dilla",
+          "Cabaret Voltaire",
+          "The Rolling Stones",
+          "Anuel AA",
+          "Scissor Sisters",
+          "Farruko",
+          "Fall Out Boy",
+          "Buzzcocks",
+          "GZA/Genius",
+          "Crystal Waters",
+          "Justin Timberlake",
+          "Chief Keef",
+          "Travis",
+          "T.I.",
+          "The National",
+          "Aphex Twin",
+          "Cristian Castro",
+          "Nicky Jam",
+          "Gil Scott-Heron",
+          "Tyler, The Creator",
+          "Refused",
+          "Valgur",
+          "Kanye West",
+          "Leftfield",
+          "Bad Bunny",
+          "Denzel Curry",
+          "Jeff Buckley",
+          "Grouper"
+        ],
+        "Frikomid": [
+          "Thundercat",
+          "Lacrimosa",
+          "Manel",
+          "Coldplay",
+          "John Maus",
+          "Lady Gaga",
+          "Cowboy Church Sunday School Choir",
+          "The Horrors",
+          "Big Thief",
+          "Damien Jurado",
+          "Daniel Johnston",
+          "Barbara",
+          "New Spell",
+          "TR/ST",
+          "Kleerup",
+          "The Weeknd",
+          "Thom Yorke",
+          "Dio",
+          "Grimes",
+          "Declan McKenna",
+          "CHICA SOBRESALTO",
+          "David Bowie",
+          "Tindersticks",
+          "Cariño",
+          "Donovan",
+          "Chromatics",
+          "Grizzly Bear",
+          "David Byrne",
+          "Christina Perri",
+          "Kindness",
+          "Nils Frahm",
+          "Mecano",
+          "Little Big",
+          "Sopor Aeternus & The Ensemble of Shadows",
+          "Dido",
+          "Aronchupa & Little Sis Nora",
+          "Tasseomancy",
+          "Texas",
+          "Porches",
+          "Anne Lukin",
+          "Los Relámpagos",
+          "First Aid Kit",
+          "The Doors",
+          "Blanche",
+          "Victoria",
+          "Cat Power",
+          "Sylvan Esso",
+          "Low",
+          "The Strokes",
+          "This Mortal Coil",
+          "Anna Calvi",
+          "Real Estate",
+          "Vive La Fête",
+          "Mike Oldfield",
+          "Los Pekenikes",
+          "Billie Eilish",
+          "Kate Tempest",
+          "Sandu Ciorba",
+          "Drab City",
+          "BTS",
+          "Amaral",
+          "The Mills Bros With Sonny Burke's Orch",
+          "Radiohead",
+          "Daði Freyr",
+          "Blas Cantó",
+          "Warpaint",
+          "Soleá Morente",
+          "Depeche Mode",
+          "Janelle Monáe",
+          "whenyoung",
+          "Fatoumata Diawara",
+          "Childish Gambino",
+          "Devo",
+          "Björk",
+          "Slowdive",
+          "Drake",
+          "MØ",
+          "Damon Albarn",
+          "The Knife",
+          "Against All Logic",
+          "Iva",
+          "Marnie",
+          "A Silver Mt. Zion",
+          "Still Corners",
+          "Gorillaz",
+          "Röyksopp & Robyn",
+          "Lush",
+          "Moby",
+          "Ellos",
+          "Nicole Kiki Jaffe",
+          "Perfume Genius",
+          "Destroyer",
+          "Father John Misty",
+          "Charlotte Gainsbourg",
+          "Ray Noble & His Orchestra",
+          "Marina",
+          "Placebo",
+          "Son Lux",
+          "Molchat Doma",
+          "Halsey",
+          "Sade",
+          "The Church",
+          "Christine and the Queens",
+          "Dorian Electra",
+          "Stolen",
+          "Dan Deacon",
+          "Bob Dylan",
+          "Junip",
+          "Mark Ronson",
+          "Black",
+          "The Moth & the Flame",
+          "Beach House",
+          "FKA twigs",
+          "Swans",
+          "Röyksopp",
+          "Mitski",
+          "CHVRCHES",
+          "Chico Buarque",
+          "The Flaming Lips",
+          "Whethan",
+          "Monica Naranjo",
+          "Siouxsie and the Banshees",
+          "Benjamin Biolay",
+          "Elbow",
+          "Glass Animals",
+          "Nicolas Jaar",
+          "Foals",
+          "Lana Del Rey",
+          "Simon & Garfunkel",
+          "Oneohtrix Point Never",
+          "Jenny Hval",
+          "Foster the People",
+          "Arcade Fire",
+          "Calexico and Iron & Wine",
+          "Deerhunter",
+          "Purity Ring",
+          "Amaia",
+          "El mató a un policía motorizado",
+          "Axolotes Mexicanos",
+          "U.S. Girls",
+          "Nelly Furtado",
+          "Kesha",
+          "Belle and Sebastian",
+          "Dua Lipa",
+          "Two Door Cinema Club",
+          "Hundred Waters",
+          "Sigur Rós",
+          "Leya",
+          "Someone",
+          "Kelis",
+          "Los Mustang",
+          "I Break Horses",
+          "Daya",
+          "The Beatles",
+          "Nacho Vegas",
+          "The Killers",
+          "Aldous Harding",
+          "TORRES",
+          "Mount Eerie",
+          "Mucho",
+          "Zeca Pagodinho",
+          "Austra",
+          "Home",
+          "The Voidz",
+          "Rebecca & Fiona",
+          "Future Islands",
+          "La Roux",
+          "Animal Collective",
+          "Tennis",
+          "Sufjan Stevens",
+          "The Cranberries",
+          "Taylor Swift",
+          "Led Zeppelin",
+          "Galaxie 500",
+          "The Avalanches",
+          "Mónica Naranjo",
+          "Róisín Murphy",
+          "Kate Boy",
+          "Yung Beef",
+          "Agnes Obel",
+          "The Antlers",
+          "Hatari",
+          "Porcelain Black",
+          "Wild Belle",
+          "David Guetta",
+          "Lorde",
+          "Half Waif",
+          "The 1975",
+          "Robyn",
+          "Madrugada",
+          "Gal Costa",
+          "Miley Cyrus",
+          "confeti de odio",
+          "Sam Smith",
+          "Sharon Van Etten",
+          "Mogwai",
+          "Azealia Banks",
+          "Patrick Wolf",
+          "Yelle",
+          "Sia",
+          "Black Sabbath",
+          "-M-",
+          "I_O",
+          "Javiera Mena",
+          "Yves Tumor",
+          "Arca",
+          "Clairo",
+          "Wild Beasts",
+          "oOoOO",
+          "Ladytron",
+          "Lacrosse",
+          "Interpol",
+          "Message To Bears",
+          "Måns Zelmerlöw",
+          "HEALTH",
+          "Fever Ray",
+          "Shallou",
+          "Susanne Sundfør",
+          "Imagine Dragons",
+          "Calexico",
+          "ROSALÍA",
+          "Los Bravos",
+          "Weyes Blood",
+          "TOPS",
+          "Khruangbin",
+          "Shakira",
+          "Nina Simone",
+          "Los Brincos",
+          "Broods",
+          "ionnalee",
+          "New Order",
+          "Pearl Jam",
+          "POLIÇA",
+          "Lykke Li",
+          "Tamaryn",
+          "Editors"
+        ]
+      }
+    },
+    {
+      "name": "2010s",
+      "count": 173,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 255,
+        "Nubis84": 36,
+        "alberto_gu": 31,
+        "Frikomid": 263
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Viagra Boys",
+          "Wavves",
+          "Boy Harsher",
+          "Lite",
+          "2:54",
+          "Gold Brother",
+          "Jawbreaker",
+          "Bauhaus",
+          "El Columpio Asesino",
+          "Yussef Kamaal",
+          "Goat",
+          "Triángulo de Amor Bizarro",
+          "Teleman",
+          "She Past Away",
+          "The Comet Is Coming",
+          "Sami Simon",
+          "Bass Drum of Death",
+          "You Slut!",
+          "Super Unison",
+          "Penelope Trappes",
+          "Soror Dolorosa",
+          "Fangoria",
+          "PINS",
+          "Cold Cave",
+          "Secret Shame",
+          "Black Pumas",
+          "Joy Division",
+          "Richard Dawson",
+          "Cancer Bats",
+          "Totorro",
+          "Sextile",
+          "Joe Crepúsculo",
+          "Damaged Bug",
+          "Angel Stanich",
+          "Beach Slang",
+          "The Kills",
+          "The Limiñanas",
+          "Super Besse",
+          "Numenorean",
+          "Antemasque",
+          "Beastmilk",
+          "Preoccupations",
+          "Crystal Castles",
+          "Cult of Youth",
+          "Chelsea Wolfe",
+          "Go for Gold",
+          "Basement",
+          "Danko Jones",
+          "Lee Ranaldo",
+          "Marvin & Guy",
+          "Slaves",
+          "Anika",
+          "Wooden Shjips",
+          "Prayers",
+          "Project Pitchfork",
+          "unkie",
+          "Godflesh",
+          "Austra",
+          "This Wild Life",
+          "Cloud Nothings",
+          "The Jesus and Mary Chain",
+          "Sufjan Stevens",
+          "And So I Watch You From Afar",
+          "Floating Points",
+          "Be Forest",
+          "HEAVY LUNGS",
+          "will.i.am",
+          "mothercoat",
+          "Blanco White",
+          "Blood Red Shoes",
+          "Wire",
+          "Buzzcocks",
+          "State Faults",
+          "Raised Fist",
+          "Covet",
+          "Thee Oh Sees",
+          "Cala Vento",
+          "Tropical Fuck Storm",
+          "The Chemical Brothers"
+        ],
+        "Nubis84": [
+          "Rush",
+          "Lena Raine",
+          "Fishmans",
+          "EF",
+          "Childish Gambino",
+          "Toby Fox",
+          "Architects",
+          "Guns N' Roses",
+          "Maria Arnal i Marcel Bagés",
+          "The Flashbulb",
+          "The American Dollar",
+          "Ochre",
+          "Sydney Symphony Orchestra",
+          "Bob Dylan"
+        ],
+        "alberto_gu": [
+          "Amy Winehouse",
+          "Depeche Mode",
+          "Claude Debussy",
+          "Farruko",
+          "6ix9ine",
+          "Miguel Bosé",
+          "Migos",
+          "Young Thug",
+          "Paulo Londra",
+          "Alejandro Sanz",
+          "Denzel Curry",
+          "Anuel AA"
+        ],
+        "Frikomid": [
+          "Half Moon Run",
+          "The Blaze",
+          "Lana Del Rey",
+          "Coldplay",
+          "Lady Gaga",
+          "Tame Impala",
+          "Robyn",
+          "Woods",
+          "Björk",
+          "Thom Yorke",
+          "Angel Olsen",
+          "Gal Costa",
+          "Anni B Sweet",
+          "Grimes",
+          "Miley Cyrus",
+          "David Bowie",
+          "Sam Smith",
+          "alt-J",
+          "Chris Isaak",
+          "Mogwai",
+          "Black Sabbath",
+          "Harry Styles",
+          "El Columpio Asesino",
+          "Sigur Rós",
+          "That Poppy",
+          "Arca",
+          "100 gecs",
+          "Clairo",
+          "Xiu Xiu",
+          "I Break Horses",
+          "Ladytron",
+          "Sopor Aeternus & The Ensemble of Shadows",
+          "Hot Chip",
+          "Aldous Harding",
+          "Eartheater",
+          "Squarepusher",
+          "Benjamin Clementine",
+          "MGMT",
+          "Nick Cave & the Bad Seeds",
+          "Colin Stetson",
+          "Animal Collective",
+          "Carolina Durante",
+          "Lingua Ignota",
+          "Beach House",
+          "Kraftwerk",
+          "Weyes Blood",
+          "The Strokes",
+          "Andrew Belle",
+          "ANOHNI",
+          "R.E.M.",
+          "Candy Claws",
+          "Radiohead",
+          "Death Grips",
+          "Blas Cantó"
+        ]
+      }
+    },
+    {
+      "name": "2020s+",
+      "count": 75,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 123,
+        "Nubis84": 11,
+        "alberto_gu": 3,
+        "Frikomid": 187
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Working Men's Club",
+          "Viagra Boys",
+          "Me and That Man",
+          "FigureItOut",
+          "Prune Deer",
+          "Crystal Castles",
+          "The Bombpops",
+          "Bleib Modern",
+          "Against All Logic",
+          "Marrasmieli",
+          "Tan Cologne",
+          "Fluisteraars",
+          "Gluecifer",
+          "Frayle",
+          "Ash Code",
+          "Bicep",
+          "Motives",
+          "Blanck Mass",
+          "Have A Good Season",
+          "Toundra",
+          "El Columpio Asesino",
+          "Boneflower",
+          "Thick",
+          "Regarde Les Hommes Tomber",
+          "Duumu",
+          "Beachheads",
+          "The Spirit",
+          "The Killers",
+          "Asking Alexandria",
+          "Fatboy Slim",
+          "POORSTACY",
+          "The Homeless Gospel Choir",
+          "The Good The Bad and The Zugly",
+          "Mujeres",
+          "Dance Gavin Dance",
+          "Parov Stelar",
+          "Milk Teeth",
+          "Gouge Away",
+          "Kvelertak",
+          "METZ",
+          "Picturesque",
+          "Project Revise",
+          "Allie X",
+          "Viva Belgrado"
+        ],
+        "Nubis84": [
+          "The Strokes",
+          "Noel Gallagher's High Flying Birds",
+          "Miss Caffeina & Varry Brava",
+          "Al Di Meola",
+          "Mac Miller",
+          "Declan McKenna",
+          "Bon Iver"
+        ],
+        "alberto_gu": [
+          "Nezza",
+          "Prince Royce"
+        ],
+        "Frikomid": [
+          "Oneohtrix Point Never",
+          "Kleerup",
+          "The Weeknd",
+          "Dotter",
+          "Cigarettes After Sex",
+          "Azealia Banks",
+          "Chromatics",
+          "Justin Bieber",
+          "Rina Sawayama",
+          "Aitana",
+          "Austra",
+          "MGMT",
+          "Kiesza",
+          "The Strokes",
+          "Ariadna",
+          "Röyksopp",
+          "Maya Hawke",
+          "Pearl Jam",
+          "Phantogram",
+          "Nicolas Jaar"
+        ]
+      }
+    },
+    {
+      "name": "2000s",
+      "count": 56,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 48,
+        "Nubis84": 10,
+        "alberto_gu": 126,
+        "Frikomid": 52
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Strike Anywhere",
+          "Kap Bambino",
+          "The Fall",
+          "Crystal Castles",
+          "The Knife",
+          "The Cramps",
+          "Freeland",
+          "Clor",
+          "Gluecifer",
+          "Blonde Redhead",
+          "Amesoeurs",
+          "Crystal Stilts",
+          "Moving Units",
+          "Hidrogenesse",
+          "Mastodon",
+          "Interpol",
+          "The Prodigy",
+          "Bobby, I Miss You",
+          "Nine Inch Nails",
+          "Entombed",
+          "Green Day",
+          "Jimmy Eat World"
+        ],
+        "Nubis84": [
+          "The Cranberries",
+          "Rachel Grimes",
+          "Iron Maiden",
+          "Johnny Cash",
+          "Arvo Pärt",
+          "Harry Nilsson",
+          "Broken Social Scene",
+          "The Rolling Stones"
+        ],
+        "alberto_gu": [
+          "The Magnetic Fields",
+          "Gucci Mane",
+          "Trentemøller",
+          "Lacrosse",
+          "Kelly Clarkson",
+          "Armin van Buuren",
+          "PQM",
+          "Scape One",
+          "Panic! at the Disco",
+          "Café Tacvba",
+          "Guns N' Roses",
+          "Kavinsky",
+          "Garbage",
+          "Tinariwen",
+          "Madonna"
+        ],
+        "Frikomid": [
+          "Peter Adams",
+          "Cranes",
+          "Simon & Garfunkel",
+          "The Divine Comedy",
+          "The Cowboy Church Sunday School",
+          "Eyaculación Post-mortem",
+          "Stevie Nicks",
+          "Radiohead",
+          "Bob Dylan",
+          "Tom Waits",
+          "St. Vincent"
+        ]
+      }
+    },
+    {
+      "name": "1990s",
+      "count": 25,
+      "users": [
+        "Frikomid",
+        "sdecandelario",
+        "alberto_gu",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "sdecandelario": 43,
+        "Nubis84": 3,
+        "alberto_gu": 51,
+        "Frikomid": 38
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "The Offspring",
+          "Bad Brains",
+          "The Rezillos",
+          "Turbonegro",
+          "Silver Jews",
+          "Deftones",
+          "Dwarves",
+          "Autechre",
+          "The Hives",
+          "Dave Days",
+          "Buena Vista Social Club"
+        ],
+        "Nubis84": [
+          "Theatre of Tragedy",
+          "New Budapest Quartet",
+          "Takács Quartet"
+        ],
+        "alberto_gu": [
+          "Pavement",
+          "Mano Negra",
+          "Guided by Voices",
+          "OutKast"
+        ],
+        "Frikomid": [
+          "Tindersticks",
+          "Television",
+          "Jethro Tull",
+          "Daniel Johnston",
+          "Los Bravos"
+        ]
+      }
+    },
+    {
+      "name": "1980s",
+      "count": 11,
+      "users": [
+        "sdecandelario",
+        "alberto_gu"
+      ],
+      "user_counts": {
+        "sdecandelario": 10,
+        "alberto_gu": 23
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Bauhaus",
+          "The Damned",
+          "Wire",
+          "Misfits",
+          "Siouxsie and the Banshees",
+          "Parade Ground",
+          "The Cramps",
+          "Deutsch Amerikanische Freundschaft",
+          "Clan of Xymox"
+        ],
+        "alberto_gu": [
+          "The Bats",
+          "Caetano Veloso"
+        ]
+      }
+    },
+    {
+      "name": "1970s",
+      "count": 6,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "sdecandelario": 3,
+        "Frikomid": 15
+      },
+      "user_artists": {
+        "sdecandelario": [
+          "Rad Horror",
+          "La Peste",
+          "Wire"
+        ],
+        "Frikomid": [
+          "Bob Dylan",
+          "Magma",
+          "Simon & Garfunkel"
+        ]
+      }
+    }
+  ]
+};
+
+        // Inicializar categorías activas
+        let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
+
+        const userSelect = document.getElementById('userSelect');
+        users.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user;
+            option.textContent = user;
+            userSelect.appendChild(option);
+        });
+
+        document.getElementById('dateRange').textContent = `${stats.from_date} → ${stats.to_date}`;
+        document.getElementById('totalScrobbles').textContent = stats.total_scrobbles;
+        document.getElementById('generatedAt').textContent = stats.generated_at;
+
+        // Manejar filtros de categorías
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        categoryFilters.forEach(filter => {
+            filter.addEventListener('click', () => {
+                const category = filter.dataset.category;
+
+                if (activeCategories.has(category)) {
+                    activeCategories.delete(category);
+                    filter.classList.remove('active');
+                } else {
+                    activeCategories.add(category);
+                    filter.classList.add('active');
+                }
+
+                renderStats();
+            });
+        });
+
+        function showArtistsPopup(itemName, category, user) {
+            const item = stats[category].find(item => item.name === itemName);
+            if (!item || !item.user_artists || !item.user_artists[user]) return;
+
+            const artists = item.user_artists[user];
+
+            // Crear overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+
+            // Crear popup
+            const popup = document.createElement('div');
+            popup.className = 'artists-popup';
+
+            const header = document.createElement('div');
+            header.className = 'popup-header';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'popup-close';
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            };
+
+            header.innerHTML = `Artistas de ${user} en "${itemName}"`;
+            header.appendChild(closeBtn);
+
+            const artistList = document.createElement('ul');
+            artistList.className = 'artist-list';
+
+            artists.forEach(artist => {
+                const li = document.createElement('li');
+                li.textContent = artist;
+                artistList.appendChild(li);
+            });
+
+            popup.appendChild(header);
+            popup.appendChild(artistList);
+
+            // Cerrar al hacer click en overlay
+            overlay.onclick = () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            };
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(popup);
+        }
+
+        function renderStats() {
+            const selectedUser = userSelect.value;
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+
+            const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels', 'decades'];
+            const categoryTitles = {
+                artists: 'Artistas',
+                tracks: 'Canciones',
+                albums: 'Álbumes',
+                genres: 'Géneros',
+                labels: 'Sellos',
+                decades: 'Décadas'
+            };
+
+            let hasData = false;
+
+            categoryOrder.forEach(categoryKey => {
+                if (!stats[categoryKey] || stats[categoryKey].length === 0) return;
+
+                hasData = true;
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category';
+                categoryDiv.dataset.category = categoryKey;
+
+                // Mostrar u ocultar según filtros activos
+                if (activeCategories.has(categoryKey)) {
+                    categoryDiv.classList.add('visible');
+                }
+
+                const title = document.createElement('h3');
+                title.textContent = categoryTitles[categoryKey];
+                categoryDiv.appendChild(title);
+
+                stats[categoryKey].forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'item';
+
+                    if (selectedUser && item.users.includes(selectedUser)) {
+                        itemDiv.classList.add('highlighted');
+                    }
+
+                    // Hacer clickeable si es género, década o sello y hay usuario seleccionado
+                    const isClickable = ['genres', 'labels', 'decades'].includes(categoryKey) &&
+                                       selectedUser &&
+                                       item.users.includes(selectedUser) &&
+                                       item.user_artists &&
+                                       item.user_artists[selectedUser];
+
+                    if (isClickable) {
+                        itemDiv.classList.add('clickable');
+                        itemDiv.onclick = () => showArtistsPopup(item.name, categoryKey, selectedUser);
+                        itemDiv.title = `Click para ver artistas de ${selectedUser}`;
+                    }
+
+                    const itemName = document.createElement('div');
+                    itemName.className = 'item-name';
+                    itemName.textContent = item.name;
+                    itemDiv.appendChild(itemName);
+
+                    const itemMeta = document.createElement('div');
+                    itemMeta.className = 'item-meta';
+
+                    const countBadge = document.createElement('span');
+                    countBadge.className = 'badge';
+                    countBadge.textContent = `${item.count} plays`;
+                    itemMeta.appendChild(countBadge);
+
+                    item.users.forEach(user => {
+                        const userBadge = document.createElement('span');
+                        userBadge.className = 'user-badge';
+                        if (user === selectedUser) {
+                            userBadge.classList.add('highlighted-user');
+                        }
+
+                        // Mostrar usuario con número de scrobbles entre paréntesis
+                        const userScrobbles = item.user_counts[user] || 0;
+                        userBadge.textContent = `${user} (${userScrobbles})`;
+                        itemMeta.appendChild(userBadge);
+                    });
+
+                    itemDiv.appendChild(itemMeta);
+                    categoryDiv.appendChild(itemDiv);
+                });
+
+                container.appendChild(categoryDiv);
+            });
+
+            if (!hasData || activeCategories.size === 0) {
+                const noData = document.createElement('div');
+                noData.className = 'no-data';
+                noData.textContent = activeCategories.size === 0
+                    ? 'Selecciona al menos una categoría para ver las estadísticas'
+                    : 'No hay coincidencias para este período';
+                container.appendChild(noData);
+            }
+        }
+
+        userSelect.addEventListener('change', renderStats);
+        renderStats();
+    </script>
+</body>
+</html>

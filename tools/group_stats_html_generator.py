@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-GroupStatsHTMLGenerator - Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas grupales
+GroupStatsHTMLGenerator - Clase para generar HTML con gráficos interactivos de estadísticas grupales
 """
 
 import json
+from datetime import datetime
 from typing import Dict, List
 
 
 class GroupStatsHTMLGenerator:
-    """Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas grupales"""
+    """Clase para generar HTML con gráficos interactivos de estadísticas grupales"""
 
     def __init__(self):
         self.colors = [
@@ -17,17 +18,28 @@ class GroupStatsHTMLGenerator:
             '#f5c2e7', '#f2cdcd', '#ddb6f2', '#ffc6ff', '#caffbf'
         ]
 
-    def generate_html(self, group_stats: Dict, years_back: int) -> str:
-        """Genera el HTML completo para estadÃ­sticas grupales"""
+    def generate_html(self, group_stats: Dict, years_back: int, period_folder: str = None) -> str:
+        """Genera el HTML completo para estadísticas grupales"""
         stats_json = json.dumps(group_stats, indent=2, ensure_ascii=False)
         colors_json = json.dumps(self.colors, ensure_ascii=False)
+
+        # Si no se proporciona period_folder, calcularlo desde group_stats
+        if period_folder is None:
+            period_parts = group_stats.get('period', '').split('-')
+            if len(period_parts) == 2:
+                period_folder = group_stats['period']
+            else:
+                # Fallback por si acaso
+                current_year = datetime.now().year
+                from_year = current_year - years_back
+                period_folder = f"{from_year}-{current_year}"
 
         return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Grupo - EstadÃ­sticas Grupales</title>
+    <title>Last.fm Grupo - Estadísticas Grupales</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -52,6 +64,7 @@ class GroupStatsHTMLGenerator:
             border-radius: 16px;
             box-shadow: 0 8px 32px rgba(0,0,0,0.3);
             overflow: hidden;
+            position: relative;
         }}
 
         header {{
@@ -69,6 +82,105 @@ class GroupStatsHTMLGenerator:
         .subtitle {{
             color: #a6adc8;
             font-size: 1em;
+        }}
+
+        /* Botón de usuario circular */
+        .user-button {{
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: #cba6f7;
+            color: #1e1e2e;
+            border: none;
+            border-radius: 50%;
+            font-size: 24px;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s;
+            box-shadow: 0 4px 16px rgba(203, 166, 247, 0.3);
+        }}
+
+        .user-button:hover {{
+            background: #ddb6f2;
+            transform: scale(1.1);
+        }}
+
+        /* Modal de selección de usuario */
+        .user-modal {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 999;
+            display: none;
+        }}
+
+        .user-modal-content {{
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 400px;
+            width: 90%;
+        }}
+
+        .user-modal-header {{
+            color: #cba6f7;
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            text-align: center;
+        }}
+
+        .user-options {{
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }}
+
+        .user-option {{
+            padding: 12px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }}
+
+        .user-option:hover {{
+            border-color: #cba6f7;
+            background: #45475a;
+        }}
+
+        .user-option.selected {{
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }}
+
+        .user-modal-close {{
+            display: block;
+            margin: 15px auto 0;
+            padding: 8px 16px;
+            background: #45475a;
+            color: #cdd6f4;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }}
+
+        .user-modal-close:hover {{
+            background: #6c7086;
         }}
 
         .controls {{
@@ -119,23 +231,6 @@ class GroupStatsHTMLGenerator:
             background: #cba6f7;
             color: #1e1e2e;
             border-color: #cba6f7;
-        }}
-
-        .group-header {{
-            background: #1e1e2e;
-            padding: 25px 30px;
-            border-bottom: 2px solid #cba6f7;
-        }}
-
-        .group-header h2 {{
-            color: #cba6f7;
-            font-size: 1.5em;
-            margin-bottom: 8px;
-        }}
-
-        .group-info {{
-            color: #a6adc8;
-            font-size: 0.9em;
         }}
 
         .stats-container {{
@@ -229,28 +324,28 @@ class GroupStatsHTMLGenerator:
 
         .summary-stats {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
             margin-bottom: 30px;
         }}
 
         .summary-card {{
             background: #1e1e2e;
-            padding: 15px;
+            padding: 10px;
             border-radius: 8px;
             border: 1px solid #313244;
             text-align: center;
         }}
 
         .summary-card .number {{
-            font-size: 1.8em;
+            font-size: 1.4em;
             font-weight: 600;
             color: #cba6f7;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }}
 
         .summary-card .label {{
-            font-size: 0.9em;
+            font-size: 0.8em;
             color: #a6adc8;
         }}
 
@@ -335,7 +430,7 @@ class GroupStatsHTMLGenerator:
             margin-top: 5px;
         }}
 
-        /* Estilos para la secciÃ³n de datos */
+        /* Estilos para la sección de datos */
         .data-section {{
             margin-bottom: 40px;
         }}
@@ -596,14 +691,37 @@ class GroupStatsHTMLGenerator:
             .data-categories {{
                 justify-content: center;
             }}
+
+            .user-button {{
+                top: 15px;
+                right: 15px;
+                width: 45px;
+                height: 45px;
+                font-size: 20px;
+            }}
         }}
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Botón de usuario circular -->
+        <button class="user-button" id="userButton" title="Seleccionar usuario destacado">👤</button>
+
+        <!-- Modal de selección de usuario -->
+        <div class="user-modal" id="userModal">
+            <div class="user-modal-content">
+                <div class="user-modal-header">Seleccionar Usuario Destacado</div>
+                <div class="user-options" id="userOptions">
+                    <div class="user-option selected" data-user="">Ninguno</div>
+                    <!-- Se llenarán dinámicamente -->
+                </div>
+                <button class="user-modal-close" id="userModalClose">Cerrar</button>
+            </div>
+        </div>
+
         <header>
-            <h1>EstadÃ­sticas Grupales</h1>
-            <p class="subtitle">AnÃ¡lisis global del grupo</p>
+            <h1>Estadísticas Grupales</h1>
+            <p class="subtitle">Análisis global del grupo</p>
         </header>
 
         <div class="controls">
@@ -613,7 +731,7 @@ class GroupStatsHTMLGenerator:
                     <button class="view-btn active" data-view="data">Datos</button>
                     <button class="view-btn" data-view="shared">Por Usuarios Compartidos</button>
                     <button class="view-btn" data-view="scrobbles">Por Scrobbles Totales</button>
-                    <button class="view-btn" data-view="evolution">EvoluciÃ³n Temporal</button>
+                    <button class="view-btn" data-view="evolution">Evolución Temporal</button>
                 </div>
             </div>
         </div>
@@ -629,15 +747,10 @@ class GroupStatsHTMLGenerator:
             </div>
         </div>
 
-        <div id="groupHeader" class="group-header">
-            <h2 id="groupTitle">AnÃ¡lisis Grupal</h2>
-            <p class="group-info" id="groupInfo">PerÃ­odo de anÃ¡lisis: {years_back + 1} aÃ±os</p>
-        </div>
-
         <div class="stats-container">
-            <!-- Resumen de estadÃ­sticas -->
+            <!-- Resumen de estadísticas -->
             <div id="summaryStats" class="summary-stats">
-                <!-- Se llenarÃ¡ dinÃ¡micamente -->
+                <!-- Se llenará dinámicamente -->
             </div>
 
             <!-- Vista de Datos -->
@@ -647,33 +760,25 @@ class GroupStatsHTMLGenerator:
                         <div class="data-control-group">
                             <label for="userLevelSelect">Nivel de coincidencia:</label>
                             <select id="userLevelSelect" class="data-select">
-                                <!-- Se llenarÃ¡ dinÃ¡micamente -->
+                                <!-- Se llenará dinámicamente -->
                             </select>
                         </div>
 
                         <div class="data-control-group">
-                            <label for="highlightUserSelect">Destacar usuario:</label>
-                            <select id="highlightUserSelect" class="data-select">
-                                <option value="">Ninguno</option>
-                                <!-- Se llenarÃ¡ dinÃ¡micamente -->
-                            </select>
-                        </div>
-
-                        <div class="data-control-group">
-                            <label>Mostrar categorÃ­as:</label>
+                            <label>Mostrar categorías:</label>
                             <div class="data-categories">
                                 <button class="data-category-filter active" data-category="artists">Artistas</button>
-                                <button class="data-category-filter" data-category="albums">Ãlbumes</button>
+                                <button class="data-category-filter" data-category="albums">Álbumes</button>
                                 <button class="data-category-filter" data-category="tracks">Canciones</button>
-                                <button class="data-category-filter" data-category="genres">GÃ©neros</button>
+                                <button class="data-category-filter" data-category="genres">Géneros</button>
                                 <button class="data-category-filter" data-category="labels">Sellos</button>
-                                <button class="data-category-filter" data-category="decades">DÃ©cadas</button>
+                                <button class="data-category-filter" data-category="decades">Décadas</button>
                             </div>
                         </div>
                     </div>
 
                     <div class="data-display" id="dataDisplay">
-                        <!-- Se llenarÃ¡ dinÃ¡micamente -->
+                        <!-- Se llenará dinámicamente -->
                     </div>
                 </div>
             </div>
@@ -690,7 +795,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 Ãlbumes</h3>
+                        <h3>Top 15 Álbumes</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedAlbumsChart"></canvas>
                         </div>
@@ -706,7 +811,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 GÃ©neros</h3>
+                        <h3>Top 15 Géneros</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedGenresChart"></canvas>
                         </div>
@@ -722,7 +827,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 AÃ±os de Lanzamiento</h3>
+                        <h3>Top 15 Años de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedReleaseYearsChart"></canvas>
                         </div>
@@ -743,7 +848,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 Ãlbumes</h3>
+                        <h3>Top 15 Álbumes</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesAlbumsChart"></canvas>
                         </div>
@@ -759,7 +864,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 GÃ©neros</h3>
+                        <h3>Top 15 Géneros</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesGenresChart"></canvas>
                         </div>
@@ -775,7 +880,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                        <h3>Top 15 AÃ±os de Lanzamiento</h3>
+                        <h3>Top 15 Años de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="scrobblesReleaseYearsChart"></canvas>
                         </div>
@@ -792,48 +897,48 @@ class GroupStatsHTMLGenerator:
                 </div>
             </div>
 
-            <!-- Vista de EvoluciÃ³n -->
+            <!-- Vista de Evolución -->
             <div id="evolutionView" class="view">
                 <div class="evolution-section">
-                    <h3>EvoluciÃ³n Temporal por Scrobbles</h3>
+                    <h3>Evolución Temporal por Scrobbles</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Top 15 Artistas por AÃ±o</h4>
+                            <h4>Top 15 Artistas por Año</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionArtistsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 Ãlbumes por AÃ±o</h4>
+                            <h4>Top 15 Álbumes por Año</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionAlbumsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 Canciones por AÃ±o</h4>
+                            <h4>Top 15 Canciones por Año</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionTracksChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 GÃ©neros por AÃ±o</h4>
+                            <h4>Top 15 Géneros por Año</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionGenresChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 Sellos por AÃ±o</h4>
+                            <h4>Top 15 Sellos por Año</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionLabelsChart"></canvas>
                             </div>
                         </div>
 
                         <div class="evolution-chart">
-                            <h4>Top 15 AÃ±os de Lanzamiento por AÃ±o</h4>
+                            <h4>Top 15 Años de Lanzamiento por Año</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="evolutionReleaseYearsChart"></canvas>
                             </div>
@@ -847,7 +952,7 @@ class GroupStatsHTMLGenerator:
             <div id="popup" class="popup" style="display: none;">
                 <div class="popup-header">
                     <span id="popupTitle">Detalles</span>
-                    <button id="popupClose" class="popup-close">âŒ</button>
+                    <button id="popupClose" class="popup-close">×</button>
                 </div>
                 <div id="popupContent" class="popup-content"></div>
             </div>
@@ -857,11 +962,12 @@ class GroupStatsHTMLGenerator:
     <script>
         const groupStats = {stats_json};
         const colors = {colors_json};
+        const periodFolder = "{period_folder}";
 
         let currentView = 'data';
         let charts = {{}};
 
-        // Variables para la secciÃ³n de datos
+        // Variables para la sección de datos
         let activeDataCategories = new Set(['artists']); // Por defecto mostrar artistas
         let currentUserLevel = '';
         let selectedHighlightUser = '';
@@ -871,9 +977,79 @@ class GroupStatsHTMLGenerator:
         let dynamicDataCache = {{}}; // Cache para datos cargados dinámicamente
         let isLoadingData = false;
 
-        // InicializaciÃ³n
+        // Funcionalidad del botón de usuario
+        function initializeUserSelector() {{
+            const userButton = document.getElementById('userButton');
+            const userModal = document.getElementById('userModal');
+            const userModalClose = document.getElementById('userModalClose');
+            const userOptions = document.getElementById('userOptions');
+
+            // Cargar usuario guardado desde localStorage
+            selectedHighlightUser = localStorage.getItem('lastfm_selected_user') || '';
+
+            // Llenar opciones de usuarios
+            groupStats.users.forEach(user => {{
+                const option = document.createElement('div');
+                option.className = 'user-option';
+                option.dataset.user = user;
+                option.textContent = user;
+                userOptions.appendChild(option);
+            }});
+
+            // Marcar opción seleccionada
+            updateSelectedUserOption();
+
+            // Event listeners
+            userButton.addEventListener('click', () => {{
+                userModal.style.display = 'block';
+            }});
+
+            userModalClose.addEventListener('click', () => {{
+                userModal.style.display = 'none';
+            }});
+
+            userModal.addEventListener('click', (e) => {{
+                if (e.target === userModal) {{
+                    userModal.style.display = 'none';
+                }}
+            }});
+
+            userOptions.addEventListener('click', (e) => {{
+                if (e.target.classList.contains('user-option')) {{
+                    const user = e.target.dataset.user;
+                    selectedHighlightUser = user;
+
+                    // Guardar en localStorage
+                    if (user) {{
+                        localStorage.setItem('lastfm_selected_user', user);
+                    }} else {{
+                        localStorage.removeItem('lastfm_selected_user');
+                    }}
+
+                    updateSelectedUserOption();
+                    userModal.style.display = 'none';
+
+                    // Actualizar vista si estamos en datos
+                    if (currentView === 'data') {{
+                        renderDataView();
+                    }}
+                }}
+            }});
+        }}
+
+        function updateSelectedUserOption() {{
+            const userOptions = document.getElementById('userOptions');
+            userOptions.querySelectorAll('.user-option').forEach(option => {{
+                option.classList.remove('selected');
+                if (option.dataset.user === selectedHighlightUser) {{
+                    option.classList.add('selected');
+                }}
+            }});
+        }}
+
+        // Inicialización
         document.addEventListener('DOMContentLoaded', function() {{
-            updateGroupHeader();
+            initializeUserSelector();
             updateSummaryStats();
 
             // Manejar botones de vista
@@ -935,11 +1111,6 @@ class GroupStatsHTMLGenerator:
             }}
         }}
 
-        function updateGroupHeader() {{
-            document.getElementById('groupInfo').innerHTML =
-                `PerÃ­odo: ${{groupStats.period}} | ${{groupStats.user_count}} usuarios | Generado: ${{groupStats.generated_at}}`;
-        }}
-
         function updateSummaryStats() {{
             // Usar los totales reales de elementos compartidos por TODOS los usuarios
             const totalCounts = groupStats.total_counts || {{}};
@@ -962,23 +1133,23 @@ class GroupStatsHTMLGenerator:
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedArtists}}</div>
-                    <div class="label">Artistas Compartidos (Todos)</div>
+                    <div class="label">Artistas Compartidos</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedAlbums}}</div>
-                    <div class="label">Ãlbumes Compartidos</div>
+                    <div class="label">Álbumes Compartidos</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedTracks}}</div>
-                    <div class="label">Canciones Compartidas (Todos)</div>
+                    <div class="label">Canciones Compartidas</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedGenres}}</div>
-                    <div class="label">GÃ©neros Compartidos (Todos)</div>
+                    <div class="label">Géneros Compartidos</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalSharedLabels}}</div>
-                    <div class="label">Sellos Compartidos (Todos)</div>
+                    <div class="label">Sellos Compartidos</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalScrobblesArtists.toLocaleString()}}</div>
@@ -1000,7 +1171,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar grÃ¡ficos por usuarios compartidos
+            // Renderizar gráficos por usuarios compartidos
             renderPieChart('sharedArtistsChart', groupStats.shared_charts.artists, 'sharedArtistsInfo');
             renderPieChart('sharedAlbumsChart', groupStats.shared_charts.albums, 'sharedAlbumsInfo');
             renderPieChart('sharedTracksChart', groupStats.shared_charts.tracks, 'sharedTracksInfo');
@@ -1016,7 +1187,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar grÃ¡ficos por scrobbles totales
+            // Renderizar gráficos por scrobbles totales
             renderPieChart('scrobblesArtistsChart', groupStats.scrobbles_charts.artists, 'scrobblesArtistsInfo');
             renderPieChart('scrobblesAlbumsChart', groupStats.scrobbles_charts.albums, 'scrobblesAlbumsInfo');
             renderPieChart('scrobblesTracksChart', groupStats.scrobbles_charts.tracks, 'scrobblesTracksInfo');
@@ -1033,7 +1204,7 @@ class GroupStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            // Renderizar grÃ¡ficos de evoluciÃ³n
+            // Renderizar gráficos de evolución
             renderLineChart('evolutionArtistsChart', groupStats.evolution.artists);
             renderLineChart('evolutionAlbumsChart', groupStats.evolution.albums);
             renderLineChart('evolutionTracksChart', groupStats.evolution.tracks);
@@ -1122,7 +1293,7 @@ class GroupStatsHTMLGenerator:
                             if (typeof yearData === 'object' && 'total' in yearData) {{
                                 return yearData.total;
                             }}
-                            // Si es la estructura antigua con nÃƒÂºmeros directos
+                            // Si es la estructura antigua con números directos
                             if (typeof yearData === 'number') {{
                                 return yearData;
                             }}
@@ -1239,16 +1410,16 @@ class GroupStatsHTMLGenerator:
             }}
 
             if (details.artist && details.album) {{
-                content += `<div class="details">Artista: ${{details.artist}} | Ãlbum: ${{details.album}}</div>`;
+                content += `<div class="details">Artista: ${{details.artist}} | Álbum: ${{details.album}}</div>`;
             }} else if (details.artist && details.track) {{
-                content += `<div class="details">Artista: ${{details.artist}} | CanciÃ³n: ${{details.track}}</div>`;
+                content += `<div class="details">Artista: ${{details.artist}} | Canción: ${{details.track}}</div>`;
             }}
 
             if (chartData.type === 'combined') {{
-                content += `<div class="details">CategorÃ­a: ${{details.category}}</div>`;
+                content += `<div class="details">Categoría: ${{details.category}}</div>`;
             }}
 
-            // Agregar desglose por usuario si estÃƒÂ¡ disponible
+            // Agregar desglose por usuario si está disponible
             if (details.user_plays && Object.keys(details.user_plays).length > 0) {{
                 content += `<div class="details" style="margin-top: 10px; font-weight: bold;">Desglose por usuario:</div>`;
                 const userPlays = Object.entries(details.user_plays)
@@ -1273,7 +1444,7 @@ class GroupStatsHTMLGenerator:
             content += `<div class="popup-item">
                 <div class="name">${{itemName}}</div>
                 <div class="details">
-                    AÃ±o: ${{year}} |
+                    Año: ${{year}} |
                     Scrobbles: ${{userData.total.toLocaleString()}}
                 </div>`;
 
@@ -1305,11 +1476,10 @@ class GroupStatsHTMLGenerator:
             document.getElementById('popup').style.display = 'none';
         }});
 
-        // Funciones para la secciÃ³n de datos
+        // Funciones para la sección de datos
         function initializeDataControls() {{
             console.log('Inicializando controles de datos...'); // Debug
             const userLevelSelect = document.getElementById('userLevelSelect');
-            const highlightUserSelect = document.getElementById('highlightUserSelect');
 
             // Llenar select de niveles de usuarios
             if (groupStats.data_by_levels) {{
@@ -1331,14 +1501,6 @@ class GroupStatsHTMLGenerator:
                 console.error('data_by_levels no encontrado en groupStats'); // Debug
             }}
 
-            // Llenar select de usuarios para destacar
-            groupStats.users.forEach(user => {{
-                const option = document.createElement('option');
-                option.value = user;
-                option.textContent = user;
-                highlightUserSelect.appendChild(option);
-            }});
-
             // Event listeners
             userLevelSelect.addEventListener('change', function() {{
                 currentUserLevel = this.value;
@@ -1346,13 +1508,7 @@ class GroupStatsHTMLGenerator:
                 renderDataView();
             }});
 
-            highlightUserSelect.addEventListener('change', function() {{
-                selectedHighlightUser = this.value;
-                console.log('Destacando usuario:', selectedHighlightUser); // Debug
-                renderDataView();
-            }});
-
-            // Manejar filtros de categorÃ­as
+            // Manejar filtros de categorías
             const dataCategoryFilters = document.querySelectorAll('.data-category-filter');
             dataCategoryFilters.forEach(filter => {{
                 filter.addEventListener('click', () => {{
@@ -1401,24 +1557,24 @@ class GroupStatsHTMLGenerator:
 
             const levelData = groupStats.data_by_levels[currentUserLevel];
             console.log('Datos del nivel seleccionado:', levelData); // Debug
-            console.log('CategorÃ­as activas:', Array.from(activeDataCategories)); // Debug
+            console.log('Categorías activas:', Array.from(activeDataCategories)); // Debug
 
             const categoryOrder = ['artists', 'albums', 'tracks', 'genres', 'labels', 'decades'];
             const categoryTitles = {{
                 artists: 'Artistas',
-                albums: 'Ãlbumes',
+                albums: 'Álbumes',
                 tracks: 'Canciones',
-                genres: 'GÃ©neros',
+                genres: 'Géneros',
                 labels: 'Sellos',
-                decades: 'DÃ©cadas'
+                decades: 'Décadas'
             }};
 
             let hasVisibleData = false;
             let elementsAdded = 0;
 
             categoryOrder.forEach(categoryKey => {{
-                console.log(`Procesando categorÃ­a: ${{categoryKey}}`); // Debug
-                console.log(`- EstÃ¡ activa: ${{activeDataCategories.has(categoryKey)}}`); // Debug
+                console.log(`Procesando categoría: ${{categoryKey}}`); // Debug
+                console.log(`- Está activa: ${{activeDataCategories.has(categoryKey)}}`); // Debug
                 console.log(`- Tiene datos: ${{levelData[categoryKey] ? levelData[categoryKey].length : 0}} items`); // Debug
 
                 if (!activeDataCategories.has(categoryKey)) return;
@@ -1433,14 +1589,14 @@ class GroupStatsHTMLGenerator:
                 const title = document.createElement('h4');
                 title.textContent = `${{categoryTitles[categoryKey]}} (${{levelData[categoryKey].length}})`;
                 categoryDiv.appendChild(title);
-                console.log(`TÃ­tulo agregado: ${{title.textContent}}`); // Debug
+                console.log(`Título agregado: ${{title.textContent}}`); // Debug
 
                 let itemsAdded = 0;
                 levelData[categoryKey].forEach(item => {{
                     const itemDiv = document.createElement('div');
                     itemDiv.className = 'data-item';
 
-                    // Destacar si el usuario seleccionado estÃ¡ en la lista
+                    // Destacar si el usuario seleccionado está en la lista
                     if (selectedHighlightUser && item.users.includes(selectedHighlightUser)) {{
                         itemDiv.classList.add('highlighted');
                     }}
@@ -1492,7 +1648,7 @@ class GroupStatsHTMLGenerator:
                 const noDataDiv = document.createElement('div');
                 noDataDiv.className = 'data-no-data';
                 noDataDiv.textContent = activeDataCategories.size === 0
-                    ? 'Selecciona al menos una categorÃ­a para ver los datos'
+                    ? 'Selecciona al menos una categoría para ver los datos'
                     : 'No hay datos disponibles para este nivel';
                 dataDisplay.appendChild(noDataDiv);
                 console.log('Agregado mensaje de no data'); // Debug
@@ -1611,7 +1767,7 @@ class GroupStatsHTMLGenerator:
             }}
 
             try {{
-                const response = await fetch(`data/${{dataType}}_${{userKey}}.json`);
+                const response = await fetch(`data/${{periodFolder}}/${{dataType}}_${{userKey}}.json`);
                 if (!response.ok) {{
                     throw new Error(`HTTP error! status: ${{response.status}}`);
                 }}
@@ -1728,5 +1884,5 @@ class GroupStatsHTMLGenerator:
 </html>"""
 
     def _format_number(self, number: int) -> str:
-        """Formatea nÃƒÆ’Ã‚Âºmeros con separadores de miles"""
+        """Formatea números con separadores de miles"""
         return f"{number:,}".replace(",", ".")

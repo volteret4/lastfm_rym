@@ -212,67 +212,162 @@ def generate_index_html(files):
             .container {
                 max-width: 1200px;
                 margin: 0 auto;
+                padding: 0 20px;
             }
 
             header {
                 background: #181825;
-                padding: 30px 20px;
-                text-align: center;
-                border-bottom: 3px solid #cba6f7;
+                padding: 2rem 0;
+                border-bottom: 2px solid #cba6f7;
             }
 
             h1 {
                 font-size: 2.5em;
                 color: #cba6f7;
-                margin-bottom: 10px;
+                margin-bottom: 0.5rem;
+                text-align: center;
             }
 
             .subtitle {
+                text-align: center;
                 color: #a6adc8;
                 font-size: 1.1em;
             }
 
+            /* Botón de usuario circular */
+            .user-button {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                width: 50px;
+                height: 50px;
+                background: #cba6f7;
+                color: #1e1e2e;
+                border: none;
+                border-radius: 50%;
+                font-size: 24px;
+                cursor: pointer;
+                z-index: 1000;
+                transition: all 0.3s;
+                box-shadow: 0 4px 16px rgba(203, 166, 247, 0.3);
+            }
+
+            .user-button:hover {
+                background: #ddb6f2;
+                transform: scale(1.1);
+            }
+
+            /* Modal de selección de usuario */
+            .user-modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.7);
+                z-index: 999;
+                display: none;
+            }
+
+            .user-modal-content {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: #1e1e2e;
+                border: 2px solid #cba6f7;
+                border-radius: 12px;
+                padding: 20px;
+                max-width: 400px;
+                width: 90%;
+            }
+
+            .user-modal-header {
+                color: #cba6f7;
+                font-size: 1.2em;
+                font-weight: 600;
+                margin-bottom: 15px;
+                text-align: center;
+            }
+
+            .user-options {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .user-option {
+                padding: 12px 16px;
+                background: #313244;
+                color: #cdd6f4;
+                border: 2px solid #45475a;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.3s;
+                text-align: center;
+            }
+
+            .user-option:hover {
+                border-color: #cba6f7;
+                background: #45475a;
+            }
+
+            .user-option.selected {
+                background: #cba6f7;
+                color: #1e1e2e;
+                border-color: #cba6f7;
+            }
+
+            .user-modal-close {
+                display: block;
+                margin: 15px auto 0;
+                padding: 8px 16px;
+                background: #45475a;
+                color: #cdd6f4;
+                border: none;
+                border-radius: 6px;
+                cursor: pointer;
+            }
+
+            .user-modal-close:hover {
+                background: #6c7086;
+            }
+
             nav {
-                background: #181825;
-                padding: 0;
+                background: #1e1e2e;
+                padding: 1rem 0;
                 border-bottom: 1px solid #313244;
             }
 
             .nav-tabs {
                 display: flex;
+                justify-content: center;
                 list-style: none;
-                max-width: 1200px;
-                margin: 0 auto;
+                gap: 1rem;
             }
 
-            .nav-tabs li {
-                flex: 1;
-            }
-
-            .nav-tabs a {
-                display: block;
-                padding: 20px;
-                text-align: center;
-                color: #a6adc8;
+            .tab-link {
+                padding: 12px 24px;
+                background: #313244;
+                color: #cdd6f4;
                 text-decoration: none;
-                border-bottom: 3px solid transparent;
+                border-radius: 8px;
                 transition: all 0.3s;
                 font-weight: 600;
             }
 
-            .nav-tabs a:hover {
-                background: #1e1e2e;
+            .tab-link:hover {
+                background: #45475a;
                 color: #cba6f7;
             }
 
-            .nav-tabs a.active {
-                color: #cba6f7;
-                border-bottom-color: #cba6f7;
-                background: #1e1e2e;
+            .tab-link.active {
+                background: #cba6f7;
+                color: #1e1e2e;
             }
 
             .content {
-                padding: 40px 20px;
+                padding: 2rem 0;
             }
 
             .tab-content {
@@ -285,166 +380,155 @@ def generate_index_html(files):
             }
 
             @keyframes fadeIn {
-                from {
-                    opacity: 0;
-                    transform: translateY(10px);
-                }
-                to {
-                    opacity: 1;
-                    transform: translateY(0);
-                }
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
             }
 
+            /* Secciones colapsables */
             .period-selector {
+                margin-bottom: 3rem;
                 background: #181825;
-                padding: 25px;
                 border-radius: 12px;
-                margin-bottom: 30px;
-                border: 1px solid #313244;
+                overflow: hidden;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.2);
             }
 
-            .period-selector h2 {
+            .section-header {
+                padding: 20px 24px;
+                background: #1e1e2e;
+                border-bottom: 1px solid #313244;
+                cursor: pointer;
+                transition: all 0.3s;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .section-header:hover {
+                background: #2a2a3e;
+            }
+
+            .section-header h2 {
                 color: #cba6f7;
-                margin-bottom: 20px;
-                font-size: 1.5em;
+                font-size: 1.3em;
+                margin: 0;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .stats-badge {
+                background: #cba6f7;
+                color: #1e1e2e;
+                font-size: 0.7em;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-weight: 600;
+            }
+
+            .collapse-icon {
+                font-size: 1.2em;
+                color: #a6adc8;
+                transition: transform 0.3s;
+            }
+
+            .section-header[aria-expanded="true"] .collapse-icon {
+                transform: rotate(180deg);
+            }
+
+            .section-content {
+                display: none;
+                padding: 24px;
+                border-top: 1px solid #313244;
+            }
+
+            .section-content.active {
+                display: block;
+                animation: fadeIn 0.3s;
             }
 
             .period-grid {
                 display: grid;
-                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-                gap: 15px;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 1rem;
             }
 
             .period-link {
                 display: block;
-                padding: 20px;
-                background: #1e1e2e;
-                border: 2px solid #313244;
-                border-radius: 10px;
+                padding: 1rem;
+                background: #313244;
+                border-radius: 8px;
                 text-decoration: none;
                 color: #cdd6f4;
                 transition: all 0.3s;
-                text-align: center;
+                border: 2px solid transparent;
             }
 
             .period-link:hover {
+                background: #45475a;
                 border-color: #cba6f7;
-                background: #313244;
                 transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(203, 166, 247, 0.2);
             }
 
-            .period-link .period-name {
+            .period-name {
                 font-size: 1.1em;
                 font-weight: 600;
-                margin-bottom: 5px;
+                margin-bottom: 0.5rem;
             }
 
-            .period-link .period-date {
+            .period-date {
+                color: #a6adc8;
                 font-size: 0.9em;
-                color: #a6adc8;
-            }
-
-            .info-box {
-                background: #181825;
-                padding: 30px;
-                border-radius: 12px;
-                border: 1px solid #313244;
-                margin-bottom: 20px;
-            }
-
-            .info-box h3 {
-                color: #cba6f7;
-                margin-bottom: 15px;
-                font-size: 1.3em;
-            }
-
-            .info-box p {
-                color: #cdd6f4;
-                margin-bottom: 10px;
-            }
-
-            .info-box ul {
-                margin-left: 20px;
-                color: #a6adc8;
-            }
-
-            .info-box ul li {
-                margin-bottom: 8px;
-            }
-
-            .info-box code {
-                background: #1e1e2e;
-                padding: 2px 6px;
-                border-radius: 4px;
-                color: #f38ba8;
-            }
-
-            footer {
-                background: #181825;
-                padding: 20px;
-                text-align: center;
-                color: #6c7086;
-                border-top: 1px solid #313244;
-                margin-top: 40px;
             }
 
             .empty-state {
+                grid-column: 1 / -1;
                 text-align: center;
-                padding: 60px 20px;
+                padding: 3rem 1rem;
                 color: #6c7086;
             }
 
             .empty-state-icon {
-                font-size: 4em;
-                margin-bottom: 20px;
-                opacity: 0.5;
+                font-size: 3em;
+                margin-bottom: 1rem;
             }
 
             .empty-state p {
-                font-size: 1.1em;
-                margin-bottom: 10px;
+                margin-bottom: 0.5rem;
             }
 
-            .stats-badge {
-                display: inline-block;
-                background: #cba6f7;
-                color: #1e1e2e;
-                padding: 4px 12px;
-                border-radius: 12px;
-                font-size: 0.85em;
-                font-weight: 600;
-                margin-left: 10px;
+            code {
+                background: #313244;
+                color: #cba6f7;
+                padding: 2px 6px;
+                border-radius: 4px;
+                font-family: "Monaco", "Menlo", monospace;
             }
 
-            /* Estilos para el selector de año */
             .year-selector {
                 margin-bottom: 20px;
-                text-align: center;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex-wrap: wrap;
             }
 
             .year-selector label {
-                color: #a6adc8;
-                margin-right: 10px;
+                color: #cba6f7;
                 font-weight: 600;
             }
 
             .year-selector select {
-                background: #1e1e2e;
-                border: 2px solid #313244;
-                border-radius: 8px;
+                background: #313244;
                 color: #cdd6f4;
+                border: 2px solid #45475a;
+                border-radius: 6px;
                 padding: 8px 12px;
                 font-size: 1em;
-                transition: all 0.3s;
             }
 
             .year-selector select:focus {
-                border-color: #cba6f7;
                 outline: none;
-            }
-
-            .year-selector select:hover {
                 border-color: #cba6f7;
             }
 
@@ -458,7 +542,57 @@ def generate_index_html(files):
                 animation: fadeIn 0.3s;
             }
 
+            .info-box {
+                background: #181825;
+                padding: 2rem;
+                border-radius: 12px;
+                margin-bottom: 2rem;
+                border: 1px solid #313244;
+            }
+
+            .info-box h3 {
+                color: #cba6f7;
+                margin-bottom: 1rem;
+                font-size: 1.3em;
+            }
+
+            .info-box p {
+                margin-bottom: 1rem;
+                color: #a6adc8;
+            }
+
+            .info-box ul {
+                list-style: none;
+                margin-left: 1rem;
+            }
+
+            .info-box li {
+                margin-bottom: 0.5rem;
+                position: relative;
+            }
+
+            .info-box li:before {
+                content: "▶";
+                color: #cba6f7;
+                position: absolute;
+                left: -1rem;
+            }
+
+            footer {
+                background: #181825;
+                padding: 2rem 0;
+                border-top: 1px solid #313244;
+                text-align: center;
+                color: #6c7086;
+                margin-top: 3rem;
+            }
+
+            /* Estilos responsive para móviles */
             @media (max-width: 768px) {
+                .container {
+                    padding: 0 15px; /* MARGEN REDUCIDO - puedes cambiarlo aquí */
+                }
+
                 h1 {
                     font-size: 2em;
                 }
@@ -471,8 +605,20 @@ def generate_index_html(files):
                     flex: 1 1 50%;
                 }
 
+                /* Temporal en 2 columnas en móvil */
                 .period-grid {
-                    grid-template-columns: 1fr;
+                    grid-template-columns: repeat(2, 1fr); /* 2 COLUMNAS EN MÓVIL - puedes cambiar a 1fr para 1 columna */
+                    gap: 0.8rem; /* Gap más pequeño en móvil */
+                }
+
+                .period-link {
+                    padding: 0.8rem; /* Padding más pequeño */
+                    font-size: 0.9em;
+                }
+
+                .period-name {
+                    font-size: 1em;
+                    margin-bottom: 0.3rem;
                 }
 
                 .year-selector {
@@ -484,10 +630,65 @@ def generate_index_html(files):
                     margin-bottom: 5px;
                     margin-right: 0;
                 }
+
+                .section-header {
+                    padding: 15px 18px; /* Padding más pequeño en header */
+                }
+
+                .section-content {
+                    padding: 18px; /* Padding más pequeño en content */
+                }
+
+                .user-button {
+                    top: 15px;
+                    right: 15px;
+                    width: 45px;
+                    height: 45px;
+                    font-size: 20px;
+                }
+
+                .info-box {
+                    padding: 1.5rem; /* Padding más pequeño en info boxes */
+                    margin-bottom: 1.5rem;
+                }
+            }
+
+            /* Para pantallas muy pequeñas */
+            @media (max-width: 480px) {
+                .container {
+                    padding: 0 10px; /* MARGEN AÚN MÁS REDUCIDO - ajústalo aquí si quieres menos margen */
+                }
+
+                .period-grid {
+                    gap: 0.6rem;
+                }
+
+                .section-header {
+                    padding: 12px 15px;
+                }
+
+                .section-content {
+                    padding: 15px;
+                }
             }
         </style>
     </head>
     <body>
+        <!-- Botón de usuario circular -->
+        <button class="user-button" id="userButton" title="Seleccionar usuario destacado">👤</button>
+
+        <!-- Modal de selección de usuario -->
+        <div class="user-modal" id="userModal">
+            <div class="user-modal-content">
+                <div class="user-modal-header">Seleccionar Usuario Destacado</div>
+                <div class="user-options" id="userOptions">
+                    <div class="user-option selected" data-user="">Ninguno</div>
+                    <!-- Se llenarán dinámicamente con JavaScript -->
+                </div>
+                <button class="user-modal-close" id="userModalClose">Cerrar</button>
+            </div>
+        </div>
+
         <header>
             <div class="container">
                 <h1>🎵 RYM Hispano Estadísticas</h1>
@@ -519,101 +720,116 @@ def generate_index_html(files):
                 <div id="temporal" class="tab-content active">
                     <!-- Estadísticas Semanales -->
                     <div class="period-selector">
-                        <h2>📀 Estadísticas Semanales<span class="stats-badge">""" + str(len(files['weekly'])) + """</span></h2>
-                        <div class="period-grid">"""
+                        <div class="section-header" onclick="toggleSection('weekly')" aria-expanded="false">
+                            <h2>📀 Estadísticas Semanales<span class="stats-badge">""" + str(len(files['weekly'])) + """</span></h2>
+                            <span class="collapse-icon">▼</span>
+                        </div>
+                        <div class="section-content" id="weekly-content">
+                            <div class="period-grid">"""
 
     # Agregar enlaces semanales
     if files['weekly']:
         for file_info in files['weekly']:
             html += f"""
-                            <a href="{file_info['filename']}" class="period-link">
-                                <div class="period-name">{file_info['label']}</div>
-                            </a>"""
+                                <a href="{file_info['filename']}" class="period-link">
+                                    <div class="period-name">{file_info['label']}</div>
+                                </a>"""
     else:
         html += """
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📀</div>
-                                <p>No hay estadísticas semanales disponibles</p>
-                                <p style="font-size: 0.9em;">Ejecuta <code>python3 html_semanal.py</code></p>
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">📀</div>
+                                    <p>No hay estadísticas semanales disponibles</p>
+                                    <p style="font-size: 0.9em;">Ejecuta <code>python3 html_semanal.py</code></p>
+                                </div>"""
+
+    html += """
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Estadísticas Mensuales -->
+                    <div class="period-selector">
+                        <div class="section-header" onclick="toggleSection('monthly')" aria-expanded="false">
+                            <h2>📅 Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>
+                            <span class="collapse-icon">▼</span>
+                        </div>
+                        <div class="section-content" id="monthly-content">"""
+
+    # Agregar selector de año si hay archivos mensuales
+    if monthly_by_year:
+        html += """
+                            <div class="year-selector">
+                                <label for="year-select">Seleccionar año:</label>
+                                <select id="year-select" onchange="changeMonthlyYear(this.value)">"""
+
+        # Agregar opción por defecto
+        html += """
+                                    <option value="">-- Selecciona un año --</option>"""
+
+        # Agregar opciones de años
+        for year in available_years:
+            html += f"""
+                                    <option value="{year}">{year}</option>"""
+
+        html += """
+                                </select>
+                            </div>"""
+
+        # Agregar secciones por año
+        for year in available_years:
+            html += f"""
+                            <div class="monthly-year-section" id="year-{year}">
+                                <div class="period-grid">"""
+
+            for file_info in monthly_by_year[year]:
+                html += f"""
+                                    <a href="{file_info['filename']}" class="period-link">
+                                        <div class="period-name">{file_info['label']}</div>
+                                    </a>"""
+
+            html += """
+                                </div>
+                            </div>"""
+    else:
+        html += """
+                            <div class="period-grid">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">📅</div>
+                                    <p>No hay estadísticas mensuales disponibles</p>
+                                    <p style="font-size: 0.9em;">Ejecuta <code>python3 html_mensual.py</code></p>
+                                </div>
                             </div>"""
 
     html += """
                         </div>
                     </div>
 
-                    <!-- Estadísticas Mensuales -->
-                    <div class="period-selector">
-                        <h2>📅 Estadísticas Mensuales<span class="stats-badge">""" + str(len(files['monthly'])) + """</span></h2>"""
-
-    # Agregar selector de año si hay archivos mensuales
-    if monthly_by_year:
-        html += """
-                        <div class="year-selector">
-                            <label for="year-select">Seleccionar año:</label>
-                            <select id="year-select" onchange="changeMonthlyYear(this.value)">"""
-
-        # Agregar opción por defecto
-        html += """
-                                <option value="">-- Selecciona un año --</option>"""
-
-        # Agregar opciones de años
-        for year in available_years:
-            html += f"""
-                                <option value="{year}">{year}</option>"""
-
-        html += """
-                            </select>
-                        </div>"""
-
-        # Agregar secciones por año
-        for year in available_years:
-            html += f"""
-                        <div class="monthly-year-section" id="year-{year}">
-                            <div class="period-grid">"""
-
-            for file_info in monthly_by_year[year]:
-                html += f"""
-                                <a href="{file_info['filename']}" class="period-link">
-                                    <div class="period-name">{file_info['label']}</div>
-                                </a>"""
-
-            html += """
-                            </div>
-                        </div>"""
-    else:
-        html += """
-                        <div class="period-grid">
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📅</div>
-                                <p>No hay estadísticas mensuales disponibles</p>
-                                <p style="font-size: 0.9em;">Ejecuta <code>python3 html_mensual.py</code></p>
-                            </div>
-                        </div>"""
-
-    html += """
-                    </div>
-
                     <!-- Estadísticas Anuales -->
                     <div class="period-selector">
-                        <h2>📆 Estadísticas Anuales<span class="stats-badge">""" + str(len(files['yearly'])) + """</span></h2>
-                        <div class="period-grid">"""
+                        <div class="section-header" onclick="toggleSection('yearly')" aria-expanded="false">
+                            <h2>📆 Estadísticas Anuales<span class="stats-badge">""" + str(len(files['yearly'])) + """</span></h2>
+                            <span class="collapse-icon">▼</span>
+                        </div>
+                        <div class="section-content" id="yearly-content">
+                            <div class="period-grid">"""
 
     # Agregar enlaces anuales
     if files['yearly']:
         for file_info in files['yearly']:
             html += f"""
-                            <a href="{file_info['filename']}" class="period-link">
-                                <div class="period-name">{file_info['label']}</div>
-                            </a>"""
+                                <a href="{file_info['filename']}" class="period-link">
+                                    <div class="period-name">{file_info['label']}</div>
+                                </a>"""
     else:
         html += """
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📆</div>
-                                <p>No hay estadísticas anuales disponibles</p>
-                                <p style="font-size: 0.9em;">Ejecuta <code>python3 html_anual.py</code></p>
-                            </div>"""
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">📆</div>
+                                    <p>No hay estadísticas anuales disponibles</p>
+                                    <p style="font-size: 0.9em;">Ejecuta <code>python3 html_anual.py</code></p>
+                                </div>"""
 
     html += """
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -679,22 +895,10 @@ def generate_index_html(files):
                             Esta aplicación genera estadísticas de coincidencias
                             musicales entre múltiples usuarios de Last.fm usando este <a href="https://github.com/volteret4/lastfm_rym">repositorio</a>
                         </p>
-                    </div>
-
-                    <div class="info-box">
-                        <h3>🎯 Características</h3>
                         <ul>
                             <li>
-                                <strong>Estadísticas Semanales:</strong>
-                                Análisis de los últimos 7 días
-                            </li>
-                            <li>
-                                <strong>Estadísticas Mensuales:</strong>
-                                Análisis de meses completos organizados por año
-                            </li>
-                            <li>
-                                <strong>Estadísticas Anuales:</strong> Análisis
-                                de años completos
+                                <strong>Temporales:</strong> Análisis semanales,
+                                mensuales y anuales
                             </li>
                             <li>
                                 <strong>Estadísticas de Usuarios:</strong> Análisis
@@ -796,6 +1000,101 @@ def generate_index_html(files):
         </footer>
 
         <script>
+            // Lista de usuarios de ejemplo - esto deberías reemplazarlo con tus usuarios reales
+            const availableUsers = ['usuario1', 'usuario2', 'usuario3', 'usuario4']; // CAMBIA ESTOS POR TUS USUARIOS REALES
+
+            // Funcionalidad del botón de usuario
+            function initializeUserSelector() {
+                const userButton = document.getElementById('userButton');
+                const userModal = document.getElementById('userModal');
+                const userModalClose = document.getElementById('userModalClose');
+                const userOptions = document.getElementById('userOptions');
+
+                // Cargar usuario guardado desde localStorage
+                let selectedUser = localStorage.getItem('lastfm_selected_user') || '';
+
+                // Llenar opciones de usuarios
+                availableUsers.forEach(user => {
+                    const option = document.createElement('div');
+                    option.className = 'user-option';
+                    option.dataset.user = user;
+                    option.textContent = user;
+                    userOptions.appendChild(option);
+                });
+
+                // Marcar opción seleccionada
+                updateSelectedUserOption(selectedUser);
+
+                // Event listeners
+                userButton.addEventListener('click', () => {
+                    userModal.style.display = 'block';
+                });
+
+                userModalClose.addEventListener('click', () => {
+                    userModal.style.display = 'none';
+                });
+
+                userModal.addEventListener('click', (e) => {
+                    if (e.target === userModal) {
+                        userModal.style.display = 'none';
+                    }
+                });
+
+                userOptions.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('user-option')) {
+                        const user = e.target.dataset.user;
+                        selectedUser = user;
+
+                        // Guardar en localStorage
+                        if (user) {
+                            localStorage.setItem('lastfm_selected_user', user);
+                        } else {
+                            localStorage.removeItem('lastfm_selected_user');
+                        }
+
+                        updateSelectedUserOption(user);
+                        userModal.style.display = 'none';
+                    }
+                });
+            }
+
+            function updateSelectedUserOption(selectedUser) {
+                const userOptions = document.getElementById('userOptions');
+                userOptions.querySelectorAll('.user-option').forEach(option => {
+                    option.classList.remove('selected');
+                    if (option.dataset.user === selectedUser) {
+                        option.classList.add('selected');
+                    }
+                });
+            }
+
+            // Sistema de secciones colapsables
+            function toggleSection(sectionName) {
+                const content = document.getElementById(sectionName + '-content');
+                const header = content.previousElementSibling;
+                const isExpanded = header.getAttribute('aria-expanded') === 'true';
+
+                if (isExpanded) {
+                    // Cerrar sección
+                    content.classList.remove('active');
+                    header.setAttribute('aria-expanded', 'false');
+                } else {
+                    // Abrir sección
+                    content.classList.add('active');
+                    header.setAttribute('aria-expanded', 'true');
+
+                    // Si es la sección mensual y hay años disponibles, mostrar el primer año
+                    if (sectionName === 'monthly') {
+                        const yearSelect = document.getElementById('year-select');
+                        if (yearSelect && yearSelect.options.length > 1 && !yearSelect.value) {
+                            const firstYear = yearSelect.options[1].value;
+                            yearSelect.value = firstYear;
+                            changeMonthlyYear(firstYear);
+                        }
+                    }
+                }
+            }
+
             // Sistema de tabs
             const tabLinks = document.querySelectorAll(".tab-link");
             const tabContents = document.querySelectorAll(".tab-content");
@@ -846,15 +1145,9 @@ def generate_index_html(files):
                 }
             }
 
-            // Mostrar el primer año por defecto si existe
+            // Inicialización
             document.addEventListener('DOMContentLoaded', function() {
-                const yearSelect = document.getElementById('year-select');
-                if (yearSelect && yearSelect.options.length > 1) {
-                    // Seleccionar el primer año disponible (más reciente)
-                    const firstYear = yearSelect.options[1].value;
-                    yearSelect.value = firstYear;
-                    changeMonthlyYear(firstYear);
-                }
+                initializeUserSelector();
             });
         </script>
     </body>

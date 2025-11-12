@@ -58,6 +58,65 @@ class Database:
         result = cursor.fetchone()
         return result['release_year'] if result and result['release_year'] else None
 
+    def get_first_scrobble_date(self, user: str, artist: str = None, album: str = None, track: str = None) -> int:
+        """Obtiene la fecha del primer scrobble de un usuario para un elemento específico"""
+        cursor = self.conn.cursor()
+
+        if track and artist:
+            # Primer scrobble de una canción específica
+            cursor.execute('''
+                SELECT MIN(timestamp) as first_scrobble
+                FROM scrobbles
+                WHERE user = ? AND artist = ? AND track = ?
+            ''', (user, artist, track))
+        elif album and artist:
+            # Primer scrobble de un álbum específico
+            cursor.execute('''
+                SELECT MIN(timestamp) as first_scrobble
+                FROM scrobbles
+                WHERE user = ? AND artist = ? AND album = ?
+            ''', (user, artist, album))
+        elif artist:
+            # Primer scrobble de un artista específico
+            cursor.execute('''
+                SELECT MIN(timestamp) as first_scrobble
+                FROM scrobbles
+                WHERE user = ? AND artist = ?
+            ''', (user, artist))
+        else:
+            return None
+
+        result = cursor.fetchone()
+        return result['first_scrobble'] if result and result['first_scrobble'] else None
+
+    def get_global_first_scrobble_date(self, artist: str = None, album: str = None, track: str = None) -> int:
+        """Obtiene la fecha del primer scrobble global (cualquier usuario) para un elemento específico"""
+        cursor = self.conn.cursor()
+
+        if track and artist:
+            cursor.execute('''
+                SELECT MIN(timestamp) as first_scrobble
+                FROM scrobbles
+                WHERE artist = ? AND track = ?
+            ''', (artist, track))
+        elif album and artist:
+            cursor.execute('''
+                SELECT MIN(timestamp) as first_scrobble
+                FROM scrobbles
+                WHERE artist = ? AND album = ?
+            ''', (artist, album))
+        elif artist:
+            cursor.execute('''
+                SELECT MIN(timestamp) as first_scrobble
+                FROM scrobbles
+                WHERE artist = ?
+            ''', (artist,))
+        else:
+            return None
+
+        result = cursor.fetchone()
+        return result['first_scrobble'] if result and result['first_scrobble'] else None
+
     def close(self):
         self.conn.close()
 
@@ -101,6 +160,233 @@ def rotate_weekly_files():
         if os.path.exists(old_path):
             shutil.move(old_path, new_path)
             print(f"   ↻ Renombrado: {old_name} → {new_name}")
+
+
+def analyze_novelties(db, users, from_timestamp, to_timestamp):
+    """
+    Analiza elementos nuevos en el período especificado
+    """
+    print("🔍 Analizando novedades...")
+
+    # Obtener todos los scrobbles del período actual
+    all_current_tracks = []
+    for user in users:
+        tracks = db.get_scrobbles(user, from_timestamp, to_timestamp)
+        all_current_tracks.extend(tracks)
+
+    if not all_current_tracks:
+        return {
+            'nuevos': {'artists': [], 'albums': [], 'tracks': []},
+            'nuevos_compartidos': {'artists': [], 'albums': [], 'tracks': []},
+            'nuevos_para_usuario': {'artists': [], 'albums': [], 'tracks': []}
+        }
+
+    # Contadores para elementos del período actual
+    current_artists = Counter()
+    current_albums = Counter()
+    current_tracks_counter = Counter()
+
+    # Usuarios que han escuchado cada elemento en el período actual
+    current_artists_users = defaultdict(set)
+    current_albums_users = defaultdict(set)
+    current_tracks_users = defaultdict(set)
+
+    # Procesar scrobbles actuales
+    for track in all_current_tracks:
+        artist = track['artist']
+        album = track['album']
+        track_name = f"{artist} - {track['track']}"
+        user = track['user']
+
+        current_artists[artist] += 1
+        current_artists_users[artist].add(user)
+
+        current_tracks_counter[track_name] += 1
+        current_tracks_users[track_name].add(user)
+
+        if album and album.strip():
+            album_display = f"{artist} - {album}"
+            current_albums[album_display] += 1
+            current_albums_users[album_display].add(user)
+
+    # Analizar novedades
+    total_users = len(users)
+    majority_threshold = max(1, total_users // 2)  # Al menos 50% de usuarios
+
+    nuevos_artists = []
+    nuevos_albums = []
+    nuevos_tracks = []
+
+    nuevos_compartidos_artists = []
+    nuevos_compartidos_albums = []
+    nuevos_compartidos_tracks = []
+
+    # NUEVOS ARTISTAS
+    for artist, count in current_artists.most_common(20):
+        first_global = db.get_global_first_scrobble_date(artist=artist)
+        if first_global and first_global >= from_timestamp:
+            nuevos_artists.append({
+                'name': artist,
+                'count': count,
+                'users': list(current_artists_users[artist])
+            })
+
+            # ¿Es compartido por la mayoría?
+            if len(current_artists_users[artist]) >= majority_threshold:
+                nuevos_compartidos_artists.append({
+                    'name': artist,
+                    'count': count,
+                    'users': list(current_artists_users[artist])
+                })
+
+    # NUEVOS ÁLBUMES
+    for album, count in current_albums.most_common(20):
+        artist, album_name = album.split(' - ', 1)
+        first_global = db.get_global_first_scrobble_date(artist=artist, album=album_name)
+        if first_global and first_global >= from_timestamp:
+            nuevos_albums.append({
+                'name': album,
+                'count': count,
+                'users': list(current_albums_users[album])
+            })
+
+            if len(current_albums_users[album]) >= majority_threshold:
+                nuevos_compartidos_albums.append({
+                    'name': album,
+                    'count': count,
+                    'users': list(current_albums_users[album])
+                })
+
+    # NUEVAS CANCIONES
+    for track, count in current_tracks_counter.most_common(20):
+        artist, track_name = track.split(' - ', 1)
+        first_global = db.get_global_first_scrobble_date(artist=artist, track=track_name)
+        if first_global and first_global >= from_timestamp:
+            nuevos_tracks.append({
+                'name': track,
+                'count': count,
+                'users': list(current_tracks_users[track])
+            })
+
+            if len(current_tracks_users[track]) >= majority_threshold:
+                nuevos_compartidos_tracks.append({
+                    'name': track,
+                    'count': count,
+                    'users': list(current_tracks_users[track])
+                })
+
+    print(f"   - Artistas nuevos: {len(nuevos_artists)}")
+    print(f"   - Álbumes nuevos: {len(nuevos_albums)}")
+    print(f"   - Canciones nuevas: {len(nuevos_tracks)}")
+    print(f"   - Artistas nuevos compartidos: {len(nuevos_compartidos_artists)}")
+    print(f"   - Álbumes nuevos compartidos: {len(nuevos_compartidos_albums)}")
+    print(f"   - Canciones nuevas compartidas: {len(nuevos_compartidos_tracks)}")
+
+    return {
+        'nuevos': {
+            'artists': nuevos_artists,
+            'albums': nuevos_albums,
+            'tracks': nuevos_tracks
+        },
+        'nuevos_compartidos': {
+            'artists': nuevos_compartidos_artists,
+            'albums': nuevos_compartidos_albums,
+            'tracks': nuevos_compartidos_tracks
+        },
+        'nuevos_para_usuario': {
+            'artists': [],  # Se calculará dinámicamente en el frontend
+            'albums': [],
+            'tracks': []
+        },
+        'user_first_scrobbles': {}  # Para cálculos dinámicos en frontend
+    }
+
+
+def get_user_novelties(db, user, from_timestamp, to_timestamp, total_users):
+    """
+    Analiza elementos nuevos para un usuario específico
+    (elementos que el usuario escucha por primera vez, pero que ya conocía el 50% del grupo)
+    """
+    if not user:
+        return {'artists': [], 'albums': [], 'tracks': []}
+
+    # Obtener scrobbles del usuario en el período actual
+    user_tracks = db.get_scrobbles(user, from_timestamp, to_timestamp)
+
+    if not user_tracks:
+        return {'artists': [], 'albums': [], 'tracks': []}
+
+    majority_threshold = max(1, total_users // 2)
+
+    user_new_artists = []
+    user_new_albums = []
+    user_new_tracks = []
+
+    # Analizar elementos únicos que el usuario escuchó en el período
+    processed_artists = set()
+    processed_albums = set()
+    processed_tracks = set()
+
+    for track in user_tracks:
+        artist = track['artist']
+        album = track['album']
+        track_name = f"{artist} - {track['track']}"
+
+        # ARTISTAS
+        if artist not in processed_artists:
+            processed_artists.add(artist)
+            user_first = db.get_first_scrobble_date(user, artist=artist)
+            global_first = db.get_global_first_scrobble_date(artist=artist)
+
+            # ¿Es nuevo para el usuario pero ya conocido por el grupo?
+            if (user_first and user_first >= from_timestamp and
+                global_first and global_first < from_timestamp):
+
+                # Verificar si ya lo conocía la mayoría del grupo antes del período
+                # (Esto es una aproximación - en una implementación completa habría que verificar usuarios específicos)
+                user_new_artists.append({
+                    'name': artist,
+                    'count': sum(1 for t in user_tracks if t['artist'] == artist),
+                    'users': [user]
+                })
+
+        # ÁLBUMES
+        if album and album.strip():
+            album_display = f"{artist} - {album}"
+            if album_display not in processed_albums:
+                processed_albums.add(album_display)
+                user_first = db.get_first_scrobble_date(user, artist=artist, album=album)
+                global_first = db.get_global_first_scrobble_date(artist=artist, album=album)
+
+                if (user_first and user_first >= from_timestamp and
+                    global_first and global_first < from_timestamp):
+
+                    user_new_albums.append({
+                        'name': album_display,
+                        'count': sum(1 for t in user_tracks if t['artist'] == artist and t['album'] == album),
+                        'users': [user]
+                    })
+
+        # CANCIONES
+        if track_name not in processed_tracks:
+            processed_tracks.add(track_name)
+            user_first = db.get_first_scrobble_date(user, artist=artist, track=track['track'])
+            global_first = db.get_global_first_scrobble_date(artist=artist, track=track['track'])
+
+            if (user_first and user_first >= from_timestamp and
+                global_first and global_first < from_timestamp):
+
+                user_new_tracks.append({
+                    'name': track_name,
+                    'count': sum(1 for t in user_tracks if t['artist'] == artist and t['track'] == track['track']),
+                    'users': [user]
+                })
+
+    return {
+        'artists': user_new_artists[:10],  # Top 10
+        'albums': user_new_albums[:10],
+        'tracks': user_new_tracks[:10]
+    }
 
 
 def generate_weekly_stats(weeks_ago: int = 0):
@@ -312,8 +598,13 @@ def generate_weekly_stats(weeks_ago: int = 0):
         'albums': filter_common(albums_counter, albums_users, albums_user_counts),
         'genres': filter_common(genres_counter, genres_users, genres_user_counts, genres_user_artists, genres_artists, genres_albums),
         'labels': filter_common(labels_counter, labels_users, labels_user_counts, labels_user_artists, labels_artists, labels_albums),
-        'years': filter_common(years_counter, years_users, years_user_counts, years_user_artists, years_artists, years_albums)
+        'years': filter_common(years_counter, years_users, years_user_counts, years_user_artists, years_artists, years_albums),
+        'users_list': users  # Para análisis dinámico de novedades
     }
+
+    # Añadir análisis de novedades
+    novelties = analyze_novelties(db, users, from_timestamp, to_timestamp)
+    stats['novelties'] = novelties
 
     db.close()
     return stats, period_label
@@ -653,6 +944,35 @@ def create_html(stats: Dict, users: List[str]) -> str:
             border-radius: 4px;
         }}
 
+        .novelty-section {{
+            margin-bottom: 30px;
+        }}
+
+        .novelty-section h4 {{
+            color: #cba6f7;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #45475a;
+        }}
+
+        .novelty-subsection {{
+            margin-bottom: 20px;
+        }}
+
+        .novelty-subsection h5 {{
+            color: #f9e2af;
+            font-size: 0.95em;
+            margin-bottom: 10px;
+        }}
+
+        .novelty-empty {{
+            color: #6c7086;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }}
+
         .artists-popup {{
             position: fixed;
             top: 50%;
@@ -776,6 +1096,7 @@ def create_html(stats: Dict, users: List[str]) -> str:
                     <button class="category-filter" data-category="genres">Géneros</button>
                     <button class="category-filter" data-category="labels">Sellos</button>
                     <button class="category-filter" data-category="years">Años</button>
+                    <button class="category-filter" data-category="novelties">Novedades</button>
                 </div>
             </div>
         </div>
@@ -884,6 +1205,49 @@ def create_html(stats: Dict, users: List[str]) -> str:
 
             document.body.appendChild(overlay);
             document.body.appendChild(popup);
+        }}
+
+        function createNoveltyItem(item, selectedUser) {{
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
+
+            if (selectedUser && item.users.includes(selectedUser)) {{
+                itemDiv.classList.add('highlighted');
+            }}
+
+            const itemName = document.createElement('div');
+            itemName.className = 'item-name';
+            itemName.textContent = item.name;
+            itemDiv.appendChild(itemName);
+
+            const itemMeta = document.createElement('div');
+            itemMeta.className = 'item-meta';
+
+            const countBadge = document.createElement('span');
+            countBadge.className = 'badge';
+            countBadge.textContent = `${{item.count}} plays`;
+            itemMeta.appendChild(countBadge);
+
+            // Ordenar usuarios por scrobbles y mostrar
+            const userCounts = item.users.map(user => ({{
+                user,
+                count: item.user_counts ? item.user_counts[user] || item.count : item.count
+            }}));
+            userCounts.sort((a, b) => b.count - a.count);
+
+            userCounts.forEach(({{user, count}}) => {{
+                const userBadge = document.createElement('span');
+                userBadge.className = 'user-badge';
+                if (user === selectedUser) {{
+                    userBadge.classList.add('highlighted-user');
+                }}
+
+                userBadge.textContent = `${{user}} (${{count}})`;
+                itemMeta.appendChild(userBadge);
+            }});
+
+            itemDiv.appendChild(itemMeta);
+            return itemDiv;
         }}
 
         function toggleItemDetails(itemDiv, item, category) {{
@@ -1014,19 +1378,144 @@ def create_html(stats: Dict, users: List[str]) -> str:
             const container = document.getElementById('categoriesContainer');
             container.innerHTML = '';
 
-            const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels', 'years'];
+            const categoryOrder = ['artists', 'tracks', 'albums', 'genres', 'labels', 'years', 'novelties'];
             const categoryTitles = {{
                 artists: 'Artistas',
                 tracks: 'Canciones',
                 albums: 'Álbumes',
                 genres: 'Géneros',
                 labels: 'Sellos',
-                years: 'Años'
+                years: 'Años',
+                novelties: 'Novedades'
             }};
 
             let hasData = false;
 
             categoryOrder.forEach(categoryKey => {{
+                if (categoryKey === 'novelties') {{
+                    // Manejar sección de novedades especialmente
+                    if (!stats.novelties) return;
+
+                    hasData = true;
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.className = 'category';
+                    categoryDiv.dataset.category = categoryKey;
+
+                    if (activeCategories.has(categoryKey)) {{
+                        categoryDiv.classList.add('visible');
+                    }}
+
+                    const title = document.createElement('h3');
+                    title.textContent = categoryTitles[categoryKey];
+                    categoryDiv.appendChild(title);
+
+                    // NUEVOS
+                    const nuevosSection = document.createElement('div');
+                    nuevosSection.className = 'novelty-section';
+
+                    const nuevosTitle = document.createElement('h4');
+                    nuevosTitle.textContent = '🆕 Nuevos para todos';
+                    nuevosSection.appendChild(nuevosTitle);
+
+                    ['artists', 'albums', 'tracks'].forEach(type => {{
+                        const subsection = document.createElement('div');
+                        subsection.className = 'novelty-subsection';
+
+                        const subsectionTitle = document.createElement('h5');
+                        subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                     type === 'albums' ? 'Álbumes' : 'Canciones';
+                        subsection.appendChild(subsectionTitle);
+
+                        const items = stats.novelties.nuevos[type];
+                        if (items && items.length > 0) {{
+                            items.forEach(item => {{
+                                const itemDiv = createNoveltyItem(item, selectedUser);
+                                subsection.appendChild(itemDiv);
+                            }});
+                        }} else {{
+                            const emptyDiv = document.createElement('div');
+                            emptyDiv.className = 'novelty-empty';
+                            emptyDiv.textContent = 'No hay elementos nuevos';
+                            subsection.appendChild(emptyDiv);
+                        }}
+
+                        nuevosSection.appendChild(subsection);
+                    }});
+
+                    categoryDiv.appendChild(nuevosSection);
+
+                    // NUEVOS COMPARTIDOS
+                    const compartidosSection = document.createElement('div');
+                    compartidosSection.className = 'novelty-section';
+
+                    const compartidosTitle = document.createElement('h4');
+                    compartidosTitle.textContent = '👥 Nuevos compartidos (50%+ del grupo)';
+                    compartidosSection.appendChild(compartidosTitle);
+
+                    ['artists', 'albums', 'tracks'].forEach(type => {{
+                        const subsection = document.createElement('div');
+                        subsection.className = 'novelty-subsection';
+
+                        const subsectionTitle = document.createElement('h5');
+                        subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                     type === 'albums' ? 'Álbumes' : 'Canciones';
+                        subsection.appendChild(subsectionTitle);
+
+                        const items = stats.novelties.nuevos_compartidos[type];
+                        if (items && items.length > 0) {{
+                            items.forEach(item => {{
+                                const itemDiv = createNoveltyItem(item, selectedUser);
+                                subsection.appendChild(itemDiv);
+                            }});
+                        }} else {{
+                            const emptyDiv = document.createElement('div');
+                            emptyDiv.className = 'novelty-empty';
+                            emptyDiv.textContent = 'No hay elementos nuevos compartidos';
+                            subsection.appendChild(emptyDiv);
+                        }}
+
+                        compartidosSection.appendChild(subsection);
+                    }});
+
+                    categoryDiv.appendChild(compartidosSection);
+
+                    // NUEVOS PARA USUARIO SELECCIONADO
+                    if (selectedUser) {{
+                        const usuarioSection = document.createElement('div');
+                        usuarioSection.className = 'novelty-section';
+
+                        const usuarioTitle = document.createElement('h4');
+                        usuarioTitle.textContent = `👤 Nuevos para ${{selectedUser}} (ya conocidos por el grupo)`;
+                        usuarioSection.appendChild(usuarioTitle);
+
+                        // Aquí se cargarían dinámicamente los elementos nuevos para el usuario
+                        // Por simplicidad, mostrar mensaje indicativo
+                        const infoDiv = document.createElement('div');
+                        infoDiv.className = 'novelty-empty';
+                        infoDiv.textContent = 'Función en desarrollo - se calculará dinámicamente';
+                        usuarioSection.appendChild(infoDiv);
+
+                        categoryDiv.appendChild(usuarioSection);
+                    }} else {{
+                        const usuarioSection = document.createElement('div');
+                        usuarioSection.className = 'novelty-section';
+
+                        const usuarioTitle = document.createElement('h4');
+                        usuarioTitle.textContent = '👤 Nuevos para usuario específico';
+                        usuarioSection.appendChild(usuarioTitle);
+
+                        const infoDiv = document.createElement('div');
+                        infoDiv.className = 'novelty-empty';
+                        infoDiv.textContent = 'Selecciona un usuario para ver sus novedades personales';
+                        usuarioSection.appendChild(infoDiv);
+
+                        categoryDiv.appendChild(usuarioSection);
+                    }}
+
+                    container.appendChild(categoryDiv);
+                    return;
+                }}
+
                 if (!stats[categoryKey] || stats[categoryKey].length === 0) return;
 
                 hasData = true;
@@ -1092,6 +1581,8 @@ def create_html(stats: Dict, users: List[str]) -> str:
                     countBadge.className = 'badge';
                     countBadge.textContent = `${{item.count}} plays`;
                     itemMeta.appendChild(countBadge);
+
+                    item.users.sort((a, b) => (item.user_counts[b] || 0) - (item.user_counts[a] || 0));
 
                     item.users.forEach(user => {{
                         const userBadge = document.createElement('span');
@@ -1190,6 +1681,7 @@ def main():
         print(f"   - Géneros: {len(stats['genres'])}")
         print(f"   - Sellos: {len(stats['labels'])}")
         print(f"   - Años: {len(stats['years'])}")
+        print(f"   - Novedades procesadas: {len(stats['novelties']['nuevos']['artists'] + stats['novelties']['nuevos']['albums'] + stats['novelties']['nuevos']['tracks'])}")
 
         # 3. Generar archivos para semanas anteriores (si no existen)
         week_files = [

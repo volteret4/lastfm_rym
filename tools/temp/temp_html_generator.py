@@ -27,7 +27,7 @@ class HTMLGenerator:
 
         # Determinar qué categorías incluir
         categories = ['artists', 'tracks', 'albums', 'genres', 'labels', 'years']
-        if period_type == 'semanal' and 'novelties' in stats:
+        if 'novelties' in stats:
             categories.append('novelties')
 
         # Crear lista de filtros para JavaScript
@@ -595,8 +595,8 @@ class HTMLGenerator:
                 <h1>📊 RYM Hispano Estadísticas</h1>
                 <div class="nav-buttons">
                     <a href="esta-semana.html" class="nav-button">TEMPORALES</a>
-                    <a href="#grupo" class="nav-button">GRUPO</a>
-                    <a href="#about" class="nav-button">ACERCA DE</a>
+                    <a href="index.html#grupo" class="nav-button">GRUPO</a>
+                    <a href="index.html#about" class="nav-button">ACERCA DE</a>
                 </div>
             </div>
             <button class="user-button" id="userButton">👤</button>
@@ -645,7 +645,7 @@ class HTMLGenerator:
         // Usuarios reales del entorno LASTFM_USERS
         const availableUsers = {users_json};
         const stats = {stats_json};
-        const includeNovelties = {'true' if 'novelties' in stats else 'false'};
+        const hasNovelties = stats.novelties !== undefined;
 
         // Funcionalidad del botón de usuario
         function initializeUserSelector() {{
@@ -850,7 +850,7 @@ class HTMLGenerator:
 
                 // Manejo especial para novedades
                 if (categoryKey === 'novelties') {{
-                    if (!includeNovelties || !stats.novelties) return;
+                    if (!hasNovelties || !stats.novelties) return;
 
                     hasData = true;
                     const categoryDiv = document.createElement('div');

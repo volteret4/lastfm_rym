@@ -6,7 +6,7 @@ Módulo analizador de estadísticas para datos de Last.fm
 
 from collections import Counter, defaultdict
 from typing import List, Dict, Optional
-from tools.temp.temp_database import Database
+from database import Database
 
 
 class StatsAnalyzer:
@@ -161,7 +161,9 @@ class StatsAnalyzer:
         # Añadir análisis de novedades si se solicita
         if include_novelties:
             print("   🆕 Analizando novedades...")
-            stats['novelties'] = self._analyze_novelties(users, from_timestamp, to_timestamp)
+            novelties = self._analyze_novelties(users, from_timestamp, to_timestamp)
+            stats['novelties'] = novelties
+            print(f"   🆕 Novedades encontradas: {len(novelties['nuevos']['artists'])} artistas, {len(novelties['nuevos']['albums'])} álbumes, {len(novelties['nuevos']['tracks'])} canciones")
 
         print(f"   ✅ Análisis completado: {len(all_scrobbles):,} scrobbles procesados")
         return stats

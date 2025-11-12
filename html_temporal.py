@@ -173,6 +173,7 @@ def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, 
 
     # Incluir novedades solo para semanales
     include_novelties = (period_type == 'weekly')
+    print(f"   🔍 Incluir novedades: {include_novelties} (período: {period_type})")
 
     stats = analyzer.analyze_period(users, from_timestamp, to_timestamp, include_novelties)
 

@@ -651,30 +651,13 @@ class HTMLGenerator:
         const stats = {stats_json};
         const hasNovelties = stats.novelties !== undefined;
 
-        // Cache para novedades por usuario
-        const userNoveltiesCache = new Map();
-
-        // Función para calcular novedades de usuario (placeholder - en producción llamaría al backend)
-        function calculateUserNovelties(user) {{
-            // Cache check
-            if (userNoveltiesCache.has(user)) {{
-                return userNoveltiesCache.get(user);
+        // Función para obtener novedades de usuario desde datos precalculados
+        function getUserNovelties(user) {{
+            if (!stats.novelties || !stats.novelties.nuevos_para_usuarios) {{
+                return {{ artists: [], albums: [], tracks: [] }};
             }}
 
-            // Por ahora devolvemos placeholder con mensaje explicativo
-            // En producción, esto haría una llamada AJAX al backend
-            const placeholder = {{
-                artists: [{{
-                    name: "Cálculo en desarrollo",
-                    user_first_date: Date.now() / 1000,
-                    global_first_date: (Date.now() / 1000) - 86400 * 30
-                }}],
-                albums: [],
-                tracks: []
-            }};
-
-            userNoveltiesCache.set(user, placeholder);
-            return placeholder;
+            return stats.novelties.nuevos_para_usuarios[user] || {{ artists: [], albums: [], tracks: [] }};
         }}
 
         // Funcionalidad del botón de usuario
@@ -880,21 +863,54 @@ class HTMLGenerator:
             const itemMeta = document.createElement('div');
             itemMeta.className = 'item-meta';
 
-            // Fecha de primer scrobble del usuario
-            const userDate = new Date(item.user_first_date * 1000);
-            const userDateBadge = document.createElement('span');
-            userDateBadge.className = 'badge';
-            userDateBadge.style.background = '#cba6f7';
-            userDateBadge.style.color = '#1e1e2e';
-            userDateBadge.textContent = `Tu primera vez: ${{userDate.toLocaleDateString('es-ES')}}`;
-            itemMeta.appendChild(userDateBadge);
+            // Total de scrobbles del usuario para este elemento
+            if (item.total_count) {{
+                const totalBadge = document.createElement('span');
+                totalBadge.className = 'badge';
+                totalBadge.style.background = '#cba6f7';
+                totalBadge.style.color = '#1e1e2e';
+                totalBadge.textContent = `${{item.total_count}} total plays`;
+                itemMeta.appendChild(totalBadge);
+            }}
 
-            // Fecha de primer scrobble global (del grupo)
-            const globalDate = new Date(item.global_first_date * 1000);
-            const globalDateBadge = document.createElement('span');
-            globalDateBadge.className = 'badge';
-            globalDateBadge.textContent = `Conocido desde: ${{globalDate.toLocaleDateString('es-ES')}}`;
-            itemMeta.appendChild(globalDateBadge);
+            // Scrobbles en este período
+            if (item.period_count) {{
+                const periodBadge = document.createElement('span');
+                periodBadge.className = 'badge';
+                periodBadge.textContent = `${{item.period_count}} plays período`;
+                itemMeta.appendChild(periodBadge);
+            }}
+
+            // Fecha de primera vez del usuario (si está disponible)
+            if (item.first_date || item.user_first_date) {{
+                const date = new Date((item.first_date || item.user_first_date) * 1000);
+                const dateBadge = document.createElement('span');
+                dateBadge.className = 'badge';
+                dateBadge.style.background = '#a6e3a1';
+                dateBadge.style.color = '#1e1e2e';
+                dateBadge.textContent = `Primera vez: ${{date.toLocaleDateString('es-ES')}}`;
+                itemMeta.appendChild(dateBadge);
+            }}
+
+            // Usuarios que también lo escucharon (coincidencias)
+            if (item.coincident_users && item.coincident_users.length > 0) {{
+                item.coincident_users.forEach(user => {{
+                    const userBadge = document.createElement('span');
+                    userBadge.className = 'user-badge';
+                    userBadge.textContent = user;
+                    itemMeta.appendChild(userBadge);
+                }});
+            }}
+
+            // Información de coincidencias
+            if (item.num_coincidences) {{
+                const coincidencesBadge = document.createElement('span');
+                coincidencesBadge.className = 'badge';
+                coincidencesBadge.style.background = '#f38ba8';
+                coincidencesBadge.style.color = '#1e1e2e';
+                coincidencesBadge.textContent = `${{item.num_coincidences}} coincidencias`;
+                itemMeta.appendChild(coincidencesBadge);
+            }}
 
             itemDiv.appendChild(itemMeta);
             return itemDiv;
@@ -1010,7 +1026,7 @@ class HTMLGenerator:
                         usuarioSection.appendChild(usuarioTitle);
 
                         // Calcular novedades para el usuario
-                        const userNovelties = calculateUserNovelties(selectedUser);
+                        const userNovelties = getUserNovelties(selectedUser);
 
                         ['artists', 'albums', 'tracks'].forEach(type => {{
                             const subsection = document.createElement('div');
@@ -1030,9 +1046,11 @@ class HTMLGenerator:
                             }} else {{
                                 const emptyDiv = document.createElement('div');
                                 emptyDiv.className = 'novelty-empty';
+                                const typeText = type === 'artists' ? 'artistas' :
+                                               type === 'albums' ? 'álbumes' : 'canciones';
                                 emptyDiv.textContent = items ?
-                                    'No hay elementos nuevos para este usuario en el período' :
-                                    'Cargando novedades del usuario...';
+                                    `No hay ${{typeText}} nuevos para ${{selectedUser}} con coincidencias en el período` :
+                                    'Calculando novedades del usuario...';
                                 subsection.appendChild(emptyDiv);
                             }}
 

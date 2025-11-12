@@ -162,6 +162,20 @@ class StatsAnalyzer:
         if include_novelties:
             print("   🆕 Analizando novedades...")
             novelties = self._analyze_novelties(users, from_timestamp, to_timestamp)
+
+            # Calcular novedades para cada usuario específico
+            print("   👤 Calculando novedades por usuario...")
+            user_specific_novelties = {}
+            for user in users:
+                user_novelties = self.calculate_user_novelties(users, user, from_timestamp, to_timestamp)
+                # Verificar si tiene al menos una novedad
+                has_novelties = (len(user_novelties['artists']) > 0 or
+                               len(user_novelties['albums']) > 0 or
+                               len(user_novelties['tracks']) > 0)
+                if has_novelties:
+                    user_specific_novelties[user] = user_novelties
+
+            novelties['nuevos_para_usuarios'] = user_specific_novelties
             stats['novelties'] = novelties
 
         print(f"   ✅ Análisis completado: {len(all_scrobbles):,} scrobbles procesados")
@@ -383,78 +397,154 @@ class StatsAnalyzer:
 
         return result
 
-    def calculate_user_novelties(self, user: str, from_timestamp: int, to_timestamp: int) -> Dict:
+    def calculate_user_novelties(self, users: List[str], user: str, from_timestamp: int, to_timestamp: int) -> Dict:
         """
-        Calcula elementos que son nuevos para un usuario específico pero ya conocidos por el grupo
+        Calcula elementos que son nuevos para un usuario específico en el período,
+        que coinciden con otros usuarios, ordenados por número de coincidencias y escuchas totales
+
+        Args:
+            users: Lista de todos los usuarios
+            user: Usuario específico a analizar
+            from_timestamp: Inicio del período
+            to_timestamp: Fin del período
+
+        Returns:
+            Dict con novedades del usuario con información de coincidencias
         """
-        if not user:
+        if not user or user not in users:
             return {'artists': [], 'albums': [], 'tracks': []}
+
+        print(f"   👤 Calculando novedades para {user}...")
 
         # Obtener scrobbles del usuario en el período
         user_scrobbles = self.db.get_scrobbles(user, from_timestamp, to_timestamp)
 
-        user_novelties = {'artists': [], 'albums': [], 'tracks': []}
+        if not user_scrobbles:
+            return {'artists': [], 'albums': [], 'tracks': []}
 
-        # Elementos únicos del usuario en el período
-        user_artists = set()
-        user_albums = set()
-        user_tracks = set()
+        # Obtener scrobbles de todos los otros usuarios en el período
+        all_other_users_scrobbles = []
+        for other_user in users:
+            if other_user != user:
+                other_scrobbles = self.db.get_scrobbles(other_user, from_timestamp, to_timestamp)
+                for scrobble in other_scrobbles:
+                    scrobble['user'] = other_user
+                all_other_users_scrobbles.extend(other_scrobbles)
+
+        # Elementos de otros usuarios en el período
+        other_users_artists = defaultdict(set)  # artist -> set of users
+        other_users_albums = defaultdict(set)   # (artist, album) -> set of users
+        other_users_tracks = defaultdict(set)   # (artist, track) -> set of users
+
+        for scrobble in all_other_users_scrobbles:
+            other_users_artists[scrobble['artist']].add(scrobble['user'])
+            if scrobble['album']:
+                other_users_albums[(scrobble['artist'], scrobble['album'])].add(scrobble['user'])
+            other_users_tracks[(scrobble['artist'], scrobble['track'])].add(scrobble['user'])
+
+        user_new_artists = []
+        user_new_albums = []
+        user_new_tracks = []
+
+        # Analizar elementos únicos que el usuario escuchó en el período
+        processed_artists = set()
+        processed_albums = set()
+        processed_tracks = set()
 
         for scrobble in user_scrobbles:
-            user_artists.add(scrobble['artist'])
-            if scrobble['album']:
-                user_albums.add((scrobble['artist'], scrobble['album']))
-            user_tracks.add((scrobble['artist'], scrobble['track']))
+            artist = scrobble['artist']
+            album = scrobble['album']
+            track = scrobble['track']
 
-        # Verificar artistas
-        for artist in user_artists:
-            # Primer scrobble del usuario para este artista
-            user_first = self.db.get_first_scrobble_date(user, artist=artist)
-            # Primer scrobble global de este artista
-            global_first = self.db.get_global_first_scrobble_date(artist=artist)
+            # ARTISTAS
+            if artist not in processed_artists:
+                processed_artists.add(artist)
+                user_first = self.db.get_first_scrobble_date(user, artist=artist)
 
-            # Si el usuario lo escuchó por primera vez en este período
-            # pero el artista ya era conocido por el grupo
-            if (user_first and user_first >= from_timestamp and
-                global_first and global_first < from_timestamp):
-                user_novelties['artists'].append({
-                    'name': artist,
-                    'user_first_date': user_first,
-                    'global_first_date': global_first
-                })
+                # ¿Es la primera vez que el usuario escucha este artista?
+                if user_first and user_first >= from_timestamp:
+                    # ¿También lo escucharon otros usuarios en este período?
+                    if artist in other_users_artists:
+                        coincident_users = list(other_users_artists[artist])
+                        period_count = sum(1 for s in user_scrobbles if s['artist'] == artist)
+                        total_count = self.db.get_user_total_scrobbles(user, artist=artist)
 
-        # Verificar álbumes
-        for artist, album in user_albums:
-            user_first = self.db.get_first_scrobble_date(user, artist=artist, album=album)
-            global_first = self.db.get_global_first_scrobble_date(artist=artist, album=album)
+                        user_new_artists.append({
+                            'name': artist,
+                            'period_count': period_count,
+                            'total_count': total_count,
+                            'coincident_users': coincident_users,
+                            'num_coincidences': len(coincident_users),
+                            'first_date': user_first
+                        })
 
-            if (user_first and user_first >= from_timestamp and
-                global_first and global_first < from_timestamp):
-                user_novelties['albums'].append({
-                    'name': f"{artist} - {album}",
-                    'artist': artist,
-                    'album': album,
-                    'user_first_date': user_first,
-                    'global_first_date': global_first
-                })
+            # ÁLBUMES
+            if album and album.strip():
+                album_key = (artist, album)
+                if album_key not in processed_albums:
+                    processed_albums.add(album_key)
+                    user_first = self.db.get_first_scrobble_date(user, artist=artist, album=album)
 
-        # Verificar canciones
-        for artist, track in user_tracks:
-            user_first = self.db.get_first_scrobble_date(user, artist=artist, track=track)
-            global_first = self.db.get_global_first_scrobble_date(artist=artist, track=track)
+                    # ¿Es la primera vez que el usuario escucha este álbum?
+                    if user_first and user_first >= from_timestamp:
+                        # ¿También lo escucharon otros usuarios en este período?
+                        if album_key in other_users_albums:
+                            coincident_users = list(other_users_albums[album_key])
+                            period_count = sum(1 for s in user_scrobbles if s['artist'] == artist and s['album'] == album)
+                            total_count = self.db.get_user_total_scrobbles(user, artist=artist, album=album)
 
-            if (user_first and user_first >= from_timestamp and
-                global_first and global_first < from_timestamp):
-                user_novelties['tracks'].append({
-                    'name': f"{artist} - {track}",
-                    'artist': artist,
-                    'track': track,
-                    'user_first_date': user_first,
-                    'global_first_date': global_first
-                })
+                            user_new_albums.append({
+                                'name': f"{artist} - {album}",
+                                'artist': artist,
+                                'album': album,
+                                'period_count': period_count,
+                                'total_count': total_count,
+                                'coincident_users': coincident_users,
+                                'num_coincidences': len(coincident_users),
+                                'first_date': user_first
+                            })
 
-        # Ordenar por fecha del primer scrobble del usuario
-        for category in user_novelties:
-            user_novelties[category].sort(key=lambda x: x['user_first_date'], reverse=True)
+            # CANCIONES
+            track_key = (artist, track)
+            if track_key not in processed_tracks:
+                processed_tracks.add(track_key)
+                user_first = self.db.get_first_scrobble_date(user, artist=artist, track=track)
 
-        return user_novelties
+                # ¿Es la primera vez que el usuario escucha esta canción?
+                if user_first and user_first >= from_timestamp:
+                    # ¿También la escucharon otros usuarios en este período?
+                    if track_key in other_users_tracks:
+                        coincident_users = list(other_users_tracks[track_key])
+                        period_count = sum(1 for s in user_scrobbles if s['artist'] == artist and s['track'] == track)
+                        total_count = self.db.get_user_total_scrobbles(user, artist=artist, track=track)
+
+                        user_new_tracks.append({
+                            'name': f"{artist} - {track}",
+                            'artist': artist,
+                            'track': track,
+                            'period_count': period_count,
+                            'total_count': total_count,
+                            'coincident_users': coincident_users,
+                            'num_coincidences': len(coincident_users),
+                            'first_date': user_first
+                        })
+
+        # Ordenar por número de coincidencias (más coincidencias primero), luego por total de scrobbles
+        def sort_key(item):
+            return (-item['num_coincidences'], -item['total_count'])
+
+        user_new_artists.sort(key=sort_key)
+        user_new_albums.sort(key=sort_key)
+        user_new_tracks.sort(key=sort_key)
+
+        result = {
+            'artists': user_new_artists[:15],  # Top 15
+            'albums': user_new_albums[:15],
+            'tracks': user_new_tracks[:15]
+        }
+
+        print(f"     - Artistas nuevos con coincidencias: {len(result['artists'])}")
+        print(f"     - Álbumes nuevos con coincidencias: {len(result['albums'])}")
+        print(f"     - Canciones nuevas con coincidencias: {len(result['tracks'])}")
+
+        return result

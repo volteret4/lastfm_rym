@@ -105,6 +105,34 @@ class Database:
         result = cursor.fetchone()
         return result['first_scrobble'] if result and result['first_scrobble'] else None
 
+    def get_user_total_scrobbles(self, user: str, artist: str = None, album: str = None, track: str = None) -> int:
+        """Obtiene el total de scrobbles de un usuario para un elemento específico"""
+        cursor = self.conn.cursor()
+
+        if track and artist:
+            cursor.execute('''
+                SELECT COUNT(*) as total_scrobbles
+                FROM scrobbles
+                WHERE user = ? AND artist = ? AND track = ?
+            ''', (user, artist, track))
+        elif album and artist:
+            cursor.execute('''
+                SELECT COUNT(*) as total_scrobbles
+                FROM scrobbles
+                WHERE user = ? AND artist = ? AND album = ?
+            ''', (user, artist, album))
+        elif artist:
+            cursor.execute('''
+                SELECT COUNT(*) as total_scrobbles
+                FROM scrobbles
+                WHERE user = ? AND artist = ?
+            ''', (user, artist))
+        else:
+            return 0
+
+        result = cursor.fetchone()
+        return result['total_scrobbles'] if result else 0
+
     def close(self):
         """Cierra la conexión a la base de datos"""
         if self.conn:

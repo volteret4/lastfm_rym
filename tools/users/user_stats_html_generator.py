@@ -1419,8 +1419,8 @@ class UserStatsHTMLGenerator:
                                 grid: {{
                                     color: '#313244'
                                 }},
-                                min: Math.min(...years) - 0.5,
-                                max: Math.max(...years) + 0.5
+                                min: Math.min(...years) - 0.8,
+                                max: Math.max(...years) + 0.8
                             }},
                             y: {{
                                 title: {{
@@ -1442,11 +1442,16 @@ class UserStatsHTMLGenerator:
                                 position: 'bottom',
                                 labels: {{
                                     color: '#cdd6f4',
-                                    padding: 8,
+                                    padding: 12,
                                     usePointStyle: true,
+                                    pointStyle: 'circle',
                                     font: {{
-                                        size: 10
-                                    }}
+                                        size: 11
+                                    }},
+                                    boxHeight: 10,
+                                    boxWidth: 10,
+                                    maxWidth: 100,
+                                    textAlign: 'left'
                                 }}
                             }},
                             tooltip: {{
@@ -1584,8 +1589,8 @@ class UserStatsHTMLGenerator:
                                 grid: {{
                                     color: '#313244'
                                 }},
-                                min: Math.min(...years) - 0.5,
-                                max: Math.max(...years) + 0.5
+                                min: Math.min(...years) - 0.8,
+                                max: Math.max(...years) + 0.8
                             }},
                             y: {{
                                 title: {{
@@ -1607,11 +1612,16 @@ class UserStatsHTMLGenerator:
                                 position: 'bottom',
                                 labels: {{
                                     color: '#cdd6f4',
-                                    padding: 8,
+                                    padding: 12,
                                     usePointStyle: true,
+                                    pointStyle: 'circle',
                                     font: {{
-                                        size: 10
-                                    }}
+                                        size: 11
+                                    }},
+                                    boxHeight: 10,
+                                    boxWidth: 10,
+                                    maxWidth: 100,
+                                    textAlign: 'left'
                                 }}
                             }},
                             tooltip: {{

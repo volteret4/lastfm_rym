@@ -21,9 +21,9 @@ except ImportError:
     pass
 
 # Importar las versiones modificadas desde los outputs
-from tools.temp.temp_analyzer import UserStatsAnalyzer
-from tools.temp.temp_database import UserStatsDatabase
-from tools.temp.temp_html_generator import UserStatsHTMLGenerator
+from tools.users.user_stats_analyzer import UserStatsAnalyzer
+from tools.users.user_stats_database import UserStatsDatabase
+from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
 
 
 def main():

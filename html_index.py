@@ -265,7 +265,7 @@ def generate_index_html(files):
                 right: 20px;
                 width: 50px;
                 height: 50px;
-                background: #cba6f7;
+                background: #181825;
                 color: #1e1e2e;
                 border: none;
                 border-radius: 50%;

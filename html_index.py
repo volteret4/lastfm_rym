@@ -1054,22 +1054,9 @@ def generate_index_html(files):
                     }
 
                     userOptions.appendChild(option);
-                    function updateUserButtonIcon(user) {
-                        const userButton = document.getElementById('userButton');
-                        const icon = userIcons[user];
-                        if (icon) {
-                            if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {
-                                userButton.innerHTML = `<img src="${icon}" alt="${user}" style="width:100%;height:100%;border-radius:50%;">`;
-                            } else {
-                                userButton.textContent = icon;
-                            }
-                        } else {
-                            userButton.textContent = '👤';
-                        }
-                    }
+
 
                 });
-
 
                 // Marcar opción seleccionada
                 updateSelectedUserOption(selectedUser);
@@ -1106,6 +1093,20 @@ def generate_index_html(files):
                         userModal.style.display = 'none';
                     }
                 });
+            }
+
+            function updateUserButtonIcon(user) {
+                const userButton = document.getElementById('userButton');
+                const icon = userIcons[user];
+                if (icon) {
+                    if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {
+                        userButton.innerHTML = `<img src="${icon}" alt="${user}" style="width:100%;height:100%;border-radius:50%;">`;
+                    } else {
+                        userButton.textContent = icon;
+                    }
+                } else {
+                    userButton.textContent = '👤';
+                }
             }
 
             function updateSelectedUserOption(selectedUser) {

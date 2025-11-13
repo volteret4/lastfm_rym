@@ -195,6 +195,15 @@ def generate_index_html(files):
         print("⚠️  No se encontraron usuarios en LASTFM_USERS, usando usuarios de ejemplo")
         users = ['usuario1', 'usuario2', 'usuario3']  # Fallback
 
+    # Leer iconos de usuarios del entorno
+    icons_env = os.getenv('LASTFM_USERS_ICONS', '')
+    user_icons = {}
+    if icons_env:
+        for pair in icons_env.split(','):
+            if ':' in pair:
+                user, icon = pair.split(':', 1)
+                user_icons[user.strip()] = icon.strip()
+
     print(f"📋 Usuarios detectados para el selector: {', '.join(users)}")
 
     # Agrupar archivos mensuales por año
@@ -690,7 +699,7 @@ def generate_index_html(files):
     </head>
     <body>
         <!-- Botón de usuario circular -->
-        <button class="user-button" id="userButton" title="Seleccionar usuario destacado">👤</button>
+        <button class="user-button" id="userButton" title="Seleccionar usuario destacado"></button>
 
         <!-- Modal de selección de usuario -->
         <div class="user-modal" id="userModal">
@@ -1013,7 +1022,8 @@ def generate_index_html(files):
         </footer>
 
         <script>
-            // Usuarios reales del entorno LASTFM_USERS
+            // Usuarios reales del entorno LASTFM_USERS e iconos de LASTFM_USERS_ICONS
+            const userIcons = """ + json.dumps(user_icons, ensure_ascii=False) + """;
             const availableUsers = """ + json.dumps(users, ensure_ascii=False) + """;
 
             // Funcionalidad del botón de usuario
@@ -1031,12 +1041,39 @@ def generate_index_html(files):
                     const option = document.createElement('div');
                     option.className = 'user-option';
                     option.dataset.user = user;
-                    option.textContent = user;
+
+                    const icon = userIcons[user];
+                    if (icon) {
+                        if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {
+                            option.innerHTML = `<img src="${icon}" alt="${user}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:8px;"> ${user}`;
+                        } else {
+                            option.innerHTML = `<span style="font-size:1.2em;margin-right:8px;">${icon}</span> ${user}`;
+                        }
+                    } else {
+                        option.textContent = user;
+                    }
+
                     userOptions.appendChild(option);
+                    function updateUserButtonIcon(user) {
+                        const userButton = document.getElementById('userButton');
+                        const icon = userIcons[user];
+                        if (icon) {
+                            if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {
+                                userButton.innerHTML = `<img src="${icon}" alt="${user}" style="width:100%;height:100%;border-radius:50%;">`;
+                            } else {
+                                userButton.textContent = icon;
+                            }
+                        } else {
+                            userButton.textContent = '👤';
+                        }
+                    }
+
                 });
+
 
                 // Marcar opción seleccionada
                 updateSelectedUserOption(selectedUser);
+                updateUserButtonIcon(selectedUser);
 
                 // Event listeners
                 userButton.addEventListener('click', () => {

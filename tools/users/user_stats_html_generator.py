@@ -1217,8 +1217,14 @@ class UserStatsHTMLGenerator:
             }});
             charts = {{}};
 
-            const genresData = userStats.genres;
             if (!genresData || !genresData[currentProvider]) {{
+                // Mostrar mensaje de no datos
+                document.getElementById('genresPieChart').style.display = 'none';
+                document.getElementById('genresPieInfo').innerHTML = '<div class="no-data">No hay datos disponibles para ' + currentProvider + '</div>';
+                document.getElementById('albumGenresPieChart').style.display = 'none';
+                document.getElementById('albumGenresPieInfo').innerHTML = '<div class="no-data">No hay datos disponibles para ' + currentProvider + '</div>';
+                document.getElementById('genresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
+                document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
                 return;
             }}
 
@@ -1233,11 +1239,17 @@ class UserStatsHTMLGenerator:
             // 3. GrÃ¡fico circular con top 15 gÃ©neros de Ã¡lbumes
             if (providerData.album_pie_chart) {{
                 renderGenresPieChart(providerData.album_pie_chart, 'albumGenresPieChart', 'albumGenresPieInfo', 'Ãlbumes');
+            }} else {{
+                document.getElementById('albumGenresPieChart').style.display = 'none';
+                document.getElementById('albumGenresPieInfo').innerHTML = '<div class="no-data">No hay datos de géneros de álbumes para ' + currentProvider + '</div>';
+
             }}
 
             // 4. 6 grÃ¡ficos de scatter para top 6 gÃ©neros de Ã¡lbumes
             if (providerData.album_scatter_charts) {{
                 renderGenresScatterCharts(providerData.album_scatter_charts, providerData.years, 'albumGenresScatterGrid', true);
+            }} else {{
+                document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter de álbumes disponibles</div>';
             }}
         }}
 

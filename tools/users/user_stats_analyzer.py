@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-UserStatsAnalyzer - VersiÃ³n optimizada para mejor rendimiento
+UserStatsAnalyzer - Versión optimizada para mejor rendimiento
 """
 
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ import json
 
 
 class UserStatsAnalyzer:
-    """Clase para analizar y procesar estadÃ­sticas de usuarios - OPTIMIZADA"""
+    """Clase para analizar y procesar estadísticas de usuarios - OPTIMIZADA"""
 
     def __init__(self, database, years_back: int = 5, mbid_only: bool = False):
         self.database = database
@@ -21,18 +21,21 @@ class UserStatsAnalyzer:
         self.to_year = self.current_year
 
     def analyze_user(self, user: str, all_users: List[str]) -> Dict:
-        """Analiza completamente un usuario y devuelve todas sus estadÃ­sticas"""
-        print(f"    â€¢ Analizando scrobbles...")
+        """Analiza completamente un usuario y devuelve todas sus estadísticas"""
+        print(f"    • Analizando scrobbles...")
         yearly_scrobbles = self._analyze_yearly_scrobbles(user)
 
-        print(f"    â€¢ Analizando coincidencias...")
+        print(f"    • Analizando coincidencias...")
         coincidences_stats = self._analyze_coincidences(user, all_users)
 
-        print(f"    â€¢ Analizando evoluciÃ³n...")
+        print(f"    • Analizando evolución...")
         evolution_stats = self._analyze_evolution(user, all_users)
 
-        print(f"    â€¢ Analizando datos individuales...")
+        print(f"    • Analizando datos individuales...")
         individual_stats = self._analyze_individual(user)
+
+        print(f"    • Analizando géneros por proveedor...")
+        genres_stats = self._analyze_genres_by_provider(user)
 
         return {
             'user': user,
@@ -41,8 +44,44 @@ class UserStatsAnalyzer:
             'coincidences': coincidences_stats,
             'evolution': evolution_stats,
             'individual': individual_stats,
+            'genres': genres_stats,
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
+
+    def _analyze_genres_by_provider(self, user: str) -> Dict:
+        """Analiza géneros del usuario según diferentes proveedores"""
+        providers = ['lastfm', 'musicbrainz', 'discogs']
+        genres_data = {}
+
+        for provider in providers:
+            print(f"      - Analizando géneros de {provider}...")
+
+            # Obtener top 15 géneros para el gráfico circular
+            top_genres = self.database.get_user_top_genres_by_provider(
+                user, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
+            )
+
+            # Tomar solo los top 5 géneros para los gráficos de puntos
+            top_5_genres = [genre for genre, _ in top_genres[:5]]
+
+            # Para cada género del top 5, obtener top 25 artistas con datos temporales
+            genres_scatter_data = {}
+            for genre_name in top_5_genres:
+                genre_artists = self.database.get_top_artists_for_genre_by_provider(
+                    user, genre_name, self.from_year, self.to_year, provider, limit=25, mbid_only=self.mbid_only
+                )
+                genres_scatter_data[genre_name] = genre_artists
+
+            genres_data[provider] = {
+                'pie_chart': {
+                    'data': dict(top_genres),
+                    'total': sum(plays for _, plays in top_genres)
+                },
+                'scatter_charts': genres_scatter_data,
+                'years': list(range(self.from_year, self.to_year + 1))
+            }
+
+        return genres_data
 
     def _analyze_individual(self, user: str) -> Dict:
         """Analiza datos individuales del usuario para la vista 'yomimeconmigo'"""
@@ -62,7 +101,7 @@ class UserStatsAnalyzer:
         }
 
     def _analyze_yearly_scrobbles(self, user: str) -> Dict[int, int]:
-        """Analiza el nÃºmero de scrobbles por aÃ±o - optimizado"""
+        """Analiza el número de scrobbles por año - optimizado"""
         scrobbles_by_year = self.database.get_user_scrobbles_by_year(
             user, self.from_year, self.to_year, self.mbid_only
         )
@@ -77,7 +116,7 @@ class UserStatsAnalyzer:
         """Analiza coincidencias del usuario con otros usuarios"""
         other_users = [u for u in all_users if u != user]
 
-        # Coincidencias bÃ¡sicas con filtro MBID
+        # Coincidencias básicas con filtro MBID
         artist_coincidences = self.database.get_common_artists_with_users(
             user, other_users, self.from_year, self.to_year, self.mbid_only
         )
@@ -90,7 +129,7 @@ class UserStatsAnalyzer:
             user, other_users, self.from_year, self.to_year, self.mbid_only
         )
 
-        # Coincidencias de gÃ©neros, sellos y aÃ±os (con filtro MBID)
+        # Coincidencias de géneros, sellos y años (con filtro MBID)
         genre_coincidences = self.database.get_common_genres_with_users(
             user, other_users, self.from_year, self.to_year, self.mbid_only
         )
@@ -103,15 +142,15 @@ class UserStatsAnalyzer:
             user, other_users, self.from_year, self.to_year, self.mbid_only
         )
 
-        # EstadÃ­sticas de gÃ©neros del usuario (mantener para grÃ¡fico individual)
+        # Estadísticas de géneros del usuario (mantener para gráfico individual)
         user_genres = self.database.get_user_top_genres(
             user, self.from_year, self.to_year, limit=20, mbid_only=self.mbid_only
         )
 
-        # Nuevos grÃ¡ficos especiales
+        # Nuevos gráficos especiales
         special_charts = self._prepare_special_charts_data(user, all_users)
 
-        # Procesar datos para grÃ¡ficos circulares con popups optimizados
+        # Procesar datos para gráficos circulares con popups optimizados
         charts_data = self._prepare_coincidence_charts_data(
             user, other_users, artist_coincidences, album_coincidences,
             track_coincidences, user_genres, genre_coincidences,
@@ -123,7 +162,7 @@ class UserStatsAnalyzer:
         }
 
     def _prepare_special_charts_data(self, user: str, all_users: List[str]) -> Dict:
-        """Prepara datos para los 4 nuevos grÃ¡ficos especiales"""
+        """Prepara datos para los 4 nuevos gráficos especiales"""
         other_users = [u for u in all_users if u != user]
 
         # Top 10 artistas por escuchas
@@ -131,12 +170,12 @@ class UserStatsAnalyzer:
             all_users, self.from_year, self.to_year, 10, self.mbid_only
         )
 
-        # Top 10 artistas por dÃ­as
+        # Top 10 artistas por días
         top_days = self.database.get_top_artists_by_days(
             all_users, self.from_year, self.to_year, 10, self.mbid_only
         )
 
-        # Top 10 artistas por nÃºmero de canciones
+        # Top 10 artistas por número de canciones
         top_tracks = self.database.get_top_artists_by_track_count(
             all_users, self.from_year, self.to_year, 10, self.mbid_only
         )
@@ -146,10 +185,10 @@ class UserStatsAnalyzer:
             all_users, self.from_year, self.to_year, 5, self.mbid_only
         )
 
-        # Procesar coincidencias para cada mÃ©trica especial
+        # Procesar coincidencias para cada métrica especial
         special_data = {}
 
-        # GrÃ¡fico 1: Top artistas por escuchas
+        # Gráfico 1: Top artistas por escuchas
         user_top_artists = {artist['name']: artist['plays'] for artist in top_scrobbles.get(user, [])}
         scrobbles_coincidences = {}
         for other_user in other_users:
@@ -172,7 +211,7 @@ class UserStatsAnalyzer:
             'type': 'top_scrobbles'
         }
 
-        # GrÃ¡fico 2: Vuelve a casa (dÃ­as)
+        # Gráfico 2: Vuelve a casa (días)
         user_top_days = {artist['name']: artist['days'] for artist in top_days.get(user, [])}
         days_coincidences = {}
         for other_user in other_users:
@@ -188,14 +227,14 @@ class UserStatsAnalyzer:
                 }
 
         special_data['top_days'] = {
-            'title': 'Vuelve a Casa (DÃ­as de Escucha)',
+            'title': 'Vuelve a Casa (Días de Escucha)',
             'data': {user: data['total_days'] for user, data in days_coincidences.items()},
             'total': sum(data['total_days'] for data in days_coincidences.values()),
             'details': days_coincidences,
             'type': 'top_days'
         }
 
-        # GrÃ¡fico 3: DiscografÃ­a completada
+        # Gráfico 3: Discografía completada
         user_top_tracks = {artist['name']: artist for artist in top_tracks.get(user, [])}
         tracks_coincidences = {}
         for other_user in other_users:
@@ -215,14 +254,14 @@ class UserStatsAnalyzer:
                 }
 
         special_data['top_discography'] = {
-            'title': 'DiscografÃ­a Completada (Canciones)',
+            'title': 'Discografía Completada (Canciones)',
             'data': {user: data['total_track_count'] for user, data in tracks_coincidences.items()},
             'total': sum(data['total_track_count'] for data in tracks_coincidences.values()),
             'details': tracks_coincidences,
             'type': 'top_discography'
         }
 
-        # GrÃ¡fico 4: Streaks
+        # Gráfico 4: Streaks
         user_top_streaks = {artist['name']: artist for artist in top_streaks.get(user, [])}
         streaks_coincidences = {}
         for other_user in other_users:
@@ -244,7 +283,7 @@ class UserStatsAnalyzer:
                 }
 
         special_data['top_streaks'] = {
-            'title': 'Streaks (DÃ­as Consecutivos)',
+            'title': 'Streaks (Días Consecutivos)',
             'data': {user: data['total_streak_days'] for user, data in streaks_coincidences.items()},
             'total': sum(data['total_streak_days'] for data in streaks_coincidences.values()),
             'details': streaks_coincidences,
@@ -258,35 +297,35 @@ class UserStatsAnalyzer:
                                        track_coincidences: Dict, user_genres: List[Tuple],
                                        genre_coincidences: Dict, label_coincidences: Dict,
                                        release_year_coincidences: Dict, special_charts: Dict) -> Dict:
-        """Prepara datos para grÃ¡ficos circulares de coincidencias"""
+        """Prepara datos para gráficos circulares de coincidencias"""
 
-        # GrÃ¡ficos bÃ¡sicos de coincidencias
+        # Gráficos básicos de coincidencias
         artist_chart = self._prepare_coincidences_pie_data(
             "Artistas", artist_coincidences, other_users, user, 'artists'
         )
 
         album_chart = self._prepare_coincidences_pie_data(
-            "Ãlbumes", album_coincidences, other_users, user, 'albums'
+            "Álbumes", album_coincidences, other_users, user, 'albums'
         )
 
         track_chart = self._prepare_coincidences_pie_data(
             "Canciones", track_coincidences, other_users, user, 'tracks'
         )
 
-        # GrÃ¡fico de gÃ©neros del usuario (individual)
+        # Gráfico de géneros del usuario (individual)
         genres_chart = self._prepare_genres_pie_data(user_genres, user)
 
-        # Nuevos grÃ¡ficos de coincidencias (ahora gÃ©neros, sellos y aÃ±os son coincidencias)
+        # Nuevos gráficos de coincidencias (ahora géneros, sellos y años son coincidencias)
         genre_coincidences_chart = self._prepare_coincidences_pie_data(
-            "GÃ©neros", genre_coincidences, other_users, user, 'genres'
+            "Géneros", genre_coincidences, other_users, user, 'genres'
         )
 
         label_coincidences_chart = self._prepare_coincidences_pie_data(
-            "Sellos DiscogrÃ¡ficos", label_coincidences, other_users, user, 'labels'
+            "Sellos Discográficos", label_coincidences, other_users, user, 'labels'
         )
 
         release_year_coincidences_chart = self._prepare_coincidences_pie_data(
-            "AÃ±os de Lanzamiento", release_year_coincidences, other_users, user, 'release_years'
+            "Años de Lanzamiento", release_year_coincidences, other_users, user, 'release_years'
         )
 
         return {
@@ -297,12 +336,12 @@ class UserStatsAnalyzer:
             'genre_coincidences': genre_coincidences_chart,  # Coincidencias
             'labels': label_coincidences_chart,  # Coincidencias
             'release_years': release_year_coincidences_chart,  # Coincidencias
-            **special_charts  # GrÃ¡ficos especiales
+            **special_charts  # Gráficos especiales
         }
 
     def _prepare_coincidences_pie_data(self, chart_type: str, coincidences: Dict,
                                      other_users: List[str], user: str, data_type: str) -> Dict:
-        """Prepara datos para grÃ¡fico circular de coincidencias con popups optimizados"""
+        """Prepara datos para gráfico circular de coincidencias con popups optimizados"""
         user_data = {}
         popup_details = {}
 
@@ -311,22 +350,22 @@ class UserStatsAnalyzer:
                 count = len(coincidences[other_user])
                 user_data[other_user] = count
 
-                # Para popups: obtener datos especÃ­ficos segÃºn el tipo
+                # Para popups: obtener datos específicos según el tipo
                 if count > 0:
                     if data_type == 'artists':
-                        # Top 5 Ã¡lbumes de estos artistas
+                        # Top 5 álbumes de estos artistas
                         artists = list(coincidences[other_user].keys())[:10]
                         popup_details[other_user] = self.database.get_top_albums_for_artists(
                             user, artists, self.from_year, self.to_year, 5
                         )
                     elif data_type == 'albums':
-                        # Top 5 canciones de estos Ã¡lbumes
+                        # Top 5 canciones de estos álbumes
                         albums = list(coincidences[other_user].keys())[:10]
                         popup_details[other_user] = self.database.get_top_tracks_for_albums(
                             user, albums, self.from_year, self.to_year, 5
                         )
                     else:  # tracks
-                        # Solo mostrar las top 5 canciones mÃ¡s escuchadas
+                        # Solo mostrar las top 5 canciones más escuchadas
                         sorted_tracks = sorted(
                             coincidences[other_user].items(),
                             key=lambda x: x[1]['user_plays'],
@@ -352,12 +391,12 @@ class UserStatsAnalyzer:
         }
 
     def _prepare_genres_pie_data(self, user_genres: List[Tuple], user: str) -> Dict:
-        """Prepara datos para grÃ¡fico circular de gÃ©neros con artistas top"""
-        # Tomar solo los top 8 gÃ©neros para visualizaciÃ³n
+        """Prepara datos para gráfico circular de géneros con artistas top"""
+        # Tomar solo los top 8 géneros para visualización
         top_genres = dict(user_genres[:8])
         total_plays = sum(top_genres.values()) if top_genres else 0
 
-        # Para popup: obtener top 5 artistas por gÃ©nero
+        # Para popup: obtener top 5 artistas por género
         popup_details = {}
         for genre, plays in user_genres[:8]:
             artists = self.database.get_top_artists_for_genre(
@@ -366,7 +405,7 @@ class UserStatsAnalyzer:
             popup_details[genre] = artists
 
         return {
-            'title': 'DistribuciÃ³n de GÃ©neros',
+            'title': 'Distribución de Géneros',
             'data': top_genres,
             'total': total_plays,
             'details': popup_details,
@@ -374,19 +413,19 @@ class UserStatsAnalyzer:
         }
 
     def _analyze_evolution(self, user: str, all_users: List[str]) -> Dict:
-        """Analiza la evoluciÃ³n temporal de COINCIDENCIAS del usuario"""
+        """Analiza la evolución temporal de COINCIDENCIAS del usuario"""
         other_users = [u for u in all_users if u != user]
 
-        # EvoluciÃ³n de coincidencias de gÃ©neros por aÃ±o
+        # Evolución de coincidencias de géneros por año
         genres_evolution = self._analyze_genres_coincidences_evolution(user, other_users)
 
-        # EvoluciÃ³n de coincidencias de sellos por aÃ±o
+        # Evolución de coincidencias de sellos por año
         labels_evolution = self._analyze_labels_coincidences_evolution(user, other_users)
 
-        # EvoluciÃ³n de coincidencias de aÃ±os de lanzamiento por aÃ±o
+        # Evolución de coincidencias de años de lanzamiento por año
         release_years_evolution = self._analyze_release_years_coincidences_evolution(user, other_users)
 
-        # EvoluciÃ³n de coincidencias bÃ¡sicas por aÃ±o - OPTIMIZADA (datos simples)
+        # Evolución de coincidencias básicas por año - OPTIMIZADA (datos simples)
         coincidences_evolution = self._analyze_coincidences_evolution_optimized(user, other_users)
 
         return {
@@ -397,7 +436,7 @@ class UserStatsAnalyzer:
         }
 
     def _analyze_genres_coincidences_evolution(self, user: str, other_users: List[str]) -> Dict:
-        """Analiza la evoluciÃ³n de coincidencias de gÃ©neros por aÃ±o - OPTIMIZADA"""
+        """Analiza la evolución de coincidencias de géneros por año - OPTIMIZADA"""
         evolution_data = {}
         evolution_details = {}
 
@@ -414,7 +453,7 @@ class UserStatsAnalyzer:
                     count = len(genre_coincidences[other_user])
                     evolution_data[other_user][year] = count
 
-                    # Top 5 gÃ©neros simples (no detallados)
+                    # Top 5 géneros simples (no detallados)
                     top_genres = sorted(
                         genre_coincidences[other_user].items(),
                         key=lambda x: x[1]['total_plays'],
@@ -436,7 +475,7 @@ class UserStatsAnalyzer:
         }
 
     def _analyze_labels_coincidences_evolution(self, user: str, other_users: List[str]) -> Dict:
-        """Analiza la evoluciÃ³n de coincidencias de sellos por aÃ±o - OPTIMIZADA"""
+        """Analiza la evolución de coincidencias de sellos por año - OPTIMIZADA"""
         evolution_data = {}
         evolution_details = {}
 
@@ -475,7 +514,7 @@ class UserStatsAnalyzer:
         }
 
     def _analyze_release_years_coincidences_evolution(self, user: str, other_users: List[str]) -> Dict:
-        """Analiza la evoluciÃ³n de coincidencias de dÃ©cadas por aÃ±o - OPTIMIZADA"""
+        """Analiza la evolución de coincidencias de décadas por año - OPTIMIZADA"""
         evolution_data = {}
         evolution_details = {}
 
@@ -492,7 +531,7 @@ class UserStatsAnalyzer:
                     count = len(decade_coincidences[other_user])
                     evolution_data[other_user][year] = count
 
-                    # Top 5 dÃ©cadas simples
+                    # Top 5 décadas simples
                     top_decades = sorted(
                         decade_coincidences[other_user].items(),
                         key=lambda x: x[1]['total_plays'],
@@ -514,7 +553,7 @@ class UserStatsAnalyzer:
         }
 
     def _analyze_coincidences_evolution_optimized(self, user: str, other_users: List[str]) -> Dict:
-        """Analiza la evoluciÃ³n de coincidencias por aÃ±o - VERSIÃ“N OPTIMIZADA"""
+        """Analiza la evolución de coincidencias por año - VERSIÓN OPTIMIZADA"""
         evolution_data = {
             'artists': {},
             'albums': {},
@@ -527,9 +566,9 @@ class UserStatsAnalyzer:
             'tracks': {}
         }
 
-        # Para cada aÃ±o, calcular coincidencias simples (sin detalles complejos)
+        # Para cada año, calcular coincidencias simples (sin detalles complejos)
         for year in range(self.from_year, self.to_year + 1):
-            # Obtener coincidencias bÃ¡sicas
+            # Obtener coincidencias básicas
             artist_coincidences = self.database.get_common_artists_with_users(
                 user, other_users, year, year, self.mbid_only
             )
@@ -563,7 +602,7 @@ class UserStatsAnalyzer:
                     for name, data in top_artists
                 ]
 
-                # Ãlbumes - datos simples
+                # Álbumes - datos simples
                 album_data = album_coincidences.get(other_user, {})
                 evolution_data['albums'][other_user][year] = len(album_data)
                 top_albums = sorted(

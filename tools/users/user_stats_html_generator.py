@@ -445,7 +445,7 @@ class UserStatsHTMLGenerator:
 
         .coincidences-grid {{
             display: grid;
-            grid-template-columns: 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 25px;
             margin-bottom: 30px;
         }}
@@ -615,13 +615,6 @@ class UserStatsHTMLGenerator:
         </div>
 
         <div class="controls">
-            <div class="control-group">
-                <label for="userSelect">Usuario:</label>
-                <select id="userSelect">
-                    <!-- Se llenará dinámicamente -->
-                </select>
-            </div>
-
             <div class="control-group">
                 <label>Vista:</label>
                 <div class="view-buttons">
@@ -1010,9 +1003,6 @@ class UserStatsHTMLGenerator:
                     updateSelectedUserOption(user);
                     userModal.style.display = 'none';
 
-                    const userSelect = document.getElementById('userSelect');
-                    userSelect.value = user;
-
                     selectUser(user);
                 }}
             }});
@@ -1029,15 +1019,6 @@ class UserStatsHTMLGenerator:
                 }}
             }});
         }}
-
-        const userSelect = document.getElementById('userSelect');
-
-        users.forEach(user => {{
-            const option = document.createElement('option');
-            option.value = user;
-            option.textContent = user;
-            userSelect.appendChild(option);
-        }});
 
         const viewButtons = document.querySelectorAll('.view-btn');
         viewButtons.forEach(btn => {{
@@ -2039,14 +2020,9 @@ class UserStatsHTMLGenerator:
             document.getElementById('popup').style.display = 'none';
         }});
 
-        userSelect.addEventListener('change', function() {{
-            selectUser(this.value);
-        }});
-
         // Inicializar
         const initialUser = initializeUserSelector();
         if (initialUser && users.includes(initialUser)) {{
-            userSelect.value = initialUser;
             selectUser(initialUser);
         }} else if (users.length > 0) {{
             selectUser(users[0]);

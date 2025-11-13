@@ -25,7 +25,7 @@ class GroupStatsAnalyzer:
 
         print(f"    • Analizando datos por niveles de usuarios...")
         # Importar aquí para evitar dependencias circulares
-        from tools.group_data_analyzer import GroupDataAnalyzer
+        from tools.group.group_data_analyzer import GroupDataAnalyzer
         data_analyzer = GroupDataAnalyzer(self.database, self.years_back, self.mbid_only)
         data_stats = data_analyzer.analyze_data_by_user_levels(users)
 

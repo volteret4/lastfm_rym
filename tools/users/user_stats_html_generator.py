@@ -1211,6 +1211,7 @@ class UserStatsHTMLGenerator:
         }}
 
         function renderGenresCharts(userStats) {{
+            // Destruir charts existentes
             Object.values(charts).forEach(chart => {{
                 if (chart) chart.destroy();
             }});
@@ -1222,13 +1223,52 @@ class UserStatsHTMLGenerator:
             }}
 
             const providerData = genresData[currentProvider];
-            renderGenresPieChart(providerData.pie_chart);
-            renderGenresScatterCharts(providerData.scatter_charts, providerData.years);
+
+            // 1. Gráfico circular con top 15 géneros de artistas
+            renderGenresPieChart(providerData.pie_chart, 'genresPieChart', 'genresPieInfo', 'Artistas');
+
+            // 2. 6 gráficos de scatter para top 6 géneros de artistas
+            renderGenresScatterCharts(providerData.scatter_charts, providerData.years, 'genresScatterGrid', false);
+
+            // 3. Gráfico circular con top 15 géneros de álbumes
+            if (providerData.album_pie_chart) {{
+                renderGenresPieChart(providerData.album_pie_chart, 'albumGenresPieChart', 'albumGenresPieInfo', 'Álbumes');
+            }}
+
+            // 4. 6 gráficos de scatter para top 6 géneros de álbumes
+            if (providerData.album_scatter_charts) {{
+                renderGenresScatterCharts(providerData.album_scatter_charts, providerData.years, 'albumGenresScatterGrid', true);
+            }}
         }}
 
-        function renderGenresPieChart(pieData) {{
-            const canvas = document.getElementById('genresPieChart');
-            const info = document.getElementById('genresPieInfo');
+        function renderLabelsCharts(userStats) {{
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {{
+                if (chart) chart.destroy();
+            }});
+            charts = {{}};
+
+            const labelsData = userStats.labels;
+            if (!labelsData) {{
+                console.log('No hay datos de sellos disponibles');
+                return;
+            }}
+
+            // 1. Gráfico circular con top 15 sellos
+            renderGenresPieChart(labelsData.pie_chart, 'labelsPieChart', 'labelsPieInfo', 'Sellos');
+
+            // 2. 6 gráficos de scatter para top 6 sellos
+            renderLabelsScatterCharts(labelsData.scatter_charts, labelsData.years, 'labelsScatterGrid');
+        }}
+
+        function renderGenresPieChart(pieData, canvasId, infoId, type) {{
+            const canvas = document.getElementById(canvasId);
+            const info = document.getElementById(infoId);
+
+            if (!canvas || !info) {{
+                console.error(`No se encontró el canvas o info para ${{canvasId}}`);
+                return;
+            }}
 
             if (!pieData || !pieData.data || Object.keys(pieData.data).length === 0) {{
                 canvas.style.display = 'none';
@@ -1237,7 +1277,8 @@ class UserStatsHTMLGenerator:
             }}
 
             canvas.style.display = 'block';
-            info.innerHTML = `Total: ${{pieData.total.toLocaleString()}} scrobbles | Proveedor: ${{currentProvider}}`;
+            const provider = type === 'Sellos' ? 'Sellos Discográficos' : `${{currentProvider}} (${{type}})`;
+            info.innerHTML = `Total: ${{pieData.total.toLocaleString()}} scrobbles | Tipo: ${{provider}}`;
 
             const data = {{
                 labels: Object.keys(pieData.data),
@@ -1275,10 +1316,340 @@ class UserStatsHTMLGenerator:
                 }}
             }};
 
-            charts['genresPieChart'] = new Chart(canvas, config);
+            charts[canvasId] = new Chart(canvas, config);
         }}
 
-        function renderGenresScatterCharts(scatterData, years) {{
+        function renderGenresScatterCharts(scatterData, years, containerId, isAlbums = false) {{
+            const container = document.getElementById(containerId);
+            if (!container) {{
+                console.error(`No se encontró el contenedor ${{containerId}}`);
+                return;
+            }}
+
+            container.innerHTML = '';
+
+            if (!scatterData || Object.keys(scatterData).length === 0) {{
+                container.innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
+                return;
+            }}
+
+            Object.keys(scatterData).forEach((genre, index) => {{
+                const items = scatterData[genre];
+
+                if (!items || items.length === 0) return;
+
+                // Crear contenedor para este género
+                const genreContainer = document.createElement('div');
+                genreContainer.className = 'genres-pie-container';
+
+                const title = document.createElement('h4');
+                const itemType = isAlbums ? 'Álbumes' : 'Artistas';
+                title.textContent = `${{genre}} - Top ${{items.length}} ${{itemType}}`;
+                title.style.color = '#cba6f7';
+                title.style.textAlign = 'center';
+                title.style.marginBottom = '15px';
+                genreContainer.appendChild(title);
+
+                const canvasWrapper = document.createElement('div');
+                canvasWrapper.className = 'chart-wrapper';
+                canvasWrapper.style.height = '300px';
+
+                const canvas = document.createElement('canvas');
+                const canvasId = `scatterChart_${{genre.replace(/[^a-zA-Z0-9]/g, '_')}}_${{index}}_${{containerId}}`;
+                canvas.id = canvasId;
+                canvasWrapper.appendChild(canvas);
+
+                genreContainer.appendChild(canvasWrapper);
+                container.appendChild(genreContainer);
+
+                // Crear dataset para scatter plot
+                const datasets = [];
+
+                items.forEach((itemData, itemIndex) => {{
+                    const points = [];
+
+                    years.forEach(year => {{
+                        const plays = itemData.yearly_data[year] || 0;
+                        if (plays > 0) {{
+                            points.push({{
+                                x: year,
+                                y: plays,
+                                itemName: isAlbums ? itemData.album : itemData.artist
+                            }});
+                        }}
+                    }});
+
+                    if (points.length > 0) {{
+                        datasets.push({{
+                            label: isAlbums ? itemData.album : itemData.artist,
+                            data: points,
+                            backgroundColor: colors[itemIndex % colors.length],
+                            borderColor: colors[itemIndex % colors.length],
+                            pointRadius: 6,
+                            pointHoverRadius: 10,
+                            showLine: false
+                        }});
+                    }}
+                }});
+
+                if (datasets.length === 0) {{
+                    canvas.parentElement.innerHTML = '<div class="no-data">No hay datos temporales para este género</div>';
+                    return;
+                }}
+
+                const config = {{
+                    type: 'scatter',
+                    data: {{ datasets }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {{
+                            x: {{
+                                type: 'linear',
+                                position: 'bottom',
+                                title: {{
+                                    display: true,
+                                    text: 'Año',
+                                    color: '#a6adc8'
+                                }},
+                                ticks: {{
+                                    color: '#a6adc8',
+                                    stepSize: 1
+                                }},
+                                grid: {{
+                                    color: '#313244'
+                                }},
+                                min: Math.min(...years) - 0.5,
+                                max: Math.max(...years) + 0.5
+                            }},
+                            y: {{
+                                title: {{
+                                    display: true,
+                                    text: 'Scrobbles',
+                                    color: '#a6adc8'
+                                }},
+                                ticks: {{
+                                    color: '#a6adc8'
+                                }},
+                                grid: {{
+                                    color: '#313244'
+                                }}
+                            }}
+                        }},
+                        plugins: {{
+                            legend: {{
+                                display: true,
+                                position: 'bottom',
+                                labels: {{
+                                    color: '#cdd6f4',
+                                    padding: 8,
+                                    usePointStyle: true,
+                                    font: {{
+                                        size: 10
+                                    }}
+                                }}
+                            }},
+                            tooltip: {{
+                                backgroundColor: '#1e1e2e',
+                                titleColor: '#cba6f7',
+                                bodyColor: '#cdd6f4',
+                                borderColor: '#cba6f7',
+                                borderWidth: 1,
+                                callbacks: {{
+                                    title: function(context) {{
+                                        const point = context[0].raw;
+                                        return point.itemName;
+                                    }},
+                                    label: function(context) {{
+                                        const point = context.raw;
+                                        return `${{point.x}}: ${{point.y}} scrobbles`;
+                                    }}
+                                }}
+                            }}
+                        }},
+                        interaction: {{
+                            mode: 'point'
+                        }},
+                        onClick: function(event, elements) {{
+                            if (elements.length > 0) {{
+                                const element = elements[0];
+                                const point = this.data.datasets[element.datasetIndex].data[element.index];
+                                const itemType = isAlbums ? 'Álbum' : 'Artista';
+                                showArtistPopup(point.itemName, genre, currentProvider, point.x, point.y, itemType);
+                            }}
+                        }}
+                    }}
+                }};
+
+                charts[canvasId] = new Chart(canvas, config);
+            }});
+        }}
+
+        function renderLabelsScatterCharts(scatterData, years, containerId) {{
+            const container = document.getElementById(containerId);
+            if (!container) {{
+                console.error(`No se encontró el contenedor ${{containerId}}`);
+                return;
+            }}
+
+            container.innerHTML = '';
+
+            if (!scatterData || Object.keys(scatterData).length === 0) {{
+                container.innerHTML = '<div class="no-data">No hay datos de sellos disponibles</div>';
+                return;
+            }}
+
+            Object.keys(scatterData).forEach((label, index) => {{
+                const artists = scatterData[label];
+
+                if (!artists || artists.length === 0) return;
+
+                // Crear contenedor para este sello
+                const labelContainer = document.createElement('div');
+                labelContainer.className = 'genres-pie-container';
+
+                const title = document.createElement('h4');
+                title.textContent = `${{label}} - Top ${{artists.length}} Artistas`;
+                title.style.color = '#cba6f7';
+                title.style.textAlign = 'center';
+                title.style.marginBottom = '15px';
+                labelContainer.appendChild(title);
+
+                const canvasWrapper = document.createElement('div');
+                canvasWrapper.className = 'chart-wrapper';
+                canvasWrapper.style.height = '300px';
+
+                const canvas = document.createElement('canvas');
+                const canvasId = `labelScatterChart_${{label.replace(/[^a-zA-Z0-9]/g, '_')}}_${{index}}`;
+                canvas.id = canvasId;
+                canvasWrapper.appendChild(canvas);
+
+                labelContainer.appendChild(canvasWrapper);
+                container.appendChild(labelContainer);
+
+                // Crear dataset para scatter plot
+                const datasets = [];
+
+                artists.forEach((artistData, artistIndex) => {{
+                    const points = [];
+
+                    years.forEach(year => {{
+                        const plays = artistData.yearly_data[year] || 0;
+                        if (plays > 0) {{
+                            points.push({{
+                                x: year,
+                                y: plays,
+                                artistName: artistData.artist
+                            }});
+                        }}
+                    }});
+
+                    if (points.length > 0) {{
+                        datasets.push({{
+                            label: artistData.artist,
+                            data: points,
+                            backgroundColor: colors[artistIndex % colors.length],
+                            borderColor: colors[artistIndex % colors.length],
+                            pointRadius: 6,
+                            pointHoverRadius: 10,
+                            showLine: false
+                        }});
+                    }}
+                }});
+
+                if (datasets.length === 0) {{
+                    canvas.parentElement.innerHTML = '<div class="no-data">No hay datos temporales para este sello</div>';
+                    return;
+                }}
+
+                const config = {{
+                    type: 'scatter',
+                    data: {{ datasets }},
+                    options: {{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {{
+                            x: {{
+                                type: 'linear',
+                                position: 'bottom',
+                                title: {{
+                                    display: true,
+                                    text: 'Año',
+                                    color: '#a6adc8'
+                                }},
+                                ticks: {{
+                                    color: '#a6adc8',
+                                    stepSize: 1
+                                }},
+                                grid: {{
+                                    color: '#313244'
+                                }},
+                                min: Math.min(...years) - 0.5,
+                                max: Math.max(...years) + 0.5
+                            }},
+                            y: {{
+                                title: {{
+                                    display: true,
+                                    text: 'Scrobbles',
+                                    color: '#a6adc8'
+                                }},
+                                ticks: {{
+                                    color: '#a6adc8'
+                                }},
+                                grid: {{
+                                    color: '#313244'
+                                }}
+                            }}
+                        }},
+                        plugins: {{
+                            legend: {{
+                                display: true,
+                                position: 'bottom',
+                                labels: {{
+                                    color: '#cdd6f4',
+                                    padding: 8,
+                                    usePointStyle: true,
+                                    font: {{
+                                        size: 10
+                                    }}
+                                }}
+                            }},
+                            tooltip: {{
+                                backgroundColor: '#1e1e2e',
+                                titleColor: '#cba6f7',
+                                bodyColor: '#cdd6f4',
+                                borderColor: '#cba6f7',
+                                borderWidth: 1,
+                                callbacks: {{
+                                    title: function(context) {{
+                                        const point = context[0].raw;
+                                        return point.artistName;
+                                    }},
+                                    label: function(context) {{
+                                        const point = context.raw;
+                                        return `${{point.x}}: ${{point.y}} scrobbles`;
+                                    }}
+                                }}
+                            }}
+                        }},
+                        interaction: {{
+                            mode: 'point'
+                        }},
+                        onClick: function(event, elements) {{
+                            if (elements.length > 0) {{
+                                const element = elements[0];
+                                const point = this.data.datasets[element.datasetIndex].data[element.index];
+                                showArtistPopup(point.artistName, label, 'Sello', point.x, point.y, 'Artista');
+                            }}
+                        }}
+                    }}
+                }};
+
+                charts[canvasId] = new Chart(canvas, config);
+            }});
+        }}
+
+        function renderGenresScatterChartsOld(scatterData, years) {{
             const container = document.getElementById('genresScatterGrid');
             container.innerHTML = '';
 

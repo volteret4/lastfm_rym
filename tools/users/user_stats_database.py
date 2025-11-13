@@ -59,7 +59,7 @@ class UserStatsDatabase:
 
     def get_user_top_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
         """
-        Obtiene los géneros más escuchados por el usuario según el proveedor especificado usando artist_genres_detailed
+        Obtiene los géneros más escuchados por el usuario según el proveedor especificado
 
         Args:
             user: Usuario
@@ -79,6 +79,7 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
+        # Intentar usar la tabla nueva primero
         try:
             cursor.execute(f'''
                 SELECT agd.genre, COUNT(*) as plays
@@ -92,13 +93,49 @@ class UserStatsDatabase:
                 LIMIT ?
             ''', (user, from_timestamp, to_timestamp, provider, limit))
 
-            return [(row['genre'], row['plays']) for row in cursor.fetchall()]
-        except sqlite3.OperationalError as e:
-            print(f"Error en get_user_top_genres_by_provider: {e}")
-            return []
+            result = [(row['genre'], row['plays']) for row in cursor.fetchall()]
+            if result:  # Si hay datos en la tabla nueva, usarlos
+                return result
+        except sqlite3.OperationalError:
+            pass  # Tabla no existe, continuar con fallback
+
+        # Fallback: usar la tabla antigua solo para lastfm
+        if provider == 'lastfm':
+            try:
+                cursor.execute(f'''
+                    SELECT ag.genres, COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                    {mbid_filter}
+                    GROUP BY ag.genres
+                    ORDER BY plays DESC
+                ''', (user, from_timestamp, to_timestamp))
+
+                genre_counts = defaultdict(int)
+                for row in cursor.fetchall():
+                    genres_json = row['genres']
+                    try:
+                        genres_list = json.loads(genres_json) if genres_json else []
+                        for genre in genres_list[:3]:  # Solo primeros 3 géneros
+                            genre_counts[genre] += row['plays']
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+                # Ordenar y limitar
+                sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)
+                return sorted_genres[:limit]
+
+            except sqlite3.OperationalError as e:
+                print(f"Error en fallback de géneros: {e}")
+                return []
+
+        # Si no es lastfm y no hay tabla nueva, devolver vacío
+        print(f"No hay datos de géneros disponibles para {provider}")
+        return []
 
     def get_top_artists_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene top artistas para un género específico por proveedor con datos temporales usando artist_genres_detailed - con filtro MBID"""
+        """Obtiene top artistas para un género específico por proveedor con datos temporales - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -106,8 +143,8 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
+        # Intentar usar la tabla nueva primero
         try:
-            # Obtener top artistas para este género
             cursor.execute(f'''
                 SELECT s.artist, COUNT(*) as total_plays
                 FROM scrobbles s
@@ -121,44 +158,93 @@ class UserStatsDatabase:
             ''', (user, from_timestamp, to_timestamp, genre, provider, limit))
 
             artists = cursor.fetchall()
-            artists_data = []
+            if artists:  # Si hay datos en la tabla nueva, procesarlos
+                artists_data = []
+                for artist_row in artists:
+                    artist_name = artist_row['artist']
+                    yearly_data = {}
+                    for year in range(from_year, to_year + 1):
+                        year_start = int(datetime(year, 1, 1).timestamp())
+                        year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
 
-            for artist_row in artists:
-                artist_name = artist_row['artist']
+                        cursor.execute(f'''
+                            SELECT COUNT(*) as plays
+                            FROM scrobbles s
+                            JOIN artist_genres_detailed agd ON s.artist = agd.artist
+                            WHERE s.user = ? AND s.artist = ?
+                              AND s.timestamp >= ? AND s.timestamp <= ?
+                              AND agd.genre = ? AND agd.source = ?
+                            {mbid_filter}
+                        ''', (user, artist_name, year_start, year_end, genre, provider))
 
-                # Obtener datos por año
-                yearly_data = {}
-                for year in range(from_year, to_year + 1):
-                    year_start = int(datetime(year, 1, 1).timestamp())
-                    year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+                        year_result = cursor.fetchone()
+                        yearly_data[year] = year_result['plays'] if year_result else 0
 
-                    cursor.execute(f'''
-                        SELECT COUNT(*) as plays
-                        FROM scrobbles s
-                        JOIN artist_genres_detailed agd ON s.artist = agd.artist
-                        WHERE s.user = ? AND s.artist = ?
-                          AND s.timestamp >= ? AND s.timestamp <= ?
-                          AND agd.genre = ? AND agd.source = ?
-                        {mbid_filter}
-                    ''', (user, artist_name, year_start, year_end, genre, provider))
+                    artists_data.append({
+                        'artist': artist_name,
+                        'yearly_data': yearly_data,
+                        'total_plays': artist_row['total_plays']
+                    })
 
-                    year_result = cursor.fetchone()
-                    yearly_data[year] = year_result['plays'] if year_result else 0
+                return artists_data
+        except sqlite3.OperationalError:
+            pass  # Tabla no existe, continuar con fallback
 
-                artists_data.append({
-                    'artist': artist_name,
-                    'yearly_data': yearly_data,
-                    'total_plays': artist_row['total_plays']
-                })
+        # Fallback: usar la tabla antigua solo para lastfm
+        if provider == 'lastfm':
+            try:
+                cursor.execute(f'''
+                    SELECT s.artist, COUNT(*) as total_plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND ag.genres LIKE ?
+                    {mbid_filter}
+                    GROUP BY s.artist
+                    ORDER BY total_plays DESC
+                    LIMIT ?
+                ''', (user, from_timestamp, to_timestamp, f'%"{genre}"%', limit))
 
-            return artists_data
+                artists = cursor.fetchall()
+                artists_data = []
 
-        except sqlite3.OperationalError as e:
-            print(f"Error en get_top_artists_for_genre_by_provider: {e}")
-            return []
+                for artist_row in artists:
+                    artist_name = artist_row['artist']
+                    yearly_data = {}
+                    for year in range(from_year, to_year + 1):
+                        year_start = int(datetime(year, 1, 1).timestamp())
+                        year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+                        cursor.execute(f'''
+                            SELECT COUNT(*) as plays
+                            FROM scrobbles s
+                            JOIN artist_genres ag ON s.artist = ag.artist
+                            WHERE s.user = ? AND s.artist = ?
+                              AND s.timestamp >= ? AND s.timestamp <= ?
+                              AND ag.genres LIKE ?
+                            {mbid_filter}
+                        ''', (user, artist_name, year_start, year_end, f'%"{genre}"%'))
+
+                        year_result = cursor.fetchone()
+                        yearly_data[year] = year_result['plays'] if year_result else 0
+
+                    artists_data.append({
+                        'artist': artist_name,
+                        'yearly_data': yearly_data,
+                        'total_plays': artist_row['total_plays']
+                    })
+
+                return artists_data
+            except sqlite3.OperationalError as e:
+                print(f"Error en fallback de artistas por género: {e}")
+                return []
+
+        # Si no es lastfm y no hay tabla nueva, devolver vacío
+        print(f"No hay datos de artistas para género {genre} en {provider}")
+        return []
 
     def get_user_top_album_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
-        """Obtiene los géneros de álbumes más escuchados por el usuario según el proveedor usando album_genres - con filtro MBID"""
+        """Obtiene los géneros de álbumes más escuchados por el usuario según el proveedor - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -166,6 +252,7 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
+        # Intentar usar la tabla nueva primero
         try:
             cursor.execute(f'''
                 SELECT ag.genre, COUNT(*) as plays
@@ -180,13 +267,19 @@ class UserStatsDatabase:
                 LIMIT ?
             ''', (user, from_timestamp, to_timestamp, provider, limit))
 
-            return [(row['genre'], row['plays']) for row in cursor.fetchall()]
-        except sqlite3.OperationalError as e:
-            print(f"Error en get_user_top_album_genres_by_provider: {e}")
-            return []
+            result = [(row['genre'], row['plays']) for row in cursor.fetchall()]
+            if result:  # Si hay datos en la tabla nueva, usarlos
+                return result
+        except sqlite3.OperationalError:
+            pass  # Tabla no existe, continuar con fallback
+
+        # Para álbumes no tenemos fallback en la tabla antigua
+        # ya que no hay géneros de álbumes en artist_genres
+        print(f"No hay datos de géneros de álbumes disponibles para {provider}")
+        return []
 
     def get_top_albums_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene top álbumes para un género específico por proveedor con datos temporales usando album_genres - con filtro MBID"""
+        """Obtiene top álbumes para un género específico por proveedor con datos temporales - con filtro MBID"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -194,8 +287,8 @@ class UserStatsDatabase:
 
         mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
+        # Intentar usar la tabla nueva primero
         try:
-            # Obtener top álbumes para este género
             cursor.execute(f'''
                 SELECT s.artist, s.album, COUNT(*) as total_plays
                 FROM scrobbles s
@@ -210,43 +303,46 @@ class UserStatsDatabase:
             ''', (user, from_timestamp, to_timestamp, genre, provider, limit))
 
             albums = cursor.fetchall()
-            albums_data = []
+            if albums:  # Si hay datos en la tabla nueva, procesarlos
+                albums_data = []
 
-            for album_row in albums:
-                artist_name = album_row['artist']
-                album_name = album_row['album']
-                album_key = f"{artist_name} - {album_name}"
+                for album_row in albums:
+                    artist_name = album_row['artist']
+                    album_name = album_row['album']
+                    album_key = f"{artist_name} - {album_name}"
 
-                # Obtener datos por año
-                yearly_data = {}
-                for year in range(from_year, to_year + 1):
-                    year_start = int(datetime(year, 1, 1).timestamp())
-                    year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+                    # Obtener datos por año
+                    yearly_data = {}
+                    for year in range(from_year, to_year + 1):
+                        year_start = int(datetime(year, 1, 1).timestamp())
+                        year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
 
-                    cursor.execute(f'''
-                        SELECT COUNT(*) as plays
-                        FROM scrobbles s
-                        JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
-                        WHERE s.user = ? AND s.artist = ? AND s.album = ?
-                          AND s.timestamp >= ? AND s.timestamp <= ?
-                          AND ag.genre = ? AND ag.source = ?
-                        {mbid_filter}
-                    ''', (user, artist_name, album_name, year_start, year_end, genre, provider))
+                        cursor.execute(f'''
+                            SELECT COUNT(*) as plays
+                            FROM scrobbles s
+                            JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                            WHERE s.user = ? AND s.artist = ? AND s.album = ?
+                              AND s.timestamp >= ? AND s.timestamp <= ?
+                              AND ag.genre = ? AND ag.source = ?
+                            {mbid_filter}
+                        ''', (user, artist_name, album_name, year_start, year_end, genre, provider))
 
-                    year_result = cursor.fetchone()
-                    yearly_data[year] = year_result['plays'] if year_result else 0
+                        year_result = cursor.fetchone()
+                        yearly_data[year] = year_result['plays'] if year_result else 0
 
-                albums_data.append({
-                    'album': album_key,
-                    'yearly_data': yearly_data,
-                    'total_plays': album_row['total_plays']
-                })
+                    albums_data.append({
+                        'album': album_key,
+                        'yearly_data': yearly_data,
+                        'total_plays': album_row['total_plays']
+                    })
 
-            return albums_data
+                return albums_data
+        except sqlite3.OperationalError:
+            pass  # Tabla no existe
 
-        except sqlite3.OperationalError as e:
-            print(f"Error en get_top_albums_for_genre_by_provider: {e}")
-            return []
+        # Para álbumes no tenemos fallback
+        print(f"No hay datos de álbumes para género {genre} en {provider}")
+        return []
 
     def get_user_top_labels(self, user: str, from_year: int, to_year: int, limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
         """Obtiene los sellos más escuchados por el usuario usando album_labels - con filtro MBID"""

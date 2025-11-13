@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Last.fm User Stats Generator - Versión Corregida con Soporte para Géneros por Proveedor
+Last.fm User Stats Generator - Versión Corregida con Soporte para Géneros por Proveedor MEJORADA
 Genera estadísticas individuales de usuarios con gráficos de coincidencias, evolución y géneros
 """
 
@@ -20,14 +20,14 @@ try:
 except ImportError:
     pass
 
-# Importar las versiones modificadas desde los outputs
+# Importar las versiones corregidas desde los outputs
 from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database import UserStatsDatabase
 from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
 
 
 def main():
-    """Función principal para generar estadísticas de usuarios con nueva sección de géneros"""
+    """Función principal para generar estadísticas de usuarios con sección de géneros CORREGIDA"""
     parser = argparse.ArgumentParser(description='Generador de estadísticas individuales de usuarios de Last.fm')
     parser.add_argument('--years-back', type=int, default=5,
                        help='Número de años hacia atrás para analizar (por defecto: 5)')
@@ -46,7 +46,7 @@ def main():
         if not users:
             raise ValueError("LASTFM_USERS no encontrada en las variables de entorno")
 
-        print("🎵 Iniciando análisis de usuarios con nueva sección de géneros...")
+        print("🎵 Iniciando análisis de usuarios con sección de géneros CORREGIDA...")
 
         # Inicializar componentes
         database = UserStatsDatabase()
@@ -63,7 +63,7 @@ def main():
             all_user_stats[user] = user_stats
 
         # Generar HTML
-        print("🎨 Generando HTML con nueva sección de géneros...")
+        print("🎨 Generando HTML con géneros corregidos...")
         html_content = html_generator.generate_html(all_user_stats, users, args.years_back)
 
         # Guardar archivo
@@ -72,18 +72,38 @@ def main():
             f.write(html_content)
 
         print(f"✅ Archivo generado: {args.output}")
-        print(f"📊 Nuevas características incluidas:")
-        print(f"  • Vista de Géneros con soporte para múltiples proveedores (Last.fm, MusicBrainz, Discogs)")
-        print(f"  • Gráfico circular con top 15 géneros por proveedor")
-        print(f"  • 5 gráficos de scatter mostrando evolución temporal de artistas por género")
-        print(f"  • Puntos clickeables optimizados para móvil")
-        print(f"  • Funcionalidad de usuario con botón y localStorage (como en temporales)")
+        print(f"📊 Características CORREGIDAS:")
+        print(f"  • Géneros diferenciados por proveedor (Last.fm, MusicBrainz, Discogs)")
+        print(f"  • Fallback automático a tabla antigua para Last.fm")
+        print(f"  • Gráficos scatter con leyendas visibles y márgenes adecuados")
+        print(f"  • Soporte para géneros de álbumes por separado")
+        print(f"  • Sección de sellos completamente funcional")
+        print(f"  • Manejo mejorado de datos vacíos")
 
         # Mostrar resumen
         print("\n📈 Resumen:")
         for user, stats in all_user_stats.items():
             total_scrobbles = sum(stats['yearly_scrobbles'].values())
-            print(f"  • {user}: {total_scrobbles:,} scrobbles analizados")
+
+            # Mostrar información sobre géneros por proveedor
+            genres_info = []
+            if 'genres' in stats:
+                for provider in ['lastfm', 'musicbrainz', 'discogs']:
+                    if provider in stats['genres']:
+                        provider_data = stats['genres'][provider]
+                        if 'pie_chart' in provider_data and provider_data['pie_chart']['total'] > 0:
+                            genres_count = len(provider_data['pie_chart']['data'])
+                            genres_info.append(f"{provider}: {genres_count} géneros")
+
+            genres_str = ", ".join(genres_info) if genres_info else "sin géneros"
+
+            # Mostrar información sobre sellos
+            labels_info = ""
+            if 'labels' in stats and 'pie_chart' in stats['labels']:
+                labels_count = len(stats['labels']['pie_chart']['data'])
+                labels_info = f", {labels_count} sellos"
+
+            print(f"  • {user}: {total_scrobbles:,} scrobbles ({genres_str}{labels_info})")
 
         database.close()
 

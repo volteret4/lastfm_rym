@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Last.fm User Stats Generator - Version Corregida
-Genera estadÃ­sticas individuales de usuarios con grÃ¡ficos de coincidencias y evoluciÃ³n
+Last.fm User Stats Generator - Versión Corregida con Soporte para Géneros por Proveedor
+Genera estadísticas individuales de usuarios con gráficos de coincidencias, evolución y géneros
 """
 
 import os
@@ -20,16 +20,17 @@ try:
 except ImportError:
     pass
 
-from tools.users.user_stats_analyzer import UserStatsAnalyzer
-from tools.users.user_stats_database import UserStatsDatabase
-from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
+# Importar las versiones modificadas desde los outputs
+from tools.temp.temp_analyzer import UserStatsAnalyzer
+from tools.temp.temp_database import UserStatsDatabase
+from tools.temp.temp_html_generator import UserStatsHTMLGenerator
 
 
 def main():
-    """FunciÃ³n principal para generar estadÃ­sticas de usuarios"""
-    parser = argparse.ArgumentParser(description='Generador de estadÃ­sticas individuales de usuarios de Last.fm')
+    """Función principal para generar estadísticas de usuarios con nueva sección de géneros"""
+    parser = argparse.ArgumentParser(description='Generador de estadísticas individuales de usuarios de Last.fm')
     parser.add_argument('--years-back', type=int, default=5,
-                       help='NÃºmero de aÃ±os hacia atrÃ¡s para analizar (por defecto: 5)')
+                       help='Número de años hacia atrás para analizar (por defecto: 5)')
     parser.add_argument('--output', type=str, default=None,
                        help='Archivo de salida HTML (por defecto: auto-generado con fecha)')
     args = parser.parse_args()
@@ -45,46 +46,49 @@ def main():
         if not users:
             raise ValueError("LASTFM_USERS no encontrada en las variables de entorno")
 
-        print("ðŸ“Š Iniciando anÃ¡lisis de usuarios...")
+        print("🎵 Iniciando análisis de usuarios con nueva sección de géneros...")
 
         # Inicializar componentes
         database = UserStatsDatabase()
         analyzer = UserStatsAnalyzer(database, years_back=args.years_back)
         html_generator = UserStatsHTMLGenerator()
 
-        # Analizar estadÃ­sticas para todos los usuarios
-        print(f"ðŸ‘¤ Analizando {len(users)} usuarios...")
+        # Analizar estadísticas para todos los usuarios
+        print(f"👤 Analizando {len(users)} usuarios...")
         all_user_stats = {}
 
         for user in users:
-            print(f"  â€¢ Procesando {user}...")
+            print(f"  • Procesando {user}...")
             user_stats = analyzer.analyze_user(user, users)
             all_user_stats[user] = user_stats
 
         # Generar HTML
-        print("ðŸŽ¨ Generando HTML...")
+        print("🎨 Generando HTML con nueva sección de géneros...")
         html_content = html_generator.generate_html(all_user_stats, users, args.years_back)
 
         # Guardar archivo
+        os.makedirs(os.path.dirname(args.output), exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
-        print(f"âœ… Archivo generado: {args.output}")
-        print(f"ðŸ“Š OptimizaciÃ³n aplicada:")
-        print(f"  â€¢ AnÃ¡lisis: Datos completos procesados en Python")
-        print(f"  â€¢ HTML: Solo datos necesarios para grÃ¡ficos")
-        print(f"  â€¢ Resultado: Archivo HTML ligero con funcionalidad completa")
+        print(f"✅ Archivo generado: {args.output}")
+        print(f"📊 Nuevas características incluidas:")
+        print(f"  • Vista de Géneros con soporte para múltiples proveedores (Last.fm, MusicBrainz, Discogs)")
+        print(f"  • Gráfico circular con top 15 géneros por proveedor")
+        print(f"  • 5 gráficos de scatter mostrando evolución temporal de artistas por género")
+        print(f"  • Puntos clickeables optimizados para móvil")
+        print(f"  • Funcionalidad de usuario con botón y localStorage (como en temporales)")
 
         # Mostrar resumen
-        print("\nðŸ“ˆ Resumen:")
+        print("\n📈 Resumen:")
         for user, stats in all_user_stats.items():
             total_scrobbles = sum(stats['yearly_scrobbles'].values())
-            print(f"  â€¢ {user}: {total_scrobbles:,} scrobbles analizados")
+            print(f"  • {user}: {total_scrobbles:,} scrobbles analizados")
 
         database.close()
 
     except Exception as e:
-        print(f"âŒ Error: {e}")
+        print(f"❌ Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

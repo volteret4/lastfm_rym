@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-UserStatsAnalyzer - Versión optimizada para mejor rendimiento
+UserStatsAnalyzer - Versión optimizada con correcciones para géneros por proveedor
 """
 
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ import json
 
 
 class UserStatsAnalyzer:
-    """Clase para analizar y procesar estadísticas de usuarios - OPTIMIZADA"""
+    """Clase para analizar y procesar estadísticas de usuarios - OPTIMIZADA y CORREGIDA"""
 
     def __init__(self, database, years_back: int = 5, mbid_only: bool = False):
         self.database = database
@@ -53,58 +53,76 @@ class UserStatsAnalyzer:
         }
 
     def _analyze_genres_by_provider(self, user: str) -> Dict:
-        """Analiza géneros del usuario según diferentes proveedores"""
+        """Analiza géneros del usuario según diferentes proveedores - CORREGIDO"""
         providers = ['lastfm', 'musicbrainz', 'discogs']
         genres_data = {}
 
         for provider in providers:
             print(f"      - Analizando géneros de {provider}...")
 
-            # Obtener top 15 géneros para el gráfico circular
-            top_genres = self.database.get_user_top_genres_by_provider(
-                user, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
-            )
-
-            # Tomar top 6 géneros para los gráficos de puntos
-            top_6_genres = [genre for genre, _ in top_genres[:6]]
-
-            # Para cada género del top 6, obtener top 15 artistas con datos temporales
-            genres_scatter_data = {}
-            for genre_name in top_6_genres:
-                genre_artists = self.database.get_top_artists_for_genre_by_provider(
-                    user, genre_name, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
+            try:
+                # Obtener top 15 géneros para el gráfico circular
+                top_genres = self.database.get_user_top_genres_by_provider(
+                    user, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
                 )
-                genres_scatter_data[genre_name] = genre_artists
 
-            # Obtener géneros de álbumes
-            top_album_genres = self.database.get_user_top_album_genres_by_provider(
-                user, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
-            )
+                if not top_genres:
+                    print(f"        No hay datos de géneros para {provider}")
+                    continue
 
-            # Tomar top 6 géneros de álbumes para los gráficos de puntos
-            top_6_album_genres = [genre for genre, _ in top_album_genres[:6]]
+                # Tomar top 6 géneros para los gráficos de puntos
+                top_6_genres = [genre for genre, _ in top_genres[:6]]
 
-            # Para cada género del top 6, obtener top 15 álbumes con datos temporales
-            album_genres_scatter_data = {}
-            for genre_name in top_6_album_genres:
-                genre_albums = self.database.get_top_albums_for_genre_by_provider(
-                    user, genre_name, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
+                # Para cada género del top 6, obtener top 15 artistas con datos temporales
+                genres_scatter_data = {}
+                for genre_name in top_6_genres:
+                    genre_artists = self.database.get_top_artists_for_genre_by_provider(
+                        user, genre_name, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
+                    )
+                    if genre_artists:
+                        genres_scatter_data[genre_name] = genre_artists
+
+                # Obtener géneros de álbumes
+                top_album_genres = self.database.get_user_top_album_genres_by_provider(
+                    user, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
                 )
-                album_genres_scatter_data[genre_name] = genre_albums
 
-            genres_data[provider] = {
-                'pie_chart': {
-                    'data': dict(top_genres),
-                    'total': sum(plays for _, plays in top_genres)
-                },
-                'scatter_charts': genres_scatter_data,
-                'album_pie_chart': {
-                    'data': dict(top_album_genres),
-                    'total': sum(plays for _, plays in top_album_genres)
-                },
-                'album_scatter_charts': album_genres_scatter_data,
-                'years': list(range(self.from_year, self.to_year + 1))
-            }
+                # Solo crear scatter para álbumes si hay datos
+                album_genres_scatter_data = {}
+                if top_album_genres:
+                    # Tomar top 6 géneros de álbumes para los gráficos de puntos
+                    top_6_album_genres = [genre for genre, _ in top_album_genres[:6]]
+
+                    # Para cada género del top 6, obtener top 15 álbumes con datos temporales
+                    for genre_name in top_6_album_genres:
+                        genre_albums = self.database.get_top_albums_for_genre_by_provider(
+                            user, genre_name, self.from_year, self.to_year, provider, limit=15, mbid_only=self.mbid_only
+                        )
+                        if genre_albums:
+                            album_genres_scatter_data[genre_name] = genre_albums
+
+                genres_data[provider] = {
+                    'pie_chart': {
+                        'data': dict(top_genres),
+                        'total': sum(plays for _, plays in top_genres)
+                    },
+                    'scatter_charts': genres_scatter_data,
+                    'years': list(range(self.from_year, self.to_year + 1))
+                }
+
+                # Solo añadir datos de álbumes si existen
+                if top_album_genres:
+                    genres_data[provider]['album_pie_chart'] = {
+                        'data': dict(top_album_genres),
+                        'total': sum(plays for _, plays in top_album_genres)
+                    }
+
+                if album_genres_scatter_data:
+                    genres_data[provider]['album_scatter_charts'] = album_genres_scatter_data
+
+            except Exception as e:
+                print(f"        Error analizando {provider}: {e}")
+                continue
 
         return genres_data
 
@@ -112,30 +130,40 @@ class UserStatsAnalyzer:
         """Analiza sellos del usuario"""
         print(f"      - Analizando sellos...")
 
-        # Obtener top 15 sellos para el gráfico circular
-        top_labels = self.database.get_user_top_labels(
-            user, self.from_year, self.to_year, limit=15, mbid_only=self.mbid_only
-        )
-
-        # Tomar top 6 sellos para los gráficos de puntos
-        top_6_labels = [label for label, _ in top_labels[:6]]
-
-        # Para cada sello del top 6, obtener top 15 artistas con datos temporales
-        labels_scatter_data = {}
-        for label_name in top_6_labels:
-            label_artists = self.database.get_top_artists_for_label(
-                user, label_name, self.from_year, self.to_year, limit=15, mbid_only=self.mbid_only
+        try:
+            # Obtener top 15 sellos para el gráfico circular
+            top_labels = self.database.get_user_top_labels(
+                user, self.from_year, self.to_year, limit=15, mbid_only=self.mbid_only
             )
-            labels_scatter_data[label_name] = label_artists
 
-        return {
-            'pie_chart': {
-                'data': dict(top_labels),
-                'total': sum(plays for _, plays in top_labels)
-            },
-            'scatter_charts': labels_scatter_data,
-            'years': list(range(self.from_year, self.to_year + 1))
-        }
+            if not top_labels:
+                print(f"        No hay datos de sellos disponibles")
+                return {}
+
+            # Tomar top 6 sellos para los gráficos de puntos
+            top_6_labels = [label for label, _ in top_labels[:6]]
+
+            # Para cada sello del top 6, obtener top 15 artistas con datos temporales
+            labels_scatter_data = {}
+            for label_name in top_6_labels:
+                label_artists = self.database.get_top_artists_for_label(
+                    user, label_name, self.from_year, self.to_year, limit=15, mbid_only=self.mbid_only
+                )
+                if label_artists:
+                    labels_scatter_data[label_name] = label_artists
+
+            return {
+                'pie_chart': {
+                    'data': dict(top_labels),
+                    'total': sum(plays for _, plays in top_labels)
+                },
+                'scatter_charts': labels_scatter_data,
+                'years': list(range(self.from_year, self.to_year + 1))
+            }
+
+        except Exception as e:
+            print(f"        Error analizando sellos: {e}")
+            return {}
 
     def _analyze_individual(self, user: str) -> Dict:
         """Analiza datos individuales del usuario para la vista 'yomimeconmigo'"""

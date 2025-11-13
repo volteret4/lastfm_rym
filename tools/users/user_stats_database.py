@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 UserStatsDatabase - Versión optimizada con soporte MBID y mejor rendimiento
+CORREGIDA para géneros por proveedor
 """
 
 import sqlite3
@@ -56,6 +57,288 @@ class UserStatsDatabase:
 
         return scrobbles_by_year
 
+    def get_user_top_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
+        """
+        Obtiene los géneros más escuchados por el usuario según el proveedor especificado usando artist_genres_detailed
+
+        Args:
+            user: Usuario
+            from_year: Año inicial
+            to_year: Año final
+            provider: 'lastfm', 'musicbrainz', o 'discogs'
+            limit: Límite de géneros
+            mbid_only: Solo scrobbles con MBID
+
+        Returns:
+            Lista de tuplas (género, reproducciones)
+        """
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        try:
+            cursor.execute(f'''
+                SELECT agd.genre, COUNT(*) as plays
+                FROM scrobbles s
+                JOIN artist_genres_detailed agd ON s.artist = agd.artist
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND agd.source = ?
+                {mbid_filter}
+                GROUP BY agd.genre
+                ORDER BY plays DESC
+                LIMIT ?
+            ''', (user, from_timestamp, to_timestamp, provider, limit))
+
+            return [(row['genre'], row['plays']) for row in cursor.fetchall()]
+        except sqlite3.OperationalError as e:
+            print(f"Error en get_user_top_genres_by_provider: {e}")
+            return []
+
+    def get_top_artists_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 15, mbid_only: bool = False) -> List[Dict]:
+        """Obtiene top artistas para un género específico por proveedor con datos temporales usando artist_genres_detailed - con filtro MBID"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        try:
+            # Obtener top artistas para este género
+            cursor.execute(f'''
+                SELECT s.artist, COUNT(*) as total_plays
+                FROM scrobbles s
+                JOIN artist_genres_detailed agd ON s.artist = agd.artist
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND agd.genre = ? AND agd.source = ?
+                {mbid_filter}
+                GROUP BY s.artist
+                ORDER BY total_plays DESC
+                LIMIT ?
+            ''', (user, from_timestamp, to_timestamp, genre, provider, limit))
+
+            artists = cursor.fetchall()
+            artists_data = []
+
+            for artist_row in artists:
+                artist_name = artist_row['artist']
+
+                # Obtener datos por año
+                yearly_data = {}
+                for year in range(from_year, to_year + 1):
+                    year_start = int(datetime(year, 1, 1).timestamp())
+                    year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as plays
+                        FROM scrobbles s
+                        JOIN artist_genres_detailed agd ON s.artist = agd.artist
+                        WHERE s.user = ? AND s.artist = ?
+                          AND s.timestamp >= ? AND s.timestamp <= ?
+                          AND agd.genre = ? AND agd.source = ?
+                        {mbid_filter}
+                    ''', (user, artist_name, year_start, year_end, genre, provider))
+
+                    year_result = cursor.fetchone()
+                    yearly_data[year] = year_result['plays'] if year_result else 0
+
+                artists_data.append({
+                    'artist': artist_name,
+                    'yearly_data': yearly_data,
+                    'total_plays': artist_row['total_plays']
+                })
+
+            return artists_data
+
+        except sqlite3.OperationalError as e:
+            print(f"Error en get_top_artists_for_genre_by_provider: {e}")
+            return []
+
+    def get_user_top_album_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
+        """Obtiene los géneros de álbumes más escuchados por el usuario según el proveedor usando album_genres - con filtro MBID"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        try:
+            cursor.execute(f'''
+                SELECT ag.genre, COUNT(*) as plays
+                FROM scrobbles s
+                JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND ag.source = ?
+                  AND s.album IS NOT NULL AND s.album != ''
+                {mbid_filter}
+                GROUP BY ag.genre
+                ORDER BY plays DESC
+                LIMIT ?
+            ''', (user, from_timestamp, to_timestamp, provider, limit))
+
+            return [(row['genre'], row['plays']) for row in cursor.fetchall()]
+        except sqlite3.OperationalError as e:
+            print(f"Error en get_user_top_album_genres_by_provider: {e}")
+            return []
+
+    def get_top_albums_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
+        """Obtiene top álbumes para un género específico por proveedor con datos temporales usando album_genres - con filtro MBID"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        try:
+            # Obtener top álbumes para este género
+            cursor.execute(f'''
+                SELECT s.artist, s.album, COUNT(*) as total_plays
+                FROM scrobbles s
+                JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND ag.genre = ? AND ag.source = ?
+                  AND s.album IS NOT NULL AND s.album != ''
+                {mbid_filter}
+                GROUP BY s.artist, s.album
+                ORDER BY total_plays DESC
+                LIMIT ?
+            ''', (user, from_timestamp, to_timestamp, genre, provider, limit))
+
+            albums = cursor.fetchall()
+            albums_data = []
+
+            for album_row in albums:
+                artist_name = album_row['artist']
+                album_name = album_row['album']
+                album_key = f"{artist_name} - {album_name}"
+
+                # Obtener datos por año
+                yearly_data = {}
+                for year in range(from_year, to_year + 1):
+                    year_start = int(datetime(year, 1, 1).timestamp())
+                    year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as plays
+                        FROM scrobbles s
+                        JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                        WHERE s.user = ? AND s.artist = ? AND s.album = ?
+                          AND s.timestamp >= ? AND s.timestamp <= ?
+                          AND ag.genre = ? AND ag.source = ?
+                        {mbid_filter}
+                    ''', (user, artist_name, album_name, year_start, year_end, genre, provider))
+
+                    year_result = cursor.fetchone()
+                    yearly_data[year] = year_result['plays'] if year_result else 0
+
+                albums_data.append({
+                    'album': album_key,
+                    'yearly_data': yearly_data,
+                    'total_plays': album_row['total_plays']
+                })
+
+            return albums_data
+
+        except sqlite3.OperationalError as e:
+            print(f"Error en get_top_albums_for_genre_by_provider: {e}")
+            return []
+
+    def get_user_top_labels(self, user: str, from_year: int, to_year: int, limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
+        """Obtiene los sellos más escuchados por el usuario usando album_labels - con filtro MBID"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        try:
+            cursor.execute(f'''
+                SELECT al.label, COUNT(*) as plays
+                FROM scrobbles s
+                LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND al.label IS NOT NULL AND al.label != ''
+                  AND s.album IS NOT NULL AND s.album != ''
+                {mbid_filter}
+                GROUP BY al.label
+                ORDER BY plays DESC
+                LIMIT ?
+            ''', (user, from_timestamp, to_timestamp, limit))
+
+            return [(row['label'], row['plays']) for row in cursor.fetchall()]
+        except sqlite3.OperationalError as e:
+            print(f"Error en get_user_top_labels: {e}")
+            return []
+
+    def get_top_artists_for_label(self, user: str, label: str, from_year: int, to_year: int, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
+        """Obtiene top artistas para un sello específico con datos temporales usando album_labels - con filtro MBID"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        try:
+            # Obtener top artistas para este sello
+            cursor.execute(f'''
+                SELECT s.artist, COUNT(*) as total_plays
+                FROM scrobbles s
+                LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND al.label = ?
+                  AND s.album IS NOT NULL AND s.album != ''
+                {mbid_filter}
+                GROUP BY s.artist
+                ORDER BY total_plays DESC
+                LIMIT ?
+            ''', (user, from_timestamp, to_timestamp, label, limit))
+
+            artists = cursor.fetchall()
+            artists_data = []
+
+            for artist_row in artists:
+                artist_name = artist_row['artist']
+
+                # Obtener datos por año
+                yearly_data = {}
+                for year in range(from_year, to_year + 1):
+                    year_start = int(datetime(year, 1, 1).timestamp())
+                    year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as plays
+                        FROM scrobbles s
+                        LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                        WHERE s.user = ? AND s.artist = ?
+                          AND s.timestamp >= ? AND s.timestamp <= ?
+                          AND al.label = ?
+                          AND s.album IS NOT NULL AND s.album != ''
+                        {mbid_filter}
+                    ''', (user, artist_name, year_start, year_end, label))
+
+                    year_result = cursor.fetchone()
+                    yearly_data[year] = year_result['plays'] if year_result else 0
+
+                artists_data.append({
+                    'artist': artist_name,
+                    'yearly_data': yearly_data,
+                    'total_plays': artist_row['total_plays']
+                })
+
+            return artists_data
+
+        except sqlite3.OperationalError as e:
+            print(f"Error en get_top_artists_for_label: {e}")
+            return []
+
+    # RESTO DE FUNCIONES - mantener las existentes del archivo original
     def get_common_artists_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, Dict[str, int]]:
         """Obtiene artistas comunes entre el usuario y otros usuarios - con filtro MBID"""
         cursor = self.conn.cursor()
@@ -423,226 +706,6 @@ class UserStatsDatabase:
                 common_decades[other_user] = common
 
         return common_decades
-
-    # NUEVOS MÉTODOS PARA GÉNEROS POR PROVEEDOR
-
-    def get_user_top_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
-        """
-        Obtiene los géneros más escuchados por el usuario según el proveedor especificado
-
-        Args:
-            user: Usuario
-            from_year: Año inicial
-            to_year: Año final
-            provider: 'lastfm', 'musicbrainz', o 'discogs'
-            limit: Límite de géneros
-            mbid_only: Solo scrobbles con MBID
-
-        Returns:
-            Lista de tuplas (género, reproducciones)
-        """
-        genres_by_year = self.get_user_genres_by_year_by_provider(user, from_year, to_year, provider, limit=50, mbid_only=mbid_only)
-
-        # Sumar todos los años
-        total_genres = defaultdict(int)
-        for year_genres in genres_by_year.values():
-            for genre, plays in year_genres.items():
-                total_genres[genre] += plays
-
-        # Ordenar y limitar
-        sorted_genres = sorted(total_genres.items(), key=lambda x: x[1], reverse=True)
-        return sorted_genres[:limit]
-
-    def get_user_genres_by_year_by_provider(self, user: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 15, mbid_only: bool = False) -> Dict[int, Dict[str, int]]:
-        """
-        Obtiene géneros del usuario por año según el proveedor especificado
-
-        Args:
-            user: Usuario
-            from_year: Año inicial
-            to_year: Año final
-            provider: 'lastfm', 'musicbrainz', o 'discogs'
-            limit: Límite de géneros por año
-            mbid_only: Solo scrobbles con MBID
-
-        Returns:
-            Dict con datos por año {año: {género: reproducciones}}
-        """
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        mbid_filter = self._get_mbid_filter(mbid_only, 's')
-
-        # Determinar la columna de géneros según el proveedor
-        if provider == 'lastfm':
-            genres_column = 'ag.genres'
-            table_join = 'JOIN artist_genres ag ON s.artist = ag.artist'
-        elif provider == 'musicbrainz':
-            # Asumir que existe una tabla artist_genres_mb o columna mb_genres
-            genres_column = 'ag.mb_genres'
-            table_join = 'JOIN artist_genres ag ON s.artist = ag.artist'
-        elif provider == 'discogs':
-            # Asumir que existe una tabla artist_genres_discogs o columna discogs_genres
-            genres_column = 'ag.discogs_genres'
-            table_join = 'JOIN artist_genres ag ON s.artist = ag.artist'
-        else:
-            # Default a lastfm
-            genres_column = 'ag.genres'
-            table_join = 'JOIN artist_genres ag ON s.artist = ag.artist'
-
-        # Solo obtener los top artistas para reducir carga
-        cursor.execute(f'''
-            SELECT DISTINCT s.artist
-            FROM scrobbles s
-            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-            {mbid_filter}
-            GROUP BY s.artist
-            ORDER BY COUNT(*) DESC
-            LIMIT 200
-        ''', (user, from_timestamp, to_timestamp))
-
-        top_artists = [row['artist'] for row in cursor.fetchall()]
-
-        if not top_artists:
-            return {}
-
-        # Obtener géneros solo para estos artistas
-        try:
-            cursor.execute(f'''
-                SELECT {genres_column} as genres,
-                       strftime('%Y', datetime(s.timestamp, 'unixepoch')) as year,
-                       COUNT(*) as plays
-                FROM scrobbles s
-                {table_join}
-                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-                  AND s.artist IN ({','.join(['?'] * len(top_artists))})
-                  AND {genres_column} IS NOT NULL AND {genres_column} != ''
-                {mbid_filter}
-                GROUP BY {genres_column}, year
-                ORDER BY year, plays DESC
-            ''', [user, from_timestamp, to_timestamp] + top_artists)
-
-            genres_by_year = defaultdict(lambda: defaultdict(int))
-
-            for row in cursor.fetchall():
-                year = int(row['year'])
-                genres_json = row['genres']
-                plays = row['plays']
-
-                try:
-                    genres_list = json.loads(genres_json) if genres_json else []
-                    for genre in genres_list[:3]:  # Solo primeros 3 géneros por artista
-                        genres_by_year[year][genre] += plays
-                except (json.JSONDecodeError, TypeError):
-                    # Si no es JSON, asumir que es un género simple
-                    if genres_json:
-                        genres_by_year[year][genres_json] += plays
-                    continue
-
-            # Limitar géneros por año
-            limited_genres_by_year = {}
-            for year, genres in genres_by_year.items():
-                sorted_genres = sorted(genres.items(), key=lambda x: x[1], reverse=True)
-                limited_genres_by_year[year] = dict(sorted_genres[:limit])
-
-            return limited_genres_by_year
-
-        except sqlite3.OperationalError:
-            # Si la columna no existe, fallback a lastfm
-            if provider != 'lastfm':
-                return self.get_user_genres_by_year_by_provider(user, from_year, to_year, 'lastfm', limit, mbid_only)
-            else:
-                return {}
-
-    def get_top_artists_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 25, mbid_only: bool = False) -> List[Dict]:
-        """
-        Obtiene top artistas para un género específico según el proveedor
-
-        Args:
-            user: Usuario
-            genre: Género
-            from_year: Año inicial
-            to_year: Año final
-            provider: 'lastfm', 'musicbrainz', o 'discogs'
-            limit: Límite de artistas
-            mbid_only: Solo scrobbles con MBID
-
-        Returns:
-            Lista de diccionarios con artista y reproducciones por año
-        """
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        mbid_filter = self._get_mbid_filter(mbid_only, 's')
-
-        # Determinar la columna de géneros según el proveedor
-        if provider == 'lastfm':
-            genres_column = 'ag.genres'
-            table_join = 'JOIN artist_genres ag ON s.artist = ag.artist'
-        elif provider == 'musicbrainz':
-            genres_column = 'ag.mb_genres'
-            table_join = 'JOIN artist_genres ag ON s.artist = ag.artist'
-        elif provider == 'discogs':
-            genres_column = 'ag.discogs_genres'
-            table_join = 'JOIN artist_genres ag ON s.artist = ag.artist'
-        else:
-            genres_column = 'ag.genres'
-            table_join = 'JOIN artist_genres ag ON s.artist = ag.artist'
-
-        try:
-            # Obtener artistas y reproducciones por año para el género específico
-            cursor.execute(f'''
-                SELECT s.artist,
-                       strftime('%Y', datetime(s.timestamp, 'unixepoch')) as year,
-                       COUNT(*) as plays
-                FROM scrobbles s
-                {table_join}
-                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-                  AND ({genres_column} LIKE ? OR {genres_column} LIKE ?)
-                {mbid_filter}
-                GROUP BY s.artist, year
-                ORDER BY s.artist, year
-            ''', (user, from_timestamp, to_timestamp, f'%"{genre}"%', f'%{genre}%'))
-
-            # Organizar datos por artista y año
-            artist_data = defaultdict(lambda: defaultdict(int))
-            total_plays_by_artist = defaultdict(int)
-
-            for row in cursor.fetchall():
-                artist = row['artist']
-                year = int(row['year'])
-                plays = row['plays']
-
-                artist_data[artist][year] = plays
-                total_plays_by_artist[artist] += plays
-
-            # Obtener top artistas por total de reproducciones
-            top_artists = sorted(total_plays_by_artist.items(), key=lambda x: x[1], reverse=True)[:limit]
-
-            result = []
-            for artist_name, total_plays in top_artists:
-                artist_yearly_data = {}
-                for year in range(from_year, to_year + 1):
-                    artist_yearly_data[year] = artist_data[artist_name].get(year, 0)
-
-                result.append({
-                    'artist': artist_name,
-                    'total_plays': total_plays,
-                    'yearly_data': artist_yearly_data
-                })
-
-            return result
-
-        except sqlite3.OperationalError:
-            # Si la columna no existe, fallback a lastfm
-            if provider != 'lastfm':
-                return self.get_top_artists_for_genre_by_provider(user, genre, from_year, to_year, 'lastfm', limit, mbid_only)
-            else:
-                return []
 
     def get_user_top_genres(self, user: str, from_year: int, to_year: int, limit: int = 10, mbid_only: bool = False) -> List[Tuple[str, int]]:
         """Obtiene los géneros más escuchados por el usuario - con filtro MBID"""
@@ -1828,247 +1891,6 @@ class UserStatsDatabase:
         else:
             decade_start = (year // 10) * 10
             return f"{decade_start}s"
-
-    def get_user_top_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
-        """Obtiene los géneros más escuchados por el usuario según el proveedor usando artists_genres_detailed - con filtro MBID"""
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        mbid_filter = self._get_mbid_filter(mbid_only, 's')
-
-        cursor.execute(f'''
-            SELECT agd.genre, COUNT(*) as plays
-            FROM scrobbles s
-            JOIN artists_genres_detailed agd ON s.artist = agd.artist
-            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-              AND agd.source = ?
-            {mbid_filter}
-            GROUP BY agd.genre
-            ORDER BY plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, provider, limit))
-
-        return [(row['genre'], row['plays']) for row in cursor.fetchall()]
-
-    def get_top_artists_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene top artistas para un género específico por proveedor con datos temporales usando artists_genres_detailed - con filtro MBID"""
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        mbid_filter = self._get_mbid_filter(mbid_only, 's')
-
-        # Obtener top artistas para este género
-        cursor.execute(f'''
-            SELECT s.artist, COUNT(*) as total_plays
-            FROM scrobbles s
-            JOIN artists_genres_detailed agd ON s.artist = agd.artist
-            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-              AND agd.genre = ? AND agd.source = ?
-            {mbid_filter}
-            GROUP BY s.artist
-            ORDER BY total_plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, genre, provider, limit))
-
-        artists = cursor.fetchall()
-        artists_data = []
-
-        for artist_row in artists:
-            artist_name = artist_row['artist']
-
-            # Obtener datos por año
-            yearly_data = {}
-            for year in range(from_year, to_year + 1):
-                year_start = int(datetime(year, 1, 1).timestamp())
-                year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
-
-                cursor.execute(f'''
-                    SELECT COUNT(*) as plays
-                    FROM scrobbles s
-                    JOIN artists_genres_detailed agd ON s.artist = agd.artist
-                    WHERE s.user = ? AND s.artist = ?
-                      AND s.timestamp >= ? AND s.timestamp <= ?
-                      AND agd.genre = ? AND agd.source = ?
-                    {mbid_filter}
-                ''', (user, artist_name, year_start, year_end, genre, provider))
-
-                year_result = cursor.fetchone()
-                yearly_data[year] = year_result['plays'] if year_result else 0
-
-            artists_data.append({
-                'artist': artist_name,
-                'yearly_data': yearly_data,
-                'total_plays': artist_row['total_plays']
-            })
-
-        return artists_data
-
-    def get_user_top_album_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
-        """Obtiene los géneros de álbumes más escuchados por el usuario según el proveedor usando album_genres - con filtro MBID"""
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        mbid_filter = self._get_mbid_filter(mbid_only, 's')
-
-        cursor.execute(f'''
-            SELECT ag.genre, COUNT(*) as plays
-            FROM scrobbles s
-            JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
-            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-              AND ag.source = ?
-              AND s.album IS NOT NULL AND s.album != ''
-            {mbid_filter}
-            GROUP BY ag.genre
-            ORDER BY plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, provider, limit))
-
-        return [(row['genre'], row['plays']) for row in cursor.fetchall()]
-
-    def get_top_albums_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene top álbumes para un género específico por proveedor con datos temporales usando album_genres - con filtro MBID"""
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        mbid_filter = self._get_mbid_filter(mbid_only, 's')
-
-        # Obtener top álbumes para este género
-        cursor.execute(f'''
-            SELECT s.artist, s.album, COUNT(*) as total_plays
-            FROM scrobbles s
-            JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
-            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-              AND ag.genre = ? AND ag.source = ?
-              AND s.album IS NOT NULL AND s.album != ''
-            {mbid_filter}
-            GROUP BY s.artist, s.album
-            ORDER BY total_plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, genre, provider, limit))
-
-        albums = cursor.fetchall()
-        albums_data = []
-
-        for album_row in albums:
-            artist_name = album_row['artist']
-            album_name = album_row['album']
-            album_key = f"{artist_name} - {album_name}"
-
-            # Obtener datos por año
-            yearly_data = {}
-            for year in range(from_year, to_year + 1):
-                year_start = int(datetime(year, 1, 1).timestamp())
-                year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
-
-                cursor.execute(f'''
-                    SELECT COUNT(*) as plays
-                    FROM scrobbles s
-                    JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
-                    WHERE s.user = ? AND s.artist = ? AND s.album = ?
-                      AND s.timestamp >= ? AND s.timestamp <= ?
-                      AND ag.genre = ? AND ag.source = ?
-                    {mbid_filter}
-                ''', (user, artist_name, album_name, year_start, year_end, genre, provider))
-
-                year_result = cursor.fetchone()
-                yearly_data[year] = year_result['plays'] if year_result else 0
-
-            albums_data.append({
-                'album': album_key,
-                'yearly_data': yearly_data,
-                'total_plays': album_row['total_plays']
-            })
-
-        return albums_data
-
-    def get_user_top_labels(self, user: str, from_year: int, to_year: int, limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
-        """Obtiene los sellos más escuchados por el usuario usando album_labels - con filtro MBID"""
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        mbid_filter = self._get_mbid_filter(mbid_only, 's')
-
-        cursor.execute(f'''
-            SELECT al.label, COUNT(*) as plays
-            FROM scrobbles s
-            LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
-            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-              AND al.label IS NOT NULL AND al.label != ''
-              AND s.album IS NOT NULL AND s.album != ''
-            {mbid_filter}
-            GROUP BY al.label
-            ORDER BY plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, limit))
-
-        return [(row['label'], row['plays']) for row in cursor.fetchall()]
-
-    def get_top_artists_for_label(self, user: str, label: str, from_year: int, to_year: int, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene top artistas para un sello específico con datos temporales usando album_labels - con filtro MBID"""
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        mbid_filter = self._get_mbid_filter(mbid_only, 's')
-
-        # Obtener top artistas para este sello
-        cursor.execute(f'''
-            SELECT s.artist, COUNT(*) as total_plays
-            FROM scrobbles s
-            LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
-            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-              AND al.label = ?
-              AND s.album IS NOT NULL AND s.album != ''
-            {mbid_filter}
-            GROUP BY s.artist
-            ORDER BY total_plays DESC
-            LIMIT ?
-        ''', (user, from_timestamp, to_timestamp, label, limit))
-
-        artists = cursor.fetchall()
-        artists_data = []
-
-        for artist_row in artists:
-            artist_name = artist_row['artist']
-
-            # Obtener datos por año
-            yearly_data = {}
-            for year in range(from_year, to_year + 1):
-                year_start = int(datetime(year, 1, 1).timestamp())
-                year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
-
-                cursor.execute(f'''
-                    SELECT COUNT(*) as plays
-                    FROM scrobbles s
-                    LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
-                    WHERE s.user = ? AND s.artist = ?
-                      AND s.timestamp >= ? AND s.timestamp <= ?
-                      AND al.label = ?
-                      AND s.album IS NOT NULL AND s.album != ''
-                    {mbid_filter}
-                ''', (user, artist_name, year_start, year_end, label))
-
-                year_result = cursor.fetchone()
-                yearly_data[year] = year_result['plays'] if year_result else 0
-
-            artists_data.append({
-                'artist': artist_name,
-                'yearly_data': yearly_data,
-                'total_plays': artist_row['total_plays']
-            })
-
-        return artists_data
 
     def get_common_album_release_years_with_users(self, user: str, other_users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, Dict[str, int]]:
         """Obtiene años de lanzamiento de álbumes comunes entre el usuario y otros usuarios - con filtro MBID"""

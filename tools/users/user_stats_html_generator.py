@@ -620,6 +620,7 @@ class UserStatsHTMLGenerator:
                 <div class="view-buttons">
                     <button class="view-btn active" data-view="individual">YoMiMeConMigo</button>
                     <button class="view-btn" data-view="genres">Géneros</button>
+                    <button class="view-btn" data-view="labels">Sellos</button>
                     <button class="view-btn" data-view="coincidences">Coincidencias</button>
                     <button class="view-btn" data-view="evolution">Evolución</button>
                 </div>
@@ -752,7 +753,7 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="genres-section">
-                    <h3>🎶 Distribución de Géneros</h3>
+                    <h3>🎶 Distribución de Géneros (Artistas)</h3>
                     <div class="genres-pie-container">
                         <h4>Top 15 Géneros del Usuario</h4>
                         <div class="chart-wrapper">
@@ -765,7 +766,46 @@ class UserStatsHTMLGenerator:
                 <div class="genres-section">
                     <h3>📈 Evolución de Artistas por Género</h3>
                     <div class="scatter-charts-grid" id="genresScatterGrid">
-                        <!-- Se llenarán dinámicamente los 5 gráficos de scatter -->
+                        <!-- Se llenarán dinámicamente los 6 gráficos de scatter -->
+                    </div>
+                </div>
+
+                <div class="genres-section">
+                    <h3>💿 Distribución de Géneros (Álbumes)</h3>
+                    <div class="genres-pie-container">
+                        <h4>Top 15 Géneros de Álbumes del Usuario</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="albumGenresPieChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="albumGenresPieInfo"></div>
+                    </div>
+                </div>
+
+                <div class="genres-section">
+                    <h3>📈 Evolución de Álbumes por Género</h3>
+                    <div class="scatter-charts-grid" id="albumGenresScatterGrid">
+                        <!-- Se llenarán dinámicamente los 6 gráficos de scatter para álbumes -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vista de Sellos -->
+            <div id="labelsView" class="view">
+                <div class="genres-section">
+                    <h3>🏷️ Distribución de Sellos</h3>
+                    <div class="genres-pie-container">
+                        <h4>Top 15 Sellos del Usuario</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="labelsPieChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="labelsPieInfo"></div>
+                    </div>
+                </div>
+
+                <div class="genres-section">
+                    <h3>📈 Evolución de Artistas por Sello</h3>
+                    <div class="scatter-charts-grid" id="labelsScatterGrid">
+                        <!-- Se llenarán dinámicamente los 6 gráficos de scatter para sellos -->
                     </div>
                 </div>
             </div>
@@ -890,10 +930,10 @@ class UserStatsHTMLGenerator:
                 </div>
 
                 <div class="evolution-section">
-                    <h3>Evolución de Décadas (Coincidencias)</h3>
+                    <h3>Evolución de Años de Lanzamiento (Coincidencias)</h3>
                     <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Coincidencias en Décadas por Año</h4>
+                            <h4>Coincidencias en Años de Lanzamiento por Año</h4>
                             <div class="line-chart-wrapper">
                                 <canvas id="releaseYearsEvolutionChart"></canvas>
                             </div>
@@ -1089,6 +1129,8 @@ class UserStatsHTMLGenerator:
                     renderIndividualCharts(userStats);
                 }} else if (view === 'genres') {{
                     renderGenresCharts(userStats);
+                }} else if (view === 'labels') {{
+                    renderLabelsCharts(userStats);
                 }} else if (view === 'coincidences') {{
                     renderCoincidenceCharts(userStats);
                 }} else if (view === 'evolution') {{
@@ -1112,6 +1154,8 @@ class UserStatsHTMLGenerator:
                 renderIndividualCharts(userStats);
             }} else if (currentView === 'genres') {{
                 renderGenresCharts(userStats);
+            }} else if (currentView === 'labels') {{
+                renderLabelsCharts(userStats);
             }} else if (currentView === 'coincidences') {{
                 renderCoincidenceCharts(userStats);
             }} else if (currentView === 'evolution') {{
@@ -1371,14 +1415,14 @@ class UserStatsHTMLGenerator:
             }});
         }}
 
-        function showArtistPopup(artistName, genre, provider, year, scrobbles) {{
-            const title = `${{artistName}} - ${{genre}} (${{year}})`;
+        function showArtistPopup(itemName, category, provider, year, scrobbles, itemType = 'Artista') {{
+            const title = `${{itemName}} - ${{category}} (${{year}})`;
             const content = `
                 <div class="popup-item">
-                    <span class="name">Artista: ${{artistName}}</span>
+                    <span class="name">${{itemType}}: ${{itemName}}</span>
                 </div>
                 <div class="popup-item">
-                    <span class="name">Género: ${{genre}}</span>
+                    <span class="name">${{provider === 'Sello' ? 'Sello' : 'Género'}}: ${{category}}</span>
                 </div>
                 <div class="popup-item">
                     <span class="name">Año: ${{year}}</span>

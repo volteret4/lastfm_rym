@@ -853,7 +853,7 @@ def generate_index_html(files):
                 <div id="grupo" class="tab-content">
                     <!-- Estadísticas de Usuarios -->
                     <div class="period-selector">
-                        <h2>👤 Estadísticas de Usuarios<span class="stats-badge">""" + str(len(files['users'])) + """</span></h2>
+                        <h2>👤 Estadísticas de Usuarios <span class="stats-badge">""" + str(len(files['users'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces de usuarios
@@ -877,7 +877,7 @@ def generate_index_html(files):
 
                     <!-- Estadísticas Grupales -->
                     <div class="period-selector">
-                        <h2>👥 Estadísticas Grupales<span class="stats-badge">""" + str(len(files['grupo'])) + """</span></h2>
+                        <h2>👥 Estadísticas Grupales <span class="stats-badge">""" + str(len(files['grupo'])) + """</span></h2>
                         <div class="period-grid">"""
 
     # Agregar enlaces de grupo

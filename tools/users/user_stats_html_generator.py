@@ -280,7 +280,7 @@ class UserStatsHTMLGeneratorFixed:
         }}
 
         .user-name {{
-            font-size: 1.8em;
+            font-size: 1.2em;
             color: #cba6f7;
             font-weight: bold;
             margin-bottom: 15px;
@@ -295,8 +295,8 @@ class UserStatsHTMLGeneratorFixed:
         }}
 
         .summary-card {{
-            background: rgba(203, 166, 247, 0.1);
-            padding: 10px;
+            background: #1e1e2e;
+            padding: 5px;
             border-radius: 8px;
             text-align: center;
             border: 1px solid rgba(203, 166, 247, 0.3);
@@ -306,7 +306,7 @@ class UserStatsHTMLGeneratorFixed:
             font-size: 1.2em;
             font-weight: bold;
             color: #cba6f7;
-            margin-bottom: 3px;
+            margin-bottom: 2px;
         }}
 
         .summary-card .label {{
@@ -1355,10 +1355,10 @@ class UserStatsHTMLGeneratorFixed:
                     <div class="number">${{totalLabels}}</div>
                     <div class="label">Sellos</div>
                 </div>
-                <div class="summary-card">
-                    <div class="number">${{totalYears}}</div>
-                    <div class="label">Años</div>
-                </div>
+                // <div class="summary-card">
+                //     <div class="number">${{totalYears}}</div>
+                //     <div class="label">Años</div>
+                // </div>
             `;
 
             document.getElementById('summaryStats').innerHTML = summaryHTML;
@@ -1835,9 +1835,9 @@ class UserStatsHTMLGeneratorFixed:
 
             try {{
                 // Gráfico de scrobbles por año
-                if (userStats.yearly_scrobbles) {{
-                    renderYearlyChart(userStats.yearly_scrobbles);
-                }}
+                // if (userStats.yearly_scrobbles) {{
+                //     renderYearlyChart(userStats.yearly_scrobbles);
+                // }}
 
                 // Top artistas, álbumes y canciones (pie charts)
                 renderTopChart(userStats.top_artists, 'topArtistsChart', 'topArtistsInfo', '👥 Top Artistas');

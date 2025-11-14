@@ -1197,6 +1197,11 @@ class UserStatsHTMLGeneratorFixed:
 
                     currentProvider = provider;
 
+                    // ✅ FIX: Recalcular estadísticas principales al cambiar proveedor
+                    if (currentUser) {{
+                        updateSummaryStats(allStats[currentUser]);
+                    }}
+
                     // Re-render gráficos de géneros
                     if (currentUser && currentView === 'genres') {{
                         renderGenresCharts(allStats[currentUser]);
@@ -1308,24 +1313,21 @@ class UserStatsHTMLGeneratorFixed:
             const totalAlbums = userStats.unique_counts ? userStats.unique_counts.total_albums : 0;
             const totalTracks = userStats.unique_counts ? userStats.unique_counts.total_tracks : 0;
 
-            // Contar géneros únicos del proveedor seleccionado
+            // ✅ NUEVO: Usar conteos únicos de géneros del proveedor seleccionado
             let totalGenres = 0;
-            if (genresData && genresData[currentProvider] && genresData[currentProvider].pie_chart) {{
-                totalGenres = Object.keys(genresData[currentProvider].pie_chart.data || {{}}).length;
+            if (userStats.unique_counts && userStats.unique_counts.total_genres && userStats.unique_counts.total_genres[currentProvider]) {{
+                totalGenres = userStats.unique_counts.total_genres[currentProvider];
             }}
 
-            // Contar sellos únicos del usuario
-            let totalLabels = 0;
-            if (userStats.labels && userStats.labels.pie_chart) {{
-                totalLabels = Object.keys(userStats.labels.pie_chart.data || {{}}).length;
-            }}
+            // ✅ NUEVO: Usar conteos únicos de sellos del usuario
+            const totalLabels = userStats.unique_counts ? userStats.unique_counts.total_labels : 0;
 
             // Años únicos con scrobbles
             const totalYears = Object.keys(userStats.yearly_scrobbles || {{}}).length;
 
             console.log('📊 Stats calculados:', {{
                 totalScrobbles, totalArtists, totalAlbums, totalTracks,
-                totalGenres, totalLabels, totalYears
+                totalGenres, totalLabels, totalYears, currentProvider
             }});
 
             const summaryHTML = `

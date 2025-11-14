@@ -155,3 +155,65 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
 
         result = cursor.fetchone()
         return result['unique_tracks'] if result else 0
+
+    def get_user_unique_count_genres_by_provider(self, user: str, from_year: int, to_year: int,
+                                               provider: str = 'lastfm', mbid_only: bool = False) -> int:
+        """Obtiene el número total de géneros únicos del usuario por proveedor"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        # Primero intentar con la tabla de géneros detallados
+        cursor.execute(f'''
+            SELECT COUNT(DISTINCT agd.genre) as unique_genres
+            FROM scrobbles s
+            JOIN artist_genres_detailed agd ON s.artist = agd.artist
+            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+              AND agd.source = ?
+            {mbid_filter}
+        ''', (user, from_timestamp, to_timestamp, provider))
+
+        result = cursor.fetchone()
+        count = result['unique_genres'] if result else 0
+
+        # Si no hay datos, intentar con tabla antigua (fallback para Last.fm)
+        if count == 0 and provider == 'lastfm':
+            cursor.execute(f'''
+                SELECT COUNT(DISTINCT genre_extracted.value) as unique_genres
+                FROM scrobbles s
+                JOIN artist_genres ag ON s.artist = ag.artist,
+                json_each(ag.genres) AS genre_extracted
+                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                  AND json_valid(ag.genres)
+                {mbid_filter}
+            ''', (user, from_timestamp, to_timestamp))
+
+            result = cursor.fetchone()
+            count = result['unique_genres'] if result else 0
+
+        return count
+
+    def get_user_unique_count_labels(self, user: str, from_year: int, to_year: int,
+                                   mbid_only: bool = False) -> int:
+        """Obtiene el número total de sellos únicos del usuario"""
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT COUNT(DISTINCT al.label) as unique_labels
+            FROM scrobbles s
+            LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+              AND al.label IS NOT NULL AND al.label != ''
+            {mbid_filter}
+        ''', (user, from_timestamp, to_timestamp))
+
+        result = cursor.fetchone()
+        return result['unique_labels'] if result else 0

@@ -64,6 +64,13 @@ def main():
         print(f"🎯 MBID Only: {'Sí' if args.mbid_only else 'No'}")
         print(f"📊 Regenerar JSON: {'No' if args.no_json else 'Sí'}")
 
+        # Verificar iconos de usuarios
+        icons_env = os.getenv('LASTFM_USERS_ICONS', '')
+        if icons_env:
+            print(f"🎨 Iconos de usuarios: Configurados")
+        else:
+            print(f"🎨 Iconos de usuarios: No configurados (usar emoji por defecto)")
+
         # Calcular período para la carpeta de datos
         current_year = datetime.now().year
         from_year = current_year - args.years_back

@@ -1,0 +1,3342 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last.fm Stats - October 2011</title>
+    <link rel="icon" type="image/png" href="images/music.png">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #181825;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: #1e1e2e;
+            padding: 20px 30px;
+            border-bottom: 2px solid #cba6f7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 80px;
+        }
+
+        .header-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            color: #cba6f7;
+            margin: 0;
+            text-align: center;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .nav-button {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .nav-button:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+            color: #cdd6f4;
+        }
+
+        .nav-button.current {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .user-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #cba6f7;
+            color: #1e1e2e;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+
+        .user-button:hover {
+            background: #b4a3e8;
+            transform: scale(1.1);
+        }
+
+        .user-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .user-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            border: 2px solid #cba6f7;
+        }
+
+        .user-modal-header {
+            color: #cba6f7;
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .user-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .user-modal-close:hover {
+            color: #cba6f7;
+        }
+
+        .user-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .user-option {
+            padding: 12px 20px;
+            background: #313244;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            color: #cdd6f4;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .user-option:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+        }
+
+        .user-option.selected {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #1e1e2e;
+            border-bottom: 1px solid #313244;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-group label {
+            color: #cba6f7;
+            font-weight: 600;
+        }
+
+        .category-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .category-filter {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .category-filter:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+        }
+
+        .category-filter.active {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .period-header {
+            background: #1e1e2e;
+            padding: 25px 30px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .period-header h2 {
+            color: #cba6f7;
+            font-size: 1.5em;
+            margin-bottom: 8px;
+        }
+
+        .period-info {
+            color: #a6adc8;
+            font-size: 0.9em;
+        }
+
+        .stats-container {
+            padding: 30px;
+        }
+
+        .categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 25px;
+        }
+
+        .category {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #313244;
+            display: none;
+        }
+
+        .category.visible {
+            display: block;
+        }
+
+        .category h3 {
+            color: #cba6f7;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #181825;
+            border-radius: 8px;
+            border-left: 3px solid #45475a;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .item:hover {
+            transform: translateX(5px);
+            border-left-color: #cba6f7;
+        }
+
+        .item.highlighted {
+            border-left-color: #cba6f7;
+            background: #1a1826;
+        }
+
+        .item-name {
+            font-weight: 600;
+            color: #cdd6f4;
+            font-size: 1em;
+        }
+
+        .item-meta {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .badge {
+            background: #45475a;
+            color: #cdd6f4;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .user-badge {
+            background: #313244;
+            color: #a6adc8;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            border: 1px solid #45475a;
+        }
+
+        .user-badge.highlighted-user {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .expandable {
+            position: relative;
+        }
+
+        .expandable::after {
+            content: '▼';
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            color: #6c7086;
+            font-size: 0.8em;
+        }
+
+        .expandable.expanded::after {
+            content: '▲';
+        }
+
+        .details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding: 0 15px;
+            margin-top: 10px;
+        }
+
+        .details.expanded {
+            max-height: 400px;
+            overflow-y: auto;
+            border-top: 1px solid #313244;
+            padding-top: 15px;
+        }
+
+        .detail-section {
+            margin-bottom: 15px;
+        }
+
+        .detail-title {
+            color: #f9e2af;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .detail-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .detail-item {
+            background: #181825;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            color: #a6adc8;
+        }
+
+        .novelty-section {
+            margin-bottom: 25px;
+        }
+
+        .novelty-section h4 {
+            color: #a6e3a1;
+            font-size: 1.05em;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #45475a;
+        }
+
+        .novelty-subsection {
+            margin-bottom: 20px;
+        }
+
+        .novelty-subsection h5 {
+            color: #f9e2af;
+            font-size: 0.95em;
+            margin-bottom: 10px;
+        }
+
+        .novelty-empty {
+            color: #6c7086;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .artists-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 999;
+        }
+
+        .popup-header {
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
+        }
+
+        .popup-close {
+            float: right;
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+            margin-top: -5px;
+        }
+
+        .popup-close:hover {
+            color: #cba6f7;
+        }
+
+        .artist-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .artist-list li {
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c7086;
+            font-style: italic;
+        }
+
+        .last-update {
+            text-align: center;
+            padding: 20px;
+            color: #6c7086;
+            font-size: 0.85em;
+            border-top: 1px solid #313244;
+        }
+
+        @media (max-width: 768px) {
+            .categories {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .category-filters {
+                justify-content: center;
+            }
+
+            .artists-popup {
+                max-width: 90%;
+                max-height: 80%;
+            }
+
+            header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .nav-buttons {
+                order: -1;
+            }
+
+            .user-button {
+                order: 1;
+                align-self: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>📊 RYM Hispano Estadísticas</h1>
+                <div class="nav-buttons">
+                    <a href="esta-semana.html" class="nav-button">TEMPORALES</a>
+                    <a href="index.html#grupo" class="nav-button">GRUPO</a>
+                    <a href="index.html#about" class="nav-button">ACERCA DE</a>
+                </div>
+            </div>
+            <button class="user-button" id="userButton">👤</button>
+        </header>
+
+        <!-- Modal de selección de usuario -->
+        <div class="user-modal" id="userModal">
+            <div class="user-modal-content">
+                <button class="user-modal-close" id="userModalClose">×</button>
+                <div class="user-modal-header">Seleccionar Usuario</div>
+                <div class="user-options" id="userOptions">
+                    <!-- Se llenarán dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Mostrar categorías:</label>
+                <div class="category-filters">
+                    <button class="category-filter active" data-category="artists">Artistas</button><button class="category-filter " data-category="tracks">Canciones</button><button class="category-filter " data-category="albums">Álbumes</button><button class="category-filter " data-category="genres">Géneros</button><button class="category-filter " data-category="labels">Sellos</button><button class="category-filter " data-category="years">Años</button><button class="category-filter " data-category="novelties">Novedades</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="period-header">
+            <h2>October 2011</h2>
+            <p class="period-info">
+                <span id="dateRange"></span> |
+                <span id="totalScrobbles"></span> scrobbles totales
+            </p>
+        </div>
+
+        <div class="stats-container">
+            <div class="categories" id="categoriesContainer">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+
+        <div class="last-update">
+            Generado: <span id="generatedAt"></span>
+        </div>
+    </div>
+
+    <script>
+        // Usuarios reales del entorno LASTFM_USERS
+        const availableUsers = ["alberto_gu", "EliasJ72", "Frikomid", "GabredMared", "Lonsonxd", "Nubis84", "paqueradejere", "Rocky_stereo", "sdecandelario"];
+        const stats = {
+  "total_scrobbles": 1939,
+  "artists": [],
+  "tracks": [
+    {
+      "name": "Talk Talk - Such a Shame",
+      "count": 2,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 1
+      }
+    }
+  ],
+  "albums": [],
+  "genres": [
+    {
+      "name": "metal",
+      "count": 418,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 18,
+        "sdecandelario": 400
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Liquid Tension Experiment",
+          "Mullmuzzler",
+          "X JAPAN",
+          "Shadow Gallery",
+          "Mastodon",
+          "Manowar",
+          "Kamelot"
+        ],
+        "sdecandelario": [
+          "Tankard",
+          "Danzig",
+          "OOMPH!",
+          "Primal Fear",
+          "Volbeat",
+          "Metal Inquisitor",
+          "Running Wild",
+          "Sodom",
+          "Iron Maiden",
+          "Raven",
+          "Wolf",
+          "Nightwish",
+          "Sepultura",
+          "Helloween",
+          "Manilla Road",
+          "Jag Panzer",
+          "Savatage",
+          "Megadeth"
+        ]
+      },
+      "top_artists": [
+        "Running Wild",
+        "Danzig",
+        "OOMPH!",
+        "Sodom",
+        "Metal Inquisitor",
+        "Wolf",
+        "Tankard",
+        "Savatage",
+        "Iron Maiden",
+        "Manilla Road"
+      ],
+      "top_albums": [
+        "Running Wild - Rogues en Vogue",
+        "Helloween - Walls of Jericho",
+        "Raven - Rock Until You Drop",
+        "Wolf - Evil Star",
+        "Danzig - Danzig 4P",
+        "Running Wild - The Rivalry",
+        "Primal Fear - Primal Fear",
+        "OOMPH! - Wunschkind",
+        "Metal Inquisitor - Doomsday for the Heretic",
+        "OOMPH! - Defekt"
+      ]
+    },
+    {
+      "name": "heavy metal",
+      "count": 403,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 5,
+        "sdecandelario": 398
+      },
+      "user_artists": {
+        "Nubis84": [
+          "X JAPAN",
+          "Manowar",
+          "Shadow Gallery"
+        ],
+        "sdecandelario": [
+          "Danzig",
+          "Primal Fear",
+          "Running Wild",
+          "Obús",
+          "Scorpions",
+          "Jag Panzer",
+          "Savatage",
+          "Michael Schenker Group",
+          "Rata Blanca",
+          "Manilla Road",
+          "Volbeat",
+          "Metal Inquisitor",
+          "Raven",
+          "Helloween",
+          "Tyrant",
+          "Iron Maiden",
+          "Wolf",
+          "Praying Mantis",
+          "Megadeth"
+        ]
+      },
+      "top_artists": [
+        "Running Wild",
+        "Danzig",
+        "Metal Inquisitor",
+        "Wolf",
+        "Savatage",
+        "Praying Mantis",
+        "Iron Maiden",
+        "Manilla Road",
+        "Rata Blanca",
+        "Tyrant"
+      ],
+      "top_albums": [
+        "Running Wild - Rogues en Vogue",
+        "Helloween - Walls of Jericho",
+        "Raven - Rock Until You Drop",
+        "Wolf - Evil Star",
+        "Danzig - Danzig 4P",
+        "Running Wild - The Rivalry",
+        "Primal Fear - Primal Fear",
+        "Metal Inquisitor - Doomsday for the Heretic",
+        "Danzig - Danzig 6:66 Satan's Child",
+        "Rata Blanca - El Reino Olvidado"
+      ]
+    },
+    {
+      "name": "rock",
+      "count": 398,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 125,
+        "sdecandelario": 273
+      },
+      "user_artists": {
+        "Nubis84": [
+          "The Beatles(Love)",
+          "Triana",
+          "Mullmuzzler",
+          "PJ Harvey",
+          "Oasis",
+          "The Smashing Pumpkins",
+          "Pixies",
+          "Bunbury & Vegas",
+          "The Moody Blues",
+          "The Mars Volta",
+          "The Beatles",
+          "Nick Cave & the Bad Seeds",
+          "Johnny Cash",
+          "Transatlantic",
+          "The Stranglers",
+          "Klaatu",
+          "Marillion",
+          "Queen",
+          "Keith Moon",
+          "Tommy Tutone",
+          "Rush",
+          "Simon Dupree & The Big Sound",
+          "Tom Waits",
+          "Puscifer",
+          "The Rolling Stones"
+        ],
+        "sdecandelario": [
+          "The 69 Eyes",
+          "Danzig",
+          "Scorpions",
+          "Snow Patrol",
+          "Michael Schenker Group",
+          "Engendro",
+          "Rata Blanca",
+          "Bad Company",
+          "Simple Minds",
+          "The Stranglers",
+          "Neil Young",
+          "The Police",
+          "The Ark",
+          "Uriah Heep",
+          "The Answer",
+          "Killing Joke",
+          "Queens of the Stone Age",
+          "Talking Heads",
+          "OOMPH!",
+          "The Jimi Hendrix Experience",
+          "Iron Maiden",
+          "The Cure"
+        ]
+      },
+      "top_artists": [
+        "The Beatles",
+        "Danzig",
+        "OOMPH!",
+        "Uriah Heep",
+        "Iron Maiden",
+        "Rata Blanca",
+        "PJ Harvey",
+        "Engendro",
+        "The Jimi Hendrix Experience",
+        "Marillion"
+      ],
+      "top_albums": [
+        "The Beatles - Everyday Chemistry",
+        "The Beatles - Revolver",
+        "The Jimi Hendrix Experience - Are You Experienced?",
+        "Queens of the Stone Age - Lullabies to Paralyze",
+        "The 69 Eyes - Devils",
+        "Danzig - Danzig 4P",
+        "PJ Harvey - Let England Shake",
+        "The Answer - Revival",
+        "OOMPH! - Wunschkind",
+        "OOMPH! - Defekt"
+      ]
+    },
+    {
+      "name": "hard rock",
+      "count": 226,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 2,
+        "sdecandelario": 224
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Rush",
+          "Queen"
+        ],
+        "sdecandelario": [
+          "Michael Schenker Group",
+          "Danzig",
+          "Bad Company",
+          "Uriah Heep",
+          "Obús",
+          "Iron Maiden",
+          "Raven",
+          "Scorpions",
+          "Queens of the Stone Age",
+          "Praying Mantis",
+          "The Answer",
+          "Savatage"
+        ]
+      },
+      "top_artists": [
+        "Danzig",
+        "Savatage",
+        "Praying Mantis",
+        "Uriah Heep",
+        "Iron Maiden",
+        "Queens of the Stone Age",
+        "Raven",
+        "The Answer",
+        "Scorpions",
+        "Obús"
+      ],
+      "top_albums": [
+        "Queens of the Stone Age - Lullabies to Paralyze",
+        "Raven - Rock Until You Drop",
+        "Danzig - Danzig 4P",
+        "The Answer - Revival",
+        "Danzig - Danzig 6:66 Satan's Child",
+        "Uriah Heep - Firefly",
+        "Savatage - Power of the Night",
+        "Praying Mantis - Predator in Disguise",
+        "Savatage - Hall of the Mountain King",
+        "Praying Mantis - Sanctuary"
+      ]
+    },
+    {
+      "name": "Power metal",
+      "count": 216,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 3,
+        "sdecandelario": 213
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Kamelot",
+          "Manowar"
+        ],
+        "sdecandelario": [
+          "Rata Blanca",
+          "Primal Fear",
+          "Running Wild",
+          "Wolf",
+          "Nightwish",
+          "Helloween",
+          "Manilla Road",
+          "Jag Panzer",
+          "Savatage",
+          "Saurom"
+        ]
+      },
+      "top_artists": [
+        "Running Wild",
+        "Wolf",
+        "Savatage",
+        "Manilla Road",
+        "Rata Blanca",
+        "Saurom",
+        "Helloween",
+        "Primal Fear",
+        "Jag Panzer",
+        "Manowar"
+      ],
+      "top_albums": [
+        "Saurom - El Guardian de las Melodias Perdidas",
+        "Running Wild - Rogues en Vogue",
+        "Helloween - Walls of Jericho",
+        "Wolf - Evil Star",
+        "Running Wild - The Rivalry",
+        "Primal Fear - Primal Fear",
+        "Rata Blanca - El Reino Olvidado",
+        "Running Wild - The Brotherhood",
+        "Running Wild - Victory",
+        "Savatage - Power of the Night"
+      ]
+    },
+    {
+      "name": "german",
+      "count": 213,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 212
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Johann Sebastian Bach"
+        ],
+        "sdecandelario": [
+          "Tankard",
+          "OOMPH!",
+          "Nachtmahr",
+          "Primal Fear",
+          "Metal Inquisitor",
+          "Sodom",
+          "Völkerball",
+          "Helloween",
+          "Loikaemie"
+        ]
+      },
+      "top_artists": [
+        "OOMPH!",
+        "Sodom",
+        "Nachtmahr",
+        "Metal Inquisitor",
+        "Tankard",
+        "Loikaemie",
+        "Helloween",
+        "Primal Fear",
+        "Johann Sebastian Bach",
+        "Völkerball"
+      ],
+      "top_albums": [
+        "Loikaemie - Ihr Für Uns Und Wir Für Euch",
+        "Helloween - Walls of Jericho",
+        "Primal Fear - Primal Fear",
+        "OOMPH! - Wunschkind",
+        "Metal Inquisitor - Doomsday for the Heretic",
+        "OOMPH! - Defekt",
+        "Sodom - The Final Sign Of Evil",
+        "Sodom - M-16",
+        "Nachtmahr - Semper Fidelis",
+        "OOMPH! - OOMPH!"
+      ]
+    },
+    {
+      "name": "80s",
+      "count": 168,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 11,
+        "sdecandelario": 157
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Kate Bush",
+          "The Stranglers",
+          "New Kids on the Block",
+          "Queen",
+          "Tommy Tutone",
+          "Talk Talk"
+        ],
+        "sdecandelario": [
+          "Talking Heads",
+          "The Sisters of Mercy",
+          "The Stranglers",
+          "The Police",
+          "Tino Casal",
+          "Siouxsie and the Banshees",
+          "Ultravox",
+          "The Cure",
+          "Scorpions",
+          "Joy Division",
+          "Talk Talk",
+          "New Order",
+          "Simple Minds",
+          "Pet Shop Boys"
+        ]
+      },
+      "top_artists": [
+        "Joy Division",
+        "The Sisters of Mercy",
+        "The Cure",
+        "Pet Shop Boys",
+        "Scorpions",
+        "Talk Talk",
+        "The Stranglers",
+        "Kate Bush",
+        "New Order",
+        "Queen"
+      ],
+      "top_albums": [
+        "Joy Division - Warsaw",
+        "The Sisters of Mercy - Some Girls Wander by Mistake",
+        "Joy Division - The Best of Joy Division",
+        "Joy Division - Unknown Pleasures",
+        "The Sisters of Mercy - First and Last and Always",
+        "Pet Shop Boys - Yes",
+        "The Sisters of Mercy - Floodland",
+        "Joy Division - Closer",
+        "The Sisters of Mercy - Vision Thing",
+        "The Cure - Pornography"
+      ]
+    },
+    {
+      "name": "alternative",
+      "count": 166,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 53,
+        "sdecandelario": 113
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Kate Bush",
+          "The Mars Volta",
+          "Tom Waits",
+          "PJ Harvey",
+          "Ride",
+          "The Smashing Pumpkins",
+          "Pixies",
+          "Mogwai",
+          "Indukti",
+          "Puscifer",
+          "Nick Cave & the Bad Seeds",
+          "MGMT",
+          "Oasis"
+        ],
+        "sdecandelario": [
+          "Talking Heads",
+          "Queens of the Stone Age",
+          "The Cure",
+          "Joy Division",
+          "Völkerball",
+          "New Order",
+          "Simple Minds",
+          "Putilatex",
+          "Snow Patrol"
+        ]
+      },
+      "top_artists": [
+        "Joy Division",
+        "PJ Harvey",
+        "Putilatex",
+        "The Cure",
+        "Queens of the Stone Age",
+        "Puscifer",
+        "Pixies",
+        "Indukti",
+        "Kate Bush",
+        "The Smashing Pumpkins"
+      ],
+      "top_albums": [
+        "Joy Division - Warsaw",
+        "Putilatex - Somos los que faltan",
+        "Joy Division - The Best of Joy Division",
+        "Queens of the Stone Age - Lullabies to Paralyze",
+        "PJ Harvey - Let England Shake",
+        "Joy Division - Unknown Pleasures",
+        "Joy Division - Closer",
+        "Puscifer - Conditions of My Parole",
+        "The Cure - Pornography",
+        "PJ Harvey - Stories From the City, Stories From the Sea"
+      ]
+    },
+    {
+      "name": "electronic",
+      "count": 164,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 48,
+        "sdecandelario": 116
+      },
+      "user_artists": {
+        "Nubis84": [
+          "M83",
+          "No-Man",
+          "Motorbass",
+          "World's End Girlfriend",
+          "Stars of the Lid",
+          "MGMT",
+          "Radical Face",
+          "The Residents",
+          "Isao Tomita",
+          "Tim Hecker"
+        ],
+        "sdecandelario": [
+          "Hocico",
+          "Prodigy",
+          "Suicide Commando",
+          "Nitzer Ebb",
+          "New Order",
+          "The Chemical Brothers",
+          "The Prodigy",
+          "Pet Shop Boys",
+          "Putilatex"
+        ]
+      },
+      "top_artists": [
+        "The Prodigy",
+        "The Chemical Brothers",
+        "Tim Hecker",
+        "Putilatex",
+        "Pet Shop Boys",
+        "M83",
+        "Stars of the Lid",
+        "No-Man",
+        "The Residents",
+        "New Order"
+      ],
+      "top_albums": [
+        "Putilatex - Somos los que faltan",
+        "Tim Hecker - Dropped Pianos",
+        "The Prodigy - Always Outnumbered Never Outgunned",
+        "The Prodigy - Experience",
+        "The Prodigy - Music for the Jilted Generation",
+        "The Chemical Brothers - Exit Planet Dust",
+        "The Prodigy - The Fat of the Land",
+        "The Chemical Brothers - Come With Us",
+        "Pet Shop Boys - Yes",
+        "M83 - Hurry Up, We're Dreaming."
+      ]
+    },
+    {
+      "name": "classic rock",
+      "count": 151,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 70,
+        "sdecandelario": 81
+      },
+      "user_artists": {
+        "Nubis84": [
+          "The Beatles(Love)",
+          "Klaatu",
+          "Marillion",
+          "Johnny Cash",
+          "Queen",
+          "Keith Moon",
+          "Tommy Tutone",
+          "The Beatles",
+          "Rush",
+          "The Moody Blues",
+          "The Rolling Stones"
+        ],
+        "sdecandelario": [
+          "Michael Schenker Group",
+          "Neil Young",
+          "The Police",
+          "Bad Company",
+          "The Jimi Hendrix Experience",
+          "Uriah Heep",
+          "Scorpions",
+          "The Answer"
+        ]
+      },
+      "top_artists": [
+        "The Beatles",
+        "Uriah Heep",
+        "The Jimi Hendrix Experience",
+        "Marillion",
+        "The Answer",
+        "Scorpions",
+        "Michael Schenker Group",
+        "Klaatu",
+        "The Beatles(Love)",
+        "Neil Young"
+      ],
+      "top_albums": [
+        "The Beatles - Everyday Chemistry",
+        "The Beatles - Revolver",
+        "The Jimi Hendrix Experience - Are You Experienced?",
+        "The Answer - Revival",
+        "Uriah Heep - Firefly",
+        "Uriah Heep - Innocent Victim",
+        "Uriah Heep - Conquest",
+        "Michael Schenker Group - Assault Attack",
+        "Marillion - Afraid of Sunlight",
+        "Neil Young - Freedom"
+      ]
+    },
+    {
+      "name": "post-punk",
+      "count": 133,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 4,
+        "sdecandelario": 129
+      },
+      "user_artists": {
+        "Nubis84": [
+          "The Stranglers",
+          "The Residents",
+          "Nick Cave & the Bad Seeds"
+        ],
+        "sdecandelario": [
+          "Talking Heads",
+          "The Sisters of Mercy",
+          "The Stranglers",
+          "Vendemmian",
+          "Siouxsie and the Banshees",
+          "The Cure",
+          "Joy Division",
+          "New Order",
+          "Killing Joke"
+        ]
+      },
+      "top_artists": [
+        "Joy Division",
+        "The Sisters of Mercy",
+        "The Cure",
+        "The Stranglers",
+        "The Residents",
+        "New Order",
+        "Nick Cave & the Bad Seeds",
+        "Killing Joke",
+        "Talking Heads",
+        "Vendemmian"
+      ],
+      "top_albums": [
+        "Joy Division - Warsaw",
+        "The Sisters of Mercy - Some Girls Wander by Mistake",
+        "Joy Division - The Best of Joy Division",
+        "Joy Division - Unknown Pleasures",
+        "The Sisters of Mercy - First and Last and Always",
+        "The Sisters of Mercy - Floodland",
+        "Joy Division - Closer",
+        "The Sisters of Mercy - Vision Thing",
+        "The Cure - Pornography",
+        "The Cure - Disintegration"
+      ]
+    },
+    {
+      "name": "industrial",
+      "count": 129,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 11,
+        "sdecandelario": 118
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Puscifer"
+        ],
+        "sdecandelario": [
+          "Hocico",
+          "OOMPH!",
+          "Nachtmahr",
+          "Suicide Commando",
+          "Nitzer Ebb",
+          "Killing Joke",
+          "The Prodigy"
+        ]
+      },
+      "top_artists": [
+        "The Prodigy",
+        "OOMPH!",
+        "Nachtmahr",
+        "Puscifer",
+        "Killing Joke",
+        "Suicide Commando",
+        "Hocico",
+        "Nitzer Ebb"
+      ],
+      "top_albums": [
+        "The Prodigy - Always Outnumbered Never Outgunned",
+        "OOMPH! - Wunschkind",
+        "OOMPH! - Defekt",
+        "The Prodigy - Experience",
+        "The Prodigy - Music for the Jilted Generation",
+        "Nachtmahr - Semper Fidelis",
+        "OOMPH! - OOMPH!",
+        "Nachtmahr - Alle Lust will Ewigkeit",
+        "Nachtmahr - Feuer Frei!",
+        "The Prodigy - The Fat of the Land"
+      ]
+    },
+    {
+      "name": "indie",
+      "count": 107,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 47,
+        "sdecandelario": 60
+      },
+      "user_artists": {
+        "Nubis84": [
+          "M83",
+          "PJ Harvey",
+          "Ride",
+          "Mogwai",
+          "Pixies",
+          "MGMT",
+          "Radical Face",
+          "Los Planetas",
+          "Nacho Vegas",
+          "Oasis"
+        ],
+        "sdecandelario": [
+          "Joy Division",
+          "The Ark",
+          "Snow Patrol"
+        ]
+      },
+      "top_artists": [
+        "Joy Division",
+        "PJ Harvey",
+        "M83",
+        "Pixies",
+        "Oasis",
+        "Ride",
+        "Los Planetas",
+        "Nacho Vegas",
+        "Mogwai",
+        "MGMT"
+      ],
+      "top_albums": [
+        "Joy Division - Warsaw",
+        "Joy Division - The Best of Joy Division",
+        "PJ Harvey - Let England Shake",
+        "Joy Division - Unknown Pleasures",
+        "Joy Division - Closer",
+        "M83 - Hurry Up, We're Dreaming.",
+        "PJ Harvey - Stories From the City, Stories From the Sea",
+        "M83 - Midnight City",
+        "Pixies - Doolittle",
+        "Los Planetas - Una Opera Egipcia"
+      ]
+    },
+    {
+      "name": "new wave",
+      "count": 106,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 7,
+        "sdecandelario": 99
+      },
+      "user_artists": {
+        "Nubis84": [
+          "The Stranglers",
+          "Talk Talk",
+          "Tommy Tutone"
+        ],
+        "sdecandelario": [
+          "Talking Heads",
+          "The Stranglers",
+          "The Police",
+          "Siouxsie and the Banshees",
+          "Ultravox",
+          "The Cure",
+          "Joy Division",
+          "Talk Talk",
+          "New Order",
+          "Simple Minds",
+          "The Skids",
+          "Killing Joke",
+          "Pet Shop Boys"
+        ]
+      },
+      "top_artists": [
+        "Joy Division",
+        "The Cure",
+        "Pet Shop Boys",
+        "Talk Talk",
+        "The Stranglers",
+        "New Order",
+        "Tommy Tutone",
+        "The Skids",
+        "Killing Joke",
+        "Ultravox"
+      ],
+      "top_albums": [
+        "Joy Division - Warsaw",
+        "Joy Division - The Best of Joy Division",
+        "Joy Division - Unknown Pleasures",
+        "Pet Shop Boys - Yes",
+        "Joy Division - Closer",
+        "The Cure - Pornography",
+        "Pet Shop Boys - Discography: The Complete Singles Collection",
+        "The Cure - Disintegration",
+        "Talk Talk - Playlist: Electro",
+        "Talk Talk - It's My Life"
+      ]
+    },
+    {
+      "name": "british",
+      "count": 93,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 62,
+        "sdecandelario": 31
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Marillion",
+          "Oasis",
+          "Ride",
+          "The Beatles",
+          "The Rolling Stones"
+        ],
+        "sdecandelario": [
+          "Praying Mantis"
+        ]
+      },
+      "top_artists": [
+        "The Beatles",
+        "Praying Mantis",
+        "Marillion",
+        "Oasis",
+        "Ride",
+        "The Rolling Stones"
+      ],
+      "top_albums": [
+        "The Beatles - Everyday Chemistry",
+        "The Beatles - Revolver",
+        "Praying Mantis - Predator in Disguise",
+        "Praying Mantis - Sanctuary",
+        "Praying Mantis - Nowhere to Hide",
+        "Marillion - Afraid of Sunlight",
+        "Marillion - Marbles",
+        "Marillion - Brave",
+        "Marillion - Clutching at Straws"
+      ]
+    },
+    {
+      "name": "electronica",
+      "count": 88,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 12,
+        "sdecandelario": 76
+      },
+      "user_artists": {
+        "Nubis84": [
+          "M83"
+        ],
+        "sdecandelario": [
+          "The Prodigy",
+          "The Chemical Brothers"
+        ]
+      },
+      "top_artists": [
+        "The Prodigy",
+        "The Chemical Brothers",
+        "M83"
+      ],
+      "top_albums": [
+        "The Prodigy - Always Outnumbered Never Outgunned",
+        "The Prodigy - Experience",
+        "The Prodigy - Music for the Jilted Generation",
+        "The Chemical Brothers - Exit Planet Dust",
+        "The Prodigy - The Fat of the Land",
+        "The Chemical Brothers - Come With Us",
+        "M83 - Hurry Up, We're Dreaming.",
+        "The Chemical Brothers - Dig Your Own Hole",
+        "M83 - Midnight City",
+        "The Chemical Brothers - Surrender"
+      ]
+    },
+    {
+      "name": "Progressive rock",
+      "count": 85,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 56,
+        "sdecandelario": 29
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Liquid Tension Experiment",
+          "Triana",
+          "No-Man",
+          "Mullmuzzler",
+          "The Mars Volta",
+          "Shadow Gallery",
+          "Klaatu",
+          "Marillion",
+          "Steven Wilson",
+          "Indukti",
+          "Puscifer",
+          "Rush",
+          "The Moody Blues",
+          "Transatlantic"
+        ],
+        "sdecandelario": [
+          "Uriah Heep"
+        ]
+      },
+      "top_artists": [
+        "Uriah Heep",
+        "Marillion",
+        "Puscifer",
+        "Steven Wilson",
+        "Triana",
+        "Klaatu",
+        "Liquid Tension Experiment",
+        "No-Man",
+        "Indukti",
+        "Shadow Gallery"
+      ],
+      "top_albums": [
+        "Uriah Heep - Firefly",
+        "Uriah Heep - Innocent Victim",
+        "Puscifer - Conditions of My Parole",
+        "Uriah Heep - Conquest",
+        "Steven Wilson - Grace for Drowning",
+        "Liquid Tension Experiment - Liquid Tension Experiment 2",
+        "Puscifer - V Is for Vagina",
+        "Triana - El Patio",
+        "No-Man - Schoolyard Ghosts",
+        "Indukti - S.U.S.A.R."
+      ]
+    },
+    {
+      "name": "pop",
+      "count": 81,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 61,
+        "sdecandelario": 20
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Kate Bush",
+          "The Beatles(Love)",
+          "Walt Ribeiro",
+          "Simon Dupree & The Big Sound",
+          "New Kids on the Block",
+          "KC and The Sunshine Band",
+          "Tommy Tutone",
+          "The Beatles",
+          "Talk Talk",
+          "Los Planetas"
+        ],
+        "sdecandelario": [
+          "The Police",
+          "Tino Casal",
+          "The Ark",
+          "Talk Talk",
+          "Simple Minds",
+          "Pet Shop Boys"
+        ]
+      },
+      "top_artists": [
+        "The Beatles",
+        "Pet Shop Boys",
+        "Talk Talk",
+        "Walt Ribeiro",
+        "The Beatles(Love)",
+        "Kate Bush",
+        "New Kids on the Block",
+        "KC and The Sunshine Band",
+        "Tommy Tutone",
+        "Los Planetas"
+      ],
+      "top_albums": [
+        "The Beatles - Everyday Chemistry",
+        "The Beatles - Revolver",
+        "Pet Shop Boys - Yes",
+        "Pet Shop Boys - Discography: The Complete Singles Collection",
+        "Walt Ribeiro - Kids (For Orchestra)",
+        "Walt Ribeiro - Bulls On Parade (For Orchestra)",
+        "Walt Ribeiro - A Day In the Life (For Orchestra)",
+        "Walt Ribeiro - Midnight City (For Orchestra Tribute to M83) - Single",
+        "Talk Talk - Playlist: Electro",
+        "Talk Talk - It's My Life"
+      ]
+    },
+    {
+      "name": "dance",
+      "count": 77,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 76
+      },
+      "user_artists": {
+        "Nubis84": [
+          "KC and The Sunshine Band"
+        ],
+        "sdecandelario": [
+          "The Prodigy",
+          "The Chemical Brothers"
+        ]
+      },
+      "top_artists": [
+        "The Prodigy",
+        "The Chemical Brothers",
+        "KC and The Sunshine Band"
+      ],
+      "top_albums": [
+        "The Prodigy - Always Outnumbered Never Outgunned",
+        "The Prodigy - Experience",
+        "The Prodigy - Music for the Jilted Generation",
+        "The Chemical Brothers - Exit Planet Dust",
+        "The Prodigy - The Fat of the Land",
+        "The Chemical Brothers - Come With Us",
+        "The Chemical Brothers - Dig Your Own Hole",
+        "KC and The Sunshine Band - 100 Hits of the '80s",
+        "The Chemical Brothers - Surrender",
+        "The Chemical Brothers - Brotherhood"
+      ]
+    },
+    {
+      "name": "spanish",
+      "count": 68,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 9,
+        "sdecandelario": 59
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Triana",
+          "Vicente Amigo",
+          "Los Planetas",
+          "Nacho Vegas",
+          "Bunbury & Vegas"
+        ],
+        "sdecandelario": [
+          "Rata Blanca",
+          "La Polla Records",
+          "Tino Casal",
+          "Obús",
+          "Saurom"
+        ]
+      },
+      "top_artists": [
+        "Rata Blanca",
+        "Saurom",
+        "La Polla Records",
+        "Obús",
+        "Triana",
+        "Los Planetas",
+        "Vicente Amigo",
+        "Nacho Vegas",
+        "Bunbury & Vegas",
+        "Tino Casal"
+      ],
+      "top_albums": [
+        "Saurom - El Guardian de las Melodias Perdidas",
+        "Rata Blanca - El Reino Olvidado",
+        "Rata Blanca - La Llave De La Puerta Secreta",
+        "Obús - Prepárate",
+        "Triana - El Patio",
+        "La Polla Records - Carne Para La Picadora",
+        "La Polla Records - Salve",
+        "La Polla Records - Toda La Puta Vida Igual",
+        "La Polla Records - Bajo Presión",
+        "Triana - Quiero Contarte"
+      ]
+    },
+    {
+      "name": "Progressive metal",
+      "count": 51,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 20,
+        "sdecandelario": 31
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Liquid Tension Experiment",
+          "Mullmuzzler",
+          "Shadow Gallery",
+          "Mastodon",
+          "FreeWILL",
+          "Indukti",
+          "Kamelot",
+          "Transatlantic"
+        ],
+        "sdecandelario": [
+          "Savatage"
+        ]
+      },
+      "top_artists": [
+        "Savatage",
+        "Mastodon",
+        "Liquid Tension Experiment",
+        "Indukti",
+        "Shadow Gallery",
+        "FreeWILL",
+        "Transatlantic",
+        "Mullmuzzler",
+        "Kamelot"
+      ],
+      "top_albums": [
+        "Savatage - Power of the Night",
+        "Savatage - Hall of the Mountain King",
+        "Savatage - Fight for the Rock",
+        "Mastodon - The Hunter",
+        "Liquid Tension Experiment - Liquid Tension Experiment 2",
+        "Indukti - S.U.S.A.R.",
+        "Transatlantic - Stolt Morse Portnoy Trewavas",
+        "Mullmuzzler - Keep It To Yourself",
+        "Shadow Gallery - Carved in Stone",
+        "Shadow Gallery - Tyranny"
+      ]
+    },
+    {
+      "name": "singer-songwriter",
+      "count": 37,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 35,
+        "sdecandelario": 2
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Kate Bush",
+          "Tom Waits",
+          "The Tallest Man on Earth",
+          "Steven Wilson",
+          "PJ Harvey",
+          "Radical Face",
+          "Nick Cave & the Bad Seeds",
+          "Johnny Cash",
+          "Bunbury & Vegas",
+          "Nacho Vegas"
+        ],
+        "sdecandelario": [
+          "Neil Young"
+        ]
+      },
+      "top_artists": [
+        "PJ Harvey",
+        "Steven Wilson",
+        "Kate Bush",
+        "Neil Young",
+        "Tom Waits",
+        "Johnny Cash",
+        "Nacho Vegas",
+        "Nick Cave & the Bad Seeds",
+        "Bunbury & Vegas",
+        "The Tallest Man on Earth"
+      ],
+      "top_albums": [
+        "PJ Harvey - Let England Shake",
+        "PJ Harvey - Stories From the City, Stories From the Sea",
+        "Steven Wilson - Grace for Drowning",
+        "Neil Young - Freedom",
+        "Kate Bush - Director's Cut",
+        "PJ Harvey - To Bring You My Love",
+        "PJ Harvey - A Woman A Man Walked By",
+        "Nick Cave & the Bad Seeds - Murder Ballads (2011 - Remaster)",
+        "Steven Wilson - Where Stalks The Sandman",
+        "Bunbury & Vegas - El Tiempo De Las Cerezas"
+      ]
+    },
+    {
+      "name": "swedish",
+      "count": 33,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 32
+      },
+      "user_artists": {
+        "Nubis84": [
+          "The Tallest Man on Earth"
+        ],
+        "sdecandelario": [
+          "Wolf",
+          "The Ark"
+        ]
+      },
+      "top_artists": [
+        "Wolf",
+        "The Tallest Man on Earth",
+        "The Ark"
+      ],
+      "top_albums": [
+        "Wolf - Evil Star",
+        "Wolf - Black Wings",
+        "Wolf - Wolf",
+        "The Ark - Big-5 : The Ark"
+      ]
+    },
+    {
+      "name": "punk",
+      "count": 31,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 30
+      },
+      "user_artists": {
+        "Nubis84": [
+          "The Stranglers"
+        ],
+        "sdecandelario": [
+          "La Polla Records",
+          "The Skids",
+          "The Stranglers",
+          "Loikaemie"
+        ]
+      },
+      "top_artists": [
+        "Loikaemie",
+        "La Polla Records",
+        "The Stranglers",
+        "The Skids"
+      ],
+      "top_albums": [
+        "Loikaemie - Ihr Für Uns Und Wir Für Euch",
+        "La Polla Records - Carne Para La Picadora",
+        "La Polla Records - Salve",
+        "La Polla Records - Toda La Puta Vida Igual",
+        "La Polla Records - Bajo Presión",
+        "The Stranglers - 100 Hits of the 80's - Volume 2",
+        "The Skids - The Saints Are Coming - The Best Of The Skids",
+        "The Stranglers - Essential: New Wave",
+        "La Polla Records - Negro",
+        "La Polla Records - Los Jubilados"
+      ]
+    },
+    {
+      "name": "Spanish Rock",
+      "count": 31,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 30
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Bunbury & Vegas"
+        ],
+        "sdecandelario": [
+          "La Polla Records",
+          "Engendro"
+        ]
+      },
+      "top_artists": [
+        "Engendro",
+        "La Polla Records",
+        "Bunbury & Vegas"
+      ],
+      "top_albums": [
+        "Engendro - Gran ilusión",
+        "Engendro - Engendro",
+        "La Polla Records - Carne Para La Picadora",
+        "La Polla Records - Salve",
+        "La Polla Records - Toda La Puta Vida Igual",
+        "La Polla Records - Bajo Presión",
+        "Bunbury & Vegas - El Tiempo De Las Cerezas",
+        "La Polla Records - Negro",
+        "La Polla Records - Los Jubilados"
+      ]
+    },
+    {
+      "name": "70s",
+      "count": 30,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 29
+      },
+      "user_artists": {
+        "Nubis84": [
+          "KC and The Sunshine Band"
+        ],
+        "sdecandelario": [
+          "Uriah Heep"
+        ]
+      },
+      "top_artists": [
+        "Uriah Heep",
+        "KC and The Sunshine Band"
+      ],
+      "top_albums": [
+        "Uriah Heep - Firefly",
+        "Uriah Heep - Innocent Victim",
+        "Uriah Heep - Conquest",
+        "KC and The Sunshine Band - 100 Hits of the '80s"
+      ]
+    },
+    {
+      "name": "punk rock",
+      "count": 30,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 29
+      },
+      "user_artists": {
+        "Nubis84": [
+          "FreeWILL"
+        ],
+        "sdecandelario": [
+          "La Polla Records",
+          "The Skids",
+          "Loikaemie"
+        ]
+      },
+      "top_artists": [
+        "Loikaemie",
+        "La Polla Records",
+        "FreeWILL",
+        "The Skids"
+      ],
+      "top_albums": [
+        "Loikaemie - Ihr Für Uns Und Wir Für Euch",
+        "La Polla Records - Carne Para La Picadora",
+        "La Polla Records - Salve",
+        "La Polla Records - Toda La Puta Vida Igual",
+        "La Polla Records - Bajo Presión",
+        "The Skids - The Saints Are Coming - The Best Of The Skids",
+        "La Polla Records - Negro",
+        "La Polla Records - Los Jubilados"
+      ]
+    }
+  ],
+  "labels": [
+    {
+      "name": "[no label]",
+      "count": 41,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 25,
+        "sdecandelario": 16
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Walt Ribeiro",
+          "The Beatles"
+        ],
+        "sdecandelario": [
+          "Saurom"
+        ]
+      },
+      "top_artists": [
+        "The Beatles",
+        "Saurom",
+        "Walt Ribeiro"
+      ],
+      "top_albums": [
+        "The Beatles - Everyday Chemistry",
+        "Saurom - El Guardian de las Melodias Perdidas",
+        "Walt Ribeiro - Bulls On Parade (For Orchestra)"
+      ]
+    },
+    {
+      "name": "EMI",
+      "count": 7,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 6
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Marillion"
+        ],
+        "sdecandelario": [
+          "Talking Heads",
+          "The Stranglers",
+          "Ultravox",
+          "Talk Talk",
+          "Simple Minds",
+          "Duran Duran"
+        ]
+      },
+      "top_artists": [
+        "Marillion",
+        "Talk Talk",
+        "Ultravox",
+        "Talking Heads",
+        "The Stranglers",
+        "Simple Minds",
+        "Duran Duran"
+      ],
+      "top_albums": [
+        "Marillion - Clutching at Straws",
+        "Talk Talk - Essential: New Wave",
+        "Ultravox - Essential: New Wave",
+        "Talking Heads - Essential: New Wave",
+        "The Stranglers - Essential: New Wave",
+        "Simple Minds - Essential: New Wave",
+        "Duran Duran - Greatest"
+      ]
+    },
+    {
+      "name": "RCA",
+      "count": 2,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 1
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Bill Medley & Jennifer Warnes"
+        ],
+        "sdecandelario": [
+          "Scorpions"
+        ]
+      },
+      "top_artists": [
+        "Bill Medley & Jennifer Warnes",
+        "Scorpions"
+      ],
+      "top_albums": [
+        "Bill Medley & Jennifer Warnes - Dirty Dancing",
+        "Scorpions - Fly To The Rainbow"
+      ]
+    }
+  ],
+  "years": [
+    {
+      "name": "2011",
+      "count": 54,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 29,
+        "sdecandelario": 25
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Kate Bush",
+          "Walt Ribeiro",
+          "Ketil Bjørnstad",
+          "Puscifer",
+          "Tim Hecker"
+        ],
+        "sdecandelario": [
+          "Talking Heads",
+          "The Stranglers",
+          "Billy Idol",
+          "Ultravox",
+          "Talk Talk",
+          "Simple Minds",
+          "Savatage"
+        ]
+      },
+      "top_artists": [
+        "Tim Hecker",
+        "Billy Idol",
+        "Savatage",
+        "Puscifer",
+        "Walt Ribeiro",
+        "Ketil Bjørnstad",
+        "Kate Bush",
+        "Talk Talk",
+        "Ultravox",
+        "Talking Heads"
+      ],
+      "top_albums": [
+        "Tim Hecker - Dropped Pianos",
+        "Billy Idol - Essential",
+        "Savatage - Fight for the Rock",
+        "Puscifer - Conditions of My Parole",
+        "Walt Ribeiro - Bulls On Parade (For Orchestra)",
+        "Ketil Bjørnstad - Early Piano Music",
+        "Kate Bush - Director's Cut",
+        "Talk Talk - Essential: New Wave",
+        "Ultravox - Essential: New Wave",
+        "Talking Heads - Essential: New Wave"
+      ]
+    },
+    {
+      "name": "2009",
+      "count": 51,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 27,
+        "sdecandelario": 24
+      },
+      "user_artists": {
+        "Nubis84": [
+          "New Kids on the Block",
+          "KC and The Sunshine Band",
+          "The Beatles",
+          "PJ Harvey"
+        ],
+        "sdecandelario": [
+          "Nachtmahr",
+          "13 bats",
+          "Aesthetic Perfection",
+          "Grave Digger"
+        ]
+      },
+      "top_artists": [
+        "The Beatles",
+        "Nachtmahr",
+        "Grave Digger",
+        "New Kids on the Block",
+        "KC and The Sunshine Band",
+        "PJ Harvey",
+        "Aesthetic Perfection",
+        "13 bats"
+      ],
+      "top_albums": [
+        "The Beatles - Everyday Chemistry",
+        "Nachtmahr - Alle Lust will Ewigkeit",
+        "Grave Digger - Ballads Of A Hangman",
+        "New Kids on the Block - 100 Hits of the '80s",
+        "KC and The Sunshine Band - 100 Hits of the '80s",
+        "PJ Harvey - A Woman A Man Walked By",
+        "Aesthetic Perfection - A Violent Emotion",
+        "13 bats - 13 Bats"
+      ]
+    },
+    {
+      "name": "2006",
+      "count": 41,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 2,
+        "sdecandelario": 39
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Bunbury & Vegas",
+          "Om"
+        ],
+        "sdecandelario": [
+          "Firewind",
+          "And One",
+          "Snow Patrol"
+        ]
+      },
+      "top_artists": [
+        "And One",
+        "Firewind",
+        "Bunbury & Vegas",
+        "Om",
+        "Snow Patrol"
+      ],
+      "top_albums": [
+        "And One - Anguish",
+        "And One - Bodypop",
+        "Firewind - Allegiance",
+        "Bunbury & Vegas - El Tiempo De Las Cerezas",
+        "Om - Conference of the Birds",
+        "Snow Patrol - Eyes Open"
+      ]
+    },
+    {
+      "name": "1995",
+      "count": 27,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 2,
+        "sdecandelario": 25
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Marillion",
+          "Shadow Gallery"
+        ],
+        "sdecandelario": [
+          "Neil Young",
+          "The Chemical Brothers",
+          "OOMPH!"
+        ]
+      },
+      "top_artists": [
+        "OOMPH!",
+        "The Chemical Brothers",
+        "Neil Young",
+        "Marillion",
+        "Shadow Gallery"
+      ],
+      "top_albums": [
+        "OOMPH! - Defekt",
+        "The Chemical Brothers - Exit Planet Dust",
+        "Neil Young - Freedom",
+        "Marillion - Brave",
+        "Shadow Gallery - Carved in Stone"
+      ]
+    },
+    {
+      "name": "1987",
+      "count": 14,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 3,
+        "sdecandelario": 11
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Bill Medley & Jennifer Warnes",
+          "Marillion",
+          "Johann Sebastian Bach"
+        ],
+        "sdecandelario": [
+          "Echo & the Bunnymen"
+        ]
+      },
+      "top_artists": [
+        "Echo & the Bunnymen",
+        "Bill Medley & Jennifer Warnes",
+        "Marillion",
+        "Johann Sebastian Bach"
+      ],
+      "top_albums": [
+        "Echo & the Bunnymen - Echo & the Bunnymen",
+        "Bill Medley & Jennifer Warnes - Dirty Dancing",
+        "Marillion - Clutching at Straws",
+        "Johann Sebastian Bach - Baroque Favourites"
+      ]
+    },
+    {
+      "name": "1999",
+      "count": 14,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 2,
+        "sdecandelario": 12
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Marillion"
+        ],
+        "sdecandelario": [
+          "Danzig"
+        ]
+      },
+      "top_artists": [
+        "Danzig",
+        "Marillion"
+      ],
+      "top_albums": [
+        "Danzig - Danzig 6:66 Satan's Child",
+        "Marillion - Afraid of Sunlight"
+      ]
+    },
+    {
+      "name": "1996",
+      "count": 4,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 3
+      },
+      "user_artists": {
+        "Nubis84": [
+          "El Niño Gusano"
+        ],
+        "sdecandelario": [
+          "La Polla Records"
+        ]
+      },
+      "top_artists": [
+        "La Polla Records",
+        "El Niño Gusano"
+      ],
+      "top_albums": [
+        "La Polla Records - Carne Para La Picadora",
+        "El Niño Gusano - El Efecto Lupa (Edición Especial)"
+      ]
+    },
+    {
+      "name": "1989",
+      "count": 4,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 3,
+        "sdecandelario": 1
+      },
+      "user_artists": {
+        "Nubis84": [
+          "X JAPAN",
+          "Pixies"
+        ],
+        "sdecandelario": [
+          "Bad Company"
+        ]
+      },
+      "top_artists": [
+        "Pixies",
+        "X JAPAN",
+        "Bad Company"
+      ],
+      "top_albums": [
+        "Pixies - Doolittle",
+        "X JAPAN - BLUE BLOOD",
+        "Bad Company - Bad Company"
+      ]
+    },
+    {
+      "name": "2007",
+      "count": 3,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 2
+      },
+      "user_artists": {
+        "Nubis84": [
+          "植松伸夫"
+        ],
+        "sdecandelario": [
+          "Scorpions",
+          "Danzig"
+        ]
+      },
+      "top_artists": [
+        "植松伸夫",
+        "Scorpions",
+        "Danzig"
+      ],
+      "top_albums": [
+        "植松伸夫 - Blue Dragon Piano",
+        "Scorpions - Fly To The Rainbow",
+        "Danzig - Danzig"
+      ]
+    }
+  ],
+  "novelties": {
+    "nuevos": {
+      "artists": [
+        {
+          "name": "Nachtmahr",
+          "count": 33,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1318322324
+        },
+        {
+          "name": "Attack",
+          "count": 57,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1317507255
+        }
+      ],
+      "albums": [
+        {
+          "name": "Attack - Revitalize",
+          "artist": "Attack",
+          "album": "Revitalize",
+          "count": 15,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319799864
+        },
+        {
+          "name": "Tim Hecker - Dropped Pianos",
+          "artist": "Tim Hecker",
+          "album": "Dropped Pianos",
+          "count": 18,
+          "users": [
+            "Nubis84"
+          ],
+          "first_date": 1319124886
+        },
+        {
+          "name": "Putilatex - Somos los que faltan",
+          "artist": "Putilatex",
+          "album": "Somos los que faltan",
+          "count": 19,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319112419
+        },
+        {
+          "name": "Joy Division - Warsaw",
+          "artist": "Joy Division",
+          "album": "Warsaw",
+          "count": 19,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319026311
+        },
+        {
+          "name": "And One - I.S.T.",
+          "artist": "And One",
+          "album": "I.S.T.",
+          "count": 15,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1318958222
+        },
+        {
+          "name": "The Sisters of Mercy - Some Girls Wander by Mistake",
+          "artist": "The Sisters of Mercy",
+          "album": "Some Girls Wander by Mistake",
+          "count": 19,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1318594075
+        },
+        {
+          "name": "The Beatles - Everyday Chemistry",
+          "artist": "The Beatles",
+          "album": "Everyday Chemistry",
+          "count": 24,
+          "users": [
+            "Nubis84"
+          ],
+          "first_date": 1318250035
+        },
+        {
+          "name": "Dropkick Murphys - Sing Loud, Sing Proud!",
+          "artist": "Dropkick Murphys",
+          "album": "Sing Loud, Sing Proud!",
+          "count": 16,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1317893035
+        },
+        {
+          "name": "Dropkick Murphys - The Gang's All Here",
+          "artist": "Dropkick Murphys",
+          "album": "The Gang's All Here",
+          "count": 16,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1317632705
+        }
+      ],
+      "tracks": [
+        {
+          "name": "Tim Hecker - Sketch 1",
+          "artist": "Tim Hecker",
+          "track": "Sketch 1",
+          "count": 3,
+          "users": [
+            "Nubis84"
+          ],
+          "first_date": 1319124886
+        },
+        {
+          "name": "Putilatex - Golpe de Estado",
+          "artist": "Putilatex",
+          "track": "Golpe de Estado",
+          "count": 3,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319117615
+        },
+        {
+          "name": "Putilatex - Un Kilo, Un Litri, Una Lata",
+          "artist": "Putilatex",
+          "track": "Un Kilo, Un Litri, Una Lata",
+          "count": 3,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319113023
+        },
+        {
+          "name": "Putilatex - Somos los que sobran",
+          "artist": "Putilatex",
+          "track": "Somos los que sobran",
+          "count": 3,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319112769
+        },
+        {
+          "name": "Putilatex - La última Cena",
+          "artist": "Putilatex",
+          "track": "La última Cena",
+          "count": 3,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319112419
+        },
+        {
+          "name": "Attack - In This Night",
+          "artist": "Attack",
+          "track": "In This Night",
+          "count": 3,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319020162
+        },
+        {
+          "name": "Attack - Destiny Of War",
+          "artist": "Attack",
+          "track": "Destiny Of War",
+          "count": 3,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1319014811
+        },
+        {
+          "name": "The Beatles - Talking to Myself",
+          "artist": "The Beatles",
+          "track": "Talking to Myself",
+          "count": 3,
+          "users": [
+            "Nubis84"
+          ],
+          "first_date": 1318250267
+        },
+        {
+          "name": "The Beatles - Four Guys",
+          "artist": "The Beatles",
+          "track": "Four Guys",
+          "count": 3,
+          "users": [
+            "Nubis84"
+          ],
+          "first_date": 1318250035
+        },
+        {
+          "name": "Joy Division - Shadowplay",
+          "artist": "Joy Division",
+          "track": "Shadowplay",
+          "count": 4,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1318229662
+        },
+        {
+          "name": "Depeche Mode - Enjoy the Silence",
+          "artist": "Depeche Mode",
+          "track": "Enjoy the Silence",
+          "count": 3,
+          "users": [
+            "sdecandelario"
+          ],
+          "first_date": 1317767448
+        },
+        {
+          "name": "Liquid Tension Experiment - Acid Rain",
+          "artist": "Liquid Tension Experiment",
+          "track": "Acid Rain",
+          "count": 3,
+          "users": [
+            "Nubis84"
+          ],
+          "first_date": 1317652142
+        }
+      ]
+    },
+    "nuevos_compartidos": {
+      "artists": [],
+      "albums": [],
+      "tracks": []
+    },
+    "nuevos_para_usuario": {
+      "artists": [],
+      "albums": [],
+      "tracks": []
+    },
+    "nuevos_para_usuarios": {
+      "sdecandelario": {
+        "artists": [
+          {
+            "name": "Talk Talk",
+            "period_count": 1,
+            "total_count": 65,
+            "coincident_users": [
+              "Nubis84"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1319131471
+          },
+          {
+            "name": "The Stranglers",
+            "period_count": 1,
+            "total_count": 39,
+            "coincident_users": [
+              "Nubis84"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1319130653
+          }
+        ],
+        "albums": [],
+        "tracks": [
+          {
+            "name": "Talk Talk - Such a Shame",
+            "artist": "Talk Talk",
+            "track": "Such a Shame",
+            "period_count": 1,
+            "total_count": 2,
+            "coincident_users": [
+              "Nubis84"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1319131471
+          }
+        ]
+      }
+    }
+  },
+  "period_label": "October 2011",
+  "from_date": "2011-10-01",
+  "to_date": "2011-10-31",
+  "generated_at": "2025-11-14 20:06"
+};
+        const hasNovelties = stats.novelties !== undefined;
+
+        // Función para obtener novedades de usuario desde datos precalculados
+        function getUserNovelties(user) {
+            if (!stats.novelties || !stats.novelties.nuevos_para_usuarios) {
+                return { artists: [], albums: [], tracks: [] };
+            }
+
+            return stats.novelties.nuevos_para_usuarios[user] || { artists: [], albums: [], tracks: [] };
+        }
+
+        // Funcionalidad del botón de usuario
+        function initializeUserSelector() {
+            const userButton = document.getElementById('userButton');
+            const userModal = document.getElementById('userModal');
+            const userModalClose = document.getElementById('userModalClose');
+            const userOptions = document.getElementById('userOptions');
+
+            // Cargar usuario guardado desde localStorage
+            let selectedUser = localStorage.getItem('lastfm_selected_user') || '';
+
+            // Llenar opciones de usuarios
+            availableUsers.forEach(user => {
+                const option = document.createElement('div');
+                option.className = 'user-option';
+                option.dataset.user = user;
+                option.textContent = user;
+                userOptions.appendChild(option);
+            });
+
+            // Marcar opción seleccionada
+            updateSelectedUserOption(selectedUser);
+
+            // Event listeners
+            userButton.addEventListener('click', () => {
+                userModal.style.display = 'block';
+            });
+
+            userModalClose.addEventListener('click', () => {
+                userModal.style.display = 'none';
+            });
+
+            userModal.addEventListener('click', (e) => {
+                if (e.target === userModal) {
+                    userModal.style.display = 'none';
+                }
+            });
+
+            userOptions.addEventListener('click', (e) => {
+                if (e.target.classList.contains('user-option')) {
+                    const user = e.target.dataset.user;
+                    selectedUser = user;
+
+                    // Guardar en localStorage
+                    if (user) {
+                        localStorage.setItem('lastfm_selected_user', user);
+                    } else {
+                        localStorage.removeItem('lastfm_selected_user');
+                    }
+
+                    updateSelectedUserOption(user);
+                    userModal.style.display = 'none';
+                    renderStats(); // Re-renderizar con nuevo usuario
+                }
+            });
+
+            return selectedUser;
+        }
+
+        function updateSelectedUserOption(selectedUser) {
+            const userOptions = document.getElementById('userOptions');
+            userOptions.querySelectorAll('.user-option').forEach(option => {
+                option.classList.remove('selected');
+                if (option.dataset.user === selectedUser) {
+                    option.classList.add('selected');
+                }
+            });
+        }
+
+        // Inicializar categorías activas
+        let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
+        let selectedUser = '';
+
+        document.getElementById('dateRange').textContent = `${stats.from_date || ''} → ${stats.to_date || ''}`;
+        document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
+        document.getElementById('generatedAt').textContent = stats.generated_at || '';
+
+        // Manejar filtros de categorías
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        categoryFilters.forEach(filter => {
+            filter.addEventListener('click', () => {
+                const category = filter.dataset.category;
+
+                if (activeCategories.has(category)) {
+                    activeCategories.delete(category);
+                    filter.classList.remove('active');
+                } else {
+                    activeCategories.add(category);
+                    filter.classList.add('active');
+                }
+
+                renderStats();
+            });
+        });
+
+        function showArtistsPopup(itemName, category, user) {
+            const item = stats[category].find(item => item.name === itemName);
+            if (!item || !item.user_artists || !item.user_artists[user]) return;
+
+            const artists = item.user_artists[user];
+
+            // Crear overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+
+            // Crear popup
+            const popup = document.createElement('div');
+            popup.className = 'artists-popup';
+
+            const header = document.createElement('div');
+            header.className = 'popup-header';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'popup-close';
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            };
+
+            header.innerHTML = `Artistas de ${user} en "${itemName}"`;
+            header.appendChild(closeBtn);
+
+            const artistList = document.createElement('ul');
+            artistList.className = 'artist-list';
+
+            artists.forEach(artist => {
+                const li = document.createElement('li');
+                li.textContent = artist;
+                artistList.appendChild(li);
+            });
+
+            popup.appendChild(header);
+            popup.appendChild(artistList);
+
+            // Cerrar al hacer click en overlay
+            overlay.onclick = () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            };
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(popup);
+        }
+
+        function createNoveltyItem(item, selectedUser) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
+
+            if (selectedUser && item.users.includes(selectedUser)) {
+                itemDiv.classList.add('highlighted');
+            }
+
+            const itemName = document.createElement('div');
+            itemName.className = 'item-name';
+            itemName.textContent = item.name;
+            itemDiv.appendChild(itemName);
+
+            const itemMeta = document.createElement('div');
+            itemMeta.className = 'item-meta';
+
+            // Conteo de plays si existe
+            if (item.count) {
+                const countBadge = document.createElement('span');
+                countBadge.className = 'badge';
+                countBadge.textContent = `${item.count} plays`;
+                itemMeta.appendChild(countBadge);
+            }
+
+            // Fecha de primer scrobble
+            const date = new Date(item.first_date * 1000);
+            const dateBadge = document.createElement('span');
+            dateBadge.className = 'badge';
+            dateBadge.textContent = `Primera vez: ${date.toLocaleDateString('es-ES')}`;
+            itemMeta.appendChild(dateBadge);
+
+            // Usuarios que lo han escuchado
+            item.users.forEach(user => {
+                const userBadge = document.createElement('span');
+                userBadge.className = 'user-badge';
+                if (user === selectedUser) {
+                    userBadge.classList.add('highlighted-user');
+                }
+                userBadge.textContent = user;
+                itemMeta.appendChild(userBadge);
+            });
+
+            itemDiv.appendChild(itemMeta);
+            return itemDiv;
+        }
+
+        function createUserNoveltyItem(item, selectedUser) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
+            itemDiv.classList.add('highlighted'); // Siempre resaltado para el usuario
+
+            const itemName = document.createElement('div');
+            itemName.className = 'item-name';
+            itemName.textContent = item.name;
+            itemDiv.appendChild(itemName);
+
+            const itemMeta = document.createElement('div');
+            itemMeta.className = 'item-meta';
+
+            // Total de scrobbles del usuario para este elemento
+            if (item.total_count) {
+                const totalBadge = document.createElement('span');
+                totalBadge.className = 'badge';
+                totalBadge.style.background = '#cba6f7';
+                totalBadge.style.color = '#1e1e2e';
+                totalBadge.textContent = `${item.total_count} total plays`;
+                itemMeta.appendChild(totalBadge);
+            }
+
+            // Scrobbles en este período
+            if (item.period_count) {
+                const periodBadge = document.createElement('span');
+                periodBadge.className = 'badge';
+                periodBadge.textContent = `${item.period_count} plays período`;
+                itemMeta.appendChild(periodBadge);
+            }
+
+            // Fecha de primera vez del usuario (si está disponible)
+            if (item.first_date || item.user_first_date) {
+                const date = new Date((item.first_date || item.user_first_date) * 1000);
+                const dateBadge = document.createElement('span');
+                dateBadge.className = 'badge';
+                dateBadge.style.background = '#a6e3a1';
+                dateBadge.style.color = '#1e1e2e';
+                dateBadge.textContent = `Primera vez: ${date.toLocaleDateString('es-ES')}`;
+                itemMeta.appendChild(dateBadge);
+            }
+
+            // Usuarios que también lo escucharon (coincidencias)
+            if (item.coincident_users && item.coincident_users.length > 0) {
+                item.coincident_users.forEach(user => {
+                    const userBadge = document.createElement('span');
+                    userBadge.className = 'user-badge';
+                    userBadge.textContent = user;
+                    itemMeta.appendChild(userBadge);
+                });
+            }
+
+            // Información de coincidencias
+            if (item.num_coincidences) {
+                const coincidencesBadge = document.createElement('span');
+                coincidencesBadge.className = 'badge';
+                coincidencesBadge.style.background = '#f38ba8';
+                coincidencesBadge.style.color = '#1e1e2e';
+                coincidencesBadge.textContent = `${item.num_coincidences} coincidencias`;
+                itemMeta.appendChild(coincidencesBadge);
+            }
+
+            itemDiv.appendChild(itemMeta);
+            return itemDiv;
+        }
+
+        function renderStats() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+
+            const categoryTitles = {
+                artists: 'Artistas Más Escuchados',
+                tracks: 'Canciones Más Escuchadas',
+                albums: 'Álbumes Más Escuchados',
+                genres: 'Géneros Más Escuchados',
+                labels: 'Sellos Más Escuchados',
+                years: 'Años Más Escuchados',
+                novelties: 'Novedades'
+            };
+
+            let hasData = false;
+
+            ['artists', 'tracks', 'albums', 'genres', 'labels', 'years', 'novelties'].forEach(categoryKey => {
+                if (!activeCategories.has(categoryKey)) return;
+
+                // Manejo especial para novedades
+                if (categoryKey === 'novelties') {
+                    if (!hasNovelties || !stats.novelties) return;
+
+                    hasData = true;
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.className = 'category visible';
+                    categoryDiv.dataset.category = categoryKey;
+
+                    const title = document.createElement('h3');
+                    title.textContent = categoryTitles[categoryKey];
+                    categoryDiv.appendChild(title);
+
+                    // NUEVOS PARA TODOS
+                    const nuevosSection = document.createElement('div');
+                    nuevosSection.className = 'novelty-section';
+
+                    const nuevosTitle = document.createElement('h4');
+                    nuevosTitle.textContent = '🆕 Nuevos para todos';
+                    nuevosSection.appendChild(nuevosTitle);
+
+                    ['artists', 'albums', 'tracks'].forEach(type => {
+                        const subsection = document.createElement('div');
+                        subsection.className = 'novelty-subsection';
+
+                        const subsectionTitle = document.createElement('h5');
+                        subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                     type === 'albums' ? 'Álbumes' : 'Canciones';
+                        subsection.appendChild(subsectionTitle);
+
+                        const items = stats.novelties.nuevos[type];
+                        if (items && items.length > 0) {
+                            items.forEach(item => {
+                                const itemDiv = createNoveltyItem(item, selectedUser);
+                                subsection.appendChild(itemDiv);
+                            });
+                        } else {
+                            const emptyDiv = document.createElement('div');
+                            emptyDiv.className = 'novelty-empty';
+                            emptyDiv.textContent = 'No hay elementos nuevos';
+                            subsection.appendChild(emptyDiv);
+                        }
+
+                        nuevosSection.appendChild(subsection);
+                    });
+
+                    categoryDiv.appendChild(nuevosSection);
+
+                    // NUEVOS COMPARTIDOS
+                    const compartidosSection = document.createElement('div');
+                    compartidosSection.className = 'novelty-section';
+
+                    const compartidosTitle = document.createElement('h4');
+                    compartidosTitle.textContent = '👥 Nuevos compartidos (50%+ del grupo)';
+                    compartidosSection.appendChild(compartidosTitle);
+
+                    ['artists', 'albums', 'tracks'].forEach(type => {
+                        const subsection = document.createElement('div');
+                        subsection.className = 'novelty-subsection';
+
+                        const subsectionTitle = document.createElement('h5');
+                        subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                     type === 'albums' ? 'Álbumes' : 'Canciones';
+                        subsection.appendChild(subsectionTitle);
+
+                        const items = stats.novelties.nuevos_compartidos[type];
+                        if (items && items.length > 0) {
+                            items.forEach(item => {
+                                const itemDiv = createNoveltyItem(item, selectedUser);
+                                subsection.appendChild(itemDiv);
+                            });
+                        } else {
+                            const emptyDiv = document.createElement('div');
+                            emptyDiv.className = 'novelty-empty';
+                            emptyDiv.textContent = 'No hay elementos nuevos compartidos';
+                            subsection.appendChild(emptyDiv);
+                        }
+
+                        compartidosSection.appendChild(subsection);
+                    });
+
+                    // NUEVOS PARA USUARIO SELECCIONADO
+                    if (selectedUser) {
+                        const usuarioSection = document.createElement('div');
+                        usuarioSection.className = 'novelty-section';
+
+                        const usuarioTitle = document.createElement('h4');
+                        usuarioTitle.textContent = `👤 Nuevos para ${selectedUser} (ya conocidos por el grupo)`;
+                        usuarioSection.appendChild(usuarioTitle);
+
+                        // Calcular novedades para el usuario
+                        const userNovelties = getUserNovelties(selectedUser);
+
+                        ['artists', 'albums', 'tracks'].forEach(type => {
+                            const subsection = document.createElement('div');
+                            subsection.className = 'novelty-subsection';
+
+                            const subsectionTitle = document.createElement('h5');
+                            subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                         type === 'albums' ? 'Álbumes' : 'Canciones';
+                            subsection.appendChild(subsectionTitle);
+
+                            const items = userNovelties[type];
+                            if (items && items.length > 0) {
+                                items.forEach(item => {
+                                    const itemDiv = createUserNoveltyItem(item, selectedUser);
+                                    subsection.appendChild(itemDiv);
+                                });
+                            } else {
+                                const emptyDiv = document.createElement('div');
+                                emptyDiv.className = 'novelty-empty';
+                                const typeText = type === 'artists' ? 'artistas' :
+                                               type === 'albums' ? 'álbumes' : 'canciones';
+                                emptyDiv.textContent = items ?
+                                    `No hay ${typeText} nuevos para ${selectedUser} con coincidencias en el período` :
+                                    'Calculando novedades del usuario...';
+                                subsection.appendChild(emptyDiv);
+                            }
+
+                            usuarioSection.appendChild(subsection);
+                        });
+
+                        categoryDiv.appendChild(usuarioSection);
+                    } else {
+                        const usuarioSection = document.createElement('div');
+                        usuarioSection.className = 'novelty-section';
+
+                        const usuarioTitle = document.createElement('h4');
+                        usuarioTitle.textContent = '👤 Nuevos para usuario específico';
+                        usuarioSection.appendChild(usuarioTitle);
+
+                        const infoDiv = document.createElement('div');
+                        infoDiv.className = 'novelty-empty';
+                        infoDiv.textContent = 'Selecciona un usuario para ver sus novedades personales';
+                        usuarioSection.appendChild(infoDiv);
+
+                        categoryDiv.appendChild(usuarioSection);
+                    }
+                    container.appendChild(categoryDiv);
+                    return;
+                }
+
+                if (!stats[categoryKey] || stats[categoryKey].length === 0) return;
+
+                hasData = true;
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category visible';
+                categoryDiv.dataset.category = categoryKey;
+
+                const title = document.createElement('h3');
+                title.textContent = categoryTitles[categoryKey];
+                categoryDiv.appendChild(title);
+
+                stats[categoryKey].forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'item';
+
+                    if (selectedUser && item.users.includes(selectedUser)) {
+                        itemDiv.classList.add('highlighted');
+                    }
+
+                    // Hacer clickeable si es género, año o sello y hay usuario seleccionado
+                    const isClickableForUser = ['genres', 'labels', 'years'].includes(categoryKey) &&
+                                       selectedUser &&
+                                       item.users.includes(selectedUser) &&
+                                       item.user_artists &&
+                                       item.user_artists[selectedUser];
+
+                    // Hacer expandible si tiene información detallada
+                    const isExpandable = ['genres', 'labels', 'years'].includes(categoryKey) &&
+                                         ((item.top_artists && item.top_artists.length > 0) ||
+                                          (item.top_albums && item.top_albums.length > 0));
+
+                    const itemName = document.createElement('div');
+                    itemName.className = 'item-name';
+                    itemName.textContent = item.name;
+
+                    if (isExpandable) {
+                        itemDiv.classList.add('expandable');
+                    }
+
+                    itemDiv.appendChild(itemName);
+
+                    const itemMeta = document.createElement('div');
+                    itemMeta.className = 'item-meta';
+
+                    const countBadge = document.createElement('span');
+                    countBadge.className = 'badge';
+                    countBadge.textContent = `${item.count} plays`;
+                    itemMeta.appendChild(countBadge);
+
+                    item.users.sort((a, b) => (item.user_counts[b] || 0) - (item.user_counts[a] || 0));
+
+                    item.users.forEach(user => {
+                        const userBadge = document.createElement('span');
+                        userBadge.className = 'user-badge';
+                        if (user === selectedUser) {
+                            userBadge.classList.add('highlighted-user');
+                        }
+
+                        const userScrobbles = item.user_counts[user] || 0;
+                        userBadge.textContent = `${user} (${userScrobbles})`;
+
+                        if (isClickableForUser && user === selectedUser) {
+                            userBadge.style.cursor = 'pointer';
+                            userBadge.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                showArtistsPopup(item.name, categoryKey, user);
+                            });
+                        }
+
+                        itemMeta.appendChild(userBadge);
+                    });
+
+                    itemDiv.appendChild(itemMeta);
+
+                    // Detalles expandibles
+                    if (isExpandable) {
+                        const detailsDiv = document.createElement('div');
+                        detailsDiv.className = 'details';
+
+                        if (item.top_artists && item.top_artists.length > 0) {
+                            const artistSection = document.createElement('div');
+                            artistSection.className = 'detail-section';
+
+                            const artistTitle = document.createElement('div');
+                            artistTitle.className = 'detail-title';
+                            artistTitle.textContent = 'Top Artistas:';
+                            artistSection.appendChild(artistTitle);
+
+                            const artistList = document.createElement('div');
+                            artistList.className = 'detail-list';
+
+                            item.top_artists.slice(0, 10).forEach(artist => {
+                                const artistItem = document.createElement('span');
+                                artistItem.className = 'detail-item';
+                                artistItem.textContent = artist;
+                                artistList.appendChild(artistItem);
+                            });
+
+                            artistSection.appendChild(artistList);
+                            detailsDiv.appendChild(artistSection);
+                        }
+
+                        if (item.top_albums && item.top_albums.length > 0) {
+                            const albumSection = document.createElement('div');
+                            albumSection.className = 'detail-section';
+
+                            const albumTitle = document.createElement('div');
+                            albumTitle.className = 'detail-title';
+                            albumTitle.textContent = 'Top Álbumes:';
+                            albumSection.appendChild(albumTitle);
+
+                            const albumList = document.createElement('div');
+                            albumList.className = 'detail-list';
+
+                            item.top_albums.slice(0, 10).forEach(album => {
+                                const albumItem = document.createElement('span');
+                                albumItem.className = 'detail-item';
+                                albumItem.textContent = album;
+                                albumList.appendChild(albumItem);
+                            });
+
+                            albumSection.appendChild(albumList);
+                            detailsDiv.appendChild(albumSection);
+                        }
+
+                        itemDiv.appendChild(detailsDiv);
+
+                        itemDiv.addEventListener('click', (e) => {
+                            if (e.target.classList.contains('user-badge') && e.target.style.cursor === 'pointer') {
+                                return;
+                            }
+
+                            itemDiv.classList.toggle('expanded');
+                            detailsDiv.classList.toggle('expanded');
+                        });
+                    }
+
+                    categoryDiv.appendChild(itemDiv);
+                });
+
+                container.appendChild(categoryDiv);
+            });
+
+            if (!hasData) {
+                const noDataDiv = document.createElement('div');
+                noDataDiv.className = 'no-data';
+                noDataDiv.textContent = 'No hay datos para mostrar con los filtros seleccionados.';
+                container.appendChild(noDataDiv);
+            }
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            selectedUser = initializeUserSelector();
+            renderStats();
+        });
+    </script>
+</body>
+</html>

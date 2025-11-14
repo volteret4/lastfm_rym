@@ -1,0 +1,7255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last.fm Stats - March 2014</title>
+    <link rel="icon" type="image/png" href="images/music.png">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: #181825;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: #1e1e2e;
+            padding: 20px 30px;
+            border-bottom: 2px solid #cba6f7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 80px;
+        }
+
+        .header-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+        }
+
+        h1 {
+            font-size: 1.8em;
+            color: #cba6f7;
+            margin: 0;
+            text-align: center;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .nav-button {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .nav-button:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+            color: #cdd6f4;
+        }
+
+        .nav-button.current {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .user-button {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #cba6f7;
+            color: #1e1e2e;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            flex-shrink: 0;
+        }
+
+        .user-button:hover {
+            background: #b4a3e8;
+            transform: scale(1.1);
+        }
+
+        .user-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .user-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            border: 2px solid #cba6f7;
+        }
+
+        .user-modal-header {
+            color: #cba6f7;
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .user-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .user-modal-close:hover {
+            color: #cba6f7;
+        }
+
+        .user-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .user-option {
+            padding: 12px 20px;
+            background: #313244;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            color: #cdd6f4;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .user-option:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+        }
+
+        .user-option.selected {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: #1e1e2e;
+            border-bottom: 1px solid #313244;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-group {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .control-group label {
+            color: #cba6f7;
+            font-weight: 600;
+        }
+
+        .category-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .category-filter {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .category-filter:hover {
+            border-color: #cba6f7;
+            background: #45475a;
+        }
+
+        .category-filter.active {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .period-header {
+            background: #1e1e2e;
+            padding: 25px 30px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .period-header h2 {
+            color: #cba6f7;
+            font-size: 1.5em;
+            margin-bottom: 8px;
+        }
+
+        .period-info {
+            color: #a6adc8;
+            font-size: 0.9em;
+        }
+
+        .stats-container {
+            padding: 30px;
+        }
+
+        .categories {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 25px;
+        }
+
+        .category {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #313244;
+            display: none;
+        }
+
+        .category.visible {
+            display: block;
+        }
+
+        .category h3 {
+            color: #cba6f7;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #cba6f7;
+        }
+
+        .item {
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #181825;
+            border-radius: 8px;
+            border-left: 3px solid #45475a;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .item:hover {
+            transform: translateX(5px);
+            border-left-color: #cba6f7;
+        }
+
+        .item.highlighted {
+            border-left-color: #cba6f7;
+            background: #1a1826;
+        }
+
+        .item-name {
+            font-weight: 600;
+            color: #cdd6f4;
+            font-size: 1em;
+        }
+
+        .item-meta {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .badge {
+            background: #45475a;
+            color: #cdd6f4;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .user-badge {
+            background: #313244;
+            color: #a6adc8;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            border: 1px solid #45475a;
+        }
+
+        .user-badge.highlighted-user {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .expandable {
+            position: relative;
+        }
+
+        .expandable::after {
+            content: '▼';
+            position: absolute;
+            right: 12px;
+            top: 12px;
+            color: #6c7086;
+            font-size: 0.8em;
+        }
+
+        .expandable.expanded::after {
+            content: '▲';
+        }
+
+        .details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding: 0 15px;
+            margin-top: 10px;
+        }
+
+        .details.expanded {
+            max-height: 400px;
+            overflow-y: auto;
+            border-top: 1px solid #313244;
+            padding-top: 15px;
+        }
+
+        .detail-section {
+            margin-bottom: 15px;
+        }
+
+        .detail-title {
+            color: #f9e2af;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .detail-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .detail-item {
+            background: #181825;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            color: #a6adc8;
+        }
+
+        .novelty-section {
+            margin-bottom: 25px;
+        }
+
+        .novelty-section h4 {
+            color: #a6e3a1;
+            font-size: 1.05em;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #45475a;
+        }
+
+        .novelty-subsection {
+            margin-bottom: 20px;
+        }
+
+        .novelty-subsection h5 {
+            color: #f9e2af;
+            font-size: 0.95em;
+            margin-bottom: 10px;
+        }
+
+        .novelty-empty {
+            color: #6c7086;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .artists-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 999;
+        }
+
+        .popup-header {
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
+        }
+
+        .popup-close {
+            float: right;
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+            margin-top: -5px;
+        }
+
+        .popup-close:hover {
+            color: #cba6f7;
+        }
+
+        .artist-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .artist-list li {
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #6c7086;
+            font-style: italic;
+        }
+
+        .last-update {
+            text-align: center;
+            padding: 20px;
+            color: #6c7086;
+            font-size: 0.85em;
+            border-top: 1px solid #313244;
+        }
+
+        @media (max-width: 768px) {
+            .categories {
+                grid-template-columns: 1fr;
+            }
+
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .category-filters {
+                justify-content: center;
+            }
+
+            .artists-popup {
+                max-width: 90%;
+                max-height: 80%;
+            }
+
+            header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .nav-buttons {
+                order: -1;
+            }
+
+            .user-button {
+                order: 1;
+                align-self: flex-end;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>📊 RYM Hispano Estadísticas</h1>
+                <div class="nav-buttons">
+                    <a href="esta-semana.html" class="nav-button">TEMPORALES</a>
+                    <a href="index.html#grupo" class="nav-button">GRUPO</a>
+                    <a href="index.html#about" class="nav-button">ACERCA DE</a>
+                </div>
+            </div>
+            <button class="user-button" id="userButton">👤</button>
+        </header>
+
+        <!-- Modal de selección de usuario -->
+        <div class="user-modal" id="userModal">
+            <div class="user-modal-content">
+                <button class="user-modal-close" id="userModalClose">×</button>
+                <div class="user-modal-header">Seleccionar Usuario</div>
+                <div class="user-options" id="userOptions">
+                    <!-- Se llenarán dinámicamente -->
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Mostrar categorías:</label>
+                <div class="category-filters">
+                    <button class="category-filter active" data-category="artists">Artistas</button><button class="category-filter " data-category="tracks">Canciones</button><button class="category-filter " data-category="albums">Álbumes</button><button class="category-filter " data-category="genres">Géneros</button><button class="category-filter " data-category="labels">Sellos</button><button class="category-filter " data-category="years">Años</button><button class="category-filter " data-category="novelties">Novedades</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="period-header">
+            <h2>March 2014</h2>
+            <p class="period-info">
+                <span id="dateRange"></span> |
+                <span id="totalScrobbles"></span> scrobbles totales
+            </p>
+        </div>
+
+        <div class="stats-container">
+            <div class="categories" id="categoriesContainer">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+
+        <div class="last-update">
+            Generado: <span id="generatedAt"></span>
+        </div>
+    </div>
+
+    <script>
+        // Usuarios reales del entorno LASTFM_USERS
+        const availableUsers = ["alberto_gu", "EliasJ72", "Frikomid", "GabredMared", "Lonsonxd", "Nubis84", "paqueradejere", "Rocky_stereo", "sdecandelario"];
+        const stats = {
+  "total_scrobbles": 5920,
+  "artists": [
+    {
+      "name": "Slowdive",
+      "count": 145,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 143,
+        "Nubis84": 2
+      }
+    },
+    {
+      "name": "Mogwai",
+      "count": 140,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 111,
+        "Nubis84": 19,
+        "sdecandelario": 10
+      }
+    },
+    {
+      "name": "Radiohead",
+      "count": 109,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 108,
+        "Nubis84": 1
+      }
+    },
+    {
+      "name": "The War on Drugs",
+      "count": 96,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 16,
+        "Nubis84": 70,
+        "sdecandelario": 10
+      }
+    },
+    {
+      "name": "Röyksopp",
+      "count": 77,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 71,
+        "sdecandelario": 6
+      }
+    },
+    {
+      "name": "Arcade Fire",
+      "count": 67,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 48,
+        "Nubis84": 15,
+        "sdecandelario": 4
+      }
+    },
+    {
+      "name": "Nine Inch Nails",
+      "count": 65,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 35,
+        "sdecandelario": 30
+      }
+    },
+    {
+      "name": "Sigur Rós",
+      "count": 63,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 53,
+        "sdecandelario": 10
+      }
+    },
+    {
+      "name": "Portishead",
+      "count": 54,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 52,
+        "Nubis84": 2
+      }
+    },
+    {
+      "name": "Have a Nice Life",
+      "count": 44,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 36,
+        "sdecandelario": 8
+      }
+    },
+    {
+      "name": "Foster the People",
+      "count": 37,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 32,
+        "sdecandelario": 5
+      }
+    },
+    {
+      "name": "Vetusta Morla",
+      "count": 35,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 29,
+        "sdecandelario": 6
+      }
+    },
+    {
+      "name": "St. Vincent",
+      "count": 33,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 22,
+        "sdecandelario": 11
+      }
+    },
+    {
+      "name": "A Silver Mt. Zion",
+      "count": 29,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 26,
+        "Nubis84": 3
+      }
+    },
+    {
+      "name": "The Smashing Pumpkins",
+      "count": 29,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 1,
+        "sdecandelario": 28
+      }
+    }
+  ],
+  "tracks": [
+    {
+      "name": "The War on Drugs - An Ocean in Between the Waves",
+      "count": 14,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 8,
+        "Nubis84": 5,
+        "sdecandelario": 1
+      }
+    },
+    {
+      "name": "St. Vincent - Rattlesnake",
+      "count": 9,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 8,
+        "sdecandelario": 1
+      }
+    },
+    {
+      "name": "The War on Drugs - Lost in the Dream",
+      "count": 7,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 1,
+        "Nubis84": 5,
+        "sdecandelario": 1
+      }
+    }
+  ],
+  "albums": [
+    {
+      "name": "The War on Drugs - Lost in the Dream",
+      "count": 76,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 16,
+        "Nubis84": 50,
+        "sdecandelario": 10
+      }
+    },
+    {
+      "name": "St. Vincent - St. Vincent",
+      "count": 32,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 21,
+        "sdecandelario": 11
+      }
+    },
+    {
+      "name": "Röyksopp - Junior",
+      "count": 30,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 28,
+        "sdecandelario": 2
+      }
+    },
+    {
+      "name": "Sigur Rós - Ágætis byrjun",
+      "count": 30,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 20,
+        "sdecandelario": 10
+      }
+    },
+    {
+      "name": "Mogwai - Happy Songs for Happy People",
+      "count": 29,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 10,
+        "Nubis84": 19
+      }
+    },
+    {
+      "name": "Nine Inch Nails - Hesitation Marks",
+      "count": 27,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 13,
+        "sdecandelario": 14
+      }
+    },
+    {
+      "name": "Have a Nice Life - The Unnatural World",
+      "count": 26,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 18,
+        "sdecandelario": 8
+      }
+    },
+    {
+      "name": "Mogwai - Rave Tapes",
+      "count": 24,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 14,
+        "sdecandelario": 10
+      }
+    },
+    {
+      "name": "Nine Inch Nails - The Fragile",
+      "count": 19,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 16,
+        "sdecandelario": 3
+      }
+    }
+  ],
+  "genres": [
+    {
+      "name": "indie",
+      "count": 1806,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 1295,
+        "Nubis84": 180,
+        "sdecandelario": 331
+      },
+      "user_artists": {
+        "Frikomid": [
+          "M.I.A.",
+          "Peter Adams",
+          "The Black Keys",
+          "Phantogram",
+          "Wild Beasts",
+          "Lana Del Rey",
+          "Slowdive",
+          "The National",
+          "Mogwai",
+          "The Flaming Lips",
+          "Muse",
+          "Sigur Rós",
+          "Imagine Dragons",
+          "Phoenix",
+          "Placebo",
+          "Kaiser Chiefs",
+          "Saint Etienne",
+          "Interpol",
+          "The xx",
+          "Vetusta Morla",
+          "Tortoise",
+          "MØ",
+          "The Verve",
+          "Radiohead",
+          "The Antlers",
+          "Liars",
+          "Lorde",
+          "Your Friend",
+          "Wilco",
+          "Modest Mouse",
+          "The Strokes",
+          "The Horrors",
+          "Katie Stelmanis",
+          "Sun Kil Moon",
+          "Yeah Yeah Yeahs",
+          "The Microphones",
+          "Real Estate",
+          "Kate Nash",
+          "Uncle Tupelo",
+          "Vampire Weekend",
+          "I Break Horses",
+          "St. Vincent",
+          "Wild Belle",
+          "Mount Eerie",
+          "Templeton",
+          "Foster the People",
+          "Spiritualized",
+          "The Veils",
+          "Sia",
+          "Sufjan Stevens",
+          "The War on Drugs",
+          "The Magnetic Fields",
+          "Holden",
+          "Xiu Xiu",
+          "Junip"
+        ],
+        "Nubis84": [
+          "Jónsi",
+          "Slowdive",
+          "Mogwai",
+          "Joanna Newsom",
+          "PJ Harvey",
+          "Jeff Buckley",
+          "Tortoise",
+          "Palms",
+          "Radiohead",
+          "The Antlers",
+          "Jim O'Rourke",
+          "Matt Elliott",
+          "Mazzy Star",
+          "Red House Painters",
+          "Sun Kil Moon",
+          "Kristin Hersh",
+          "Mark Kozelek & Jimmy Lavalle",
+          "Nick Drake",
+          "Jeff Buckley & Gary Lucas",
+          "The War on Drugs",
+          "The Album Leaf"
+        ],
+        "sdecandelario": [
+          "Portugal. The Man",
+          "The Teenagers",
+          "White Lies",
+          "Maxïmo Park",
+          "The Dresden Dolls",
+          "Hot Chip",
+          "Tilly and the Wall",
+          "Mogwai",
+          "Sigur Rós",
+          "Pete and the Pirates",
+          "Ra Ra Riot",
+          "The Postal Service",
+          "Is Tropical",
+          "Interpol",
+          "Vetusta Morla",
+          "Triángulo de Amor Bizarro",
+          "LCD Soundsystem",
+          "Rocket from the Crypt",
+          "Swim Deep",
+          "Woodkid",
+          "Snow Patrol",
+          "Oasis",
+          "La Bien Querida",
+          "MGMT",
+          "Yeah Yeah Yeahs",
+          "Santigold",
+          "Jimmy Eat World",
+          "Kill Hannah",
+          "The Hives",
+          "Passion Pit",
+          "St. Vincent",
+          "Moonlit Sailor",
+          "Foster the People",
+          "The Fauns",
+          "The Kooks",
+          "The Jesus and Mary Chain",
+          "The Pigeon Detectives",
+          "Temples",
+          "Stars",
+          "Jeremy Jay",
+          "Gym Class Heroes",
+          "The War on Drugs",
+          "Suede",
+          "The Killers",
+          "Pixies"
+        ]
+      },
+      "top_artists": [
+        "Slowdive",
+        "Mogwai",
+        "Radiohead",
+        "Mount Eerie",
+        "The War on Drugs",
+        "Wild Beasts",
+        "Modest Mouse",
+        "The Horrors",
+        "The xx",
+        "Sigur Rós"
+      ],
+      "top_albums": [
+        "The War on Drugs - Lost in the Dream",
+        "Slowdive - Pygmalion",
+        "Mogwai - Mr. Beast",
+        "The Horrors - Skying",
+        "Wild Beasts - Present Tense",
+        "Sufjan Stevens - The Age of Adz",
+        "The xx - xx",
+        "St. Vincent - St. Vincent",
+        "The xx - Coexist",
+        "Saint Etienne - Words and Music by Saint Etienne"
+      ]
+    },
+    {
+      "name": "alternative",
+      "count": 1276,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 783,
+        "Nubis84": 136,
+        "sdecandelario": 357
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Kate Bush",
+          "Lana Del Rey",
+          "Kimbra",
+          "The National",
+          "Nine Inch Nails",
+          "Mogwai",
+          "The Flaming Lips",
+          "Muse",
+          "Sigur Rós",
+          "The Smashing Pumpkins",
+          "Imagine Dragons",
+          "Placebo",
+          "Rage Against the Machine",
+          "Kaiser Chiefs",
+          "Interpol",
+          "The Verve",
+          "Radiohead",
+          "Wilco",
+          "Modest Mouse",
+          "Porcelain Black",
+          "The Strokes",
+          "Yeah Yeah Yeahs",
+          "The Mars Volta",
+          "UNKLE",
+          "Moby",
+          "Vampire Weekend",
+          "Nick Cave & the Bad Seeds",
+          "St. Vincent",
+          "Foster the People",
+          "Spiritualized",
+          "The Veils",
+          "Sufjan Stevens",
+          "The Magnetic Fields",
+          "Junip"
+        ],
+        "Nubis84": [
+          "Jeff Buckley",
+          "Kate Bush",
+          "John Frusciante",
+          "Tool",
+          "Kristin Hersh",
+          "Tori Amos",
+          "Jeff Buckley & Gary Lucas",
+          "Mogwai",
+          "Radiohead",
+          "Mazzy Star",
+          "Patti Smith",
+          "PJ Harvey",
+          "Tom Waits",
+          "Nick Cave & the Bad Seeds"
+        ],
+        "sdecandelario": [
+          "White Lies",
+          "Maxïmo Park",
+          "The Dresden Dolls",
+          "Nine Inch Nails",
+          "Sum 41",
+          "Mogwai",
+          "The Distillers",
+          "Sigur Rós",
+          "Pete and the Pirates",
+          "Ra Ra Riot",
+          "The Smashing Pumpkins",
+          "Red Hot Chili Peppers",
+          "The Postal Service",
+          "Interpol",
+          "No Use for a Name",
+          "LCD Soundsystem",
+          "Hoobastank",
+          "IAMX",
+          "Three Days Grace",
+          "Woodkid",
+          "Snow Patrol",
+          "Oasis",
+          "Queens of the Stone Age",
+          "MGMT",
+          "Porcelain Black",
+          "Yeah Yeah Yeahs",
+          "Santigold",
+          "Jimmy Eat World",
+          "Mendetz",
+          "Kill Hannah",
+          "The Cure",
+          "Linkin Park",
+          "St. Vincent",
+          "Foster the People",
+          "The Kooks",
+          "Story of the Year",
+          "The Jesus and Mary Chain",
+          "The Pigeon Detectives",
+          "Stars",
+          "Porcelain and The Tramps",
+          "The Dirty Heads",
+          "Gym Class Heroes",
+          "The Offspring",
+          "The Velvet Underground",
+          "Suede",
+          "The Killers",
+          "Pixies",
+          "No Doubt",
+          "System of a Down"
+        ]
+      },
+      "top_artists": [
+        "Mogwai",
+        "Radiohead",
+        "Moby",
+        "Modest Mouse",
+        "Nine Inch Nails",
+        "Sigur Rós",
+        "Tool",
+        "Sufjan Stevens",
+        "Foster the People",
+        "The Flaming Lips"
+      ],
+      "top_albums": [
+        "Mogwai - Mr. Beast",
+        "Sufjan Stevens - The Age of Adz",
+        "St. Vincent - St. Vincent",
+        "Sigur Rós - Ágætis byrjun",
+        "Radiohead - Hail to the Thief",
+        "Mogwai - Happy Songs for Happy People",
+        "The Smashing Pumpkins - Mellon Collie and the Infinite Sadness",
+        "Moby - Destroyed",
+        "Nine Inch Nails - Hesitation Marks",
+        "Modest Mouse - Good News For People Who Love Bad News"
+      ]
+    },
+    {
+      "name": "electronic",
+      "count": 1113,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 805,
+        "Nubis84": 79,
+        "sdecandelario": 229
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Morcheeba",
+          "M.I.A.",
+          "Inventions",
+          "Phantogram",
+          "Nine Inch Nails",
+          "Metronomy",
+          "Röyksopp",
+          "Yelle",
+          "Phoenix",
+          "Massive Attack",
+          "Saint Etienne",
+          "The xx",
+          "Kylie Minogue",
+          "Radiohead",
+          "Mike Oldfield",
+          "Trust",
+          "Lorde",
+          "Marnie",
+          "Robyn",
+          "Portishead",
+          "Pastora",
+          "Porcelain Black",
+          "Skeewiff",
+          "Madonna",
+          "Vive La Fête",
+          "Ladytron",
+          "Jungle",
+          "Tycho",
+          "Tim Hecker",
+          "The Caretaker",
+          "UNKLE",
+          "Moby",
+          "I Break Horses",
+          "Najwa",
+          "Velvet Acid Christ",
+          "Pendulum",
+          "Sophie Ellis-Bextor",
+          "Holden",
+          "The Knife",
+          "Lykke Li",
+          "Zeigeist",
+          "Xiu Xiu"
+        ],
+        "Nubis84": [
+          "The Album Leaf",
+          "The American Dollar",
+          "Keith Fullerton Whitman",
+          "William Basinski",
+          "Enno Velthuys",
+          "Portishead",
+          "Palms",
+          "Mark Kozelek & Jimmy Lavalle",
+          "Lustmord",
+          "Radiohead",
+          "Svarte Greiner",
+          "Harold Budd/Brian Eno",
+          "Robert Rich & B. Lustmord",
+          "Trent Reznor and Atticus Ross",
+          "Hammock"
+        ],
+        "sdecandelario": [
+          "The Teenagers",
+          "Hot Chip",
+          "Nine Inch Nails",
+          "Metronomy",
+          "Röyksopp",
+          "Goodbye Horses",
+          "The Prodigy",
+          "Seven Lions",
+          "Hercules and Love Affair",
+          "The Postal Service",
+          "VNV Nation",
+          "Is Tropical",
+          "The Death Set",
+          "Solitary Experiments",
+          "LCD Soundsystem",
+          "Vitalic",
+          "Robert Miles",
+          "Martin Solveig",
+          "IAMX",
+          "Orbital",
+          "MGMT",
+          "Porcelain Black",
+          "Neon Lights",
+          "Santigold",
+          "Rex the Dog",
+          "Mendetz",
+          "Kavinsky",
+          "KMFDM",
+          "Todd Terje",
+          "Passion Pit",
+          "Igorrr",
+          "Moderat",
+          "Mondkopf",
+          "Ulver",
+          "Pendulum",
+          "Pet Shop Boys",
+          "Porcelain and The Tramps",
+          "The Chemical Brothers",
+          "The Magician",
+          "Lykke Li",
+          "Simian Mobile Disco"
+        ]
+      },
+      "top_artists": [
+        "Radiohead",
+        "Moby",
+        "Röyksopp",
+        "The Knife",
+        "The xx",
+        "Nine Inch Nails",
+        "Mike Oldfield",
+        "Portishead",
+        "VNV Nation",
+        "Saint Etienne"
+      ],
+      "top_albums": [
+        "The xx - xx",
+        "The xx - Coexist",
+        "Saint Etienne - Words and Music by Saint Etienne",
+        "Röyksopp - Junior",
+        "Sophie Ellis-Bextor - Wanderlust",
+        "Radiohead - Hail to the Thief",
+        "The Knife - Silent Shout",
+        "Moby - Destroyed",
+        "Nine Inch Nails - Hesitation Marks",
+        "Portishead - Third"
+      ]
+    },
+    {
+      "name": "rock",
+      "count": 1045,
+      "users": [
+        "paqueradejere",
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 466,
+        "Nubis84": 200,
+        "paqueradejere": 1,
+        "sdecandelario": 378
+      },
+      "user_artists": {
+        "Frikomid": [
+          "The Animals",
+          "Peter Adams",
+          "The Black Keys",
+          "The National",
+          "Nine Inch Nails",
+          "King Crimson",
+          "The Flaming Lips",
+          "Muse",
+          "The Smashing Pumpkins",
+          "Imagine Dragons",
+          "Phoenix",
+          "Placebo",
+          "Rage Against the Machine",
+          "Kaiser Chiefs",
+          "Pink Floyd",
+          "Interpol",
+          "Robbie Williams",
+          "The Verve",
+          "Turbonegro",
+          "Radiohead",
+          "Wilco",
+          "Modest Mouse",
+          "Porcelain Black",
+          "The Strokes",
+          "Slash",
+          "Yeah Yeah Yeahs",
+          "The Mars Volta",
+          "Vampire Weekend",
+          "Nick Cave & the Bad Seeds",
+          "The Veils",
+          "The War on Drugs"
+        ],
+        "Nubis84": [
+          "John Frusciante",
+          "Leonard Cohen",
+          "Tool",
+          "Neil Young",
+          "PJ Harvey",
+          "Jeff Buckley",
+          "Tim Buckley",
+          "Radiohead",
+          "Harry Nilsson",
+          "Tom Waits",
+          "Van der Graaf Generator",
+          "Simon & Garfunkel",
+          "Johnny Cash",
+          "Patti Smith",
+          "Nick Cave & the Bad Seeds",
+          "Love",
+          "Tori Amos",
+          "Jeff Buckley & Gary Lucas",
+          "Mark Knopfler",
+          "The War on Drugs"
+        ],
+        "paqueradejere": [
+          "Rosendo"
+        ],
+        "sdecandelario": [
+          "Portugal. The Man",
+          "Maxïmo Park",
+          "Nine Inch Nails",
+          "Sum 41",
+          "Kansas",
+          "The Distillers",
+          "Red Hot Chili Peppers",
+          "The Smashing Pumpkins",
+          "NOFX",
+          "Interpol",
+          "No Use for a Name",
+          "Tame Impala",
+          "Loquillo",
+          "Skid Row",
+          "Peter Pan Speedrock",
+          "Triana",
+          "Led Zeppelin",
+          "UFO",
+          "Hoobastank",
+          "Rocket from the Crypt",
+          "Rollins Band",
+          "Three Days Grace",
+          "Rise Against",
+          "Surf Punks",
+          "Snow Patrol",
+          "Pennywise",
+          "Rainbow",
+          "Thin Lizzy",
+          "Oasis",
+          "Marea",
+          "Queens of the Stone Age",
+          "Tsunami Bomb",
+          "Scorpions",
+          "Porcelain Black",
+          "Iron Maiden",
+          "Motörhead",
+          "Yeah Yeah Yeahs",
+          "Slipknot",
+          "Zenttric",
+          "Queen",
+          "Jimmy Eat World",
+          "Kiss",
+          "OOMPH!",
+          "Lagwagon",
+          "Kill Hannah",
+          "The Cure",
+          "House of Pain",
+          "Mojinos Escozíos",
+          "Ozzy Osbourne",
+          "The Hives",
+          "Tequila",
+          "Rob Zombie",
+          "Linkin Park",
+          "System of a Down",
+          "Whitesnake",
+          "The Jesus and Mary Chain",
+          "Story of the Year",
+          "Imperial State Electric",
+          "Porcelain and The Tramps",
+          "The Dirty Heads",
+          "The War on Drugs",
+          "Twisted Sister",
+          "Danzig",
+          "Reincidentes",
+          "The Velvet Underground",
+          "The Offspring",
+          "Suede",
+          "The Killers",
+          "Pixies",
+          "No Doubt",
+          "Molly Hatchet"
+        ]
+      },
+      "top_artists": [
+        "Radiohead",
+        "The War on Drugs",
+        "Modest Mouse",
+        "Nine Inch Nails",
+        "Tool",
+        "The Flaming Lips",
+        "Wilco",
+        "Placebo",
+        "The Smashing Pumpkins",
+        "Interpol"
+      ],
+      "top_albums": [
+        "The War on Drugs - Lost in the Dream",
+        "Radiohead - Hail to the Thief",
+        "The Smashing Pumpkins - Mellon Collie and the Infinite Sadness",
+        "Nine Inch Nails - Hesitation Marks",
+        "Modest Mouse - Good News For People Who Love Bad News",
+        "The Flaming Lips - Embryonic",
+        "Tool - Undertow",
+        "Nine Inch Nails - The Fragile",
+        "Wilco - Sky Blue Sky",
+        "Radiohead - OK Computer (Collector's Edition)"
+      ]
+    },
+    {
+      "name": "indie rock",
+      "count": 867,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 602,
+        "Nubis84": 89,
+        "sdecandelario": 176
+      },
+      "user_artists": {
+        "Frikomid": [
+          "The Black Keys",
+          "Wild Beasts",
+          "Slowdive",
+          "The National",
+          "The Flaming Lips",
+          "Imagine Dragons",
+          "Kaiser Chiefs",
+          "Interpol",
+          "Vetusta Morla",
+          "The Antlers",
+          "Liars",
+          "Wilco",
+          "Modest Mouse",
+          "The Strokes",
+          "Katie Stelmanis",
+          "The Microphones",
+          "Sun Kil Moon",
+          "Yeah Yeah Yeahs",
+          "Real Estate",
+          "Vampire Weekend",
+          "Foster the People",
+          "The Veils",
+          "Sufjan Stevens",
+          "The War on Drugs",
+          "The Magnetic Fields",
+          "Xiu Xiu"
+        ],
+        "Nubis84": [
+          "Sun Kil Moon",
+          "Slowdive",
+          "The War on Drugs",
+          "The Antlers",
+          "Jim O'Rourke"
+        ],
+        "sdecandelario": [
+          "Portugal. The Man",
+          "White Lies",
+          "Maxïmo Park",
+          "Tilly and the Wall",
+          "Ra Ra Riot",
+          "Pete and the Pirates",
+          "Interpol",
+          "Vetusta Morla",
+          "Tame Impala",
+          "Triángulo de Amor Bizarro",
+          "Rocket from the Crypt",
+          "Swim Deep",
+          "Snow Patrol",
+          "Yeah Yeah Yeahs",
+          "Mendetz",
+          "Foster the People",
+          "The Kooks",
+          "Stars",
+          "The Pigeon Detectives",
+          "Temples",
+          "The War on Drugs",
+          "Trade Wind",
+          "The Killers",
+          "Pixies"
+        ]
+      },
+      "top_artists": [
+        "Slowdive",
+        "The War on Drugs",
+        "Wild Beasts",
+        "Modest Mouse",
+        "Sufjan Stevens",
+        "Foster the People",
+        "Vetusta Morla",
+        "The Flaming Lips",
+        "Wilco",
+        "Interpol"
+      ],
+      "top_albums": [
+        "The War on Drugs - Lost in the Dream",
+        "Slowdive - Pygmalion",
+        "Wild Beasts - Present Tense",
+        "Sufjan Stevens - The Age of Adz",
+        "Slowdive - I Saw The Sun Unreleased",
+        "Slowdive - Soulvaki",
+        "Modest Mouse - Good News For People Who Love Bad News",
+        "Wild Beasts - Smother",
+        "The Flaming Lips - Embryonic",
+        "Slowdive - Just for a Day"
+      ]
+    },
+    {
+      "name": "ambient",
+      "count": 674,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 474,
+        "Nubis84": 116,
+        "sdecandelario": 84
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Have a Nice Life",
+          "Inventions",
+          "Tim Hecker",
+          "Tycho",
+          "Slowdive",
+          "The Caretaker",
+          "Mike Oldfield",
+          "Röyksopp",
+          "Nils Frahm",
+          "Moby",
+          "Sigur Rós",
+          "Your Friend",
+          "Johnny Hollow"
+        ],
+        "Nubis84": [
+          "The American Dollar",
+          "Jónsi",
+          "Slowdive",
+          "Sleep Research Facility",
+          "Infinite Body",
+          "Gareth Davis & Steven R. Smith",
+          "The Ascent Of Everest",
+          "Robert Rich & B. Lustmord",
+          "Ludovico Einaudi",
+          "Alio Die & Amelia Cuni",
+          "Keith Fullerton Whitman",
+          "Enno Velthuys",
+          "Yellow Swans",
+          "Svarte Greiner",
+          "Harold Budd/Brian Eno",
+          "Hammock",
+          "Memories of Machines",
+          "William Basinski",
+          "Lustmord",
+          "Trent Reznor and Atticus Ross",
+          "Jefre Cantu-Ledesma",
+          "The Album Leaf"
+        ],
+        "sdecandelario": [
+          "Musk Ox",
+          "Mondkopf",
+          "Have a Nice Life",
+          "Moonlit Sailor",
+          "Ulver",
+          "Robert Miles",
+          "Havnatt",
+          "Syven",
+          "Tenhi",
+          "Nest",
+          "Röyksopp",
+          "Nhor",
+          "Moëvöt",
+          "Sigur Rós",
+          "Orbital",
+          "Moon Duo"
+        ]
+      },
+      "top_artists": [
+        "Slowdive",
+        "Moby",
+        "Röyksopp",
+        "Sigur Rós",
+        "Mike Oldfield",
+        "Have a Nice Life",
+        "Orbital",
+        "Ludovico Einaudi",
+        "Robert Rich & B. Lustmord",
+        "Sleep Research Facility"
+      ],
+      "top_albums": [
+        "Slowdive - Pygmalion",
+        "Röyksopp - Junior",
+        "Slowdive - I Saw The Sun Unreleased",
+        "Sigur Rós - Ágætis byrjun",
+        "Slowdive - Soulvaki",
+        "Moby - Destroyed",
+        "Have a Nice Life - The Unnatural World",
+        "Sigur Rós - Kveikur",
+        "Moby - Wait for Me",
+        "Mike Oldfield - Man On The Rocks (Deluxe Edition)"
+      ]
+    },
+    {
+      "name": "metal",
+      "count": 557,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 12,
+        "Nubis84": 58,
+        "sdecandelario": 487
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Passenger"
+        ],
+        "Nubis84": [
+          "Tool",
+          "Pain of Salvation"
+        ],
+        "sdecandelario": [
+          "Metal Inquisitor",
+          "Mors Principium Est",
+          "Haste The Day",
+          "Tygers of Pan Tang",
+          "Saxon",
+          "Parkway Drive",
+          "Mayhem",
+          "Opeth",
+          "Virgin Steele",
+          "Iron Maiden",
+          "Iron Savior",
+          "Insomnium",
+          "Manowar",
+          "Impellitteri",
+          "Korpiklaani",
+          "Danzig",
+          "Ozzy Osbourne",
+          "Judas Priest",
+          "Haken",
+          "Rollins Band",
+          "Rise to Remain",
+          "Speedealer",
+          "Rainbow",
+          "Overkill",
+          "Onslaught",
+          "Motörhead",
+          "Slipknot",
+          "OOMPH!",
+          "LUJURIA",
+          "Rob Zombie",
+          "High on Fire",
+          "Lamb of God",
+          "The Ghost Inside",
+          "Raven",
+          "The Agonist",
+          "White Wizzard",
+          "The Unguided",
+          "System of a Down",
+          "U.D.O.",
+          "Napalm Death",
+          "Vanden Plas",
+          "The Black Dahlia Murder",
+          "Tokyo Blade",
+          "Savatage",
+          "Summoning",
+          "Trivium",
+          "Straight Line Stitch",
+          "Steel Panther",
+          "Saratoga",
+          "Masterplan",
+          "Slayer",
+          "Soilwork",
+          "Hatebreed",
+          "Sonic Syndicate",
+          "Queensrÿche",
+          "Vita Imana",
+          "Quo Vadis",
+          "Wolf",
+          "Ángeles del Infierno",
+          "Primal Fear",
+          "HammerFall",
+          "Skiltron",
+          "Running Wild",
+          "Kreator",
+          "The Dillinger Escape Plan",
+          "Manilla Road",
+          "Three Days Grace",
+          "Warcry",
+          "Sodom",
+          "Terror",
+          "Tierra Santa",
+          "Linkin Park",
+          "Spineshank",
+          "ReVamp",
+          "Powerwolf",
+          "Moonspell",
+          "Helloween"
+        ]
+      },
+      "top_artists": [
+        "Tool",
+        "Warcry",
+        "Soilwork",
+        "LUJURIA",
+        "Impellitteri",
+        "Insomnium",
+        "Terror",
+        "Hatebreed",
+        "Napalm Death",
+        "Motörhead"
+      ],
+      "top_albums": [
+        "Tool - Undertow",
+        "Hatebreed - Perseverance",
+        "Napalm Death - Utilitarian",
+        "Tool - Ænima",
+        "Terror - Forever Crossing the Line",
+        "Tool - The Holy Gift",
+        "Motörhead - Aftershock",
+        "LUJURIA - República Popular del coito",
+        "Passenger - All the Little Lights",
+        "Rob Zombie - Venomous Rat Regeneration Vendor [Edited]"
+      ]
+    },
+    {
+      "name": "experimental",
+      "count": 540,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 342,
+        "Nubis84": 108,
+        "sdecandelario": 90
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Have a Nice Life",
+          "Inventions",
+          "Phantogram",
+          "Wild Beasts",
+          "King Crimson",
+          "Metronomy",
+          "Tortoise",
+          "Liars",
+          "Katie Stelmanis",
+          "The KVB",
+          "Tim Hecker",
+          "The Microphones",
+          "Susanne Sundfør",
+          "The Caretaker",
+          "The Mars Volta",
+          "Swans",
+          "Johnny Hollow",
+          "Mount Eerie",
+          "Red Sparowes",
+          "Xiu Xiu"
+        ],
+        "Nubis84": [
+          "John Frusciante",
+          "The American Dollar",
+          "Jónsi",
+          "Infinite Body",
+          "Gareth Davis & Steven R. Smith",
+          "The Ascent Of Everest",
+          "Robert Rich & B. Lustmord",
+          "Tortoise",
+          "Keith Fullerton Whitman",
+          "Enno Velthuys",
+          "Palms",
+          "Morton Feldman",
+          "Yellow Swans",
+          "Svarte Greiner",
+          "Jim O'Rourke",
+          "Tom Waits",
+          "Matt Elliott",
+          "Hala Strana",
+          "William Basinski",
+          "Lustmord",
+          "Steven R. Smith",
+          "Mani Deum",
+          "Jefre Cantu-Ledesma"
+        ],
+        "sdecandelario": [
+          "Portugal. The Man",
+          "Terra Tenebrosa",
+          "Mondkopf",
+          "Igorrr",
+          "Have a Nice Life",
+          "Orplid",
+          "Ulver",
+          "Melt-Banana",
+          "Metronomy",
+          "Protest the Hero",
+          "Swans",
+          "The Body",
+          "The Dillinger Escape Plan"
+        ]
+      },
+      "top_artists": [
+        "Mount Eerie",
+        "Wild Beasts",
+        "Have a Nice Life",
+        "King Crimson",
+        "Steven R. Smith",
+        "Swans",
+        "Metronomy",
+        "Xiu Xiu",
+        "Robert Rich & B. Lustmord",
+        "Igorrr"
+      ],
+      "top_albums": [
+        "Wild Beasts - Present Tense",
+        "Mount Eerie - Wind's Poem",
+        "Mount Eerie - Song Islands vol. 2",
+        "Have a Nice Life - The Unnatural World",
+        "Wild Beasts - Smother",
+        "Mount Eerie - Clear Moon",
+        "Steven R. Smith - Cities",
+        "Have a Nice Life - Deathconsciousness",
+        "Mount Eerie - No Flashlight",
+        "Robert Rich & B. Lustmord - Stalker"
+      ]
+    },
+    {
+      "name": "female vocalists",
+      "count": 395,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 298,
+        "Nubis84": 40,
+        "sdecandelario": 57
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Morcheeba",
+          "Kate Bush",
+          "M.I.A.",
+          "Lana Del Rey",
+          "Kimbra",
+          "Yelle",
+          "Vanessa Amorosi",
+          "Saint Etienne",
+          "Ruth Lorenzo",
+          "Kylie Minogue",
+          "Laura Pausini",
+          "Marnie",
+          "Robyn",
+          "Portishead",
+          "Pastora",
+          "Madonna",
+          "Katie Stelmanis",
+          "Yeah Yeah Yeahs",
+          "Susanne Sundfør",
+          "Kate Nash",
+          "St. Vincent",
+          "Wild Belle",
+          "Najwa",
+          "Miley Cyrus",
+          "Idina Menzel",
+          "Rihanna",
+          "Sia",
+          "Sophie Ellis-Bextor",
+          "Holden",
+          "Nena Daconte",
+          "Lykke Li"
+        ],
+        "Nubis84": [
+          "Kate Bush",
+          "Tori Amos",
+          "Kristin Hersh",
+          "Patti Smith",
+          "Joni Mitchell",
+          "Joanna Newsom",
+          "PJ Harvey",
+          "Portishead",
+          "Mazzy Star"
+        ],
+        "sdecandelario": [
+          "St. Vincent",
+          "Tsunami Bomb",
+          "The Fauns",
+          "Yeah Yeah Yeahs",
+          "The Dresden Dolls",
+          "Santigold",
+          "Straight Line Stitch",
+          "Porcelain and The Tramps",
+          "Tilly and the Wall",
+          "The Agonist",
+          "The Distillers",
+          "Lykke Li",
+          "No Doubt"
+        ]
+      },
+      "top_artists": [
+        "Portishead",
+        "St. Vincent",
+        "Saint Etienne",
+        "Sophie Ellis-Bextor",
+        "Robyn",
+        "PJ Harvey",
+        "Holden",
+        "Yeah Yeah Yeahs",
+        "No Doubt",
+        "Susanne Sundfør"
+      ],
+      "top_albums": [
+        "St. Vincent - St. Vincent",
+        "Saint Etienne - Words and Music by Saint Etienne",
+        "Sophie Ellis-Bextor - Wanderlust",
+        "Portishead - Third",
+        "Holden - The Inheritors",
+        "Portishead - Portishead",
+        "Robyn - Body Talk",
+        "No Doubt - Tragic Kingdom",
+        "PJ Harvey - Stories From the City, Stories From the Sea",
+        "The Dresden Dolls - The Dresden Dolls"
+      ]
+    },
+    {
+      "name": "alternative rock",
+      "count": 388,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 294,
+        "Nubis84": 7,
+        "sdecandelario": 87
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Rage Against the Machine",
+          "The Strokes",
+          "The National",
+          "Radiohead",
+          "Placebo",
+          "The Flaming Lips",
+          "Muse",
+          "The Smashing Pumpkins",
+          "Modest Mouse",
+          "Nick Cave & the Bad Seeds"
+        ],
+        "Nubis84": [
+          "John Frusciante",
+          "Radiohead",
+          "Nick Cave & the Bad Seeds"
+        ],
+        "sdecandelario": [
+          "Red Hot Chili Peppers",
+          "Jimmy Eat World",
+          "Hoobastank",
+          "Kill Hannah",
+          "The Offspring",
+          "Three Days Grace",
+          "Linkin Park",
+          "Trade Wind",
+          "The Killers",
+          "Pixies",
+          "The Smashing Pumpkins",
+          "Queens of the Stone Age"
+        ]
+      },
+      "top_artists": [
+        "Radiohead",
+        "Modest Mouse",
+        "The Flaming Lips",
+        "Placebo",
+        "The Smashing Pumpkins",
+        "Muse",
+        "Nick Cave & the Bad Seeds",
+        "The Killers",
+        "Pixies",
+        "The Strokes"
+      ],
+      "top_albums": [
+        "Radiohead - Hail to the Thief",
+        "The Smashing Pumpkins - Mellon Collie and the Infinite Sadness",
+        "Modest Mouse - Good News For People Who Love Bad News",
+        "The Flaming Lips - Embryonic",
+        "Radiohead - OK Computer (Collector's Edition)",
+        "Modest Mouse - This Is a Long Drive for Someone with Nothing to Think About",
+        "Radiohead - Amnesiac",
+        "Placebo - Without You I'm Nothing",
+        "Modest Mouse - The Moon & Antarctica [Reissue]",
+        "The Killers - Battle Born"
+      ]
+    },
+    {
+      "name": "folk",
+      "count": 357,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 195,
+        "Nubis84": 138,
+        "sdecandelario": 24
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Mount Eerie",
+          "The Microphones",
+          "Peter Adams",
+          "Sun Kil Moon",
+          "Passenger",
+          "Sufjan Stevens",
+          "The War on Drugs",
+          "Junip"
+        ],
+        "Nubis84": [
+          "Nick Drake",
+          "Jeff Buckley",
+          "Leonard Cohen",
+          "Red House Painters",
+          "Hala Strana",
+          "Mark Kozelek & Desertshore",
+          "Sun Kil Moon",
+          "Tim Buckley",
+          "Steven R. Smith",
+          "Harry Nilsson",
+          "Simon & Garfunkel",
+          "The War on Drugs",
+          "Johnny Cash",
+          "Joanna Newsom",
+          "Joni Mitchell",
+          "Neil Young",
+          "Luar na Lubre",
+          "Matt Elliott"
+        ],
+        "sdecandelario": [
+          "Musk Ox",
+          "Les Discrets",
+          "Neun Welten",
+          "Havnatt",
+          "Lönndom",
+          "October Falls",
+          "Syven",
+          "Tenhi",
+          "Tilly and the Wall",
+          "The War on Drugs",
+          "Woodkid",
+          "Nebelung",
+          "Nest"
+        ]
+      },
+      "top_artists": [
+        "Mount Eerie",
+        "The War on Drugs",
+        "Sufjan Stevens",
+        "Steven R. Smith",
+        "Jeff Buckley",
+        "Passenger",
+        "Sun Kil Moon",
+        "The Microphones",
+        "Tim Buckley",
+        "Johnny Cash"
+      ],
+      "top_albums": [
+        "The War on Drugs - Lost in the Dream",
+        "Sufjan Stevens - The Age of Adz",
+        "Mount Eerie - Wind's Poem",
+        "Mount Eerie - Song Islands vol. 2",
+        "Sufjan Stevens - Michigan",
+        "Mount Eerie - Clear Moon",
+        "Steven R. Smith - Cities",
+        "Mount Eerie - No Flashlight",
+        "Jeff Buckley - Grace",
+        "Passenger - All the Little Lights"
+      ]
+    },
+    {
+      "name": "british",
+      "count": 350,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 255,
+        "sdecandelario": 95
+      },
+      "user_artists": {
+        "Frikomid": [
+          "The Animals",
+          "Robbie Williams",
+          "The Horrors",
+          "The xx",
+          "Wild Beasts",
+          "The Verve",
+          "Kate Nash",
+          "Sophie Ellis-Bextor"
+        ],
+        "sdecandelario": [
+          "White Lies",
+          "Maxïmo Park",
+          "Is Tropical",
+          "Onslaught",
+          "The Kooks",
+          "Spandau Ballet",
+          "The Pigeon Detectives",
+          "Swim Deep",
+          "Suede",
+          "Pete and the Pirates",
+          "Oasis",
+          "Haken"
+        ]
+      },
+      "top_artists": [
+        "Wild Beasts",
+        "The Horrors",
+        "The xx",
+        "Sophie Ellis-Bextor",
+        "White Lies",
+        "The Pigeon Detectives",
+        "Oasis",
+        "Maxïmo Park",
+        "Suede",
+        "Onslaught"
+      ],
+      "top_albums": [
+        "The Horrors - Skying",
+        "Wild Beasts - Present Tense",
+        "The xx - xx",
+        "The xx - Coexist",
+        "Sophie Ellis-Bextor - Wanderlust",
+        "Wild Beasts - Smother",
+        "The Horrors - I See You",
+        "The Pigeon Detectives - Emergency",
+        "Oasis - (What's The Story) Morning Glory",
+        "Suede - Suede"
+      ]
+    },
+    {
+      "name": "electronica",
+      "count": 327,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 250,
+        "sdecandelario": 77
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Massive Attack",
+          "Ladytron",
+          "Pendulum",
+          "Röyksopp",
+          "UNKLE",
+          "Moby",
+          "The Knife"
+        ],
+        "sdecandelario": [
+          "Hercules and Love Affair",
+          "The Postal Service",
+          "LCD Soundsystem",
+          "Vitalic",
+          "Hot Chip",
+          "Pendulum",
+          "Röyksopp",
+          "The Chemical Brothers",
+          "The Prodigy",
+          "Orbital",
+          "Simian Mobile Disco"
+        ]
+      },
+      "top_artists": [
+        "Moby",
+        "Röyksopp",
+        "The Knife",
+        "Orbital",
+        "Hot Chip",
+        "Ladytron",
+        "Pendulum",
+        "Hercules and Love Affair",
+        "Vitalic",
+        "Massive Attack"
+      ],
+      "top_albums": [
+        "Röyksopp - Junior",
+        "The Knife - Silent Shout",
+        "Moby - Destroyed",
+        "The Knife - Deep Cuts",
+        "Moby - Wait for Me",
+        "Orbital - Orbital 20",
+        "The Knife - Tomorrow, in a Year",
+        "Röyksopp - Senior",
+        "Röyksopp - The Understanding",
+        "Hot Chip - Made in the Dark"
+      ]
+    },
+    {
+      "name": "post-rock",
+      "count": 325,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 223,
+        "Nubis84": 61,
+        "sdecandelario": 41
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Have a Nice Life",
+          "Tortoise",
+          "Inventions",
+          "Red Sparowes",
+          "Mogwai",
+          "Sigur Rós",
+          "Xiu Xiu"
+        ],
+        "Nubis84": [
+          "Talk Talk",
+          "Tortoise",
+          "The American Dollar",
+          "Palms",
+          "Mogwai",
+          "Anon, They Move...",
+          "The Ascent Of Everest",
+          "Jim O'Rourke",
+          "The Album Leaf",
+          "Hammock"
+        ],
+        "sdecandelario": [
+          "Have a Nice Life",
+          "Les Discrets",
+          "Moonlit Sailor",
+          "The Fauns",
+          "Mogwai",
+          "Sigur Rós"
+        ]
+      },
+      "top_artists": [
+        "Mogwai",
+        "Sigur Rós",
+        "Have a Nice Life",
+        "Xiu Xiu",
+        "Palms",
+        "Moonlit Sailor",
+        "The American Dollar",
+        "Inventions",
+        "The Album Leaf",
+        "Talk Talk"
+      ],
+      "top_albums": [
+        "Mogwai - Mr. Beast",
+        "Sigur Rós - Ágætis byrjun",
+        "Mogwai - Happy Songs for Happy People",
+        "Have a Nice Life - The Unnatural World",
+        "Sigur Rós - Kveikur",
+        "Mogwai - Rave Tapes",
+        "Mogwai - Les Revenants Soundtrack",
+        "Mogwai - Hardcore Will Never Die, But You Will",
+        "Have a Nice Life - Deathconsciousness",
+        "Xiu Xiu - Always"
+      ]
+    },
+    {
+      "name": "instrumental",
+      "count": 314,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 232,
+        "Nubis84": 60,
+        "sdecandelario": 22
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Tortoise",
+          "Yann Tiersen",
+          "Inventions",
+          "Red Sparowes",
+          "Mogwai",
+          "The Caretaker",
+          "Mike Oldfield",
+          "Nils Frahm",
+          "Pascal Comelade"
+        ],
+        "Nubis84": [
+          "Ludovico Einaudi",
+          "Tortoise",
+          "The American Dollar",
+          "Mogwai",
+          "Anon, They Move...",
+          "The Ascent Of Everest",
+          "The Album Leaf",
+          "Hammock"
+        ],
+        "sdecandelario": [
+          "Mogwai",
+          "Vali",
+          "Moonlit Sailor"
+        ]
+      },
+      "top_artists": [
+        "Mogwai",
+        "Mike Oldfield",
+        "Yann Tiersen",
+        "Ludovico Einaudi",
+        "Moonlit Sailor",
+        "The American Dollar",
+        "Inventions",
+        "The Album Leaf",
+        "The Ascent Of Everest",
+        "Tortoise"
+      ],
+      "top_albums": [
+        "Mogwai - Mr. Beast",
+        "Mogwai - Happy Songs for Happy People",
+        "Yann Tiersen - Cascade Street",
+        "Mogwai - Rave Tapes",
+        "Mike Oldfield - Man On The Rocks (Deluxe Edition)",
+        "Mogwai - Les Revenants Soundtrack",
+        "Mogwai - Hardcore Will Never Die, But You Will",
+        "Mike Oldfield - Crises",
+        "Moonlit Sailor - We Come From Exploding Stars",
+        "Yann Tiersen - A Midsummer Evening"
+      ]
+    },
+    {
+      "name": "indie pop",
+      "count": 277,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 217,
+        "sdecandelario": 60
+      },
+      "user_artists": {
+        "Frikomid": [
+          "St. Vincent",
+          "Wild Belle",
+          "Templeton",
+          "Saint Etienne",
+          "Peter Adams",
+          "Foster the People",
+          "Wild Beasts",
+          "Lana Del Rey",
+          "Kimbra",
+          "Phoenix",
+          "MØ",
+          "Kate Nash",
+          "The Magnetic Fields",
+          "Vampire Weekend",
+          "I Break Horses",
+          "Lorde",
+          "Lykke Li",
+          "Imagine Dragons"
+        ],
+        "sdecandelario": [
+          "Passion Pit",
+          "St. Vincent",
+          "The Postal Service",
+          "La Bien Querida",
+          "Lykke Li",
+          "MGMT",
+          "Foster the People",
+          "Zenttric",
+          "Stars",
+          "Tilly and the Wall",
+          "Jeremy Jay",
+          "Ra Ra Riot",
+          "Pete and the Pirates",
+          "Papa Topo"
+        ]
+      },
+      "top_artists": [
+        "Wild Beasts",
+        "Foster the People",
+        "St. Vincent",
+        "Saint Etienne",
+        "MØ",
+        "Lykke Li",
+        "La Bien Querida",
+        "Ra Ra Riot",
+        "Jeremy Jay",
+        "I Break Horses"
+      ],
+      "top_albums": [
+        "Wild Beasts - Present Tense",
+        "St. Vincent - St. Vincent",
+        "Saint Etienne - Words and Music by Saint Etienne",
+        "Wild Beasts - Smother",
+        "Foster the People - Supermodel",
+        "MØ - No Mythologies to Follow (Deluxe)",
+        "Foster the People - Torches",
+        "La Bien Querida - Ceremonia",
+        "Ra Ra Riot - Beta Love",
+        "Jeremy Jay - Abandoned Apartments"
+      ]
+    },
+    {
+      "name": "post-punk",
+      "count": 256,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 173,
+        "Nubis84": 5,
+        "sdecandelario": 78
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Interpol",
+          "The xx",
+          "The Horrors",
+          "The KVB",
+          "Liars",
+          "Swans",
+          "Nick Cave & the Bad Seeds"
+        ],
+        "Nubis84": [
+          "Nick Cave & the Bad Seeds"
+        ],
+        "sdecandelario": [
+          "White Lies",
+          "Interpol",
+          "The Jesus and Mary Chain",
+          "Les Discrets",
+          "Neon Lights",
+          "The Cure",
+          "Swans",
+          "Self Defense Family"
+        ]
+      },
+      "top_artists": [
+        "The Horrors",
+        "The xx",
+        "Interpol",
+        "White Lies",
+        "Nick Cave & the Bad Seeds",
+        "Swans",
+        "The Jesus and Mary Chain",
+        "Neon Lights",
+        "Self Defense Family",
+        "Liars"
+      ],
+      "top_albums": [
+        "The Horrors - Skying",
+        "The xx - xx",
+        "The xx - Coexist",
+        "The Horrors - I See You",
+        "Nick Cave & the Bad Seeds - Push the Sky Away",
+        "The Horrors - Luminous",
+        "White Lies - To Lose My Life",
+        "The Jesus and Mary Chain - Darklands",
+        "Swans - Children of God",
+        "Neon Lights - LATE"
+      ]
+    },
+    {
+      "name": "chillout",
+      "count": 237,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 228,
+        "Nubis84": 2,
+        "sdecandelario": 7
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Morcheeba",
+          "Massive Attack",
+          "Tycho",
+          "Sia",
+          "Röyksopp",
+          "Moby",
+          "Your Friend",
+          "Portishead"
+        ],
+        "Nubis84": [
+          "Portishead"
+        ],
+        "sdecandelario": [
+          "Robert Miles",
+          "Röyksopp"
+        ]
+      },
+      "top_artists": [
+        "Moby",
+        "Röyksopp",
+        "Portishead",
+        "Tycho",
+        "Sia",
+        "Massive Attack",
+        "Morcheeba",
+        "Your Friend",
+        "Robert Miles"
+      ],
+      "top_albums": [
+        "Röyksopp - Junior",
+        "Moby - Destroyed",
+        "Portishead - Third",
+        "Moby - Wait for Me",
+        "Portishead - Portishead",
+        "Röyksopp - Senior",
+        "Röyksopp - The Understanding",
+        "Moby - Innocents",
+        "Portishead - Dummy",
+        "Tycho - Awake"
+      ]
+    },
+    {
+      "name": "shoegaze",
+      "count": 229,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 196,
+        "Nubis84": 8,
+        "sdecandelario": 25
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Have a Nice Life",
+          "Slowdrive",
+          "The KVB",
+          "Spiritualized",
+          "Slowdive",
+          "I Break Horses"
+        ],
+        "Nubis84": [
+          "Slowdive",
+          "Hammock",
+          "Mazzy Star"
+        ],
+        "sdecandelario": [
+          "Have a Nice Life",
+          "Les Discrets",
+          "The Jesus and Mary Chain",
+          "The Fauns",
+          "Triángulo de Amor Bizarro",
+          "Heretoir",
+          "Heaven's Gate"
+        ]
+      },
+      "top_artists": [
+        "Slowdive",
+        "Have a Nice Life",
+        "The Jesus and Mary Chain",
+        "Spiritualized",
+        "I Break Horses",
+        "Mazzy Star",
+        "The KVB",
+        "Heaven's Gate",
+        "Les Discrets",
+        "Slowdrive"
+      ],
+      "top_albums": [
+        "Slowdive - Pygmalion",
+        "Slowdive - I Saw The Sun Unreleased",
+        "Slowdive - Soulvaki",
+        "Have a Nice Life - The Unnatural World",
+        "Slowdive - Just for a Day",
+        "Have a Nice Life - Deathconsciousness",
+        "The Jesus and Mary Chain - Darklands",
+        "Spiritualized - Lazer Guided Melodies",
+        "Slowdive - Souvlaki",
+        "Have a Nice Life - Time of Land"
+      ]
+    },
+    {
+      "name": "singer-songwriter",
+      "count": 228,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 115,
+        "Nubis84": 102,
+        "sdecandelario": 11
+      },
+      "user_artists": {
+        "Frikomid": [
+          "St. Vincent",
+          "Kate Bush",
+          "Sun Kil Moon",
+          "Sufjan Stevens",
+          "Susanne Sundfør",
+          "Kate Nash",
+          "The Antlers",
+          "Nena Daconte",
+          "Nick Cave & the Bad Seeds"
+        ],
+        "Nubis84": [
+          "John Frusciante",
+          "Kate Bush",
+          "Leonard Cohen",
+          "Joanna Newsom",
+          "Neil Young",
+          "PJ Harvey",
+          "Jeff Buckley",
+          "Mark Kozelek & Desertshore",
+          "Tim Buckley",
+          "Ismael Serrano",
+          "The Antlers",
+          "Harry Nilsson",
+          "Tom Waits",
+          "Matt Elliott",
+          "Red House Painters",
+          "Sun Kil Moon",
+          "Kristin Hersh",
+          "Mark Kozelek & Jimmy Lavalle",
+          "Simon & Garfunkel",
+          "Johnny Cash",
+          "Joni Mitchell",
+          "Patti Smith",
+          "Nick Cave & the Bad Seeds",
+          "Nick Drake",
+          "Tori Amos",
+          "Jeff Buckley & Gary Lucas",
+          "Mark Knopfler"
+        ],
+        "sdecandelario": [
+          "St. Vincent"
+        ]
+      },
+      "top_artists": [
+        "Sufjan Stevens",
+        "St. Vincent",
+        "PJ Harvey",
+        "The Antlers",
+        "Nick Cave & the Bad Seeds",
+        "Jeff Buckley",
+        "Susanne Sundfør",
+        "Sun Kil Moon",
+        "Tim Buckley",
+        "Kate Bush"
+      ],
+      "top_albums": [
+        "Sufjan Stevens - The Age of Adz",
+        "St. Vincent - St. Vincent",
+        "Sufjan Stevens - Michigan",
+        "Jeff Buckley - Grace",
+        "The Antlers - Hospice",
+        "PJ Harvey - Stories From the City, Stories From the Sea",
+        "Nick Cave & the Bad Seeds - Push the Sky Away",
+        "Susanne Sundfør - The Brothel",
+        "PJ Harvey - Is This Desire?",
+        "PJ Harvey - To Bring You My Love"
+      ]
+    },
+    {
+      "name": "pop",
+      "count": 227,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 167,
+        "Nubis84": 20,
+        "sdecandelario": 40
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Kate Bush",
+          "Lana Del Rey",
+          "Pharrell Williams",
+          "Vanessa Amorosi",
+          "Saint Etienne",
+          "Robbie Williams",
+          "MØ",
+          "Ruth Lorenzo",
+          "Kylie Minogue",
+          "Laura Pausini",
+          "Lorde",
+          "Robyn",
+          "Pastora",
+          "Porcelain Black",
+          "Madonna",
+          "Miley Cyrus",
+          "Tune Robbers",
+          "Время И Стекло",
+          "Idina Menzel",
+          "Rihanna",
+          "Sophie Ellis-Bextor",
+          "Motown",
+          "Nena Daconte",
+          "Lykke Li"
+        ],
+        "Nubis84": [
+          "Harry Nilsson",
+          "Kate Bush",
+          "Nino Bravo",
+          "Talk Talk"
+        ],
+        "sdecandelario": [
+          "Passion Pit",
+          "La Bien Querida",
+          "Porcelain Black",
+          "Spandau Ballet",
+          "Zenttric",
+          "Pet Shop Boys",
+          "Tank",
+          "Vali",
+          "Woodkid",
+          "Lykke Li",
+          "No Doubt",
+          "Pharrell Williams"
+        ]
+      },
+      "top_artists": [
+        "Saint Etienne",
+        "Sophie Ellis-Bextor",
+        "Robyn",
+        "MØ",
+        "No Doubt",
+        "Lykke Li",
+        "Nino Bravo",
+        "Madonna",
+        "La Bien Querida",
+        "Ruth Lorenzo"
+      ],
+      "top_albums": [
+        "Saint Etienne - Words and Music by Saint Etienne",
+        "Sophie Ellis-Bextor - Wanderlust",
+        "MØ - No Mythologies to Follow (Deluxe)",
+        "Robyn - Body Talk",
+        "No Doubt - Tragic Kingdom",
+        "Nino Bravo - En libertad (By La Casa Azul)",
+        "Madonna - MDNA",
+        "La Bien Querida - Ceremonia",
+        "Ruth Lorenzo - Dancing In The Rain",
+        "Robyn - Robyn"
+      ]
+    },
+    {
+      "name": "industrial",
+      "count": 224,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 63,
+        "Nubis84": 30,
+        "sdecandelario": 131
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Porcelain Black",
+          "Velvet Acid Christ",
+          "Nine Inch Nails",
+          "Swans",
+          "Johnny Hollow"
+        ],
+        "Nubis84": [
+          "Robert Rich & B. Lustmord",
+          "Trent Reznor and Atticus Ross",
+          "Lustmord"
+        ],
+        "sdecandelario": [
+          "Porcelain Black",
+          "VNV Nation",
+          "Solitary Experiments",
+          "Spineshank",
+          "Heimataerde",
+          "Rob Zombie",
+          "Nine Inch Nails",
+          "Porcelain and The Tramps",
+          "OOMPH!",
+          "KMFDM",
+          "The Prodigy",
+          "Swans",
+          "Nachtmahr"
+        ]
+      },
+      "top_artists": [
+        "Nine Inch Nails",
+        "VNV Nation",
+        "Nachtmahr",
+        "Swans",
+        "Robert Rich & B. Lustmord",
+        "Rob Zombie",
+        "Solitary Experiments",
+        "Lustmord",
+        "Heimataerde",
+        "Velvet Acid Christ"
+      ],
+      "top_albums": [
+        "Nine Inch Nails - Hesitation Marks",
+        "VNV Nation - Transnational",
+        "Nine Inch Nails - The Fragile",
+        "Robert Rich & B. Lustmord - Stalker",
+        "Rob Zombie - Venomous Rat Regeneration Vendor [Edited]",
+        "Solitary Experiments - Phenomena",
+        "Swans - Children of God",
+        "Nachtmahr - Semper Fidelis",
+        "Nine Inch Nails - Ghosts I-IV",
+        "Lustmord - Heresy"
+      ]
+    },
+    {
+      "name": "Progressive rock",
+      "count": 218,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 114,
+        "Nubis84": 68,
+        "sdecandelario": 36
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Templeton",
+          "Pink Floyd",
+          "Red Sparowes",
+          "King Crimson",
+          "Mike Oldfield",
+          "The Mars Volta",
+          "Muse"
+        ],
+        "Nubis84": [
+          "Tool",
+          "Pain of Salvation",
+          "Memories of Machines",
+          "Van der Graaf Generator"
+        ],
+        "sdecandelario": [
+          "Nucleus Torn",
+          "Vanden Plas",
+          "Led Zeppelin",
+          "Triana",
+          "UFO",
+          "Queensrÿche",
+          "Kansas",
+          "Trade Wind",
+          "Haken"
+        ]
+      },
+      "top_artists": [
+        "Mike Oldfield",
+        "Tool",
+        "King Crimson",
+        "Muse",
+        "Vanden Plas",
+        "Haken",
+        "Memories of Machines",
+        "The Mars Volta",
+        "Triana",
+        "Pink Floyd"
+      ],
+      "top_albums": [
+        "Mike Oldfield - Man On The Rocks (Deluxe Edition)",
+        "Tool - Undertow",
+        "Mike Oldfield - Crises",
+        "Tool - Ænima",
+        "Tool - The Holy Gift",
+        "Muse - Showbiz",
+        "Vanden Plas - Chronicles of the Immortals - Netherworld",
+        "Haken - The Mountain",
+        "King Crimson - In the Wake of Poseidon",
+        "Memories of Machines - Warm Winter"
+      ]
+    },
+    {
+      "name": "death metal",
+      "count": 202,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 1,
+        "sdecandelario": 201
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Kadavar"
+        ],
+        "sdecandelario": [
+          "Winds of Plague",
+          "Napalm Death",
+          "Quo Vadis",
+          "Hatebreed",
+          "Sonic Syndicate",
+          "Lamb of God",
+          "In Mourning",
+          "Mors Principium Est",
+          "Morbus Chron",
+          "The Black Dahlia Murder",
+          "Insomnium",
+          "Opeth",
+          "Heaven Shall Burn",
+          "Rise to Remain",
+          "Icestorm",
+          "Soilwork"
+        ]
+      },
+      "top_artists": [
+        "Heaven Shall Burn",
+        "Soilwork",
+        "Insomnium",
+        "Hatebreed",
+        "Napalm Death",
+        "The Black Dahlia Murder",
+        "Rise to Remain",
+        "In Mourning",
+        "Opeth",
+        "Morbus Chron"
+      ],
+      "top_albums": [
+        "Hatebreed - Perseverance",
+        "Napalm Death - Utilitarian",
+        "Heaven Shall Burn - Antigone",
+        "Heaven Shall Burn - Whatever It May Take",
+        "The Black Dahlia Murder - Ritual",
+        "Rise to Remain - City of Vultures",
+        "Soilwork - Figure Number Five",
+        "Insomnium - Since the Day All Came Down",
+        "Heaven Shall Burn - Veto",
+        "Heaven Shall Burn - Asunder"
+      ]
+    },
+    {
+      "name": "swedish",
+      "count": 201,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 116,
+        "Nubis84": 1,
+        "sdecandelario": 84
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Robyn",
+          "The Knife",
+          "I Break Horses",
+          "Lykke Li",
+          "Zeigeist",
+          "Junip"
+        ],
+        "Nubis84": [
+          "Pain of Salvation"
+        ],
+        "sdecandelario": [
+          "Raised Fist",
+          "Moonlit Sailor",
+          "Sonic Syndicate",
+          "Wolf",
+          "Lönndom",
+          "Imperial State Electric",
+          "HammerFall",
+          "Morbus Chron",
+          "The Hives",
+          "The Unguided",
+          "Lykke Li",
+          "Soilwork"
+        ]
+      },
+      "top_artists": [
+        "The Knife",
+        "Soilwork",
+        "Robyn",
+        "Lykke Li",
+        "Moonlit Sailor",
+        "Imperial State Electric",
+        "Morbus Chron",
+        "Sonic Syndicate",
+        "I Break Horses",
+        "The Hives"
+      ],
+      "top_albums": [
+        "The Knife - Silent Shout",
+        "The Knife - Deep Cuts",
+        "Robyn - Body Talk",
+        "The Knife - Tomorrow, in a Year",
+        "Soilwork - Figure Number Five",
+        "Moonlit Sailor - We Come From Exploding Stars",
+        "Soilwork - A Predator's Portrait",
+        "Imperial State Electric - Pop War",
+        "Soilwork - Natural Born Chaos",
+        "Robyn - Robyn"
+      ]
+    },
+    {
+      "name": "dance",
+      "count": 176,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 147,
+        "sdecandelario": 29
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Wild Belle",
+          "M.I.A.",
+          "Madonna",
+          "The xx",
+          "Miley Cyrus",
+          "Время И Стекло",
+          "Rihanna",
+          "Kylie Minogue",
+          "Sophie Ellis-Bextor",
+          "Robyn"
+        ],
+        "sdecandelario": [
+          "Hercules and Love Affair",
+          "LCD Soundsystem",
+          "Vitalic",
+          "Robert Miles",
+          "Martin Solveig",
+          "Rex the Dog",
+          "Kavinsky",
+          "The Chemical Brothers",
+          "The Magician",
+          "The Prodigy",
+          "Simian Mobile Disco"
+        ]
+      },
+      "top_artists": [
+        "The xx",
+        "Sophie Ellis-Bextor",
+        "Robyn",
+        "Madonna",
+        "Hercules and Love Affair",
+        "Vitalic",
+        "Miley Cyrus",
+        "Wild Belle",
+        "The Prodigy",
+        "Kavinsky"
+      ],
+      "top_albums": [
+        "The xx - xx",
+        "The xx - Coexist",
+        "Sophie Ellis-Bextor - Wanderlust",
+        "Robyn - Body Talk",
+        "Madonna - MDNA",
+        "Hercules and Love Affair - Hercules And Love Affair",
+        "Robyn - Robyn",
+        "The xx - Fiction",
+        "Vitalic - OK Cowboy",
+        "Miley Cyrus - Bangerz (Deluxe Version)"
+      ]
+    },
+    {
+      "name": "synthpop",
+      "count": 174,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 108,
+        "sdecandelario": 66
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Vive La Fête",
+          "Ladytron",
+          "Trust",
+          "The Knife",
+          "Marnie",
+          "Zeigeist"
+        ],
+        "sdecandelario": [
+          "Hercules and Love Affair",
+          "VNV Nation",
+          "Neon Lights",
+          "Pet Shop Boys",
+          "IAMX"
+        ]
+      },
+      "top_artists": [
+        "The Knife",
+        "VNV Nation",
+        "Trust",
+        "Ladytron",
+        "Hercules and Love Affair",
+        "IAMX",
+        "Neon Lights",
+        "Vive La Fête",
+        "Marnie",
+        "Zeigeist"
+      ],
+      "top_albums": [
+        "The Knife - Silent Shout",
+        "The Knife - Deep Cuts",
+        "VNV Nation - Transnational",
+        "Trust - Joyland",
+        "The Knife - Tomorrow, in a Year",
+        "Hercules and Love Affair - Hercules And Love Affair",
+        "IAMX - Volatile Times",
+        "Neon Lights - LATE",
+        "Ladytron - Best of 00-10",
+        "Ladytron - Gravity the Seducer"
+      ]
+    },
+    {
+      "name": "dream pop",
+      "count": 170,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 161,
+        "Nubis84": 7,
+        "sdecandelario": 2
+      },
+      "user_artists": {
+        "Frikomid": [
+          "MØ",
+          "Slowdive"
+        ],
+        "Nubis84": [
+          "Slowdive",
+          "Mazzy Star"
+        ],
+        "sdecandelario": [
+          "Swim Deep",
+          "The Fauns"
+        ]
+      },
+      "top_artists": [
+        "Slowdive",
+        "MØ",
+        "Mazzy Star",
+        "The Fauns",
+        "Swim Deep"
+      ],
+      "top_albums": [
+        "Slowdive - Pygmalion",
+        "Slowdive - I Saw The Sun Unreleased",
+        "Slowdive - Soulvaki",
+        "Slowdive - Just for a Day",
+        "MØ - No Mythologies to Follow (Deluxe)",
+        "Slowdive - Souvlaki",
+        "Mazzy Star - Seasons of Your Day",
+        "Slowdive - Souvlaki [Bonus Tracks]",
+        "Mazzy Star - So Tonight That I Might See",
+        "Slowdive - Original Album Classics"
+      ]
+    },
+    {
+      "name": "Melodic Death Metal",
+      "count": 164,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 12,
+        "sdecandelario": 152
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Passenger"
+        ],
+        "sdecandelario": [
+          "Winds of Plague",
+          "Quo Vadis",
+          "Sonic Syndicate",
+          "In Mourning",
+          "Mors Principium Est",
+          "The Black Dahlia Murder",
+          "The Agonist",
+          "Insomnium",
+          "Opeth",
+          "Heaven Shall Burn",
+          "The Unguided",
+          "Icestorm",
+          "Soilwork"
+        ]
+      },
+      "top_artists": [
+        "Heaven Shall Burn",
+        "Soilwork",
+        "Insomnium",
+        "Passenger",
+        "The Black Dahlia Murder",
+        "In Mourning",
+        "Opeth",
+        "Sonic Syndicate",
+        "The Unguided",
+        "Quo Vadis"
+      ],
+      "top_albums": [
+        "Heaven Shall Burn - Antigone",
+        "Heaven Shall Burn - Whatever It May Take",
+        "Passenger - All the Little Lights",
+        "The Black Dahlia Murder - Ritual",
+        "Soilwork - Figure Number Five",
+        "Insomnium - Since the Day All Came Down",
+        "Heaven Shall Burn - Veto",
+        "Heaven Shall Burn - Asunder",
+        "Soilwork - A Predator's Portrait",
+        "Soilwork - Natural Born Chaos"
+      ]
+    },
+    {
+      "name": "spanish",
+      "count": 156,
+      "users": [
+        "paqueradejere",
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 60,
+        "Nubis84": 17,
+        "paqueradejere": 1,
+        "sdecandelario": 78
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Pastora",
+          "Viento Smith",
+          "Najwa",
+          "Vetusta Morla",
+          "Ruth Lorenzo",
+          "Nena Daconte"
+        ],
+        "Nubis84": [
+          "Ismael Serrano",
+          "Luar na Lubre",
+          "Nino Bravo"
+        ],
+        "paqueradejere": [
+          "Rosendo"
+        ],
+        "sdecandelario": [
+          "Los Delinqüentes",
+          "Muro",
+          "Lux Divina",
+          "Obús",
+          "Papa Topo",
+          "Loquillo",
+          "Vetusta Morla",
+          "Triángulo de Amor Bizarro",
+          "Triana",
+          "Saurom",
+          "Saratoga",
+          "Marea",
+          "La Bien Querida",
+          "Tierra Santa",
+          "Zenttric",
+          "Mojinos Escozíos",
+          "Tequila",
+          "LUJURIA",
+          "Vita Imana",
+          "Reincidentes"
+        ]
+      },
+      "top_artists": [
+        "Vetusta Morla",
+        "LUJURIA",
+        "Viento Smith",
+        "Nino Bravo",
+        "La Bien Querida",
+        "Ruth Lorenzo",
+        "Triana",
+        "Nena Daconte",
+        "Luar na Lubre",
+        "Najwa"
+      ],
+      "top_albums": [
+        "Viento Smith - Viento Smith",
+        "LUJURIA - República Popular del coito",
+        "Vetusta Morla - Un día en el mundo",
+        "Nino Bravo - En libertad (By La Casa Azul)",
+        "La Bien Querida - Ceremonia",
+        "LUJURIA - El Poder Del Deseo",
+        "Ruth Lorenzo - Dancing In The Rain",
+        "LUJURIA - Sin Parar De Pecar",
+        "Vetusta Morla - Golpe Maestro",
+        "Vetusta Morla - Mapas"
+      ]
+    },
+    {
+      "name": "post rock",
+      "count": 152,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 114,
+        "Nubis84": 28,
+        "sdecandelario": 10
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Red Sparowes",
+          "Mogwai",
+          "Templeton",
+          "Tortoise"
+        ],
+        "Nubis84": [
+          "Mogwai",
+          "Anon, They Move...",
+          "Tortoise",
+          "The Ascent Of Everest"
+        ],
+        "sdecandelario": [
+          "Mogwai"
+        ]
+      },
+      "top_artists": [
+        "Mogwai",
+        "The Ascent Of Everest",
+        "Tortoise",
+        "Anon, They Move...",
+        "Red Sparowes",
+        "Templeton"
+      ],
+      "top_albums": [
+        "Mogwai - Mr. Beast",
+        "Mogwai - Happy Songs for Happy People",
+        "Mogwai - Rave Tapes",
+        "Mogwai - Les Revenants Soundtrack",
+        "Mogwai - Hardcore Will Never Die, But You Will",
+        "Mogwai - Friend of the Night",
+        "Mogwai - Rock Action",
+        "The Ascent Of Everest - From This Vantage",
+        "The Ascent Of Everest - How Lonely Sits the City",
+        "Anon, They Move... - [TFN164] The Passing Of A Spy Glass"
+      ]
+    },
+    {
+      "name": "hard rock",
+      "count": 151,
+      "users": [
+        "paqueradejere",
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 18,
+        "paqueradejere": 1,
+        "sdecandelario": 132
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Kadavar",
+          "Slash",
+          "Trust"
+        ],
+        "paqueradejere": [
+          "Rosendo"
+        ],
+        "sdecandelario": [
+          "U.D.O.",
+          "Kansas",
+          "Obús",
+          "Tygers of Pan Tang",
+          "Tokyo Blade",
+          "Savatage",
+          "Saxon",
+          "Skid Row",
+          "Peter Pan Speedrock",
+          "Led Zeppelin",
+          "Rollins Band",
+          "UFO",
+          "Steel Panther",
+          "Three Days Grace",
+          "Rainbow",
+          "Thin Lizzy",
+          "Marea",
+          "Queens of the Stone Age",
+          "Scorpions",
+          "Iron Maiden",
+          "Motörhead",
+          "Queen",
+          "Kiss",
+          "The Rods",
+          "Queensrÿche",
+          "Rob Zombie",
+          "White Wizzard",
+          "Whitesnake",
+          "Stryper",
+          "Ángeles del Infierno",
+          "Imperial State Electric",
+          "Twisted Sister",
+          "Raven",
+          "Danzig",
+          "Ozzy Osbourne",
+          "Judas Priest",
+          "Molly Hatchet"
+        ]
+      },
+      "top_artists": [
+        "Trust",
+        "Motörhead",
+        "U.D.O.",
+        "Rob Zombie",
+        "Stryper",
+        "Imperial State Electric",
+        "Molly Hatchet",
+        "White Wizzard",
+        "Judas Priest",
+        "Thin Lizzy"
+      ],
+      "top_albums": [
+        "Trust - Joyland",
+        "Motörhead - Aftershock",
+        "Rob Zombie - Venomous Rat Regeneration Vendor [Edited]",
+        "U.D.O. - Steelhammer",
+        "Stryper - No More Hell To Pay",
+        "Imperial State Electric - Pop War",
+        "Molly Hatchet - Molly Hatchet",
+        "White Wizzard - The Devils Cut",
+        "Judas Priest - Turbo",
+        "Thin Lizzy - Renegade"
+      ]
+    },
+    {
+      "name": "punk",
+      "count": 131,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 13,
+        "Nubis84": 1,
+        "sdecandelario": 117
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Turbonegro"
+        ],
+        "Nubis84": [
+          "Patti Smith"
+        ],
+        "sdecandelario": [
+          "Propagandhi",
+          "Sum 41",
+          "The Distillers",
+          "The Real McKenzies",
+          "NOFX",
+          "The Death Set",
+          "No Use for a Name",
+          "Rollins Band",
+          "Hoobastank",
+          "Rocket from the Crypt",
+          "Surf Punks",
+          "Rise Against",
+          "Pennywise",
+          "Tsunami Bomb",
+          "The Holybuttons",
+          "Set Your Goals",
+          "Lagwagon",
+          "The Hives",
+          "Operation Ivy",
+          "Raised Fist",
+          "Masked Intruder",
+          "The Offspring",
+          "Reincidentes",
+          "Suicidal Tendencies",
+          "Madball",
+          "Self Defense Family"
+        ]
+      },
+      "top_artists": [
+        "Operation Ivy",
+        "Surf Punks",
+        "Propagandhi",
+        "Turbonegro",
+        "Masked Intruder",
+        "Self Defense Family",
+        "Rocket from the Crypt",
+        "Hoobastank",
+        "Madball",
+        "Rise Against"
+      ],
+      "top_albums": [
+        "Operation Ivy - Operation Ivy",
+        "Surf Punks - Locals Only",
+        "Propagandhi - Failed States [Deluxe Edition]",
+        "Masked Intruder - Masked Intruder",
+        "Self Defense Family - Try Me",
+        "Turbonegro - Sexual Harassment",
+        "Rocket from the Crypt - The State Of Art Is On Fire",
+        "Turbonegro - Scandinavian Leather",
+        "Turbonegro - Party Animals",
+        "Turbonegro - Ass Cobra"
+      ]
+    },
+    {
+      "name": "Lo-Fi",
+      "count": 128,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 126,
+        "sdecandelario": 2
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Real Estate",
+          "Mount Eerie",
+          "The Magnetic Fields",
+          "The Microphones"
+        ],
+        "sdecandelario": [
+          "Is Tropical",
+          "Papa Topo"
+        ]
+      },
+      "top_artists": [
+        "Mount Eerie",
+        "Real Estate",
+        "The Microphones",
+        "The Magnetic Fields",
+        "Papa Topo",
+        "Is Tropical"
+      ],
+      "top_albums": [
+        "Mount Eerie - Wind's Poem",
+        "Mount Eerie - Song Islands vol. 2",
+        "Mount Eerie - Clear Moon",
+        "Real Estate - Atlas",
+        "Mount Eerie - No Flashlight",
+        "Mount Eerie - Black Wooden",
+        "Mount Eerie - Ocean Roar",
+        "The Microphones - Mount Eerie",
+        "The Magnetic Fields - Love at the Bottom of the Sea",
+        "Mount Eerie - Seven New Songs"
+      ]
+    },
+    {
+      "name": "electro",
+      "count": 124,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 94,
+        "sdecandelario": 30
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Yelle",
+          "Vive La Fête",
+          "Metronomy",
+          "The Knife",
+          "Zeigeist"
+        ],
+        "sdecandelario": [
+          "Vitalic",
+          "Hot Chip",
+          "Rex the Dog",
+          "Kavinsky",
+          "Metronomy",
+          "Todd Terje",
+          "Simian Mobile Disco"
+        ]
+      },
+      "top_artists": [
+        "The Knife",
+        "Hot Chip",
+        "Metronomy",
+        "Vitalic",
+        "Yelle",
+        "Vive La Fête",
+        "Kavinsky",
+        "Todd Terje",
+        "Zeigeist",
+        "Rex the Dog"
+      ],
+      "top_albums": [
+        "The Knife - Silent Shout",
+        "The Knife - Deep Cuts",
+        "The Knife - Tomorrow, in a Year",
+        "Hot Chip - Made in the Dark",
+        "Metronomy - Love Letters",
+        "Vitalic - OK Cowboy",
+        "The Knife - Shaking the Habitual",
+        "Vive La Fête - Produit de Belgique",
+        "Yelle - Kitsuné: La musique - EP",
+        "The Knife - Full of Fire"
+      ]
+    },
+    {
+      "name": "punk rock",
+      "count": 115,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 13,
+        "sdecandelario": 102
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Turbonegro"
+        ],
+        "sdecandelario": [
+          "Propagandhi",
+          "Sum 41",
+          "The Distillers",
+          "The Real McKenzies",
+          "NOFX",
+          "No Use for a Name",
+          "Peter Pan Speedrock",
+          "Hoobastank",
+          "Rocket from the Crypt",
+          "Surf Punks",
+          "Rise Against",
+          "Speedealer",
+          "Pennywise",
+          "Tsunami Bomb",
+          "The Holybuttons",
+          "Lagwagon",
+          "Operation Ivy",
+          "Masked Intruder",
+          "The Offspring",
+          "Reincidentes",
+          "Mute"
+        ]
+      },
+      "top_artists": [
+        "Operation Ivy",
+        "Surf Punks",
+        "Propagandhi",
+        "Turbonegro",
+        "Masked Intruder",
+        "Rocket from the Crypt",
+        "Hoobastank",
+        "Rise Against",
+        "Speedealer",
+        "No Use for a Name"
+      ],
+      "top_albums": [
+        "Operation Ivy - Operation Ivy",
+        "Surf Punks - Locals Only",
+        "Propagandhi - Failed States [Deluxe Edition]",
+        "Masked Intruder - Masked Intruder",
+        "Turbonegro - Sexual Harassment",
+        "Rocket from the Crypt - The State Of Art Is On Fire",
+        "Turbonegro - Scandinavian Leather",
+        "Turbonegro - Party Animals",
+        "Speedealer - Tony Hawk's Pro Skater 1",
+        "Turbonegro - Ass Cobra"
+      ]
+    },
+    {
+      "name": "norwegian",
+      "count": 109,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 97,
+        "Nubis84": 1,
+        "sdecandelario": 11
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Susanne Sundfør",
+          "Röyksopp",
+          "Turbonegro"
+        ],
+        "Nubis84": [
+          "Ketil Bjørnstad"
+        ],
+        "sdecandelario": [
+          "Limbonic Art",
+          "Mayhem",
+          "Röyksopp",
+          "Kvelertak"
+        ]
+      },
+      "top_artists": [
+        "Röyksopp",
+        "Turbonegro",
+        "Susanne Sundfør",
+        "Mayhem",
+        "Ketil Bjørnstad",
+        "Kvelertak",
+        "Limbonic Art"
+      ],
+      "top_albums": [
+        "Röyksopp - Junior",
+        "Röyksopp - Senior",
+        "Röyksopp - The Understanding",
+        "Susanne Sundfør - The Brothel",
+        "Turbonegro - Sexual Harassment",
+        "Röyksopp - Melody AM",
+        "Röyksopp - Running to the Sea",
+        "Röyksopp - Happy Up Here",
+        "Susanne Sundfør - The Silicone Veil",
+        "Turbonegro - Scandinavian Leather"
+      ]
+    },
+    {
+      "name": "german",
+      "count": 103,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 1,
+        "sdecandelario": 102
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Kadavar"
+        ],
+        "sdecandelario": [
+          "U.D.O.",
+          "Vanden Plas",
+          "Neun Welten",
+          "Metal Inquisitor",
+          "Kreator",
+          "Nebelung",
+          "Heimataerde",
+          "Masterplan",
+          "Sodom",
+          "Nachtmahr",
+          "Stormwarrior",
+          "Iron Savior",
+          "OOMPH!",
+          "KMFDM",
+          "Saltatio Mortis",
+          "Orplid",
+          "Powerwolf",
+          "Primal Fear",
+          "Helloween"
+        ]
+      },
+      "top_artists": [
+        "Nachtmahr",
+        "U.D.O.",
+        "Primal Fear",
+        "Powerwolf",
+        "Vanden Plas",
+        "Stormwarrior",
+        "Heimataerde",
+        "Helloween",
+        "Kreator",
+        "Saltatio Mortis"
+      ],
+      "top_albums": [
+        "U.D.O. - Steelhammer",
+        "Powerwolf - Preachers of the Night",
+        "Vanden Plas - Chronicles of the Immortals - Netherworld",
+        "Stormwarrior - Thunder & Steele",
+        "Primal Fear - Delivering the Black",
+        "Nachtmahr - Semper Fidelis",
+        "Nachtmahr - Alle Lust will Ewigkeit",
+        "Nachtmahr - Feuer Frei!",
+        "Nachtmahr - Veni Vidi Vici",
+        "Heimataerde - Unwesen"
+      ]
+    },
+    {
+      "name": "folk rock",
+      "count": 101,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 16,
+        "Nubis84": 73,
+        "sdecandelario": 12
+      },
+      "user_artists": {
+        "Frikomid": [
+          "The War on Drugs"
+        ],
+        "Nubis84": [
+          "The War on Drugs",
+          "Neil Young"
+        ],
+        "sdecandelario": [
+          "Saltatio Mortis",
+          "The War on Drugs"
+        ]
+      },
+      "top_artists": [
+        "The War on Drugs",
+        "Neil Young",
+        "Saltatio Mortis"
+      ],
+      "top_albums": [
+        "The War on Drugs - Lost in the Dream",
+        "The War on Drugs - Slave Ambient",
+        "The War on Drugs - Wagonwheel Blues",
+        "Neil Young - Harvest",
+        "Neil Young - Dead Man",
+        "Saltatio Mortis - Aus Der Asche",
+        "Saltatio Mortis - Das Zweite Gesicht"
+      ]
+    },
+    {
+      "name": "drone",
+      "count": 100,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 37,
+        "Nubis84": 45,
+        "sdecandelario": 18
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Have a Nice Life",
+          "Tim Hecker"
+        ],
+        "Nubis84": [
+          "Hala Strana",
+          "Alio Die & Amelia Cuni",
+          "Keith Fullerton Whitman",
+          "William Basinski",
+          "Steven R. Smith",
+          "Sleep Research Facility",
+          "Yellow Swans",
+          "Infinite Body",
+          "Gareth Davis & Steven R. Smith",
+          "Jefre Cantu-Ledesma"
+        ],
+        "sdecandelario": [
+          "Terra Tenebrosa",
+          "Have a Nice Life"
+        ]
+      },
+      "top_artists": [
+        "Have a Nice Life",
+        "Steven R. Smith",
+        "Sleep Research Facility",
+        "Terra Tenebrosa",
+        "Alio Die & Amelia Cuni",
+        "Hala Strana",
+        "William Basinski",
+        "Keith Fullerton Whitman",
+        "Jefre Cantu-Ledesma",
+        "Tim Hecker"
+      ],
+      "top_albums": [
+        "Have a Nice Life - The Unnatural World",
+        "Steven R. Smith - Cities",
+        "Have a Nice Life - Deathconsciousness",
+        "Terra Tenebrosa - The Purging",
+        "Sleep Research Facility - Dead Weather Machine",
+        "Have a Nice Life - Time of Land",
+        "Alio Die & Amelia Cuni - Apsaras",
+        "Hala Strana - Fielding",
+        "Sleep Research Facility - Nostromo",
+        "Keith Fullerton Whitman - Lisbon"
+      ]
+    },
+    {
+      "name": "Progressive metal",
+      "count": 99,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 58,
+        "sdecandelario": 41
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Tool",
+          "Pain of Salvation"
+        ],
+        "sdecandelario": [
+          "Savatage",
+          "Nucleus Torn",
+          "Vanden Plas",
+          "In Mourning",
+          "Queensrÿche",
+          "Protest the Hero",
+          "Opeth",
+          "Haken"
+        ]
+      },
+      "top_artists": [
+        "Tool",
+        "Vanden Plas",
+        "Haken",
+        "In Mourning",
+        "Opeth",
+        "Pain of Salvation",
+        "Queensrÿche",
+        "Protest the Hero",
+        "Nucleus Torn",
+        "Savatage"
+      ],
+      "top_albums": [
+        "Tool - Undertow",
+        "Tool - Ænima",
+        "Tool - The Holy Gift",
+        "Vanden Plas - Chronicles of the Immortals - Netherworld",
+        "Haken - The Mountain",
+        "In Mourning - The Weight of Oceans",
+        "Opeth - Black Water Park",
+        "Tool - Opiate",
+        "Pain of Salvation - Remedy Lane",
+        "Queensrÿche - The Warning"
+      ]
+    },
+    {
+      "name": "french",
+      "count": 92,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 82,
+        "Nubis84": 3,
+        "sdecandelario": 7
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Yelle",
+          "Yann Tiersen",
+          "Holden",
+          "Pascal Comelade",
+          "Phoenix"
+        ],
+        "Nubis84": [
+          "Jacques Loussier",
+          "Jean-Philippe Rameau"
+        ],
+        "sdecandelario": [
+          "The Teenagers",
+          "Les Discrets",
+          "Wake the Dead",
+          "Martin Solveig",
+          "Kavinsky"
+        ]
+      },
+      "top_artists": [
+        "Yann Tiersen",
+        "Holden",
+        "Yelle",
+        "Phoenix",
+        "Jacques Loussier",
+        "Kavinsky",
+        "Les Discrets",
+        "Pascal Comelade",
+        "Jean-Philippe Rameau",
+        "The Teenagers"
+      ],
+      "top_albums": [
+        "Yann Tiersen - Cascade Street",
+        "Holden - The Inheritors",
+        "Yann Tiersen - A Midsummer Evening",
+        "Yann Tiersen - Skyline",
+        "Yelle - Kitsuné: La musique - EP",
+        "Yann Tiersen - The Waltz of the Monsters / Cascade Street",
+        "Yann Tiersen - Amelie From Montmartre",
+        "Jacques Loussier - Satie - Gymnopédies - Gnossiennes",
+        "Kavinsky - OutRun",
+        "Les Discrets - Whom The Moon A Night Song Sings"
+      ]
+    }
+  ],
+  "labels": [
+    {
+      "name": "Domino",
+      "count": 42,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 27,
+        "Nubis84": 1,
+        "sdecandelario": 14
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Austra",
+          "Real Estate"
+        ],
+        "Nubis84": [
+          "Elliott Smith"
+        ],
+        "sdecandelario": [
+          "Hot Chip",
+          "Arctic Monkeys"
+        ]
+      },
+      "top_artists": [
+        "Real Estate",
+        "Arctic Monkeys",
+        "Austra",
+        "Hot Chip",
+        "Elliott Smith"
+      ],
+      "top_albums": [
+        "Real Estate - Atlas",
+        "Arctic Monkeys - AM",
+        "Austra - Feel It Break (Deluxe Version)",
+        "Hot Chip - Dark and Stormy",
+        "Austra - Forgive Me",
+        "Elliott Smith - Elliott Smith"
+      ]
+    },
+    {
+      "name": "Parlophone",
+      "count": 38,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 37,
+        "Nubis84": 1
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Radiohead",
+          "Coldplay"
+        ],
+        "Nubis84": [
+          "George Harrison"
+        ]
+      },
+      "top_artists": [
+        "Coldplay",
+        "Radiohead",
+        "George Harrison"
+      ],
+      "top_albums": [
+        "Coldplay - A Rush of Blood to the Head",
+        "Radiohead - Amnesiac",
+        "Radiohead - Com Lag: 2+2=5",
+        "George Harrison - Dark Horse"
+      ]
+    },
+    {
+      "name": "Warner Bros. Records",
+      "count": 25,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 24,
+        "sdecandelario": 1
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Damon Albarn",
+          "The Flaming Lips"
+        ],
+        "sdecandelario": [
+          "Red Hot Chili Peppers"
+        ]
+      },
+      "top_artists": [
+        "The Flaming Lips",
+        "Damon Albarn",
+        "Red Hot Chili Peppers"
+      ],
+      "top_albums": [
+        "The Flaming Lips - Embryonic",
+        "Damon Albarn - Everyday Robots",
+        "Red Hot Chili Peppers - Californication"
+      ]
+    },
+    {
+      "name": "EMI",
+      "count": 21,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 6,
+        "Nubis84": 3,
+        "sdecandelario": 12
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Arcade Fire",
+          "Pink Floyd"
+        ],
+        "Nubis84": [
+          "[unknown]",
+          "Kate Bush"
+        ],
+        "sdecandelario": [
+          "Rise to Remain"
+        ]
+      },
+      "top_artists": [
+        "Rise to Remain",
+        "Arcade Fire",
+        "Kate Bush",
+        "Pink Floyd",
+        "[unknown]"
+      ],
+      "top_albums": [
+        "Rise to Remain - City of Vultures",
+        "Arcade Fire - Ep",
+        "Kate Bush - Aerial  (CD1)",
+        "Pink Floyd - Atom Heart Mother - 2011 - Remaster",
+        "[unknown] - 1986 - the colour of spring"
+      ]
+    },
+    {
+      "name": "Island",
+      "count": 20,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 2,
+        "Nubis84": 1,
+        "sdecandelario": 17
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Brandon Flowers"
+        ],
+        "Nubis84": [
+          "Nick Drake"
+        ],
+        "sdecandelario": [
+          "The Killers",
+          "Sum 41"
+        ]
+      },
+      "top_artists": [
+        "The Killers",
+        "Brandon Flowers",
+        "Nick Drake",
+        "Sum 41"
+      ],
+      "top_albums": [
+        "The Killers - Battle Born",
+        "Brandon Flowers - Crossfire",
+        "Nick Drake - Five Leaves Left",
+        "The Killers - Day & Age",
+        "Sum 41 - Does This Look Infected?"
+      ]
+    },
+    {
+      "name": "Mercury Records",
+      "count": 16,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 15,
+        "sdecandelario": 1
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Mike Oldfield"
+        ],
+        "sdecandelario": [
+          "Scorpions"
+        ]
+      },
+      "top_artists": [
+        "Mike Oldfield",
+        "Scorpions"
+      ],
+      "top_albums": [
+        "Mike Oldfield - Crises",
+        "Scorpions - Animal Magnetism"
+      ]
+    },
+    {
+      "name": "Atlantic",
+      "count": 16,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 1,
+        "sdecandelario": 15
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Phoenix"
+        ],
+        "sdecandelario": [
+          "Portugal. The Man",
+          "AC/DC",
+          "Lykke Li"
+        ]
+      },
+      "top_artists": [
+        "Portugal. The Man",
+        "Lykke Li",
+        "Phoenix",
+        "AC/DC"
+      ],
+      "top_albums": [
+        "Portugal. The Man - Evil Friends",
+        "Lykke Li - I Follow Rivers",
+        "Phoenix - Bankrupt!",
+        "AC/DC - Flick of the Switch"
+      ]
+    },
+    {
+      "name": "Virgin",
+      "count": 14,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 9,
+        "Nubis84": 2,
+        "sdecandelario": 3
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Massive Attack",
+          "Amaral"
+        ],
+        "Nubis84": [
+          "Harold Budd/Brian Eno"
+        ],
+        "sdecandelario": [
+          "Daft Punk",
+          "Does It Offend You, Yeah?"
+        ]
+      },
+      "top_artists": [
+        "Amaral",
+        "Massive Attack",
+        "Harold Budd/Brian Eno",
+        "Daft Punk",
+        "Does It Offend You, Yeah?"
+      ],
+      "top_albums": [
+        "Amaral - Estrella de mar",
+        "Massive Attack - Collected",
+        "Harold Budd/Brian Eno - AMBIENT #2 The Plateaux of Mirror",
+        "Daft Punk - Discovery",
+        "Does It Offend You, Yeah? - Epic Last Song"
+      ]
+    },
+    {
+      "name": "Secretly Canadian",
+      "count": 12,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 2,
+        "Nubis84": 10
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Damien Jurado"
+        ],
+        "Nubis84": [
+          "Antony and the Johnsons"
+        ]
+      },
+      "top_artists": [
+        "Antony and the Johnsons",
+        "Damien Jurado"
+      ],
+      "top_albums": [
+        "Antony and the Johnsons - Cut the World",
+        "Damien Jurado - Brothers and Sisters of the Eternal Son"
+      ]
+    },
+    {
+      "name": "Sub Pop Records",
+      "count": 12,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 9,
+        "Nubis84": 3
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Beach House"
+        ],
+        "Nubis84": [
+          "The Album Leaf"
+        ]
+      },
+      "top_artists": [
+        "Beach House",
+        "The Album Leaf"
+      ],
+      "top_albums": [
+        "Beach House - Bloom",
+        "The Album Leaf - A Chorus of Storytellers"
+      ]
+    },
+    {
+      "name": "Trisol",
+      "count": 11,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 6,
+        "sdecandelario": 5
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Spiritual Front"
+        ],
+        "sdecandelario": [
+          "Nachtmahr"
+        ]
+      },
+      "top_artists": [
+        "Spiritual Front",
+        "Nachtmahr"
+      ],
+      "top_albums": [
+        "Spiritual Front - Armageddon Gigolo",
+        "Nachtmahr - Alle Lust will Ewigkeit"
+      ]
+    }
+  ],
+  "years": [
+    {
+      "name": "2012",
+      "count": 262,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 115,
+        "Nubis84": 13,
+        "sdecandelario": 134
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Godspeed You! Black Emperor",
+          "Mount Eerie",
+          "Yann Tiersen",
+          "The xx",
+          "The KVB",
+          "Lana Del Rey",
+          "Beach House",
+          "Rihanna",
+          "Passenger",
+          "Gossip",
+          "Xiu Xiu",
+          "Nick Cave & the Bad Seeds"
+        ],
+        "Nubis84": [
+          "Sun Kil Moon",
+          "[unknown]",
+          "Antony and the Johnsons",
+          "Brambles"
+        ],
+        "sdecandelario": [
+          "La Bien Querida",
+          "Cloud Nothings",
+          "Converge",
+          "Propagandhi",
+          "Django Django",
+          "The Dirty Heads",
+          "Heaven Shall Burn",
+          "The Killers",
+          "Lykke Li",
+          "Moon Duo",
+          "High on Fire"
+        ]
+      },
+      "top_artists": [
+        "Converge",
+        "The xx",
+        "Yann Tiersen",
+        "Mount Eerie",
+        "The Dirty Heads",
+        "The Killers",
+        "Heaven Shall Burn",
+        "Propagandhi",
+        "Passenger",
+        "Moon Duo"
+      ],
+      "top_albums": [
+        "The xx - Coexist",
+        "Yann Tiersen - Cascade Street",
+        "Mount Eerie - Clear Moon",
+        "Converge - All We Love We Leave Behind [Deluxe Edition]",
+        "The Dirty Heads - Cabin By The Sea",
+        "The Killers - Battle Born",
+        "Converge - All We Love We Leave Behind",
+        "Heaven Shall Burn - Antigone",
+        "Propagandhi - Failed States [Deluxe Edition]",
+        "Passenger - All the Little Lights"
+      ]
+    },
+    {
+      "name": "2014",
+      "count": 173,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 57,
+        "Nubis84": 2,
+        "sdecandelario": 114
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Kaiser Chiefs",
+          "Najwa",
+          "Yann Tiersen",
+          "Sun Kil Moon",
+          "Tycho",
+          "Ruth Lorenzo",
+          "Sia",
+          "Real Estate",
+          "Damien Jurado",
+          "Damon Albarn",
+          "Gazelle Twin",
+          "Xiu Xiu"
+        ],
+        "Nubis84": [
+          "Johnny Cash"
+        ],
+        "sdecandelario": [
+          "Freedom Call",
+          "Vanden Plas",
+          "Motörhead",
+          "Primal Fear",
+          "Jeremy Jay",
+          "Aenaon",
+          "Kampfar",
+          "Big Ups",
+          "Comeback Kid",
+          "Oasis"
+        ]
+      },
+      "top_artists": [
+        "Real Estate",
+        "Comeback Kid",
+        "Freedom Call",
+        "Motörhead",
+        "Oasis",
+        "Big Ups",
+        "Ruth Lorenzo",
+        "Vanden Plas",
+        "Primal Fear",
+        "Aenaon"
+      ],
+      "top_albums": [
+        "Real Estate - Atlas",
+        "Comeback Kid - Die Knowing",
+        "Freedom Call - Beyond",
+        "Motörhead - Aftershock",
+        "Oasis - (What's The Story) Morning Glory",
+        "Big Ups - Eighteen Hours of Static",
+        "Ruth Lorenzo - Dancing In The Rain",
+        "Vanden Plas - Chronicles of the Immortals - Netherworld",
+        "Primal Fear - Delivering the Black",
+        "Aenaon - Extance"
+      ]
+    },
+    {
+      "name": "2013",
+      "count": 157,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 77,
+        "Nubis84": 12,
+        "sdecandelario": 68
+      },
+      "user_artists": {
+        "Frikomid": [
+          "The Strokes",
+          "The xx",
+          "Miley Cyrus",
+          "Austra",
+          "Coldplay",
+          "Mike Oldfield",
+          "Atoms for Peace",
+          "Metronomy",
+          "Kadavar",
+          "I Break Horses",
+          "Marnie",
+          "Phoenix"
+        ],
+        "Nubis84": [
+          "Nino Bravo"
+        ],
+        "sdecandelario": [
+          "Portugal. The Man",
+          "Airbourne",
+          "Hot Chip",
+          "Melt-Banana",
+          "Pet Shop Boys",
+          "Arctic Monkeys",
+          "Deez Nuts",
+          "Ra Ra Riot",
+          "Pharrell Williams",
+          "Caladan Brood"
+        ]
+      },
+      "top_artists": [
+        "Atoms for Peace",
+        "Coldplay",
+        "Mike Oldfield",
+        "Nino Bravo",
+        "Melt-Banana",
+        "Arctic Monkeys",
+        "Portugal. The Man",
+        "Ra Ra Riot",
+        "Airbourne",
+        "The Strokes"
+      ],
+      "top_albums": [
+        "Atoms for Peace - AMOK",
+        "Coldplay - A Rush of Blood to the Head",
+        "Mike Oldfield - Crises",
+        "Nino Bravo - En libertad (By La Casa Azul)",
+        "Melt-Banana - Fetch",
+        "Arctic Monkeys - AM",
+        "Portugal. The Man - Evil Friends",
+        "Ra Ra Riot - Beta Love",
+        "Airbourne - Black Dog Barking",
+        "The Strokes - Comedown Machine"
+      ]
+    },
+    {
+      "name": "2010",
+      "count": 129,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 25,
+        "Nubis84": 17,
+        "sdecandelario": 87
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Morcheeba",
+          "M.I.A.",
+          "Brandon Flowers",
+          "Amy Macdonald",
+          "Robyn"
+        ],
+        "Nubis84": [
+          "The American Dollar",
+          "Sun Kil Moon",
+          "Kristin Hersh",
+          "Ólafur Arnalds",
+          "Ben Frost",
+          "Infinite Body",
+          "Balmorhea",
+          "The Album Leaf"
+        ],
+        "sdecandelario": [
+          "Four Year Strong",
+          "Accept",
+          "Touché Amoré",
+          "Eluveitie",
+          "Adrenalized",
+          "And So I Watch You From Afar",
+          "The Cure",
+          "†††",
+          "Soilwork"
+        ]
+      },
+      "top_artists": [
+        "†††",
+        "Robyn",
+        "Soilwork",
+        "Touché Amoré",
+        "And So I Watch You From Afar",
+        "Adrenalized",
+        "Ben Frost",
+        "Balmorhea",
+        "The Album Leaf",
+        "Brandon Flowers"
+      ],
+      "top_albums": [
+        "††† - Crosses (†††)",
+        "Robyn - Body Talk",
+        "Soilwork - Figure Number Five",
+        "Touché Amoré - ...to the Beat of a Dead Horse",
+        "And So I Watch You From Afar - ASIWYFA",
+        "Adrenalized - Docet Umbra",
+        "Ben Frost - By The Throat",
+        "Balmorhea - Constellations",
+        "The Album Leaf - A Chorus of Storytellers",
+        "Brandon Flowers - Crossfire"
+      ]
+    },
+    {
+      "name": "2009",
+      "count": 106,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 34,
+        "Nubis84": 33,
+        "sdecandelario": 39
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Mount Eerie",
+          "Tortoise",
+          "Vive La Fête",
+          "The Flaming Lips",
+          "Sigur Rós",
+          "APSE",
+          "Placebo"
+        ],
+        "Nubis84": [
+          "[unknown]",
+          "The American Dollar",
+          "Steven R. Smith",
+          "Lil B",
+          "Balmorhea",
+          "Aus"
+        ],
+        "sdecandelario": [
+          "Converge",
+          "Dinosaur Jr.",
+          "Vitalic",
+          "Enter Shikari",
+          "Abney Park",
+          "Grave Digger",
+          "KMFDM",
+          "Against Me!",
+          "Nachtmahr"
+        ]
+      },
+      "top_artists": [
+        "The Flaming Lips",
+        "Steven R. Smith",
+        "Converge",
+        "Dinosaur Jr.",
+        "The American Dollar",
+        "Mount Eerie",
+        "Nachtmahr",
+        "Balmorhea",
+        "Against Me!",
+        "[unknown]"
+      ],
+      "top_albums": [
+        "The Flaming Lips - Embryonic",
+        "Steven R. Smith - Cities",
+        "Converge - Axe to Fall",
+        "Dinosaur Jr. - Farm",
+        "The American Dollar - Ambient One",
+        "Mount Eerie - Black Wooden",
+        "Nachtmahr - Alle Lust will Ewigkeit",
+        "Balmorhea - All Is Wild, All Is Silent",
+        "Against Me! - As the Eternal Cowboy",
+        "[unknown] - (2009)Nightbook"
+      ]
+    },
+    {
+      "name": "2008",
+      "count": 93,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 17,
+        "Nubis84": 14,
+        "sdecandelario": 62
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Claire Denamur",
+          "Have a Nice Life",
+          "Dover"
+        ],
+        "Nubis84": [
+          "Sun Kil Moon",
+          "Bohren & der Club of Gore",
+          "Ben Woods",
+          "Bon Iver"
+        ],
+        "sdecandelario": [
+          "Bad Religion",
+          "Flogging Molly",
+          "Does It Offend You, Yeah?",
+          "The Pigeon Detectives",
+          "Alkaline Trio",
+          "Jimmy Eat World",
+          "Boikot",
+          "The Killers",
+          "Rise Against",
+          "Protest the Hero",
+          "Opeth",
+          "Nachtmahr",
+          "Terror",
+          "Queens of the Stone Age"
+        ]
+      },
+      "top_artists": [
+        "Terror",
+        "Have a Nice Life",
+        "The Pigeon Detectives",
+        "Alkaline Trio",
+        "Opeth",
+        "Bohren & der Club of Gore",
+        "Nachtmahr",
+        "Bon Iver",
+        "Ben Woods",
+        "Claire Denamur"
+      ],
+      "top_albums": [
+        "Terror - Forever Crossing the Line",
+        "Have a Nice Life - Deathconsciousness",
+        "The Pigeon Detectives - Emergency",
+        "Alkaline Trio - Agony & Irony",
+        "Opeth - Black Water Park",
+        "Bohren & der Club of Gore - Black Earth",
+        "Nachtmahr - Feuer Frei!",
+        "Bon Iver - For Emma, Forever Ago",
+        "Ben Woods - A Collection of Thoughts",
+        "Claire Denamur - Claire Denamur"
+      ]
+    },
+    {
+      "name": "2011",
+      "count": 83,
+      "users": [
+        "Frikomid",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 56,
+        "sdecandelario": 27
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Pink Floyd",
+          "The Strokes",
+          "Ladytron",
+          "Austra",
+          "The Antlers",
+          "Röyksopp",
+          "Moby"
+        ],
+        "sdecandelario": [
+          "Savatage",
+          "White Lies",
+          "Crystal Castles",
+          "Peter Pan Speedrock",
+          "Silverstein",
+          "Rise to Remain",
+          "Warcry"
+        ]
+      },
+      "top_artists": [
+        "Moby",
+        "Austra",
+        "Rise to Remain",
+        "Warcry",
+        "Ladytron",
+        "The Antlers",
+        "Pink Floyd",
+        "Röyksopp",
+        "The Strokes",
+        "Crystal Castles"
+      ],
+      "top_albums": [
+        "Moby - Destroyed",
+        "Rise to Remain - City of Vultures",
+        "Warcry - Alfa",
+        "Austra - Feel It Break (Deluxe Version)",
+        "Ladytron - Best of 00-10",
+        "Austra - Feel It Break",
+        "The Antlers - Burst Apart",
+        "Pink Floyd - Atom Heart Mother - 2011 - Remaster",
+        "Röyksopp - Forsaken Cowboy",
+        "The Strokes - Angles"
+      ]
+    },
+    {
+      "name": "2003",
+      "count": 49,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 15,
+        "Nubis84": 1,
+        "sdecandelario": 33
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Amaral",
+          "Belle and Sebastian",
+          "The Mars Volta",
+          "Muse",
+          "Moby",
+          "Swans"
+        ],
+        "Nubis84": [
+          "Arvo Pärt"
+        ],
+        "sdecandelario": [
+          "Edge of Sanity",
+          "LUJURIA",
+          "Heaven Shall Burn"
+        ]
+      },
+      "top_artists": [
+        "Edge of Sanity",
+        "LUJURIA",
+        "Heaven Shall Burn",
+        "Amaral",
+        "Swans",
+        "Moby",
+        "Belle and Sebastian",
+        "Muse",
+        "The Mars Volta",
+        "Arvo Pärt"
+      ],
+      "top_albums": [
+        "Edge of Sanity - Crimson II",
+        "LUJURIA - El Poder Del Deseo",
+        "Heaven Shall Burn - Asunder",
+        "Amaral - Estrella de mar",
+        "Swans - Children of God/World of Skin",
+        "Moby - 18 - B Sides",
+        "Belle and Sebastian - Dear Catastrophe Waitress",
+        "Muse - Absolution",
+        "The Mars Volta - Deloused in the Comatorium",
+        "Arvo Pärt - De Profundis"
+      ]
+    },
+    {
+      "name": "2002",
+      "count": 44,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 16,
+        "Nubis84": 1,
+        "sdecandelario": 27
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Moby",
+          "múm",
+          "Nine Inch Nails"
+        ],
+        "Nubis84": [
+          "Johnny Cash"
+        ],
+        "sdecandelario": [
+          "Saltatio Mortis",
+          "Slayer",
+          "VNV Nation",
+          "Down",
+          "Wolf",
+          "Sum 41",
+          "Anvil",
+          "Warcry",
+          "Ozzy Osbourne"
+        ]
+      },
+      "top_artists": [
+        "Down",
+        "múm",
+        "Moby",
+        "Warcry",
+        "VNV Nation",
+        "Nine Inch Nails",
+        "Johnny Cash",
+        "Anvil",
+        "Sum 41",
+        "Saltatio Mortis"
+      ],
+      "top_albums": [
+        "Down - Down II",
+        "múm - Finally We Are No One",
+        "Moby - 18",
+        "Warcry - El Sello De Los Tiempos",
+        "VNV Nation - Futureperfect",
+        "Nine Inch Nails - And All That Could Have Been/Still",
+        "Johnny Cash - American IV: The Man Comes Around",
+        "Anvil - Forged In Fire",
+        "Sum 41 - Does This Look Infected?",
+        "Saltatio Mortis - Das Zweite Gesicht"
+      ]
+    },
+    {
+      "name": "2001",
+      "count": 44,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 23,
+        "Nubis84": 5,
+        "sdecandelario": 16
+      },
+      "user_artists": {
+        "Frikomid": [
+          "A Silver Mt. Zion",
+          "Radiohead",
+          "Yann Tiersen"
+        ],
+        "Nubis84": [
+          "Love",
+          "Chillout Moods",
+          "Alio Die & Amelia Cuni"
+        ],
+        "sdecandelario": [
+          "Daft Punk",
+          "VNV Nation",
+          "Iron Savior",
+          "LUJURIA",
+          "Soilwork"
+        ]
+      },
+      "top_artists": [
+        "Radiohead",
+        "Soilwork",
+        "A Silver Mt. Zion",
+        "Alio Die & Amelia Cuni",
+        "Yann Tiersen",
+        "Daft Punk",
+        "VNV Nation",
+        "Chillout Moods",
+        "Love",
+        "LUJURIA"
+      ],
+      "top_albums": [
+        "Radiohead - Amnesiac",
+        "Soilwork - A Predator's Portrait",
+        "A Silver Mt. Zion - Born Into Trouble As The Sparks Fly Upward.",
+        "Alio Die & Amelia Cuni - Apsaras",
+        "Yann Tiersen - Amelie From Montmartre",
+        "Daft Punk - Discovery",
+        "VNV Nation - Advance and Follow",
+        "Chillout Moods - Chillout Moods",
+        "Love - Forever Changes",
+        "LUJURIA - Enemigos de la Castidad"
+      ]
+    },
+    {
+      "name": "2004",
+      "count": 42,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 5,
+        "Nubis84": 12,
+        "sdecandelario": 25
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Radiohead",
+          "Wilco"
+        ],
+        "Nubis84": [
+          "Harold Budd/Brian Eno",
+          "Arthur Russell",
+          "Arvo Pärt",
+          "Sleep Research Facility"
+        ],
+        "sdecandelario": [
+          "Bad Religion",
+          "Interpol",
+          "Guns N' Roses",
+          "Saratoga",
+          "Warcry"
+        ]
+      },
+      "top_artists": [
+        "Bad Religion",
+        "Warcry",
+        "Sleep Research Facility",
+        "Wilco",
+        "Interpol",
+        "Radiohead",
+        "Harold Budd/Brian Eno",
+        "Arthur Russell",
+        "Arvo Pärt",
+        "Guns N' Roses"
+      ],
+      "top_albums": [
+        "Bad Religion - Against the Grain",
+        "Warcry - Alea Jacta Est",
+        "Sleep Research Facility - Dead Weather Machine",
+        "Wilco - A Ghost is Born",
+        "Interpol - Antics",
+        "Radiohead - Com Lag: 2+2=5",
+        "Harold Budd/Brian Eno - AMBIENT #2 The Plateaux of Mirror",
+        "Arvo Pärt - Cantus",
+        "Arthur Russell - 2004 - The World of Arthur Russell",
+        "Arthur Russell - Calling Out of Context"
+      ]
+    },
+    {
+      "name": "2007",
+      "count": 40,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 28,
+        "Nubis84": 6,
+        "sdecandelario": 6
+      },
+      "user_artists": {
+        "Frikomid": [
+          "ABBA",
+          "The Knife",
+          "Boney M.",
+          "Depeche Mode"
+        ],
+        "Nubis84": [
+          "Ludovico Einaudi",
+          "Sleep Research Facility"
+        ],
+        "sdecandelario": [
+          "Saltatio Mortis",
+          "Bloc Party",
+          "No Use for a Name",
+          "Danzig",
+          "Comeback Kid",
+          "Simian Mobile Disco"
+        ]
+      },
+      "top_artists": [
+        "The Knife",
+        "Ludovico Einaudi",
+        "ABBA",
+        "Sleep Research Facility",
+        "Depeche Mode",
+        "Boney M.",
+        "Saltatio Mortis",
+        "No Use for a Name",
+        "Comeback Kid",
+        "Bloc Party"
+      ],
+      "top_albums": [
+        "The Knife - Deep Cuts",
+        "Ludovico Einaudi - Divenire",
+        "ABBA - ABBA Gold",
+        "Sleep Research Facility - Deep_Frieze",
+        "Depeche Mode - Exciter",
+        "Boney M. - 100 Hits Of The '70s",
+        "Saltatio Mortis - Aus Der Asche",
+        "No Use for a Name - All The Best Songs",
+        "Comeback Kid - Broadcasting",
+        "Bloc Party - A Weekend In the City"
+      ]
+    },
+    {
+      "name": "2006",
+      "count": 32,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 11,
+        "Nubis84": 8,
+        "sdecandelario": 13
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Muse",
+          "Massive Attack",
+          "Spiritual Front"
+        ],
+        "Nubis84": [
+          "Arthur Russell",
+          "Tortoise",
+          "Johnny Cash",
+          "Agalloch"
+        ],
+        "sdecandelario": [
+          "Children of Bodom",
+          "As Blood Runs Black",
+          "Yeah Yeah Yeahs",
+          "Bring Me the Horizon",
+          "Agalloch",
+          "Silverstein",
+          "Snow Patrol"
+        ]
+      },
+      "top_artists": [
+        "Spiritual Front",
+        "Arthur Russell",
+        "Silverstein",
+        "Massive Attack",
+        "As Blood Runs Black",
+        "Muse",
+        "Agalloch",
+        "Johnny Cash",
+        "Tortoise",
+        "Children of Bodom"
+      ],
+      "top_albums": [
+        "Spiritual Front - Armageddon Gigolo",
+        "Arthur Russell - Another Thought",
+        "Silverstein - Discovering the Waterfront",
+        "Massive Attack - Collected",
+        "As Blood Runs Black - Allegiance",
+        "Muse - Black Holes and Revelations",
+        "Agalloch - Ashes Against the Grain",
+        "Johnny Cash - American Recordings V - A Hundred Highways",
+        "Tortoise - A Lazarus Taxon (Disc 2)",
+        "Children of Bodom - Follow the Reaper"
+      ]
+    },
+    {
+      "name": "1999",
+      "count": 30,
+      "users": [
+        "paqueradejere",
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 1,
+        "Nubis84": 3,
+        "paqueradejere": 1,
+        "sdecandelario": 25
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Muse"
+        ],
+        "Nubis84": [
+          "Luar na Lubre"
+        ],
+        "paqueradejere": [
+          "Fito Y Fitipaldis"
+        ],
+        "sdecandelario": [
+          "VNV Nation",
+          "Grave Digger",
+          "Bruce Dickinson",
+          "Kill Hannah",
+          "The Dillinger Escape Plan"
+        ]
+      },
+      "top_artists": [
+        "The Dillinger Escape Plan",
+        "Kill Hannah",
+        "Luar na Lubre",
+        "Grave Digger",
+        "Muse",
+        "Fito Y Fitipaldis",
+        "Bruce Dickinson",
+        "VNV Nation"
+      ],
+      "top_albums": [
+        "The Dillinger Escape Plan - Calculating Infinity",
+        "Kill Hannah - American Jet Set",
+        "Luar na Lubre - Cabo do mundo",
+        "Grave Digger - Excalibur",
+        "Muse - Cave",
+        "Fito Y Fitipaldis - A puerta cerrada",
+        "Bruce Dickinson - Balls to Picasso",
+        "VNV Nation - Empires"
+      ]
+    },
+    {
+      "name": "2005",
+      "count": 27,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 10,
+        "Nubis84": 10,
+        "sdecandelario": 7
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Arcade Fire",
+          "Moby",
+          "The Mars Volta"
+        ],
+        "Nubis84": [
+          "Kate Bush",
+          "Bruce Springsteen"
+        ],
+        "sdecandelario": [
+          "Combichrist",
+          "Maxïmo Park",
+          "Mojinos Escozíos",
+          "Black Knight",
+          "Judas Priest",
+          "A Day to Remember"
+        ]
+      },
+      "top_artists": [
+        "Bruce Springsteen",
+        "Arcade Fire",
+        "Moby",
+        "The Mars Volta",
+        "Kate Bush",
+        "Combichrist",
+        "Black Knight",
+        "Mojinos Escozíos",
+        "Judas Priest",
+        "Maxïmo Park"
+      ],
+      "top_albums": [
+        "Bruce Springsteen - Born to Run",
+        "Arcade Fire - Ep",
+        "Moby - Beautiful",
+        "The Mars Volta - Frances the Mute",
+        "Kate Bush - Aerial  (CD1)",
+        "Combichrist - Everybody Hates You",
+        "Black Knight - Black Knight",
+        "Mojinos Escozíos - Con Cuernos y a lo Loco",
+        "Judas Priest - Angel of Retribution",
+        "Maxïmo Park - A Certain Trigger"
+      ]
+    },
+    {
+      "name": "1987",
+      "count": 20,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 9,
+        "Nubis84": 1,
+        "sdecandelario": 10
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Swans"
+        ],
+        "Nubis84": [
+          "Nick Drake"
+        ],
+        "sdecandelario": [
+          "The Jesus and Mary Chain"
+        ]
+      },
+      "top_artists": [
+        "The Jesus and Mary Chain",
+        "Swans",
+        "Nick Drake"
+      ],
+      "top_albums": [
+        "The Jesus and Mary Chain - Darklands",
+        "Swans - Children of God",
+        "Nick Drake - Five Leaves Left"
+      ]
+    },
+    {
+      "name": "1989",
+      "count": 18,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 17
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Harry Nilsson"
+        ],
+        "sdecandelario": [
+          "Deep Purple",
+          "Pixies",
+          "Sodom"
+        ]
+      },
+      "top_artists": [
+        "Pixies",
+        "Harry Nilsson",
+        "Deep Purple",
+        "Sodom"
+      ],
+      "top_albums": [
+        "Pixies - Doolittle",
+        "Harry Nilsson - All Time Greatest Hits",
+        "Deep Purple - Burn",
+        "Sodom - Agent Orange"
+      ]
+    },
+    {
+      "name": "2000",
+      "count": 13,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 12
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Steven R. Smith"
+        ],
+        "sdecandelario": [
+          "Impellitteri",
+          "Axxis"
+        ]
+      },
+      "top_artists": [
+        "Impellitteri",
+        "Steven R. Smith",
+        "Axxis"
+      ],
+      "top_albums": [
+        "Impellitteri - Crunch",
+        "Steven R. Smith - Darla 100 * 1994-2000 - Disc 1",
+        "Axxis - Back to the Kingdom"
+      ]
+    },
+    {
+      "name": "1994",
+      "count": 12,
+      "users": [
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 9,
+        "Nubis84": 1,
+        "sdecandelario": 2
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Portishead"
+        ],
+        "Nubis84": [
+          "Portishead"
+        ],
+        "sdecandelario": [
+          "Green Day"
+        ]
+      },
+      "top_artists": [
+        "Portishead",
+        "Green Day"
+      ],
+      "top_albums": [
+        "Portishead - Dummy",
+        "Green Day - Dookie"
+      ]
+    },
+    {
+      "name": "1984",
+      "count": 11,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 9,
+        "sdecandelario": 2
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Enno Velthuys"
+        ],
+        "sdecandelario": [
+          "Death in June",
+          "Accept"
+        ]
+      },
+      "top_artists": [
+        "Enno Velthuys",
+        "Accept",
+        "Death in June"
+      ],
+      "top_albums": [
+        "Enno Velthuys - A Glimpse Of Light",
+        "Accept - Balls to the Wall",
+        "Death in June - Burial"
+      ]
+    },
+    {
+      "name": "1985",
+      "count": 10,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 9,
+        "sdecandelario": 1
+      },
+      "user_artists": {
+        "Nubis84": [
+          "Bob Dylan"
+        ],
+        "sdecandelario": [
+          "Ángeles del Infierno"
+        ]
+      },
+      "top_artists": [
+        "Bob Dylan",
+        "Ángeles del Infierno"
+      ],
+      "top_albums": [
+        "Bob Dylan - Desire",
+        "Ángeles del Infierno - Diabolicca"
+      ]
+    },
+    {
+      "name": "1996",
+      "count": 5,
+      "users": [
+        "paqueradejere",
+        "Frikomid",
+        "Nubis84",
+        "sdecandelario"
+      ],
+      "user_counts": {
+        "Frikomid": 1,
+        "Nubis84": 1,
+        "paqueradejere": 1,
+        "sdecandelario": 2
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Turbonegro"
+        ],
+        "Nubis84": [
+          "Neil Young"
+        ],
+        "paqueradejere": [
+          "Extremoduro"
+        ],
+        "sdecandelario": [
+          "Extremoduro"
+        ]
+      },
+      "top_artists": [
+        "Extremoduro",
+        "Turbonegro",
+        "Neil Young"
+      ],
+      "top_albums": [
+        "Extremoduro - Agila",
+        "Turbonegro - Ass Cobra",
+        "Neil Young - Dead Man"
+      ]
+    },
+    {
+      "name": "2017",
+      "count": 4,
+      "users": [
+        "Frikomid",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Frikomid": 1,
+        "Nubis84": 3
+      },
+      "user_artists": {
+        "Frikomid": [
+          "Nils Frahm"
+        ],
+        "Nubis84": [
+          "Tom Waits",
+          "Jim O'Rourke"
+        ]
+      },
+      "top_artists": [
+        "Tom Waits",
+        "Nils Frahm",
+        "Jim O'Rourke"
+      ],
+      "top_albums": [
+        "Tom Waits - Alice",
+        "Nils Frahm - Erased Tapes Collection II",
+        "Jim O'Rourke - Eureka"
+      ]
+    },
+    {
+      "name": "1991",
+      "count": 4,
+      "users": [
+        "sdecandelario",
+        "Nubis84"
+      ],
+      "user_counts": {
+        "Nubis84": 1,
+        "sdecandelario": 3
+      },
+      "user_artists": {
+        "Nubis84": [
+          "George Harrison"
+        ],
+        "sdecandelario": [
+          "Tank",
+          "Running Wild",
+          "Alcatrazz"
+        ]
+      },
+      "top_artists": [
+        "George Harrison",
+        "Running Wild",
+        "Alcatrazz",
+        "Tank"
+      ],
+      "top_albums": [
+        "George Harrison - Dark Horse",
+        "Running Wild - Blazon Stone",
+        "Alcatrazz - Disturbing The Peace",
+        "Tank - Filth Hounds of Hades"
+      ]
+    }
+  ],
+  "novelties": {
+    "nuevos": {
+      "artists": [],
+      "albums": [
+        {
+          "name": "Yann Tiersen - Cascade Street",
+          "artist": "Yann Tiersen",
+          "album": "Cascade Street",
+          "count": 28,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1395784692
+        },
+        {
+          "name": "Slowdive - I Saw The Sun Unreleased",
+          "artist": "Slowdive",
+          "album": "I Saw The Sun Unreleased",
+          "count": 30,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1395672497
+        },
+        {
+          "name": "Sufjan Stevens - The Age of Adz",
+          "artist": "Sufjan Stevens",
+          "album": "The Age of Adz",
+          "count": 36,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1395090427
+        },
+        {
+          "name": "The War on Drugs - Lost in the Dream",
+          "artist": "The War on Drugs",
+          "album": "Lost in the Dream",
+          "count": 76,
+          "users": [
+            "Frikomid",
+            "Nubis84",
+            "sdecandelario"
+          ],
+          "first_date": 1394797974
+        },
+        {
+          "name": "Saint Etienne - Words and Music by Saint Etienne",
+          "artist": "Saint Etienne",
+          "album": "Words and Music by Saint Etienne",
+          "count": 31,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1394287109
+        },
+        {
+          "name": "Sophie Ellis-Bextor - Wanderlust",
+          "artist": "Sophie Ellis-Bextor",
+          "album": "Wanderlust",
+          "count": 30,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1394201252
+        }
+      ],
+      "tracks": [
+        {
+          "name": "Viento Smith - Donde los Aviones",
+          "artist": "Viento Smith",
+          "track": "Donde los Aviones",
+          "count": 11,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1395865575
+        },
+        {
+          "name": "Grizzly Bear - Foreground",
+          "artist": "Grizzly Bear",
+          "track": "Foreground",
+          "count": 11,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1395596674
+        },
+        {
+          "name": "Sufjan Stevens - Futile Devices",
+          "artist": "Sufjan Stevens",
+          "track": "Futile Devices",
+          "count": 11,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1395090427
+        },
+        {
+          "name": "Slowdive - Ambient Guitar - Demo Version",
+          "artist": "Slowdive",
+          "track": "Ambient Guitar - Demo Version",
+          "count": 13,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1394835053
+        },
+        {
+          "name": "The War on Drugs - An Ocean in Between the Waves",
+          "artist": "The War on Drugs",
+          "track": "An Ocean in Between the Waves",
+          "count": 14,
+          "users": [
+            "Frikomid",
+            "Nubis84",
+            "sdecandelario"
+          ],
+          "first_date": 1394799167
+        },
+        {
+          "name": "Slowdive - Miranda - Demo Version",
+          "artist": "Slowdive",
+          "track": "Miranda - Demo Version",
+          "count": 14,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1394746606
+        },
+        {
+          "name": "Saint Etienne - Over the Border",
+          "artist": "Saint Etienne",
+          "track": "Over the Border",
+          "count": 18,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1394398738
+        },
+        {
+          "name": "Mike Oldfield - Castaway",
+          "artist": "Mike Oldfield",
+          "track": "Castaway",
+          "count": 11,
+          "users": [
+            "Frikomid"
+          ],
+          "first_date": 1394056336
+        }
+      ]
+    },
+    "nuevos_compartidos": {
+      "artists": [],
+      "albums": [],
+      "tracks": []
+    },
+    "nuevos_para_usuario": {
+      "artists": [],
+      "albums": [],
+      "tracks": []
+    },
+    "nuevos_para_usuarios": {
+      "Frikomid": {
+        "artists": [
+          {
+            "name": "The War on Drugs",
+            "period_count": 16,
+            "total_count": 230,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395238550
+          },
+          {
+            "name": "Belle and Sebastian",
+            "period_count": 11,
+            "total_count": 515,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395584829
+          },
+          {
+            "name": "Foster the People",
+            "period_count": 32,
+            "total_count": 52,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395435480
+          },
+          {
+            "name": "Pendulum",
+            "period_count": 2,
+            "total_count": 14,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1393952844
+          },
+          {
+            "name": "Porcelain Black",
+            "period_count": 2,
+            "total_count": 8,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1393888340
+          },
+          {
+            "name": "Pharrell Williams",
+            "period_count": 1,
+            "total_count": 4,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395585137
+          }
+        ],
+        "albums": [
+          {
+            "name": "The War on Drugs - Lost in the Dream",
+            "artist": "The War on Drugs",
+            "album": "Lost in the Dream",
+            "period_count": 16,
+            "total_count": 171,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395238550
+          },
+          {
+            "name": "Foster the People - Torches",
+            "artist": "Foster the People",
+            "album": "Torches",
+            "period_count": 12,
+            "total_count": 14,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395440077
+          }
+        ],
+        "tracks": [
+          {
+            "name": "The War on Drugs - Eyes to the Wind",
+            "artist": "The War on Drugs",
+            "track": "Eyes to the Wind",
+            "period_count": 1,
+            "total_count": 67,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395241736
+          },
+          {
+            "name": "The War on Drugs - An Ocean in Between the Waves",
+            "artist": "The War on Drugs",
+            "track": "An Ocean in Between the Waves",
+            "period_count": 8,
+            "total_count": 48,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395239745
+          },
+          {
+            "name": "The War on Drugs - Red Eyes",
+            "artist": "The War on Drugs",
+            "track": "Red Eyes",
+            "period_count": 1,
+            "total_count": 33,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395239082
+          },
+          {
+            "name": "The War on Drugs - Suffering",
+            "artist": "The War on Drugs",
+            "track": "Suffering",
+            "period_count": 1,
+            "total_count": 5,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395239382
+          },
+          {
+            "name": "The War on Drugs - The Haunting Idle",
+            "artist": "The War on Drugs",
+            "track": "The Haunting Idle",
+            "period_count": 1,
+            "total_count": 4,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395242090
+          },
+          {
+            "name": "The War on Drugs - Disappearing",
+            "artist": "The War on Drugs",
+            "track": "Disappearing",
+            "period_count": 1,
+            "total_count": 4,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395241407
+          },
+          {
+            "name": "The War on Drugs - Under the Pressure",
+            "artist": "The War on Drugs",
+            "track": "Under the Pressure",
+            "period_count": 1,
+            "total_count": 4,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395238550
+          },
+          {
+            "name": "The War on Drugs - Lost in the Dream",
+            "artist": "The War on Drugs",
+            "track": "Lost in the Dream",
+            "period_count": 1,
+            "total_count": 3,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395242624
+          },
+          {
+            "name": "The War on Drugs - Burning",
+            "artist": "The War on Drugs",
+            "track": "Burning",
+            "period_count": 1,
+            "total_count": 3,
+            "coincident_users": [
+              "sdecandelario",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395242278
+          },
+          {
+            "name": "Vetusta Morla - Copenhague",
+            "artist": "Vetusta Morla",
+            "track": "Copenhague",
+            "period_count": 1,
+            "total_count": 60,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1394490002
+          },
+          {
+            "name": "The Smashing Pumpkins - Tonight, Tonight",
+            "artist": "The Smashing Pumpkins",
+            "track": "Tonight, Tonight",
+            "period_count": 1,
+            "total_count": 36,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395779271
+          },
+          {
+            "name": "Swans - A Little God In My Hands",
+            "artist": "Swans",
+            "track": "A Little God In My Hands",
+            "period_count": 2,
+            "total_count": 29,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395499841
+          },
+          {
+            "name": "Foster the People - Pumped Up Kicks",
+            "artist": "Foster the People",
+            "track": "Pumped Up Kicks",
+            "period_count": 2,
+            "total_count": 4,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395440077
+          },
+          {
+            "name": "Pharrell Williams - Happy",
+            "artist": "Pharrell Williams",
+            "track": "Happy",
+            "period_count": 1,
+            "total_count": 3,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395585137
+          },
+          {
+            "name": "Vetusta Morla - Al respirar",
+            "artist": "Vetusta Morla",
+            "track": "Al respirar",
+            "period_count": 1,
+            "total_count": 2,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1394820078
+          }
+        ]
+      },
+      "Nubis84": {
+        "artists": [],
+        "albums": [
+          {
+            "name": "The War on Drugs - Lost in the Dream",
+            "artist": "The War on Drugs",
+            "album": "Lost in the Dream",
+            "period_count": 50,
+            "total_count": 133,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394797974
+          }
+        ],
+        "tracks": [
+          {
+            "name": "The War on Drugs - Red Eyes",
+            "artist": "The War on Drugs",
+            "track": "Red Eyes",
+            "period_count": 5,
+            "total_count": 39,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394798506
+          },
+          {
+            "name": "The War on Drugs - An Ocean in Between the Waves",
+            "artist": "The War on Drugs",
+            "track": "An Ocean in Between the Waves",
+            "period_count": 5,
+            "total_count": 31,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394799167
+          },
+          {
+            "name": "The War on Drugs - Under the Pressure",
+            "artist": "The War on Drugs",
+            "track": "Under the Pressure",
+            "period_count": 5,
+            "total_count": 13,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394797974
+          },
+          {
+            "name": "The War on Drugs - Burning",
+            "artist": "The War on Drugs",
+            "track": "Burning",
+            "period_count": 5,
+            "total_count": 9,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394800555
+          },
+          {
+            "name": "The War on Drugs - Disappearing",
+            "artist": "The War on Drugs",
+            "track": "Disappearing",
+            "period_count": 5,
+            "total_count": 9,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394799599
+          },
+          {
+            "name": "The War on Drugs - Suffering",
+            "artist": "The War on Drugs",
+            "track": "Suffering",
+            "period_count": 5,
+            "total_count": 8,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394798805
+          },
+          {
+            "name": "The War on Drugs - The Haunting Idle",
+            "artist": "The War on Drugs",
+            "track": "The Haunting Idle",
+            "period_count": 5,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394800366
+          },
+          {
+            "name": "The War on Drugs - Eyes to the Wind",
+            "artist": "The War on Drugs",
+            "track": "Eyes to the Wind",
+            "period_count": 5,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394800010
+          },
+          {
+            "name": "The War on Drugs - Lost in the Dream",
+            "artist": "The War on Drugs",
+            "track": "Lost in the Dream",
+            "period_count": 5,
+            "total_count": 6,
+            "coincident_users": [
+              "Frikomid",
+              "sdecandelario"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1394800902
+          },
+          {
+            "name": "The War on Drugs - In Reverse",
+            "artist": "The War on Drugs",
+            "track": "In Reverse",
+            "period_count": 5,
+            "total_count": 6,
+            "coincident_users": [
+              "sdecandelario"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1394801151
+          }
+        ]
+      },
+      "sdecandelario": {
+        "artists": [
+          {
+            "name": "Have a Nice Life",
+            "period_count": 8,
+            "total_count": 153,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1394538698
+          }
+        ],
+        "albums": [
+          {
+            "name": "The War on Drugs - Lost in the Dream",
+            "artist": "The War on Drugs",
+            "album": "Lost in the Dream",
+            "period_count": 10,
+            "total_count": 95,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395318286
+          },
+          {
+            "name": "Mogwai - Rave Tapes",
+            "artist": "Mogwai",
+            "album": "Rave Tapes",
+            "period_count": 10,
+            "total_count": 41,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1393858266
+          },
+          {
+            "name": "Have a Nice Life - The Unnatural World",
+            "artist": "Have a Nice Life",
+            "album": "The Unnatural World",
+            "period_count": 8,
+            "total_count": 36,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1394538698
+          },
+          {
+            "name": "Covenant - Leaving Babylon",
+            "artist": "Covenant",
+            "album": "Leaving Babylon",
+            "period_count": 9,
+            "total_count": 26,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395387511
+          },
+          {
+            "name": "Sigur Rós - Ágætis byrjun",
+            "artist": "Sigur Rós",
+            "album": "Ágætis byrjun",
+            "period_count": 10,
+            "total_count": 21,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395832174
+          },
+          {
+            "name": "St. Vincent - St. Vincent",
+            "artist": "St. Vincent",
+            "album": "St. Vincent",
+            "period_count": 11,
+            "total_count": 15,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395745796
+          }
+        ],
+        "tracks": [
+          {
+            "name": "The War on Drugs - Under the Pressure",
+            "artist": "The War on Drugs",
+            "track": "Under the Pressure",
+            "period_count": 1,
+            "total_count": 9,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395318286
+          },
+          {
+            "name": "The War on Drugs - An Ocean in Between the Waves",
+            "artist": "The War on Drugs",
+            "track": "An Ocean in Between the Waves",
+            "period_count": 1,
+            "total_count": 8,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395319529
+          },
+          {
+            "name": "The War on Drugs - Lost in the Dream",
+            "artist": "The War on Drugs",
+            "track": "Lost in the Dream",
+            "period_count": 1,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395327100
+          },
+          {
+            "name": "The War on Drugs - Burning",
+            "artist": "The War on Drugs",
+            "track": "Burning",
+            "period_count": 1,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395321018
+          },
+          {
+            "name": "The War on Drugs - The Haunting Idle",
+            "artist": "The War on Drugs",
+            "track": "The Haunting Idle",
+            "period_count": 1,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395320829
+          },
+          {
+            "name": "The War on Drugs - Eyes to the Wind",
+            "artist": "The War on Drugs",
+            "track": "Eyes to the Wind",
+            "period_count": 1,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395320472
+          },
+          {
+            "name": "The War on Drugs - Disappearing",
+            "artist": "The War on Drugs",
+            "track": "Disappearing",
+            "period_count": 1,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395319961
+          },
+          {
+            "name": "The War on Drugs - Suffering",
+            "artist": "The War on Drugs",
+            "track": "Suffering",
+            "period_count": 1,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid",
+              "Nubis84"
+            ],
+            "num_coincidences": 2,
+            "first_date": 1395319166
+          },
+          {
+            "name": "Swans - A Little God In My Hands",
+            "artist": "Swans",
+            "track": "A Little God In My Hands",
+            "period_count": 1,
+            "total_count": 10,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395500379
+          },
+          {
+            "name": "The War on Drugs - In Reverse",
+            "artist": "The War on Drugs",
+            "track": "In Reverse",
+            "period_count": 1,
+            "total_count": 7,
+            "coincident_users": [
+              "Nubis84"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395327349
+          },
+          {
+            "name": "Have a Nice Life - Defenestration Song",
+            "artist": "Have a Nice Life",
+            "track": "Defenestration Song",
+            "period_count": 1,
+            "total_count": 7,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1394539013
+          },
+          {
+            "name": "Have a Nice Life - Dan and Tim, Reunited By Fate",
+            "artist": "Have a Nice Life",
+            "track": "Dan and Tim, Reunited By Fate",
+            "period_count": 1,
+            "total_count": 5,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1394540860
+          },
+          {
+            "name": "Have a Nice Life - Burial Society",
+            "artist": "Have a Nice Life",
+            "track": "Burial Society",
+            "period_count": 1,
+            "total_count": 5,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1394539435
+          },
+          {
+            "name": "Mogwai - Remurdered",
+            "artist": "Mogwai",
+            "track": "Remurdered",
+            "period_count": 1,
+            "total_count": 5,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1393860043
+          },
+          {
+            "name": "St. Vincent - Rattlesnake",
+            "artist": "St. Vincent",
+            "track": "Rattlesnake",
+            "period_count": 1,
+            "total_count": 4,
+            "coincident_users": [
+              "Frikomid"
+            ],
+            "num_coincidences": 1,
+            "first_date": 1395745796
+          }
+        ]
+      }
+    }
+  },
+  "period_label": "March 2014",
+  "from_date": "2014-03-01",
+  "to_date": "2014-03-31",
+  "generated_at": "2025-11-14 20:06"
+};
+        const hasNovelties = stats.novelties !== undefined;
+
+        // Función para obtener novedades de usuario desde datos precalculados
+        function getUserNovelties(user) {
+            if (!stats.novelties || !stats.novelties.nuevos_para_usuarios) {
+                return { artists: [], albums: [], tracks: [] };
+            }
+
+            return stats.novelties.nuevos_para_usuarios[user] || { artists: [], albums: [], tracks: [] };
+        }
+
+        // Funcionalidad del botón de usuario
+        function initializeUserSelector() {
+            const userButton = document.getElementById('userButton');
+            const userModal = document.getElementById('userModal');
+            const userModalClose = document.getElementById('userModalClose');
+            const userOptions = document.getElementById('userOptions');
+
+            // Cargar usuario guardado desde localStorage
+            let selectedUser = localStorage.getItem('lastfm_selected_user') || '';
+
+            // Llenar opciones de usuarios
+            availableUsers.forEach(user => {
+                const option = document.createElement('div');
+                option.className = 'user-option';
+                option.dataset.user = user;
+                option.textContent = user;
+                userOptions.appendChild(option);
+            });
+
+            // Marcar opción seleccionada
+            updateSelectedUserOption(selectedUser);
+
+            // Event listeners
+            userButton.addEventListener('click', () => {
+                userModal.style.display = 'block';
+            });
+
+            userModalClose.addEventListener('click', () => {
+                userModal.style.display = 'none';
+            });
+
+            userModal.addEventListener('click', (e) => {
+                if (e.target === userModal) {
+                    userModal.style.display = 'none';
+                }
+            });
+
+            userOptions.addEventListener('click', (e) => {
+                if (e.target.classList.contains('user-option')) {
+                    const user = e.target.dataset.user;
+                    selectedUser = user;
+
+                    // Guardar en localStorage
+                    if (user) {
+                        localStorage.setItem('lastfm_selected_user', user);
+                    } else {
+                        localStorage.removeItem('lastfm_selected_user');
+                    }
+
+                    updateSelectedUserOption(user);
+                    userModal.style.display = 'none';
+                    renderStats(); // Re-renderizar con nuevo usuario
+                }
+            });
+
+            return selectedUser;
+        }
+
+        function updateSelectedUserOption(selectedUser) {
+            const userOptions = document.getElementById('userOptions');
+            userOptions.querySelectorAll('.user-option').forEach(option => {
+                option.classList.remove('selected');
+                if (option.dataset.user === selectedUser) {
+                    option.classList.add('selected');
+                }
+            });
+        }
+
+        // Inicializar categorías activas
+        let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
+        let selectedUser = '';
+
+        document.getElementById('dateRange').textContent = `${stats.from_date || ''} → ${stats.to_date || ''}`;
+        document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
+        document.getElementById('generatedAt').textContent = stats.generated_at || '';
+
+        // Manejar filtros de categorías
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        categoryFilters.forEach(filter => {
+            filter.addEventListener('click', () => {
+                const category = filter.dataset.category;
+
+                if (activeCategories.has(category)) {
+                    activeCategories.delete(category);
+                    filter.classList.remove('active');
+                } else {
+                    activeCategories.add(category);
+                    filter.classList.add('active');
+                }
+
+                renderStats();
+            });
+        });
+
+        function showArtistsPopup(itemName, category, user) {
+            const item = stats[category].find(item => item.name === itemName);
+            if (!item || !item.user_artists || !item.user_artists[user]) return;
+
+            const artists = item.user_artists[user];
+
+            // Crear overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'popup-overlay';
+
+            // Crear popup
+            const popup = document.createElement('div');
+            popup.className = 'artists-popup';
+
+            const header = document.createElement('div');
+            header.className = 'popup-header';
+
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'popup-close';
+            closeBtn.innerHTML = '×';
+            closeBtn.onclick = () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            };
+
+            header.innerHTML = `Artistas de ${user} en "${itemName}"`;
+            header.appendChild(closeBtn);
+
+            const artistList = document.createElement('ul');
+            artistList.className = 'artist-list';
+
+            artists.forEach(artist => {
+                const li = document.createElement('li');
+                li.textContent = artist;
+                artistList.appendChild(li);
+            });
+
+            popup.appendChild(header);
+            popup.appendChild(artistList);
+
+            // Cerrar al hacer click en overlay
+            overlay.onclick = () => {
+                document.body.removeChild(overlay);
+                document.body.removeChild(popup);
+            };
+
+            document.body.appendChild(overlay);
+            document.body.appendChild(popup);
+        }
+
+        function createNoveltyItem(item, selectedUser) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
+
+            if (selectedUser && item.users.includes(selectedUser)) {
+                itemDiv.classList.add('highlighted');
+            }
+
+            const itemName = document.createElement('div');
+            itemName.className = 'item-name';
+            itemName.textContent = item.name;
+            itemDiv.appendChild(itemName);
+
+            const itemMeta = document.createElement('div');
+            itemMeta.className = 'item-meta';
+
+            // Conteo de plays si existe
+            if (item.count) {
+                const countBadge = document.createElement('span');
+                countBadge.className = 'badge';
+                countBadge.textContent = `${item.count} plays`;
+                itemMeta.appendChild(countBadge);
+            }
+
+            // Fecha de primer scrobble
+            const date = new Date(item.first_date * 1000);
+            const dateBadge = document.createElement('span');
+            dateBadge.className = 'badge';
+            dateBadge.textContent = `Primera vez: ${date.toLocaleDateString('es-ES')}`;
+            itemMeta.appendChild(dateBadge);
+
+            // Usuarios que lo han escuchado
+            item.users.forEach(user => {
+                const userBadge = document.createElement('span');
+                userBadge.className = 'user-badge';
+                if (user === selectedUser) {
+                    userBadge.classList.add('highlighted-user');
+                }
+                userBadge.textContent = user;
+                itemMeta.appendChild(userBadge);
+            });
+
+            itemDiv.appendChild(itemMeta);
+            return itemDiv;
+        }
+
+        function createUserNoveltyItem(item, selectedUser) {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
+            itemDiv.classList.add('highlighted'); // Siempre resaltado para el usuario
+
+            const itemName = document.createElement('div');
+            itemName.className = 'item-name';
+            itemName.textContent = item.name;
+            itemDiv.appendChild(itemName);
+
+            const itemMeta = document.createElement('div');
+            itemMeta.className = 'item-meta';
+
+            // Total de scrobbles del usuario para este elemento
+            if (item.total_count) {
+                const totalBadge = document.createElement('span');
+                totalBadge.className = 'badge';
+                totalBadge.style.background = '#cba6f7';
+                totalBadge.style.color = '#1e1e2e';
+                totalBadge.textContent = `${item.total_count} total plays`;
+                itemMeta.appendChild(totalBadge);
+            }
+
+            // Scrobbles en este período
+            if (item.period_count) {
+                const periodBadge = document.createElement('span');
+                periodBadge.className = 'badge';
+                periodBadge.textContent = `${item.period_count} plays período`;
+                itemMeta.appendChild(periodBadge);
+            }
+
+            // Fecha de primera vez del usuario (si está disponible)
+            if (item.first_date || item.user_first_date) {
+                const date = new Date((item.first_date || item.user_first_date) * 1000);
+                const dateBadge = document.createElement('span');
+                dateBadge.className = 'badge';
+                dateBadge.style.background = '#a6e3a1';
+                dateBadge.style.color = '#1e1e2e';
+                dateBadge.textContent = `Primera vez: ${date.toLocaleDateString('es-ES')}`;
+                itemMeta.appendChild(dateBadge);
+            }
+
+            // Usuarios que también lo escucharon (coincidencias)
+            if (item.coincident_users && item.coincident_users.length > 0) {
+                item.coincident_users.forEach(user => {
+                    const userBadge = document.createElement('span');
+                    userBadge.className = 'user-badge';
+                    userBadge.textContent = user;
+                    itemMeta.appendChild(userBadge);
+                });
+            }
+
+            // Información de coincidencias
+            if (item.num_coincidences) {
+                const coincidencesBadge = document.createElement('span');
+                coincidencesBadge.className = 'badge';
+                coincidencesBadge.style.background = '#f38ba8';
+                coincidencesBadge.style.color = '#1e1e2e';
+                coincidencesBadge.textContent = `${item.num_coincidences} coincidencias`;
+                itemMeta.appendChild(coincidencesBadge);
+            }
+
+            itemDiv.appendChild(itemMeta);
+            return itemDiv;
+        }
+
+        function renderStats() {
+            const container = document.getElementById('categoriesContainer');
+            container.innerHTML = '';
+
+            const categoryTitles = {
+                artists: 'Artistas Más Escuchados',
+                tracks: 'Canciones Más Escuchadas',
+                albums: 'Álbumes Más Escuchados',
+                genres: 'Géneros Más Escuchados',
+                labels: 'Sellos Más Escuchados',
+                years: 'Años Más Escuchados',
+                novelties: 'Novedades'
+            };
+
+            let hasData = false;
+
+            ['artists', 'tracks', 'albums', 'genres', 'labels', 'years', 'novelties'].forEach(categoryKey => {
+                if (!activeCategories.has(categoryKey)) return;
+
+                // Manejo especial para novedades
+                if (categoryKey === 'novelties') {
+                    if (!hasNovelties || !stats.novelties) return;
+
+                    hasData = true;
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.className = 'category visible';
+                    categoryDiv.dataset.category = categoryKey;
+
+                    const title = document.createElement('h3');
+                    title.textContent = categoryTitles[categoryKey];
+                    categoryDiv.appendChild(title);
+
+                    // NUEVOS PARA TODOS
+                    const nuevosSection = document.createElement('div');
+                    nuevosSection.className = 'novelty-section';
+
+                    const nuevosTitle = document.createElement('h4');
+                    nuevosTitle.textContent = '🆕 Nuevos para todos';
+                    nuevosSection.appendChild(nuevosTitle);
+
+                    ['artists', 'albums', 'tracks'].forEach(type => {
+                        const subsection = document.createElement('div');
+                        subsection.className = 'novelty-subsection';
+
+                        const subsectionTitle = document.createElement('h5');
+                        subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                     type === 'albums' ? 'Álbumes' : 'Canciones';
+                        subsection.appendChild(subsectionTitle);
+
+                        const items = stats.novelties.nuevos[type];
+                        if (items && items.length > 0) {
+                            items.forEach(item => {
+                                const itemDiv = createNoveltyItem(item, selectedUser);
+                                subsection.appendChild(itemDiv);
+                            });
+                        } else {
+                            const emptyDiv = document.createElement('div');
+                            emptyDiv.className = 'novelty-empty';
+                            emptyDiv.textContent = 'No hay elementos nuevos';
+                            subsection.appendChild(emptyDiv);
+                        }
+
+                        nuevosSection.appendChild(subsection);
+                    });
+
+                    categoryDiv.appendChild(nuevosSection);
+
+                    // NUEVOS COMPARTIDOS
+                    const compartidosSection = document.createElement('div');
+                    compartidosSection.className = 'novelty-section';
+
+                    const compartidosTitle = document.createElement('h4');
+                    compartidosTitle.textContent = '👥 Nuevos compartidos (50%+ del grupo)';
+                    compartidosSection.appendChild(compartidosTitle);
+
+                    ['artists', 'albums', 'tracks'].forEach(type => {
+                        const subsection = document.createElement('div');
+                        subsection.className = 'novelty-subsection';
+
+                        const subsectionTitle = document.createElement('h5');
+                        subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                     type === 'albums' ? 'Álbumes' : 'Canciones';
+                        subsection.appendChild(subsectionTitle);
+
+                        const items = stats.novelties.nuevos_compartidos[type];
+                        if (items && items.length > 0) {
+                            items.forEach(item => {
+                                const itemDiv = createNoveltyItem(item, selectedUser);
+                                subsection.appendChild(itemDiv);
+                            });
+                        } else {
+                            const emptyDiv = document.createElement('div');
+                            emptyDiv.className = 'novelty-empty';
+                            emptyDiv.textContent = 'No hay elementos nuevos compartidos';
+                            subsection.appendChild(emptyDiv);
+                        }
+
+                        compartidosSection.appendChild(subsection);
+                    });
+
+                    // NUEVOS PARA USUARIO SELECCIONADO
+                    if (selectedUser) {
+                        const usuarioSection = document.createElement('div');
+                        usuarioSection.className = 'novelty-section';
+
+                        const usuarioTitle = document.createElement('h4');
+                        usuarioTitle.textContent = `👤 Nuevos para ${selectedUser} (ya conocidos por el grupo)`;
+                        usuarioSection.appendChild(usuarioTitle);
+
+                        // Calcular novedades para el usuario
+                        const userNovelties = getUserNovelties(selectedUser);
+
+                        ['artists', 'albums', 'tracks'].forEach(type => {
+                            const subsection = document.createElement('div');
+                            subsection.className = 'novelty-subsection';
+
+                            const subsectionTitle = document.createElement('h5');
+                            subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
+                                                         type === 'albums' ? 'Álbumes' : 'Canciones';
+                            subsection.appendChild(subsectionTitle);
+
+                            const items = userNovelties[type];
+                            if (items && items.length > 0) {
+                                items.forEach(item => {
+                                    const itemDiv = createUserNoveltyItem(item, selectedUser);
+                                    subsection.appendChild(itemDiv);
+                                });
+                            } else {
+                                const emptyDiv = document.createElement('div');
+                                emptyDiv.className = 'novelty-empty';
+                                const typeText = type === 'artists' ? 'artistas' :
+                                               type === 'albums' ? 'álbumes' : 'canciones';
+                                emptyDiv.textContent = items ?
+                                    `No hay ${typeText} nuevos para ${selectedUser} con coincidencias en el período` :
+                                    'Calculando novedades del usuario...';
+                                subsection.appendChild(emptyDiv);
+                            }
+
+                            usuarioSection.appendChild(subsection);
+                        });
+
+                        categoryDiv.appendChild(usuarioSection);
+                    } else {
+                        const usuarioSection = document.createElement('div');
+                        usuarioSection.className = 'novelty-section';
+
+                        const usuarioTitle = document.createElement('h4');
+                        usuarioTitle.textContent = '👤 Nuevos para usuario específico';
+                        usuarioSection.appendChild(usuarioTitle);
+
+                        const infoDiv = document.createElement('div');
+                        infoDiv.className = 'novelty-empty';
+                        infoDiv.textContent = 'Selecciona un usuario para ver sus novedades personales';
+                        usuarioSection.appendChild(infoDiv);
+
+                        categoryDiv.appendChild(usuarioSection);
+                    }
+                    container.appendChild(categoryDiv);
+                    return;
+                }
+
+                if (!stats[categoryKey] || stats[categoryKey].length === 0) return;
+
+                hasData = true;
+                const categoryDiv = document.createElement('div');
+                categoryDiv.className = 'category visible';
+                categoryDiv.dataset.category = categoryKey;
+
+                const title = document.createElement('h3');
+                title.textContent = categoryTitles[categoryKey];
+                categoryDiv.appendChild(title);
+
+                stats[categoryKey].forEach(item => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'item';
+
+                    if (selectedUser && item.users.includes(selectedUser)) {
+                        itemDiv.classList.add('highlighted');
+                    }
+
+                    // Hacer clickeable si es género, año o sello y hay usuario seleccionado
+                    const isClickableForUser = ['genres', 'labels', 'years'].includes(categoryKey) &&
+                                       selectedUser &&
+                                       item.users.includes(selectedUser) &&
+                                       item.user_artists &&
+                                       item.user_artists[selectedUser];
+
+                    // Hacer expandible si tiene información detallada
+                    const isExpandable = ['genres', 'labels', 'years'].includes(categoryKey) &&
+                                         ((item.top_artists && item.top_artists.length > 0) ||
+                                          (item.top_albums && item.top_albums.length > 0));
+
+                    const itemName = document.createElement('div');
+                    itemName.className = 'item-name';
+                    itemName.textContent = item.name;
+
+                    if (isExpandable) {
+                        itemDiv.classList.add('expandable');
+                    }
+
+                    itemDiv.appendChild(itemName);
+
+                    const itemMeta = document.createElement('div');
+                    itemMeta.className = 'item-meta';
+
+                    const countBadge = document.createElement('span');
+                    countBadge.className = 'badge';
+                    countBadge.textContent = `${item.count} plays`;
+                    itemMeta.appendChild(countBadge);
+
+                    item.users.sort((a, b) => (item.user_counts[b] || 0) - (item.user_counts[a] || 0));
+
+                    item.users.forEach(user => {
+                        const userBadge = document.createElement('span');
+                        userBadge.className = 'user-badge';
+                        if (user === selectedUser) {
+                            userBadge.classList.add('highlighted-user');
+                        }
+
+                        const userScrobbles = item.user_counts[user] || 0;
+                        userBadge.textContent = `${user} (${userScrobbles})`;
+
+                        if (isClickableForUser && user === selectedUser) {
+                            userBadge.style.cursor = 'pointer';
+                            userBadge.addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                showArtistsPopup(item.name, categoryKey, user);
+                            });
+                        }
+
+                        itemMeta.appendChild(userBadge);
+                    });
+
+                    itemDiv.appendChild(itemMeta);
+
+                    // Detalles expandibles
+                    if (isExpandable) {
+                        const detailsDiv = document.createElement('div');
+                        detailsDiv.className = 'details';
+
+                        if (item.top_artists && item.top_artists.length > 0) {
+                            const artistSection = document.createElement('div');
+                            artistSection.className = 'detail-section';
+
+                            const artistTitle = document.createElement('div');
+                            artistTitle.className = 'detail-title';
+                            artistTitle.textContent = 'Top Artistas:';
+                            artistSection.appendChild(artistTitle);
+
+                            const artistList = document.createElement('div');
+                            artistList.className = 'detail-list';
+
+                            item.top_artists.slice(0, 10).forEach(artist => {
+                                const artistItem = document.createElement('span');
+                                artistItem.className = 'detail-item';
+                                artistItem.textContent = artist;
+                                artistList.appendChild(artistItem);
+                            });
+
+                            artistSection.appendChild(artistList);
+                            detailsDiv.appendChild(artistSection);
+                        }
+
+                        if (item.top_albums && item.top_albums.length > 0) {
+                            const albumSection = document.createElement('div');
+                            albumSection.className = 'detail-section';
+
+                            const albumTitle = document.createElement('div');
+                            albumTitle.className = 'detail-title';
+                            albumTitle.textContent = 'Top Álbumes:';
+                            albumSection.appendChild(albumTitle);
+
+                            const albumList = document.createElement('div');
+                            albumList.className = 'detail-list';
+
+                            item.top_albums.slice(0, 10).forEach(album => {
+                                const albumItem = document.createElement('span');
+                                albumItem.className = 'detail-item';
+                                albumItem.textContent = album;
+                                albumList.appendChild(albumItem);
+                            });
+
+                            albumSection.appendChild(albumList);
+                            detailsDiv.appendChild(albumSection);
+                        }
+
+                        itemDiv.appendChild(detailsDiv);
+
+                        itemDiv.addEventListener('click', (e) => {
+                            if (e.target.classList.contains('user-badge') && e.target.style.cursor === 'pointer') {
+                                return;
+                            }
+
+                            itemDiv.classList.toggle('expanded');
+                            detailsDiv.classList.toggle('expanded');
+                        });
+                    }
+
+                    categoryDiv.appendChild(itemDiv);
+                });
+
+                container.appendChild(categoryDiv);
+            });
+
+            if (!hasData) {
+                const noDataDiv = document.createElement('div');
+                noDataDiv.className = 'no-data';
+                noDataDiv.textContent = 'No hay datos para mostrar con los filtros seleccionados.';
+                container.appendChild(noDataDiv);
+            }
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            selectedUser = initializeUserSelector();
+            renderStats();
+        });
+    </script>
+</body>
+</html>

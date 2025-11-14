@@ -1301,20 +1301,12 @@ class UserStatsHTMLGeneratorFixed:
         }}
 
         function updateSummaryStats(userStats) {{
-            // ✅ DEBUG: Ver qué datos están disponibles
-            console.log('UserStats available keys:', Object.keys(userStats));
-            console.log('top_artists keys length:', Object.keys(userStats.top_artists || {{}}).length);
-            console.log('top_albums keys length:', Object.keys(userStats.top_albums || {{}}).length);
-            console.log('top_tracks keys length:', Object.keys(userStats.top_tracks || {{}}).length);
-            console.log('Genres data:', genresData ? Object.keys(genresData) : 'No genres data');
-            console.log('Labels data:', userStats.labels ? 'Available' : 'Not available');
-
             const totalScrobbles = Object.values(userStats.yearly_scrobbles).reduce((a, b) => a + b, 0);
 
-            // ✅ FIX: Calcular estadísticas reales de elementos únicos del usuario
-            const totalArtists = Object.keys(userStats.top_artists || {{}}).length;
-            const totalAlbums = Object.keys(userStats.top_albums || {{}}).length;
-            const totalTracks = Object.keys(userStats.top_tracks || {{}}).length;
+            // ✅ FIX: Usar conteos únicos reales del analizador
+            const totalArtists = userStats.unique_counts ? userStats.unique_counts.total_artists : 0;
+            const totalAlbums = userStats.unique_counts ? userStats.unique_counts.total_albums : 0;
+            const totalTracks = userStats.unique_counts ? userStats.unique_counts.total_tracks : 0;
 
             // Contar géneros únicos del proveedor seleccionado
             let totalGenres = 0;
@@ -1331,7 +1323,10 @@ class UserStatsHTMLGeneratorFixed:
             // Años únicos con scrobbles
             const totalYears = Object.keys(userStats.yearly_scrobbles || {{}}).length;
 
-            console.log('Calculated stats:', {{ totalScrobbles, totalArtists, totalAlbums, totalTracks, totalGenres, totalLabels, totalYears }});
+            console.log('📊 Stats calculados:', {{
+                totalScrobbles, totalArtists, totalAlbums, totalTracks,
+                totalGenres, totalLabels, totalYears
+            }});
 
             const summaryHTML = `
                 <div class="summary-card">

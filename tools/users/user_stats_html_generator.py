@@ -695,48 +695,6 @@ class UserStatsHTMLGeneratorFixed:
                     <button class="data-type-btn" data-type="cumulative">Acumulativo</button>
                 </div>
 
-                <div class="charts-grid">
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">🎵 Scrobbles por Año</h3>
-                        </div>
-                        <div class="chart-wrapper">
-                            <canvas id="yearlyChart"></canvas>
-                        </div>
-                        <div class="chart-info" id="yearlyInfo"></div>
-                    </div>
-
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">👥 Top Artistas</h3>
-                        </div>
-                        <div class="chart-wrapper">
-                            <canvas id="topArtistsChart"></canvas>
-                        </div>
-                        <div class="chart-info" id="topArtistsInfo"></div>
-                    </div>
-
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">💿 Top Álbumes</h3>
-                        </div>
-                        <div class="chart-wrapper">
-                            <canvas id="topAlbumsChart"></canvas>
-                        </div>
-                        <div class="chart-info" id="topAlbumsInfo"></div>
-                    </div>
-
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">🎶 Top Canciones</h3>
-                        </div>
-                        <div class="chart-wrapper">
-                            <canvas id="topTracksChart"></canvas>
-                        </div>
-                        <div class="chart-info" id="topTracksInfo"></div>
-                    </div>
-                </div>
-
                 <!-- Sección de evolución individual -->
                 <div class="evolution-section">
                     <h3>🎭 Evolución de Géneros Individuales</h3>
@@ -1303,25 +1261,25 @@ class UserStatsHTMLGeneratorFixed:
         function updateSummaryStats(userStats) {{
             const totalScrobbles = Object.values(userStats.yearly_scrobbles).reduce((a, b) => a + b, 0);
 
-            // ✅ FIX: Calcular estadísticas correctamente desde los datos del usuario
+            // ✅ FIX: Calcular estadísticas reales del usuario individual
             const totalArtists = Object.keys(userStats.top_artists || {{}}).length;
             const totalAlbums = Object.keys(userStats.top_albums || {{}}).length;
             const totalTracks = Object.keys(userStats.top_tracks || {{}}).length;
 
-            // Contar géneros del usuario (no coincidencias)
+            // Contar géneros del proveedor seleccionado
             let totalGenres = 0;
             if (genresData && genresData[currentProvider] && genresData[currentProvider].pie_chart) {{
-                totalGenres = Object.keys(genresData[currentProvider].pie_chart.data).length;
+                totalGenres = Object.keys(genresData[currentProvider].pie_chart.data || {{}}).length;
             }}
 
             // Contar sellos del usuario
             let totalLabels = 0;
             if (userStats.labels && userStats.labels.pie_chart) {{
-                totalLabels = Object.keys(userStats.labels.pie_chart.data).length;
+                totalLabels = Object.keys(userStats.labels.pie_chart.data || {{}}).length;
             }}
 
-            // Años únicos desde scrobbles
-            const years = Object.keys(userStats.yearly_scrobbles).length;
+            // Años únicos con scrobbles
+            const totalYears = Object.keys(userStats.yearly_scrobbles || {{}}).length;
 
             const summaryHTML = `
                 <div class="summary-card">
@@ -1349,7 +1307,7 @@ class UserStatsHTMLGeneratorFixed:
                     <div class="label">Sellos</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{years}}</div>
+                    <div class="number">${{totalYears}}</div>
                     <div class="label">Años</div>
                 </div>
             `;

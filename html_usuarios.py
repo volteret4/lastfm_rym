@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
 """
-Last.fm User Stats Generator - Versión FINAL con conteos únicos reales
-Genera estadísticas individuales de usuarios con conteos únicos correctos para stats principales
-FIXES:
-- Corrige el enlace del botón TEMPORALES para que apunte a index.html#temporal
-- Arregla la inicialización de genresData para mostrar los gráficos de géneros
-- Restaura funciones completas para scatter charts y gráficos de evolución
-- Incluye popups interactivos para detalles
-- ✅ NUEVO: Conteos únicos reales del usuario (no solo top 15)
+Last.fm User Stats Generator - Versión FINAL con conteos únicos correctos
+Genera estadísticas individuales de usuarios usando clases extendidas
 """
 
 import os
@@ -26,10 +20,10 @@ try:
 except ImportError:
     pass
 
-# Importar las versiones corregidas
-from tools.users.user_stats_analyzer import UserStatsAnalyzerFixed
-from tools.users.user_stats_database import UserStatsDatabase
-from tools.users.user_stats_html_generator import UserStatsHTMLGeneratorFixed
+# Importar las clases como propones
+from tools.users.user_stats_analyzer import UserStatsAnalyzer
+from tools.users.user_stats_database_extended import UserStatsDatabaseExtended
+from tools.users.user_stats_html_generator_fixed import UserStatsHTMLGeneratorFixed
 
 
 def main():
@@ -52,11 +46,11 @@ def main():
         if not users:
             raise ValueError("LASTFM_USERS no encontrada en las variables de entorno")
 
-        print("🎵 Iniciando análisis de usuarios con conteos únicos REALES...")
+        print("🎵 Iniciando análisis de usuarios con conteos únicos CORRECTOS...")
 
-        # Inicializar componentes con analizador corregido
-        database = UserStatsDatabase()
-        analyzer = UserStatsAnalyzerFixed(database, years_back=args.years_back)  # ✅ Usar analizador corregido
+        # ✅ Usar base de datos extendida con funciones adicionales
+        database = UserStatsDatabaseExtended()
+        analyzer = UserStatsAnalyzer(database, years_back=args.years_back)
         html_generator = UserStatsHTMLGeneratorFixed()
 
         # Analizar estadísticas para todos los usuarios
@@ -80,53 +74,44 @@ def main():
         print(f"✅ Archivo generado: {args.output}")
         print(f"📊 Características FINALES:")
         print(f"  • Géneros diferenciados por proveedor (Last.fm, MusicBrainz, Discogs)")
-        print(f"  • Fallback automático a tabla antigua para Last.fm")
         print(f"  • Gráficos scatter con leyendas visibles y márgenes adecuados")
         print(f"  • Soporte para géneros de álbumes por separado")
         print(f"  • Sección de sellos completamente funcional")
         print(f"  • Manejo mejorado de datos vacíos")
-        print(f"  • ✅ CORREGIDO: Botón TEMPORALES apunta a index.html#temporal")
         print(f"  • ✅ CORREGIDO: Gráficos de géneros se muestran correctamente")
         print(f"  • ✅ RESTAURADO: Funciones completas de scatter charts")
         print(f"  • ✅ RESTAURADO: Funciones completas de evolución")
         print(f"  • ✅ AÑADIDO: Popups interactivos con detalles")
-        print(f"  • ✅ CORREGIDO: Iconos de usuario con persistencia")
-        print(f"  • ✅ NUEVO: Conteos únicos reales del usuario (no solo top 15)")
+        print(f"  • ✅ NUEVO: Conteos únicos reales del usuario (SOLUCIONADO)")
 
         # Mostrar resumen con conteos reales
-        print("\n📈 Resumen con conteos únicos:")
+        print("\n📈 Resumen con conteos únicos REALES:")
         for user, stats in all_user_stats.items():
             total_scrobbles = sum(stats['yearly_scrobbles'].values())
 
             # Mostrar conteos únicos reales
-            unique_info = []
             if 'unique_counts' in stats:
                 unique_counts = stats['unique_counts']
-                unique_info.append(f"{unique_counts['total_artists']} artistas únicos")
-                unique_info.append(f"{unique_counts['total_albums']} álbumes únicos")
-                unique_info.append(f"{unique_counts['total_tracks']} canciones únicas")
+                print(f"  • {user}: {total_scrobbles:,} scrobbles")
+                print(f"    - ✅ {unique_counts['total_artists']} artistas únicos")
+                print(f"    - ✅ {unique_counts['total_albums']} álbumes únicos")
+                print(f"    - ✅ {unique_counts['total_tracks']} canciones únicas")
 
-            # Mostrar información sobre géneros por proveedor
-            genres_info = []
-            if 'genres' in stats:
-                for provider in ['lastfm', 'musicbrainz', 'discogs']:
-                    if provider in stats['genres']:
-                        provider_data = stats['genres'][provider]
-                        if 'pie_chart' in provider_data and provider_data['pie_chart']['total'] > 0:
-                            genres_count = len(provider_data['pie_chart']['data'])
-                            genres_info.append(f"{provider}: {genres_count} géneros")
+                # Mostrar información sobre géneros por proveedor
+                if 'genres' in stats:
+                    for provider in ['lastfm', 'musicbrainz', 'discogs']:
+                        if provider in stats['genres']:
+                            provider_data = stats['genres'][provider]
+                            if 'pie_chart' in provider_data and provider_data['pie_chart']['total'] > 0:
+                                genres_count = len(provider_data['pie_chart']['data'])
+                                print(f"    - {provider}: {genres_count} géneros")
 
-            genres_str = ", ".join(genres_info) if genres_info else "sin géneros"
-
-            # Mostrar información sobre sellos
-            labels_info = ""
-            if 'labels' in stats and 'pie_chart' in stats['labels']:
-                labels_count = len(stats['labels']['pie_chart']['data'])
-                labels_info = f", {labels_count} sellos"
-
-            unique_str = ", ".join(unique_info) if unique_info else "sin conteos únicos"
-
-            print(f"  • {user}: {total_scrobbles:,} scrobbles ({unique_str}) - ({genres_str}{labels_info})")
+                # Mostrar información sobre sellos
+                if 'labels' in stats and 'pie_chart' in stats['labels']:
+                    labels_count = len(stats['labels']['pie_chart']['data'])
+                    print(f"    - {labels_count} sellos discográficos")
+            else:
+                print(f"  • {user}: {total_scrobbles:,} scrobbles (❌ sin conteos únicos)")
 
         database.close()
 

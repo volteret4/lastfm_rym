@@ -288,29 +288,29 @@ class UserStatsHTMLGeneratorFixed:
 
         .summary-stats {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 15px;
-            max-width: 800px;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            max-width: 700px;
             margin: 0 auto;
         }}
 
         .summary-card {{
             background: rgba(203, 166, 247, 0.1);
-            padding: 15px;
+            padding: 10px;
             border-radius: 8px;
             text-align: center;
             border: 1px solid rgba(203, 166, 247, 0.3);
         }}
 
         .summary-card .number {{
-            font-size: 1.5em;
+            font-size: 1.2em;
             font-weight: bold;
             color: #cba6f7;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }}
 
         .summary-card .label {{
-            font-size: 0.9em;
+            font-size: 0.8em;
             color: #a6adc8;
             text-transform: uppercase;
         }}
@@ -1301,20 +1301,28 @@ class UserStatsHTMLGeneratorFixed:
         }}
 
         function updateSummaryStats(userStats) {{
+            // ✅ DEBUG: Ver qué datos están disponibles
+            console.log('UserStats available keys:', Object.keys(userStats));
+            console.log('top_artists keys length:', Object.keys(userStats.top_artists || {{}}).length);
+            console.log('top_albums keys length:', Object.keys(userStats.top_albums || {{}}).length);
+            console.log('top_tracks keys length:', Object.keys(userStats.top_tracks || {{}}).length);
+            console.log('Genres data:', genresData ? Object.keys(genresData) : 'No genres data');
+            console.log('Labels data:', userStats.labels ? 'Available' : 'Not available');
+
             const totalScrobbles = Object.values(userStats.yearly_scrobbles).reduce((a, b) => a + b, 0);
 
-            // ✅ FIX: Calcular estadísticas reales del usuario individual
+            // ✅ FIX: Calcular estadísticas reales de elementos únicos del usuario
             const totalArtists = Object.keys(userStats.top_artists || {{}}).length;
             const totalAlbums = Object.keys(userStats.top_albums || {{}}).length;
             const totalTracks = Object.keys(userStats.top_tracks || {{}}).length;
 
-            // Contar géneros del proveedor seleccionado
+            // Contar géneros únicos del proveedor seleccionado
             let totalGenres = 0;
             if (genresData && genresData[currentProvider] && genresData[currentProvider].pie_chart) {{
                 totalGenres = Object.keys(genresData[currentProvider].pie_chart.data || {{}}).length;
             }}
 
-            // Contar sellos del usuario
+            // Contar sellos únicos del usuario
             let totalLabels = 0;
             if (userStats.labels && userStats.labels.pie_chart) {{
                 totalLabels = Object.keys(userStats.labels.pie_chart.data || {{}}).length;
@@ -1323,21 +1331,23 @@ class UserStatsHTMLGeneratorFixed:
             // Años únicos con scrobbles
             const totalYears = Object.keys(userStats.yearly_scrobbles || {{}}).length;
 
+            console.log('Calculated stats:', {{ totalScrobbles, totalArtists, totalAlbums, totalTracks, totalGenres, totalLabels, totalYears }});
+
             const summaryHTML = `
                 <div class="summary-card">
                     <div class="number">${{totalScrobbles.toLocaleString()}}</div>
                     <div class="label">Scrobbles</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalArtists.toLocaleString()}}</div>
+                    <div class="number">${{totalArtists}}</div>
                     <div class="label">Artistas</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalAlbums.toLocaleString()}}</div>
+                    <div class="number">${{totalAlbums}}</div>
                     <div class="label">Álbumes</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalTracks.toLocaleString()}}</div>
+                    <div class="number">${{totalTracks}}</div>
                     <div class="label">Canciones</div>
                 </div>
                 <div class="summary-card">

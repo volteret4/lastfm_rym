@@ -77,18 +77,7 @@ def main():
             f.write(html_content)
 
         print(f"✅ Archivo generado: {args.output}")
-        print(f"📊 Características COMPLETAS:")
-        print(f"  • Géneros diferenciados por proveedor (Last.fm, MusicBrainz, Discogs)")
-        print(f"  • Fallback automático a tabla antigua para Last.fm")
-        print(f"  • Gráficos scatter con leyendas visibles y márgenes adecuados")
-        print(f"  • Soporte para géneros de álbumes por separado")
-        print(f"  • Sección de sellos completamente funcional")
-        print(f"  • Manejo mejorado de datos vacíos")
-        print(f"  • ✅ CORREGIDO: Botón TEMPORALES apunta a index.html#temporal")
-        print(f"  • ✅ CORREGIDO: Gráficos de géneros se muestran correctamente")
-        print(f"  • ✅ RESTAURADO: Funciones completas de scatter charts")
-        print(f"  • ✅ RESTAURADO: Funciones completas de evolución")
-        print(f"  • ✅ AÑADIDO: Popups interactivos con detalles")
+
 
         # Mostrar resumen
         print("\n📈 Resumen:")

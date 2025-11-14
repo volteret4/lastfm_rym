@@ -695,6 +695,48 @@ class UserStatsHTMLGeneratorFixed:
                     <button class="data-type-btn" data-type="cumulative">Acumulativo</button>
                 </div>
 
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">🎵 Scrobbles por Año</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="yearlyChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="yearlyInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">👥 Top Artistas</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="topArtistsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topArtistsInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">💿 Top Álbumes</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="topAlbumsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topAlbumsInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">🎶 Top Canciones</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="topTracksChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topTracksInfo"></div>
+                    </div>
+                </div>
+
                 <!-- Sección de evolución individual -->
                 <div class="evolution-section">
                     <h3>🎭 Evolución de Géneros Individuales</h3>
@@ -1784,35 +1826,57 @@ class UserStatsHTMLGeneratorFixed:
             }});
             charts = {{}};
 
-            // Gráfico de scrobbles por año
-            renderYearlyChart(userStats.yearly_scrobbles);
-
-            // Top artistas, álbumes y canciones (pie charts)
-            renderTopChart(userStats.top_artists, 'topArtistsChart', 'topArtistsInfo', '👥 Top Artistas');
-            renderTopChart(userStats.top_albums, 'topAlbumsChart', 'topAlbumsInfo', '💿 Top Álbumes');
-            renderTopChart(userStats.top_tracks, 'topTracksChart', 'topTracksInfo', '🎶 Top Canciones');
-
-            // ✅ FIX: Gráficos de evolución individual
-            if (userStats.individual) {{
-                const individualData = currentDataType === 'annual' ? userStats.individual.annual : userStats.individual.cumulative;
-
-                if (individualData) {{
-                    renderIndividualLineChart('individualGenresChart', individualData.genres, 'Géneros');
-                    renderIndividualLineChart('individualLabelsChart', individualData.labels, 'Sellos');
-                    renderIndividualLineChart('individualArtistsChart', individualData.artists, 'Artistas');
-                    renderIndividualLineChart('individualOneHitChart', individualData.one_hit_wonders, 'One Hit Wonders');
-                    renderIndividualLineChart('individualStreakChart', individualData.streak_artists, 'Artistas con Mayor Streak');
-                    renderIndividualLineChart('individualTrackCountChart', individualData.track_count_artists, 'Artistas con Mayor Discografía');
-                    renderIndividualLineChart('individualNewArtistsChart', individualData.new_artists, 'Artistas Nuevos');
-                    renderIndividualLineChart('individualRisingChart', individualData.rising_artists, 'Artistas en Ascenso');
-                    renderIndividualLineChart('individualFallingChart', individualData.falling_artists, 'Artistas en Declive');
+            try {{
+                // Gráfico de scrobbles por año
+                if (userStats.yearly_scrobbles) {{
+                    renderYearlyChart(userStats.yearly_scrobbles);
                 }}
+
+                // Top artistas, álbumes y canciones (pie charts)
+                renderTopChart(userStats.top_artists, 'topArtistsChart', 'topArtistsInfo', '👥 Top Artistas');
+                renderTopChart(userStats.top_albums, 'topAlbumsChart', 'topAlbumsInfo', '💿 Top Álbumes');
+                renderTopChart(userStats.top_tracks, 'topTracksChart', 'topTracksInfo', '🎶 Top Canciones');
+
+                // ✅ FIX: Gráficos de evolución individual
+                if (userStats.individual) {{
+                    const individualData = currentDataType === 'annual' ? userStats.individual.annual : userStats.individual.cumulative;
+
+                    if (individualData) {{
+                        console.log('Renderizando gráficos individuales con datos:', Object.keys(individualData));
+
+                        // Solo renderizar si existen los datos
+                        if (individualData.genres) renderIndividualLineChart('individualGenresChart', individualData.genres, 'Géneros');
+                        if (individualData.labels) renderIndividualLineChart('individualLabelsChart', individualData.labels, 'Sellos');
+                        if (individualData.artists) renderIndividualLineChart('individualArtistsChart', individualData.artists, 'Artistas');
+                        if (individualData.one_hit_wonders) renderIndividualLineChart('individualOneHitChart', individualData.one_hit_wonders, 'One Hit Wonders');
+                        if (individualData.streak_artists) renderIndividualLineChart('individualStreakChart', individualData.streak_artists, 'Artistas con Mayor Streak');
+                        if (individualData.track_count_artists) renderIndividualLineChart('individualTrackCountChart', individualData.track_count_artists, 'Artistas con Mayor Discografía');
+                        if (individualData.new_artists) renderIndividualLineChart('individualNewArtistsChart', individualData.new_artists, 'Artistas Nuevos');
+                        if (individualData.rising_artists) renderIndividualLineChart('individualRisingChart', individualData.rising_artists, 'Artistas en Ascenso');
+                        if (individualData.falling_artists) renderIndividualLineChart('individualFallingChart', individualData.falling_artists, 'Artistas en Declive');
+                    }} else {{
+                        console.warn('No hay datos individuales para el tipo:', currentDataType);
+                    }}
+                }} else {{
+                    console.warn('No hay datos individuales en userStats');
+                }}
+            }} catch (error) {{
+                console.error('Error renderizando gráficos individuales:', error);
             }}
         }}
 
         function renderYearlyChart(yearlyData) {{
             const canvas = document.getElementById('yearlyChart');
             const info = document.getElementById('yearlyInfo');
+
+            if (!canvas) {{
+                console.error('Canvas yearlyChart no encontrado');
+                return;
+            }}
+            if (!info) {{
+                console.error('Info yearlyInfo no encontrado');
+                return;
+            }}
 
             const years = Object.keys(yearlyData).sort();
             const scrobbles = years.map(year => yearlyData[year]);
@@ -1889,6 +1953,15 @@ class UserStatsHTMLGeneratorFixed:
         function renderTopChart(topData, canvasId, infoId, title) {{
             const canvas = document.getElementById(canvasId);
             const info = document.getElementById(infoId);
+
+            if (!canvas) {{
+                console.error(`Canvas ${{canvasId}} no encontrado`);
+                return;
+            }}
+            if (!info) {{
+                console.error(`Info ${{infoId}} no encontrado`);
+                return;
+            }}
 
             if (!topData || Object.keys(topData).length === 0) {{
                 canvas.style.display = 'none';
@@ -2246,12 +2319,12 @@ class UserStatsHTMLGeneratorFixed:
             const canvas = document.getElementById(canvasId);
 
             if (!canvas) {{
-                console.error(`Canvas ${{canvasId}} no encontrado`);
+                console.warn(`Canvas ${{canvasId}} no encontrado para ${{title}}`);
                 return;
             }}
 
             if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {{
-                console.log(`No hay datos para ${{title}}`);
+                console.log(`No hay datos para ${{title}} en ${{canvasId}}`);
                 return;
             }}
 

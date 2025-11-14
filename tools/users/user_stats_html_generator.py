@@ -442,7 +442,7 @@ class UserStatsHTMLGeneratorFixed:
 
         .scatter-charts-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
             gap: 20px;
             margin-top: 20px;
         }}
@@ -695,16 +695,7 @@ class UserStatsHTMLGeneratorFixed:
                     <button class="data-type-btn" data-type="cumulative">Acumulativo</button>
                 </div>
 
-                // <div class="charts-grid">
-                //     <div class="chart-card">
-                //         <div class="chart-header">
-                //             <h3 class="chart-title">🎵 Scrobbles por Año</h3>
-                //         </div>
-                //         <div class="chart-wrapper">
-                //             <canvas id="yearlyChart"></canvas>
-                //         </div>
-                //         <div class="chart-info" id="yearlyInfo"></div>
-                //     </div>
+
 
                     <div class="chart-card">
                         <div class="chart-header">

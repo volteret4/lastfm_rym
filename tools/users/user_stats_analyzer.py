@@ -741,6 +741,19 @@ class UserStatsAnalyzer:
             user, self.from_year, self.to_year, mbid_only=self.mbid_only
         )
 
+        # ✅ NUEVO: Obtener conteos únicos de géneros y sellos
+        total_genres = {}
+        for provider in ['lastfm', 'musicbrainz', 'discogs']:
+            genre_count = self.database.get_user_unique_count_genres_by_provider(
+                user, self.from_year, self.to_year, provider, mbid_only=self.mbid_only
+            )
+            if genre_count > 0:
+                total_genres[provider] = genre_count
+
+        total_labels = self.database.get_user_unique_count_labels(
+            user, self.from_year, self.to_year, mbid_only=self.mbid_only
+        )
+
         # Obtener top 15 para los gráficos (con límite)
         top_artists = self.database.get_user_top_artists(
             user, self.from_year, self.to_year, limit=15, mbid_only=self.mbid_only
@@ -758,6 +771,8 @@ class UserStatsAnalyzer:
             "total_artists": total_artists,
             "total_albums": total_albums,
             "total_tracks": total_tracks,
+            "total_genres": total_genres,  # ✅ NUEVO: Dict por proveedor
+            "total_labels": total_labels,  # ✅ NUEVO: Conteo de sellos
             "top_artists": dict(top_artists) if top_artists else {},  # Top 15 para gráficos
             "top_albums": dict(top_albums) if top_albums else {},     # Top 15 para gráficos
             "top_tracks": dict(top_tracks) if top_tracks else {}      # Top 15 para gráficos

@@ -142,7 +142,7 @@ class HTMLGenerator:
             width: 50px;
             height: 50px;
             border-radius: 50%;
-            background: #cba6f7;
+            background: #181825;
             color: #1e1e2e;
             border: none;
             cursor: pointer;

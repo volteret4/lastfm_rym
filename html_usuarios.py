@@ -2,6 +2,9 @@
 """
 Last.fm User Stats Generator - Versión Corregida con Soporte para Géneros por Proveedor MEJORADA
 Genera estadísticas individuales de usuarios con gráficos de coincidencias, evolución y géneros
+FIXES:
+- Corrige el enlace del botón TEMPORALES para que apunte a index.html#temporal
+- Arregla la inicialización de genresData para mostrar los gráficos de géneros
 """
 
 import os
@@ -23,7 +26,7 @@ except ImportError:
 # Importar las versiones corregidas desde los outputs
 from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database import UserStatsDatabase
-from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
+from tools.users.user_stats_html_generator_fixed import UserStatsHTMLGeneratorFixed
 
 
 def main():
@@ -51,7 +54,7 @@ def main():
         # Inicializar componentes
         database = UserStatsDatabase()
         analyzer = UserStatsAnalyzer(database, years_back=args.years_back)
-        html_generator = UserStatsHTMLGenerator()
+        html_generator = UserStatsHTMLGeneratorFixed()
 
         # Analizar estadísticas para todos los usuarios
         print(f"👤 Analizando {len(users)} usuarios...")
@@ -79,6 +82,8 @@ def main():
         print(f"  • Soporte para géneros de álbumes por separado")
         print(f"  • Sección de sellos completamente funcional")
         print(f"  • Manejo mejorado de datos vacíos")
+        print(f"  • ✅ NUEVO: Botón TEMPORALES apunta correctamente a index.html#temporal")
+        print(f"  • ✅ NUEVO: Gráficos de géneros se muestran correctamente")
 
         # Mostrar resumen
         print("\n📈 Resumen:")

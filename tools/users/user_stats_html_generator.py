@@ -5,7 +5,7 @@ UserStatsHTMLGenerator - Clase para generar HTML con grÃ¡ficos interactivos de
 
 import json
 from typing import Dict, List
-
+import os
 
 class UserStatsHTMLGenerator:
     """Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas de usuarios"""
@@ -22,7 +22,15 @@ class UserStatsHTMLGenerator:
         users_json = json.dumps(users, ensure_ascii=False)
         stats_json = json.dumps(all_user_stats, indent=2, ensure_ascii=False)
         colors_json = json.dumps(self.colors, ensure_ascii=False)
+        icons_env = os.getenv('LASTFM_USERS_ICONS', '')
+        user_icons = {}
+        if icons_env:
+            for pair in icons_env.split(','):
+                if ':' in pair:
+                    user, icon = pair.split(':', 1)
+                    user_icons[user.strip()] = icon.strip()
 
+        user_icons_json = json.dumps(user_icons, ensure_ascii=False)
         return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -989,6 +997,7 @@ class UserStatsHTMLGenerator:
         const users = {users_json};
         const allStats = {stats_json};
         const colors = {colors_json};
+        const userIcons = {user_icons_json};
 
         let currentUser = null;
         let currentView = 'individual';
@@ -1009,11 +1018,24 @@ class UserStatsHTMLGenerator:
                 const option = document.createElement('div');
                 option.className = 'user-option';
                 option.dataset.user = user;
-                option.textContent = user;
+
+                // Añadir icono si existe
+                const icon = userIcons[user];
+                if (icon) {{
+                    if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg') || icon.endsWith('.jpeg') || icon.endsWith('.gif')) {{
+                        option.innerHTML = `<img src="${icon}" alt="${user}" style="width:24px;height:24px;border-radius:50%;margin-right:12px;object-fit:cover;"> ${user}`;
+                    }} else {{
+                        option.innerHTML = `<span style="font-size:16px;margin-right:12px;">${icon}</span> ${user}`;
+                    }}
+                }} else {{
+                    option.textContent = user;
+                }}
+
                 userOptions.appendChild(option);
             }});
 
             updateSelectedUserOption(selectedUser);
+            updateUserButtonIcon(selectedUser);
 
             userButton.addEventListener('click', () => {{
                 userModal.style.display = 'block';
@@ -1041,6 +1063,7 @@ class UserStatsHTMLGenerator:
                     }}
 
                     updateSelectedUserOption(user);
+                    updateUserButtonIcon(user);
                     userModal.style.display = 'none';
 
                     selectUser(user);
@@ -1060,6 +1083,20 @@ class UserStatsHTMLGenerator:
             }});
         }}
 
+        function updateUserButtonIcon(user) {{
+            const userButton = document.getElementById('userButton');
+            const icon = userIcons[user];
+
+            if (icon) {{
+                if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg') || icon.endsWith('.jpeg') || icon.endsWith('.gif')) {{
+                    userButton.innerHTML = `<img src="${icon}" alt="${user}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+                }} else {{
+                    userButton.textContent = icon;
+                }}
+            }} else {{
+                userButton.textContent = '👤';
+            }}
+        }}
         const viewButtons = document.querySelectorAll('.view-btn');
         viewButtons.forEach(btn => {{
             btn.addEventListener('click', function() {{

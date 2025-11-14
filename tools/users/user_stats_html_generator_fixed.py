@@ -4,6 +4,7 @@ UserStatsHTMLGeneratorFixed - Clase para generar HTML con gráficos interactivos
 FIXES:
 - Corrige el enlace del botón TEMPORALES para que apunte a index.html#temporal
 - Arregla la inicialización de genresData para mostrar los gráficos de géneros
+- Restaura funciones completas para scatter charts y gráficos de evolución
 """
 
 import json
@@ -450,6 +451,84 @@ class UserStatsHTMLGeneratorFixed:
             gap: 25px;
         }}
 
+        .popup-overlay {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 999;
+            backdrop-filter: blur(5px);
+        }}
+
+        .popup {{
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }}
+
+        .popup-header {{
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+
+        .popup-close {{
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+        }}
+
+        .popup-close:hover {{
+            color: #cba6f7;
+        }}
+
+        .popup-content {{
+            max-height: 300px;
+            overflow-y: auto;
+        }}
+
+        .popup-item {{
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+
+        .popup-item .name {{
+            color: #cdd6f4;
+            font-weight: 600;
+        }}
+
+        .popup-item .count {{
+            color: #a6adc8;
+            font-size: 0.9em;
+        }}
+
         @media (max-width: 768px) {{
             .charts-grid {{
                 grid-template-columns: 1fr;
@@ -482,6 +561,11 @@ class UserStatsHTMLGeneratorFixed:
 
             .user-name {{
                 font-size: 1.5em;
+            }}
+
+            .popup {{
+                width: 90%;
+                max-width: none;
             }}
         }}
     </style>
@@ -772,6 +856,16 @@ class UserStatsHTMLGeneratorFixed:
                 </div>
             </div>
         </div>
+
+        <!-- Popup para mostrar detalles -->
+        <div id="popupOverlay" class="popup-overlay" style="display: none;"></div>
+        <div id="popup" class="popup" style="display: none;">
+            <div class="popup-header">
+                <span id="popupTitle">Detalles</span>
+                <button id="popupClose" class="popup-close">X</button>
+            </div>
+            <div id="popupContent" class="popup-content"></div>
+        </div>
     </div>
 
     <script>
@@ -796,6 +890,7 @@ class UserStatsHTMLGeneratorFixed:
             setupUserModal();
             setupNavigation();
             setupProviderButtons();
+            setupPopup();
 
             // Seleccionar primer usuario por defecto
             if (allUsers.length > 0) {{
@@ -885,6 +980,19 @@ class UserStatsHTMLGeneratorFixed:
                         renderGenresCharts(allStats[currentUser]);
                     }}
                 }});
+            }});
+        }}
+
+        function setupPopup() {{
+            // Configurar cierre de popup
+            document.getElementById('popupClose').addEventListener('click', function() {{
+                document.getElementById('popupOverlay').style.display = 'none';
+                document.getElementById('popup').style.display = 'none';
+            }});
+
+            document.getElementById('popupOverlay').addEventListener('click', function() {{
+                document.getElementById('popupOverlay').style.display = 'none';
+                document.getElementById('popup').style.display = 'none';
             }});
         }}
 
@@ -1000,7 +1108,6 @@ class UserStatsHTMLGeneratorFixed:
             }} else {{
                 document.getElementById('albumGenresPieChart').style.display = 'none';
                 document.getElementById('albumGenresPieInfo').innerHTML = '<div class="no-data">No hay datos de géneros de álbumes para ' + currentProvider + '</div>';
-
             }}
 
             // 4. 6 gráficos de scatter para top 6 géneros de álbumes
@@ -1089,6 +1196,7 @@ class UserStatsHTMLGeneratorFixed:
             charts[canvasId] = new Chart(canvas, config);
         }}
 
+        // ✅ FIX: Función corregida para scatter charts de géneros
         function renderGenresScatterCharts(scatterData, years, containerId, isAlbums = false) {{
             const container = document.getElementById(containerId);
             if (!container) {{
@@ -1106,55 +1214,70 @@ class UserStatsHTMLGeneratorFixed:
             Object.keys(scatterData).forEach((genre, index) => {{
                 const items = scatterData[genre];
 
-                const cardDiv = document.createElement('div');
-                cardDiv.className = 'scatter-chart-card';
+                if (!items || items.length === 0) return;
 
-                const title = document.createElement('h5');
-                const prefix = isAlbums ? '💿' : '🎵';
-                const itemType = isAlbums ? 'álbumes' : 'artistas';
-                title.textContent = `${{prefix}} ${{genre}} (${{items.length}} ${{itemType}})`;
+                // Crear contenedor para este género
+                const genreContainer = document.createElement('div');
+                genreContainer.className = 'genres-pie-container';
+
+                const title = document.createElement('h4');
+                const itemType = isAlbums ? 'Álbumes' : 'Artistas';
+                title.textContent = `${{genre}} - Top ${{items.length}} ${{itemType}}`;
+                title.style.color = '#cba6f7';
+                title.style.textAlign = 'center';
+                title.style.marginBottom = '15px';
+                genreContainer.appendChild(title);
 
                 const canvasWrapper = document.createElement('div');
-                canvasWrapper.className = 'scatter-chart-wrapper';
+                canvasWrapper.className = 'chart-wrapper';
+                canvasWrapper.style.height = '300px';
 
                 const canvas = document.createElement('canvas');
                 const canvasId = `scatterChart_${{genre.replace(/[^a-zA-Z0-9]/g, '_')}}_${{index}}_${{containerId}}`;
                 canvas.id = canvasId;
-
                 canvasWrapper.appendChild(canvas);
-                cardDiv.appendChild(title);
-                cardDiv.appendChild(canvasWrapper);
-                container.appendChild(cardDiv);
 
-                // Crear dataset para el gráfico
-                const datasets = items.map((item, itemIndex) => {{
-                    const itemData = years.map(year => {{
-                        const yearData = item.yearly_data[year];
-                        return yearData ? {{
-                            x: year,
-                            y: yearData.scrobbles
-                        }} : null;
-                    }}).filter(point => point !== null);
+                genreContainer.appendChild(canvasWrapper);
+                container.appendChild(genreContainer);
 
-                    return {{
-                        label: item.name,
-                        data: itemData,
-                        borderColor: colors[itemIndex % colors.length],
-                        backgroundColor: colors[itemIndex % colors.length] + '40',
-                        pointBackgroundColor: colors[itemIndex % colors.length],
-                        pointBorderColor: '#181825',
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        fill: false,
-                        tension: 0.1
-                    }};
+                // Crear dataset para scatter plot
+                const datasets = [];
+
+                items.forEach((itemData, itemIndex) => {{
+                    const points = [];
+
+                    years.forEach(year => {{
+                        const plays = itemData.yearly_data[year] || 0;
+                        if (plays > 0) {{
+                            points.push({{
+                                x: year,
+                                y: plays,
+                                itemName: isAlbums ? itemData.album : itemData.artist
+                            }});
+                        }}
+                    }});
+
+                    if (points.length > 0) {{
+                        datasets.push({{
+                            label: isAlbums ? itemData.album : itemData.artist,
+                            data: points,
+                            backgroundColor: colors[itemIndex % colors.length],
+                            borderColor: colors[itemIndex % colors.length],
+                            pointRadius: 6,
+                            pointHoverRadius: 10,
+                            showLine: false
+                        }});
+                    }}
                 }});
 
-                const scatterConfig = {{
-                    type: 'line',
-                    data: {{
-                        datasets: datasets
-                    }},
+                if (datasets.length === 0) {{
+                    canvas.parentElement.innerHTML = '<div class="no-data">No hay datos temporales para este género</div>';
+                    return;
+                }}
+
+                const config = {{
+                    type: 'scatter',
+                    data: {{ datasets }},
                     options: {{
                         responsive: true,
                         maintainAspectRatio: false,
@@ -1165,37 +1288,48 @@ class UserStatsHTMLGeneratorFixed:
                                 title: {{
                                     display: true,
                                     text: 'Año',
-                                    color: '#cdd6f4'
+                                    color: '#a6adc8'
+                                }},
+                                ticks: {{
+                                    color: '#a6adc8',
+                                    stepSize: 1
                                 }},
                                 grid: {{
                                     color: '#313244'
                                 }},
-                                ticks: {{
-                                    color: '#cdd6f4'
-                                }}
+                                min: Math.min(...years) - 0.8,
+                                max: Math.max(...years) + 0.8
                             }},
                             y: {{
                                 title: {{
                                     display: true,
                                     text: 'Scrobbles',
-                                    color: '#cdd6f4'
+                                    color: '#a6adc8'
+                                }},
+                                ticks: {{
+                                    color: '#a6adc8'
                                 }},
                                 grid: {{
                                     color: '#313244'
-                                }},
-                                ticks: {{
-                                    color: '#cdd6f4'
                                 }}
                             }}
                         }},
                         plugins: {{
                             legend: {{
+                                display: true,
                                 position: 'bottom',
                                 labels: {{
                                     color: '#cdd6f4',
-                                    padding: 8,
+                                    padding: 12,
                                     usePointStyle: true,
-                                    boxWidth: 6
+                                    pointStyle: 'circle',
+                                    font: {{
+                                        size: 11
+                                    }},
+                                    boxHeight: 10,
+                                    boxWidth: 10,
+                                    maxWidth: 100,
+                                    textAlign: 'left'
                                 }}
                             }},
                             tooltip: {{
@@ -1203,22 +1337,38 @@ class UserStatsHTMLGeneratorFixed:
                                 titleColor: '#cba6f7',
                                 bodyColor: '#cdd6f4',
                                 borderColor: '#cba6f7',
-                                borderWidth: 1
+                                borderWidth: 1,
+                                callbacks: {{
+                                    title: function(context) {{
+                                        const point = context[0].raw;
+                                        return point.itemName;
+                                    }},
+                                    label: function(context) {{
+                                        const point = context.raw;
+                                        return `${{point.x}}: ${{point.y}} scrobbles`;
+                                    }}
+                                }}
+                            }}
+                        }},
+                        interaction: {{
+                            mode: 'point'
+                        }},
+                        onClick: function(event, elements) {{
+                            if (elements.length > 0) {{
+                                const element = elements[0];
+                                const point = this.data.datasets[element.datasetIndex].data[element.index];
+                                const itemType = isAlbums ? 'Álbum' : 'Artista';
+                                showArtistPopup(point.itemName, genre, currentProvider, point.x, point.y, itemType);
                             }}
                         }}
                     }}
                 }};
 
-                // Solo crear el gráfico si el canvas existe en el DOM
-                if (document.getElementById(canvasId)) {{
-                    charts[canvasId] = new Chart(canvas, scatterConfig);
-                }} else {{
-                    console.warn(`Canvas ${{canvasId}} no encontrado en el DOM`);
-                    canvas.parentElement.innerHTML = '<div class="no-data">No hay datos temporales para este género</div>';
-                }}
+                charts[canvasId] = new Chart(canvas, config);
             }});
         }}
 
+        // ✅ FIX: Función corregida para scatter charts de sellos
         function renderLabelsScatterCharts(scatterData, years, containerId) {{
             const container = document.getElementById(containerId);
             if (!container) {{
@@ -1229,60 +1379,76 @@ class UserStatsHTMLGeneratorFixed:
             container.innerHTML = '';
 
             if (!scatterData || Object.keys(scatterData).length === 0) {{
-                container.innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
+                container.innerHTML = '<div class="no-data">No hay datos de sellos disponibles</div>';
                 return;
             }}
 
             Object.keys(scatterData).forEach((label, index) => {{
                 const artists = scatterData[label];
 
-                const cardDiv = document.createElement('div');
-                cardDiv.className = 'scatter-chart-card';
+                if (!artists || artists.length === 0) return;
 
-                const title = document.createElement('h5');
-                title.textContent = `💿 ${{label}} (${{artists.length}} artistas)`;
+                // Crear contenedor para este sello
+                const labelContainer = document.createElement('div');
+                labelContainer.className = 'genres-pie-container';
+
+                const title = document.createElement('h4');
+                title.textContent = `${{label}} - Top ${{artists.length}} Artistas`;
+                title.style.color = '#cba6f7';
+                title.style.textAlign = 'center';
+                title.style.marginBottom = '15px';
+                labelContainer.appendChild(title);
 
                 const canvasWrapper = document.createElement('div');
-                canvasWrapper.className = 'scatter-chart-wrapper';
+                canvasWrapper.className = 'chart-wrapper';
+                canvasWrapper.style.height = '300px';
 
                 const canvas = document.createElement('canvas');
-                const canvasId = `scatterChart_${{label.replace(/[^a-zA-Z0-9]/g, '_')}}_${{index}}`;
+                const canvasId = `labelScatterChart_${{label.replace(/[^a-zA-Z0-9]/g, '_')}}_${{index}}`;
                 canvas.id = canvasId;
-
                 canvasWrapper.appendChild(canvas);
-                cardDiv.appendChild(title);
-                cardDiv.appendChild(canvasWrapper);
-                container.appendChild(cardDiv);
 
-                // Crear dataset para el gráfico
-                const datasets = artists.map((artist, artistIndex) => {{
-                    const artistData = years.map(year => {{
-                        const yearData = artist.yearly_data[year];
-                        return yearData ? {{
-                            x: year,
-                            y: yearData.scrobbles
-                        }} : null;
-                    }}).filter(point => point !== null);
+                labelContainer.appendChild(canvasWrapper);
+                container.appendChild(labelContainer);
 
-                    return {{
-                        label: artist.name,
-                        data: artistData,
-                        borderColor: colors[artistIndex % colors.length],
-                        backgroundColor: colors[artistIndex % colors.length] + '40',
-                        pointBackgroundColor: colors[artistIndex % colors.length],
-                        pointBorderColor: '#181825',
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        fill: false,
-                        tension: 0.1
-                    }};
+                // Crear dataset para scatter plot
+                const datasets = [];
+
+                artists.forEach((artistData, artistIndex) => {{
+                    const points = [];
+
+                    years.forEach(year => {{
+                        const plays = artistData.yearly_data[year] || 0;
+                        if (plays > 0) {{
+                            points.push({{
+                                x: year,
+                                y: plays,
+                                artistName: artistData.artist
+                            }});
+                        }}
+                    }});
+
+                    if (points.length > 0) {{
+                        datasets.push({{
+                            label: artistData.artist,
+                            data: points,
+                            backgroundColor: colors[artistIndex % colors.length],
+                            borderColor: colors[artistIndex % colors.length],
+                            pointRadius: 6,
+                            pointHoverRadius: 10,
+                            showLine: false
+                        }});
+                    }}
                 }});
 
-                const scatterConfig = {{
-                    type: 'line',
-                    data: {{
-                        datasets: datasets
-                    }},
+                if (datasets.length === 0) {{
+                    canvas.parentElement.innerHTML = '<div class="no-data">No hay datos temporales para este sello</div>';
+                    return;
+                }}
+
+                const config = {{
+                    type: 'scatter',
+                    data: {{ datasets }},
                     options: {{
                         responsive: true,
                         maintainAspectRatio: false,
@@ -1293,37 +1459,48 @@ class UserStatsHTMLGeneratorFixed:
                                 title: {{
                                     display: true,
                                     text: 'Año',
-                                    color: '#cdd6f4'
+                                    color: '#a6adc8'
+                                }},
+                                ticks: {{
+                                    color: '#a6adc8',
+                                    stepSize: 1
                                 }},
                                 grid: {{
                                     color: '#313244'
                                 }},
-                                ticks: {{
-                                    color: '#cdd6f4'
-                                }}
+                                min: Math.min(...years) - 0.8,
+                                max: Math.max(...years) + 0.8
                             }},
                             y: {{
                                 title: {{
                                     display: true,
                                     text: 'Scrobbles',
-                                    color: '#cdd6f4'
+                                    color: '#a6adc8'
+                                }},
+                                ticks: {{
+                                    color: '#a6adc8'
                                 }},
                                 grid: {{
                                     color: '#313244'
-                                }},
-                                ticks: {{
-                                    color: '#cdd6f4'
                                 }}
                             }}
                         }},
                         plugins: {{
                             legend: {{
+                                display: true,
                                 position: 'bottom',
                                 labels: {{
                                     color: '#cdd6f4',
-                                    padding: 8,
+                                    padding: 12,
                                     usePointStyle: true,
-                                    boxWidth: 6
+                                    pointStyle: 'circle',
+                                    font: {{
+                                        size: 11
+                                    }},
+                                    boxHeight: 10,
+                                    boxWidth: 10,
+                                    maxWidth: 100,
+                                    textAlign: 'left'
                                 }}
                             }},
                             tooltip: {{
@@ -1331,19 +1508,33 @@ class UserStatsHTMLGeneratorFixed:
                                 titleColor: '#cba6f7',
                                 bodyColor: '#cdd6f4',
                                 borderColor: '#cba6f7',
-                                borderWidth: 1
+                                borderWidth: 1,
+                                callbacks: {{
+                                    title: function(context) {{
+                                        const point = context[0].raw;
+                                        return point.artistName;
+                                    }},
+                                    label: function(context) {{
+                                        const point = context.raw;
+                                        return `${{point.x}}: ${{point.y}} scrobbles`;
+                                    }}
+                                }}
+                            }}
+                        }},
+                        interaction: {{
+                            mode: 'point'
+                        }},
+                        onClick: function(event, elements) {{
+                            if (elements.length > 0) {{
+                                const element = elements[0];
+                                const point = this.data.datasets[element.datasetIndex].data[element.index];
+                                showArtistPopup(point.artistName, label, 'Sello', point.x, point.y, 'Artista');
                             }}
                         }}
                     }}
                 }};
 
-                // Solo crear el gráfico si el canvas existe en el DOM
-                if (document.getElementById(canvasId)) {{
-                    charts[canvasId] = new Chart(canvas, scatterConfig);
-                }} else {{
-                    console.warn(`Canvas ${{canvasId}} no encontrado en el DOM`);
-                    canvas.parentElement.innerHTML = '<div class="no-data">No hay datos temporales para este sello</div>';
-                }}
+                charts[canvasId] = new Chart(canvas, config);
             }});
         }}
 
@@ -1582,6 +1773,7 @@ class UserStatsHTMLGeneratorFixed:
             charts[canvasId] = new Chart(canvas, config);
         }}
 
+        // ✅ FIX: Función corregida para gráficos de evolución
         function renderEvolutionCharts(userStats) {{
             // Destruir charts existentes
             Object.values(charts).forEach(chart => {{
@@ -1598,118 +1790,79 @@ class UserStatsHTMLGeneratorFixed:
             renderCoincidencesEvolution('tracks', userStats.evolution.coincidences);
         }}
 
+        // ✅ FIX: Función corregida para evolución de coincidencias
         function renderCoincidencesEvolution(type, evolutionData) {{
-            const canvasId = type + 'EvolutionChart';
-            const infoId = type + 'EvolutionInfo';
+            let canvas, chartId;
 
-            const canvas = document.getElementById(canvasId);
-            const info = document.getElementById(infoId);
+            if (type === 'genres') {{
+                canvas = document.getElementById('genresEvolutionChart');
+                chartId = 'genresEvolutionChart';
+            }} else if (type === 'labels') {{
+                canvas = document.getElementById('labelsEvolutionChart');
+                chartId = 'labelsEvolutionChart';
+            }} else if (type === 'release_years') {{
+                canvas = document.getElementById('releaseYearsEvolutionChart');
+                chartId = 'releaseYearsEvolutionChart';
+            }} else {{
+                canvas = document.getElementById(type + 'EvolutionChart');
+                chartId = type + 'EvolutionChart';
+            }}
 
-            if (!canvas || !info) {{
-                console.error(`No se encontró canvas o info para ${{canvasId}}`);
+            if (!canvas) {{
+                console.error(`Canvas no encontrado para ${{chartId}}`);
                 return;
             }}
 
-            if (!evolutionData || Object.keys(evolutionData).length === 0) {{
-                canvas.style.display = 'none';
-                info.innerHTML = '<div class="no-data">No hay datos de evolución disponibles</div>';
+            if (!evolutionData || !evolutionData.data) {{
+                console.log(`No hay datos de evolución para ${{type}}`);
                 return;
             }}
 
-            canvas.style.display = 'block';
+            let typeData, detailsData;
+            if (['artists', 'albums', 'tracks'].includes(type)) {{
+                typeData = evolutionData.data[type];
+                detailsData = evolutionData.details[type];
+            }} else {{
+                typeData = evolutionData.data;
+                detailsData = evolutionData.details;
+            }}
 
-            const years = Object.keys(evolutionData).sort();
+            if (!typeData) {{
+                console.log(`No hay datos de tipo para ${{type}}`);
+                return;
+            }}
+
             const datasets = [];
+            let colorIndex = 0;
 
-            // Obtener todos los usuarios únicos
-            const allUsers = new Set();
-            years.forEach(year => {{
-                if (evolutionData[year] && evolutionData[year].users) {{
-                    Object.keys(evolutionData[year].users).forEach(user => allUsers.add(user));
-                }}
-            }});
-
-            const usersList = Array.from(allUsers).slice(0, 10); // Limitar a 10 usuarios para legibilidad
-
-            usersList.forEach((user, index) => {{
-                const userData = years.map(year => {{
-                    const yearData = evolutionData[year];
-                    const userCount = yearData && yearData.users && yearData.users[user] ? yearData.users[user] : 0;
-                    return {{
-                        x: parseInt(year),
-                        y: userCount
-                    }};
-                }});
-
+            Object.keys(typeData).forEach(user => {{
                 datasets.push({{
                     label: user,
-                    data: userData,
-                    borderColor: colors[index % colors.length],
-                    backgroundColor: colors[index % colors.length] + '40',
-                    pointBackgroundColor: colors[index % colors.length],
-                    pointBorderColor: '#181825',
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    fill: false,
-                    tension: 0.1
+                    data: evolutionData.years.map(year => typeData[user][year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false
                 }});
+                colorIndex++;
             }});
-
-            // Calcular totales para el info
-            const totalByYear = years.map(year => {{
-                const yearData = evolutionData[year];
-                return yearData && yearData.total ? yearData.total : 0;
-            }});
-            const grandTotal = totalByYear.reduce((a, b) => a + b, 0);
-
-            info.innerHTML = `Total acumulado: ${{grandTotal.toLocaleString()}} coincidencias | Usuarios: ${{usersList.length}} | Años: ${{years.length}}`;
 
             const config = {{
                 type: 'line',
                 data: {{
+                    labels: evolutionData.years,
                     datasets: datasets
                 }},
                 options: {{
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: {{
-                        x: {{
-                            type: 'linear',
-                            position: 'bottom',
-                            title: {{
-                                display: true,
-                                text: 'Año',
-                                color: '#cdd6f4'
-                            }},
-                            grid: {{
-                                color: '#313244'
-                            }},
-                            ticks: {{
-                                color: '#cdd6f4'
-                            }}
-                        }},
-                        y: {{
-                            title: {{
-                                display: true,
-                                text: 'Coincidencias',
-                                color: '#cdd6f4'
-                            }},
-                            grid: {{
-                                color: '#313244'
-                            }},
-                            ticks: {{
-                                color: '#cdd6f4'
-                            }}
-                        }}
-                    }},
                     plugins: {{
                         legend: {{
                             position: 'bottom',
                             labels: {{
                                 color: '#cdd6f4',
-                                padding: 8,
-                                usePointStyle: true,
-                                boxWidth: 6
+                                padding: 10,
+                                usePointStyle: true
                             }}
                         }},
                         tooltip: {{
@@ -1719,12 +1872,126 @@ class UserStatsHTMLGeneratorFixed:
                             borderColor: '#cba6f7',
                             borderWidth: 1
                         }}
+                    }},
+                    scales: {{
+                        x: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }},
+                        y: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const user = this.data.datasets[datasetIndex].label;
+                            const year = this.data.labels[pointIndex];
+                            const coincidences = this.data.datasets[datasetIndex].data[pointIndex];
+
+                            if (coincidences > 0 && detailsData && detailsData[user] && detailsData[user][year]) {{
+                                const typeLabel = type === 'artists' ? 'Artistas' :
+                                               type === 'albums' ? 'Álbumes' :
+                                               type === 'tracks' ? 'Canciones' :
+                                               type === 'genres' ? 'Géneros' :
+                                               type === 'labels' ? 'Sellos' :
+                                               type === 'release_years' ? 'Décadas' : type;
+
+                                const limit = ['artists', 'albums', 'tracks'].includes(type) ? 10 : 5;
+                                const limitedDetails = detailsData[user][year].slice(0, limit);
+                                showLinearPopup(`Top ${{limit}} ${{typeLabel}} - ${{user}} (${{year}})`, limitedDetails);
+                            }}
+                        }}
                     }}
                 }}
             }};
 
-            charts[canvasId] = new Chart(canvas, config);
+            charts[chartId] = new Chart(canvas, config);
+        }}
+
+        // ✅ FIX: Función para popup de artistas
+        function showArtistPopup(itemName, category, provider, year, scrobbles, itemType = 'Artista') {{
+            const title = `${{itemName}} - ${{category}} (${{year}})`;
+            const content = `
+                <div class="popup-item">
+                    <span class="name">${{itemType}}: ${{itemName}}</span>
+                </div>
+                <div class="popup-item">
+                    <span class="name">${{provider === 'Sello' ? 'Sello' : 'Género'}}: ${{category}}</span>
+                </div>
+                <div class="popup-item">
+                    <span class="name">Año: ${{year}}</span>
+                    <span class="count">${{scrobbles}} scrobbles</span>
+                </div>
+                <div class="popup-item">
+                    <span class="name">Proveedor: ${{provider}}</span>
+                </div>
+            `;
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }}
+
+        // ✅ FIX: Función para popup lineal
+        function showLinearPopup(title, details) {{
+            if (!details || details.length === 0) return;
+
+            let content = '';
+            details.slice(0, 10).forEach(item => {{
+                if (item.artist) {{
+                    content += `<div class="popup-item">
+                        <div style="margin-bottom: 5px;">
+                            <span class="name" style="font-weight: bold;">${{item.artist}}</span>
+                        </div>`;
+
+                    if (item.track) {{
+                        content += `<div style="margin-left: 10px; color: #a6adc8;">
+                            🎵 ${{item.track}}
+                        </div>`;
+                    }}
+
+                    if (item.album) {{
+                        content += `<div style="margin-left: 10px; color: #a6adc8;">
+                            💿 ${{item.album}}
+                        </div>`;
+                    }}
+
+                    if (item.user1_plays && item.user2_plays) {{
+                        content += `<div style="margin-left: 10px; font-size: 0.9em; color: #6c7086;">
+                            Usuario 1: ${{item.user1_plays}} plays | Usuario 2: ${{item.user2_plays}} plays
+                        </div>`;
+                    }}
+
+                    content += `</div>`;
+                }} else {{
+                    content += `<div class="popup-item">
+                        <span class="name">${{item.name}}</span>
+                        <span class="count">${{item.plays}} plays</span>
+                    </div>`;
+                }}
+            }});
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
         }}
     </script>
 </body>
 </html>"""
+
+    def _format_number(self, number: int) -> str:
+        """Formatea números con separadores de miles"""
+        return f"{number:,}".replace(",", ".")

@@ -1417,7 +1417,7 @@ class UserStatsHTMLGenerator:
                 canvasWrapper.style.height = '300px';
 
                 const canvas = document.createElement('canvas');
-                const canvasId = `scatterChart_${genre.replace(/[^a-zA-Z0-9]/g, '_')}_${index}_${containerId}`;
+                const canvasId = `scatterChart_${{genre.replace(/[^a-zA-Z0-9]/g, '_')}}_${index}_${containerId}`;
                 canvas.id = canvasId;
                 canvasWrapper.appendChild(canvas);
 

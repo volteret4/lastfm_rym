@@ -26,10 +26,10 @@ class Database:
         ''', (user, from_timestamp, to_timestamp))
         return [dict(row) for row in cursor.fetchall()]
 
-    def get_artist_genres_detailed(self, artist: str) -> List[str]:
+    def get_artist_genres(self, artist: str) -> List[str]:
         """Obtiene géneros de un artista"""
         cursor = self.conn.cursor()
-        cursor.execute('SELECT genres FROM artist_genres_detailed WHERE artist = ?', (artist,))
+        cursor.execute('SELECT genres FROM artist_genres WHERE artist = ?', (artist,))
         result = cursor.fetchone()
         if result and result['genres']:
             return json.loads(result['genres'])

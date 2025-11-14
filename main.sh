@@ -26,24 +26,24 @@ fi
 # TEMPORAL
 # Anuales
 if [[ $1 == "anuales" ]]; then
-    ${python} html_temporal.py yearly --years-back 1
-    ${python} html_temporal.py yearly --years-back 2
-    ${python} html_temporal.py yearly --years-back 3
-    ${python} html_temporal.py yearly --years-back 4
-    ${python} html_temporal.py yearly --years-back 5
-    ${python} html_temporal.py yearly --years-back 6
-    ${python} html_temporal.py yearly --years-back 7
-    ${python} html_temporal.py yearly --years-back 8
-    ${python} html_temporal.py yearly --years-back 9
-    ${python} html_temporal.py yearly --years-back 10
-    ${python} html_temporal.py yearly --years-back 11
-    ${python} html_temporal.py yearly --years-back 12
-    ${python} html_temporal.py yearly --years-back 13
-    ${python} html_temporal.py yearly --years-back 14
-    ${python} html_temporal.py yearly --years-back 15
-    ${python} html_temporal.py yearly --years-back 16
-    ${python} html_temporal.py yearly --years-back 17
-    ${python} html_temporal.py yearly --years-back 18
+    ${python} html_temporal.py yearly --years-ago 1
+    ${python} html_temporal.py yearly --years-ago 2
+    ${python} html_temporal.py yearly --years-ago 3
+    ${python} html_temporal.py yearly --years-ago 4
+    ${python} html_temporal.py yearly --years-ago 5
+    ${python} html_temporal.py yearly --years-ago 6
+    ${python} html_temporal.py yearly --years-ago 7
+    ${python} html_temporal.py yearly --years-ago 8
+    ${python} html_temporal.py yearly --years-ago 9
+    ${python} html_temporal.py yearly --years-ago 10
+    ${python} html_temporal.py yearly --years-ago 11
+    ${python} html_temporal.py yearly --years-ago 12
+    ${python} html_temporal.py yearly --years-ago 13
+    ${python} html_temporal.py yearly --years-ago 14
+    ${python} html_temporal.py yearly --years-ago 15
+    ${python} html_temporal.py yearly --years-ago 16
+    ${python} html_temporal.py yearly --years-ago 17
+    ${python} html_temporal.py yearly --years-ago 18
     exit 0
 fi
 

@@ -468,6 +468,68 @@ class UserStatsHTMLGeneratorFixed:
             gap: 25px;
         }}
 
+        .data-type-buttons {{
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }}
+
+        .data-type-btn {{
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+        }}
+
+        .data-type-btn:hover {{
+            border-color: #f38ba8;
+            background: #45475a;
+        }}
+
+        .data-type-btn.active {{
+            background: #f38ba8;
+            color: #1e1e2e;
+            border-color: #f38ba8;
+        }}
+
+        .evolution-section {{
+            margin-bottom: 40px;
+        }}
+
+        .evolution-section h3 {{
+            color: #cba6f7;
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #cba6f7;
+            padding-bottom: 10px;
+        }}
+
+        .evolution-chart {{
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #313244;
+        }}
+
+        .evolution-chart h4 {{
+            color: #cba6f7;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            text-align: center;
+        }}
+
+        .line-chart-wrapper {{
+            position: relative;
+            height: 400px;
+        }}
+
         .popup-overlay {{
             position: fixed;
             top: 0;
@@ -628,6 +690,11 @@ class UserStatsHTMLGeneratorFixed:
             </div>
 
             <div id="individualTab" class="tab-content active">
+                <div class="data-type-buttons">
+                    <button class="data-type-btn active" data-type="annual">Por Año</button>
+                    <button class="data-type-btn" data-type="cumulative">Acumulativo</button>
+                </div>
+
                 <div class="charts-grid">
                     <div class="chart-card">
                         <div class="chart-header">
@@ -667,6 +734,115 @@ class UserStatsHTMLGeneratorFixed:
                             <canvas id="topTracksChart"></canvas>
                         </div>
                         <div class="chart-info" id="topTracksInfo"></div>
+                    </div>
+                </div>
+
+                <!-- Sección de evolución individual -->
+                <div class="evolution-section">
+                    <h3>🎭 Evolución de Géneros Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Géneros por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualGenresChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🏷️ Evolución de Sellos Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 10 Sellos por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualLabelsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🎤 Evolución de Artistas Individuales</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas por Año</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualArtistsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🎯 One Hit Wonders</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas con 1 Canción (+25 scrobbles)</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualOneHitChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🔥 Artistas con Mayor Streak</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas con Más Días Consecutivos</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualStreakChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📚 Artistas con Mayor Discografía</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas con Más Canciones Únicas</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualTrackCountChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>✨ Artistas Nuevos</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas Nuevos (Sin Escuchas Previas)</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualNewArtistsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📈 Artistas en Ascenso</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas que Más Rápido Subieron</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualRisingChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📉 Artistas en Declive</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas que Más Rápido Bajaron</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualFallingChart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -896,6 +1072,7 @@ class UserStatsHTMLGeneratorFixed:
         let currentUser = null;
         let currentView = 'individual';
         let currentProvider = 'lastfm';
+        let currentDataType = 'annual';
         let charts = {{}};
         let genresData = null; // ✅ FIX: Inicializar variable global genresData
 
@@ -1023,6 +1200,26 @@ class UserStatsHTMLGeneratorFixed:
                     // Re-render gráficos de géneros
                     if (currentUser && currentView === 'genres') {{
                         renderGenresCharts(allStats[currentUser]);
+                    }}
+                }});
+            }});
+
+            // ✅ FIX: Configurar botones de tipo de datos
+            const dataTypeBtns = document.querySelectorAll('.data-type-btn');
+
+            dataTypeBtns.forEach(btn => {{
+                btn.addEventListener('click', () => {{
+                    const dataType = btn.dataset.type;
+
+                    // Actualizar botones activos
+                    dataTypeBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    currentDataType = dataType;
+
+                    // Re-render gráficos individuales
+                    if (currentUser && currentView === 'individual') {{
+                        renderIndividualCharts(allStats[currentUser]);
                     }}
                 }});
             }});
@@ -1632,14 +1829,27 @@ class UserStatsHTMLGeneratorFixed:
             // Gráfico de scrobbles por año
             renderYearlyChart(userStats.yearly_scrobbles);
 
-            // Top artistas
+            // Top artistas, álbumes y canciones (pie charts)
             renderTopChart(userStats.top_artists, 'topArtistsChart', 'topArtistsInfo', '👥 Top Artistas');
-
-            // Top álbumes
             renderTopChart(userStats.top_albums, 'topAlbumsChart', 'topAlbumsInfo', '💿 Top Álbumes');
-
-            // Top canciones
             renderTopChart(userStats.top_tracks, 'topTracksChart', 'topTracksInfo', '🎶 Top Canciones');
+
+            // ✅ FIX: Gráficos de evolución individual
+            if (userStats.individual) {{
+                const individualData = currentDataType === 'annual' ? userStats.individual.annual : userStats.individual.cumulative;
+
+                if (individualData) {{
+                    renderIndividualLineChart('individualGenresChart', individualData.genres, 'Géneros');
+                    renderIndividualLineChart('individualLabelsChart', individualData.labels, 'Sellos');
+                    renderIndividualLineChart('individualArtistsChart', individualData.artists, 'Artistas');
+                    renderIndividualLineChart('individualOneHitChart', individualData.one_hit_wonders, 'One Hit Wonders');
+                    renderIndividualLineChart('individualStreakChart', individualData.streak_artists, 'Artistas con Mayor Streak');
+                    renderIndividualLineChart('individualTrackCountChart', individualData.track_count_artists, 'Artistas con Mayor Discografía');
+                    renderIndividualLineChart('individualNewArtistsChart', individualData.new_artists, 'Artistas Nuevos');
+                    renderIndividualLineChart('individualRisingChart', individualData.rising_artists, 'Artistas en Ascenso');
+                    renderIndividualLineChart('individualFallingChart', individualData.falling_artists, 'Artistas en Declive');
+                }}
+            }}
         }}
 
         function renderYearlyChart(yearlyData) {{
@@ -2071,6 +2281,109 @@ class UserStatsHTMLGeneratorFixed:
             document.getElementById('popupContent').innerHTML = content;
             document.getElementById('popupOverlay').style.display = 'block';
             document.getElementById('popup').style.display = 'block';
+        }}
+
+        // ✅ FIX: Función para gráficos de líneas individuales
+        function renderIndividualLineChart(canvasId, chartData, title) {{
+            const canvas = document.getElementById(canvasId);
+
+            if (!canvas) {{
+                console.error(`Canvas ${{canvasId}} no encontrado`);
+                return;
+            }}
+
+            if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {{
+                console.log(`No hay datos para ${{title}}`);
+                return;
+            }}
+
+            const datasets = [];
+            let colorIndex = 0;
+
+            // Obtener top 15 elementos con más datos
+            const sortedItems = Object.entries(chartData.data)
+                .sort((a, b) => {{
+                    const aTotal = Object.values(a[1]).reduce((sum, val) => sum + val, 0);
+                    const bTotal = Object.values(b[1]).reduce((sum, val) => sum + val, 0);
+                    return bTotal - aTotal;
+                }})
+                .slice(0, 15);
+
+            sortedItems.forEach(([item, yearlyData]) => {{
+                datasets.push({{
+                    label: item,
+                    data: chartData.years.map(year => yearlyData[year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 3,
+                    pointHoverRadius: 6
+                }});
+                colorIndex++;
+            }});
+
+            const config = {{
+                type: 'line',
+                data: {{
+                    labels: chartData.years,
+                    datasets: datasets
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{
+                                color: '#cdd6f4',
+                                padding: 10,
+                                usePointStyle: true,
+                                font: {{
+                                    size: 10
+                                }}
+                            }}
+                        }},
+                        tooltip: {{
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }}
+                    }},
+                    scales: {{
+                        x: {{
+                            title: {{
+                                display: true,
+                                text: 'Año',
+                                color: '#cdd6f4'
+                            }},
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }},
+                        y: {{
+                            title: {{
+                                display: true,
+                                text: currentDataType === 'annual' ? 'Scrobbles/Año' : 'Scrobbles Acumulados',
+                                color: '#cdd6f4'
+                            }},
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }}
+                    }}
+                }}
+            }};
+
+            charts[canvasId] = new Chart(canvas, config);
         }}
     </script>
 </body>

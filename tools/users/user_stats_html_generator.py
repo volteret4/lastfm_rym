@@ -1070,7 +1070,7 @@ class UserStatsHTMLGenerator:
                 userModal.style.display = 'none';
 
                 selectUser(user);
-                }}
+
             }});
 
             return selectedUser;

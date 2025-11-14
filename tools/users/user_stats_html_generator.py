@@ -1130,7 +1130,7 @@ class UserStatsHTMLGenerator:
             document.querySelectorAll('.provider-btn').forEach(btn => {{
                 btn.classList.remove('active');
             }});
-            document.querySelector(`[data-provider="${{provider}}"]`).classList.add('active');
+            document.querySelector(`[data-provider="${provider}"]`).classList.add('active');
 
             if (currentView === 'genres' && currentUser && allStats[currentUser]) {{
                 renderGenresCharts(allStats[currentUser]);
@@ -1143,7 +1143,7 @@ class UserStatsHTMLGenerator:
             document.querySelectorAll('.data-type-btn').forEach(btn => {{
                 btn.classList.remove('active');
             }});
-            document.querySelector(`[data-type="${{dataType}}"]`).classList.add('active');
+            document.querySelector(`[data-type="${dataType}"]`).classList.add('active');
 
             if (currentView === 'individual' && currentUser && allStats[currentUser]) {{
                 renderIndividualCharts(allStats[currentUser]);
@@ -1156,7 +1156,7 @@ class UserStatsHTMLGenerator:
             document.querySelectorAll('.view-btn').forEach(btn => {{
                 btn.classList.remove('active');
             }});
-            document.querySelector(`[data-view="${{view}}"]`).classList.add('active');
+            document.querySelector(`[data-view="${view}"]`).classList.add('active');
 
             document.querySelectorAll('.view').forEach(v => {{
                 v.classList.remove('active');
@@ -1222,27 +1222,27 @@ class UserStatsHTMLGenerator:
 
             const summaryHTML = `
                 <div class="summary-card">
-                    <div class="number">${{totalScrobbles.toLocaleString()}}</div>
+                    <div class="number">${totalScrobbles.toLocaleString()}</div>
                     <div class="label">Scrobbles</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalArtistCoincidences}}</div>
+                    <div class="number">${totalArtistCoincidences}</div>
                     <div class="label">Usuarios (Artistas)</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalAlbumCoincidences}}</div>
+                    <div class="number">${totalAlbumCoincidences}</div>
                     <div class="label">Usuarios (Álbumes)</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalGenres}}</div>
+                    <div class="number">${totalGenres}</div>
                     <div class="label">Géneros</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalReleaseYears}}</div>
+                    <div class="number">${totalReleaseYears}</div>
                     <div class="label">Décadas</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalLabels}}</div>
+                    <div class="number">${totalLabels}</div>
                     <div class="label">Sellos</div>
                 </div>
             `;
@@ -1328,7 +1328,7 @@ class UserStatsHTMLGenerator:
             const info = document.getElementById(infoId);
 
             if (!canvas || !info) {{
-                console.error(`No se encontró el canvas o info para ${{canvasId}}`);
+                console.error(`No se encontró el canvas o info para ${canvasId}`);
                 return;
             }}
 
@@ -1339,8 +1339,8 @@ class UserStatsHTMLGenerator:
             }}
 
             canvas.style.display = 'block';
-            const provider = type === 'Sellos' ? 'Sellos Discográficos' : `${{currentProvider}} (${{type}})`;
-            info.innerHTML = `Total: ${{pieData.total.toLocaleString()}} scrobbles | Tipo: ${{provider}}`;
+            const provider = type === 'Sellos' ? 'Sellos Discográficos' : `${currentProvider} (${type})`;
+            info.innerHTML = `Total: ${pieData.total.toLocaleString()} scrobbles | Tipo: ${provider}`;
 
             const data = {{
                 labels: Object.keys(pieData.data),
@@ -1384,7 +1384,7 @@ class UserStatsHTMLGenerator:
         function renderGenresScatterCharts(scatterData, years, containerId, isAlbums = false) {{
             const container = document.getElementById(containerId);
             if (!container) {{
-                console.error(`No se encontró el contenedor ${{containerId}}`);
+                console.error(`No se encontró el contenedor ${containerId}`);
                 return;
             }}
 
@@ -1406,7 +1406,7 @@ class UserStatsHTMLGenerator:
 
                 const title = document.createElement('h4');
                 const itemType = isAlbums ? 'Álbumes' : 'Artistas';
-                title.textContent = `${{genre}} - Top ${{items.length}} ${{itemType}}`;
+                title.textContent = `${genre} - Top ${items.length} ${itemType}`;
                 title.style.color = '#cba6f7';
                 title.style.textAlign = 'center';
                 title.style.marginBottom = '15px';
@@ -1417,7 +1417,7 @@ class UserStatsHTMLGenerator:
                 canvasWrapper.style.height = '300px';
 
                 const canvas = document.createElement('canvas');
-                const canvasId = `scatterChart_${{genre.replace(/[^a-zA-Z0-9]/g, '_')}}_${{index}}_${{containerId}}`;
+                const canvasId = `scatterChart_${genre.replace(/[^a-zA-Z0-9]/g, '_')}_${index}_${containerId}`;
                 canvas.id = canvasId;
                 canvasWrapper.appendChild(canvas);
 
@@ -1529,7 +1529,7 @@ class UserStatsHTMLGenerator:
                                     }},
                                     label: function(context) {{
                                         const point = context.raw;
-                                        return `${{point.x}}: ${{point.y}} scrobbles`;
+                                        return `${point.x}: ${point.y} scrobbles`;
                                     }}
                                 }}
                             }}
@@ -1555,7 +1555,7 @@ class UserStatsHTMLGenerator:
         function renderLabelsScatterCharts(scatterData, years, containerId) {{
             const container = document.getElementById(containerId);
             if (!container) {{
-                console.error(`No se encontró el contenedor ${{containerId}}`);
+                console.error(`No se encontró el contenedor ${containerId}`);
                 return;
             }}
 
@@ -1576,7 +1576,7 @@ class UserStatsHTMLGenerator:
                 labelContainer.className = 'genres-pie-container';
 
                 const title = document.createElement('h4');
-                title.textContent = `${{label}} - Top ${{artists.length}} Artistas`;
+                title.textContent = `${label} - Top ${artists.length} Artistas`;
                 title.style.color = '#cba6f7';
                 title.style.textAlign = 'center';
                 title.style.marginBottom = '15px';
@@ -1587,7 +1587,7 @@ class UserStatsHTMLGenerator:
                 canvasWrapper.style.height = '300px';
 
                 const canvas = document.createElement('canvas');
-                const canvasId = `labelScatterChart_${{label.replace(/[^a-zA-Z0-9]/g, '_')}}_${{index}}`;
+                const canvasId = `labelScatterChart_${label.replace(/[^a-zA-Z0-9]/g, '_')}_${index}`;
                 canvas.id = canvasId;
                 canvasWrapper.appendChild(canvas);
 
@@ -1699,7 +1699,7 @@ class UserStatsHTMLGenerator:
                                     }},
                                     label: function(context) {{
                                         const point = context.raw;
-                                        return `${{point.x}}: ${{point.y}} scrobbles`;
+                                        return `${point.x}: ${point.y} scrobbles`;
                                     }}
                                 }}
                             }}
@@ -1734,7 +1734,7 @@ class UserStatsHTMLGenerator:
                 genreContainer.className = 'genres-pie-container';
 
                 const title = document.createElement('h4');
-                title.textContent = `${{genre}} - Top ${{artists.length}} Artistas`;
+                title.textContent = `${genre} - Top ${artists.length} Artistas`;
                 title.style.color = '#cba6f7';
                 title.style.textAlign = 'center';
                 title.style.marginBottom = '15px';
@@ -1744,7 +1744,7 @@ class UserStatsHTMLGenerator:
                 canvasWrapper.className = 'scatter-chart-wrapper';
 
                 const canvas = document.createElement('canvas');
-                const canvasId = `scatterChart_${{genre.replace(/[^a-zA-Z0-9]/g, '_')}}_${{index}}`;
+                const canvasId = `scatterChart_${genre.replace(/[^a-zA-Z0-9]/g, '_')}_${index}`;
                 canvas.id = canvasId;
                 canvasWrapper.appendChild(canvas);
 
@@ -1836,7 +1836,7 @@ class UserStatsHTMLGenerator:
                                     }},
                                     label: function(context) {{
                                         const point = context.raw;
-                                        return `${{point.x}}: ${{point.y}} scrobbles`;
+                                        return `${point.x}: ${point.y} scrobbles`;
                                     }}
                                 }}
                             }}
@@ -1859,20 +1859,20 @@ class UserStatsHTMLGenerator:
         }}
 
         function showArtistPopup(itemName, category, provider, year, scrobbles, itemType = 'Artista') {{
-            const title = `${{itemName}} - ${{category}} (${{year}})`;
+            const title = `${itemName} - ${category} (${year})`;
             const content = `
                 <div class="popup-item">
-                    <span class="name">${{itemType}}: ${{itemName}}</span>
+                    <span class="name">${itemType}: ${itemName}</span>
                 </div>
                 <div class="popup-item">
-                    <span class="name">${{provider === 'Sello' ? 'Sello' : 'Género'}}: ${{category}}</span>
+                    <span class="name">${provider === 'Sello' ? 'Sello' : 'Género'}: ${category}</span>
                 </div>
                 <div class="popup-item">
-                    <span class="name">Año: ${{year}}</span>
-                    <span class="count">${{scrobbles}} scrobbles</span>
+                    <span class="name">Año: ${year}</span>
+                    <span class="count">${scrobbles} scrobbles</span>
                 </div>
                 <div class="popup-item">
-                    <span class="name">Proveedor: ${{provider}}</span>
+                    <span class="name">Proveedor: ${provider}</span>
                 </div>
             `;
 
@@ -1962,11 +1962,11 @@ class UserStatsHTMLGenerator:
                                             const details = chartData.details[item][year];
 
                                             if (title === 'One Hit Wonders' && details.track && details.artist) {{
-                                                return [`Artista: ${{details.artist}}`, `Canción: ${{details.track}}`];
+                                                return [`Artista: ${details.artist}`, `Canción: ${details.track}`];
                                             }} else if (title === 'Artistas con Mayor Streak' && details.days !== undefined) {{
-                                                return [`Días en ${{year}}: ${{details.days}}`];
+                                                return [`Días en ${year}: ${details.days}`];
                                             }} else if (title === 'Artistas con Mayor Discografía' && details.track_count !== undefined) {{
-                                                return [`Canciones únicas: ${{details.track_count}}`];
+                                                return [`Canciones únicas: ${details.track_count}`];
                                             }}
                                         }}
                                     }}
@@ -2020,7 +2020,7 @@ class UserStatsHTMLGenerator:
         }}
 
         function showIndividualPopupDetailed(category, item, year, value, chartData) {{
-            let title = `${{category}} - ${{item}} (${{year}})`;
+            let title = `${category} - ${item} (${year})`;
             let content = '';
 
             if (chartData.details && chartData.details[item] && chartData.details[item][year]) {{
@@ -2028,88 +2028,88 @@ class UserStatsHTMLGenerator:
 
                 if (category === 'One Hit Wonders') {{
                     content = `<div class="popup-item">
-                        <span class="name">Artista: ${{details.artist}}</span>
+                        <span class="name">Artista: ${details.artist}</span>
                     </div>
                     <div class="popup-item">
-                        <span class="name">Canción: ${{details.track}}</span>
-                        <span class="count">${{details.plays}} reproducciones</span>
+                        <span class="name">Canción: ${details.track}</span>
+                        <span class="count">${details.plays} reproducciones</span>
                     </div>`;
                 }} else if (category === 'Géneros') {{
                     content = `<div class="popup-item">
-                        <span class="name">${{item}} en ${{year}}</span>
-                        <span class="count">${{value}} reproducciones</span>
+                        <span class="name">${item} en ${year}</span>
+                        <span class="count">${value} reproducciones</span>
                     </div>`;
                     if (details.length > 0) {{
                         content += '<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">Top Artistas:</h4>';
                         details.slice(0, 5).forEach(artist => {{
                             content += `<div class="popup-item">
-                                <span class="name">${{artist.name}}</span>
-                                <span class="count">${{artist.plays}} plays</span>
+                                <span class="name">${artist.name}</span>
+                                <span class="count">${artist.plays} plays</span>
                             </div>`;
                         }});
                     }}
                 }} else if (category === 'Sellos') {{
                     content = `<div class="popup-item">
-                        <span class="name">${{item}} en ${{year}}</span>
-                        <span class="count">${{value}} reproducciones</span>
+                        <span class="name">${item} en ${year}</span>
+                        <span class="count">${value} reproducciones</span>
                     </div>`;
                     if (details.length > 0) {{
                         content += '<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">Top Artistas:</h4>';
                         details.slice(0, 5).forEach(artist => {{
                             content += `<div class="popup-item">
-                                <span class="name">${{artist.name}}</span>
-                                <span class="count">${{artist.plays}} plays</span>
+                                <span class="name">${artist.name}</span>
+                                <span class="count">${artist.plays} plays</span>
                             </div>`;
                         }});
                     }}
                 }} else if (category === 'Artistas con Mayor Streak') {{
                     content = `<div class="popup-item">
-                        <span class="name">${{item}} en ${{year}}</span>
-                        <span class="count">${{details.days}} días de escucha</span>
+                        <span class="name">${item} en ${year}</span>
+                        <span class="count">${details.days} días de escucha</span>
                     </div>
                     <div class="popup-item">
                         <span class="name">Streak máximo general</span>
-                        <span class="count">${{details.max_streak}} días consecutivos</span>
+                        <span class="count">${details.max_streak} días consecutivos</span>
                     </div>`;
                 }} else if (category === 'Artistas con Mayor Discografía') {{
                     content = `<div class="popup-item">
-                        <span class="name">${{item}} en ${{year}}</span>
-                        <span class="count">${{details.track_count}} canciones únicas</span>
+                        <span class="name">${item} en ${year}</span>
+                        <span class="count">${details.track_count} canciones únicas</span>
                     </div>`;
                     if (details.albums && details.albums.length > 0) {{
                         content += '<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">Top 10 Álbumes:</h4>';
                         details.albums.forEach(album => {{
                             content += `<div class="popup-item">
-                                <span class="name">${{album.name}}</span>
-                                <span class="count">${{album.plays}} plays</span>
+                                <span class="name">${album.name}</span>
+                                <span class="count">${album.plays} plays</span>
                             </div>`;
                         }});
                     }}
                 }} else if (category === 'Artistas en Ascenso' || category === 'Artistas en Declive') {{
                     const playText = currentDataType === 'cumulative' ? 'reproducciones acumuladas' : 'reproducciones';
                     content = `<div class="popup-item">
-                        <span class="name">${{item}} en ${{year}}</span>
-                        <span class="count">${{value}} ${{playText}}</span>
+                        <span class="name">${item} en ${year}</span>
+                        <span class="count">${value} ${playText}</span>
                     </div>`;
                     if (details && details.length > 0) {{
                         content += '<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">Top 10 Canciones:</h4>';
                         details.forEach(track => {{
                             content += `<div class="popup-item">
-                                <span class="name">${{track.name}}</span>
-                                <span class="count">${{track.plays}} plays</span>
+                                <span class="name">${track.name}</span>
+                                <span class="count">${track.plays} plays</span>
                             </div>`;
                         }});
                     }}
                 }} else {{
                     content = `<div class="popup-item">
-                        <span class="name">${{item}} en ${{year}}</span>
-                        <span class="count">${{value}} ${{category.includes('Días') ? 'días' : category.includes('Canciones') ? 'canciones' : 'reproducciones'}}</span>
+                        <span class="name">${item} en ${year}</span>
+                        <span class="count">${value} ${category.includes('Días') ? 'días' : category.includes('Canciones') ? 'canciones' : 'reproducciones'}</span>
                     </div>`;
                 }}
             }} else {{
                 content = `<div class="popup-item">
-                    <span class="name">${{item}} en ${{year}}</span>
-                    <span class="count">${{value}} ${{category.includes('Días') ? 'días' : category.includes('Canciones') ? 'canciones' : 'reproducciones'}}</span>
+                    <span class="name">${item} en ${year}</span>
+                    <span class="count">${value} ${category.includes('Días') ? 'días' : category.includes('Canciones') ? 'canciones' : 'reproducciones'}</span>
                 </div>`;
             }}
 
@@ -2155,7 +2155,7 @@ class UserStatsHTMLGenerator:
             }}
 
             canvas.style.display = 'block';
-            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}} | Click en una porción para ver detalles`;
+            info.innerHTML = `Total: ${chartData.total.toLocaleString()} | Click en una porción para ver detalles`;
 
             const data = {{
                 labels: Object.keys(chartData.data),
@@ -2213,97 +2213,97 @@ class UserStatsHTMLGenerator:
             let content = '';
 
             if (chartType === 'artists') {{
-                title = `Top Álbumes - ${{selectedLabel}}`;
+                title = `Top Álbumes - ${selectedLabel}`;
                 Object.keys(details).slice(0, 5).forEach(artist => {{
                     if (details[artist] && details[artist].length > 0) {{
-                        content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${{artist}}</h4>`;
+                        content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${artist}</h4>`;
                         details[artist].forEach(album => {{
                             content += `<div class="popup-item">
-                                <span class="name">${{album.name}}</span>
-                                <span class="count">${{album.plays}} plays</span>
+                                <span class="name">${album.name}</span>
+                                <span class="count">${album.plays} plays</span>
                             </div>`;
                         }});
                     }}
                 }});
             }} else if (chartType === 'albums') {{
-                title = `Top Canciones - ${{selectedLabel}}`;
+                title = `Top Canciones - ${selectedLabel}`;
                 Object.keys(details).slice(0, 5).forEach(album => {{
                     if (details[album] && details[album].length > 0) {{
-                        content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${{album}}</h4>`;
+                        content += `<h4 style="color: #cba6f7; margin: 10px 0 5px 0;">${album}</h4>`;
                         details[album].forEach(track => {{
                             content += `<div class="popup-item">
-                                <span class="name">${{track.name}}</span>
-                                <span class="count">${{track.plays}} plays</span>
+                                <span class="name">${track.name}</span>
+                                <span class="count">${track.plays} plays</span>
                             </div>`;
                         }});
                     }}
                 }});
             }} else if (chartType === 'tracks') {{
-                title = `Top Canciones - ${{selectedLabel}}`;
+                title = `Top Canciones - ${selectedLabel}`;
                 Object.keys(details).slice(0, 5).forEach(track => {{
                     const trackData = details[track];
                     content += `<div class="popup-item">
-                        <span class="name">${{track}}</span>
-                        <span class="count">${{trackData.user_plays}} plays</span>
+                        <span class="name">${track}</span>
+                        <span class="count">${trackData.user_plays} plays</span>
                     </div>`;
                 }});
             }} else if (chartType === 'genres') {{
-                title = `Top Artistas - ${{selectedLabel}}`;
+                title = `Top Artistas - ${selectedLabel}`;
                 details.forEach(artist => {{
                     content += `<div class="popup-item">
-                        <span class="name">${{artist.name}}</span>
-                        <span class="count">${{artist.plays}} plays</span>
+                        <span class="name">${artist.name}</span>
+                        <span class="count">${artist.plays} plays</span>
                     </div>`;
                 }});
             }} else if (chartType === 'years_labels') {{
-                title = `Top Artistas - ${{selectedLabel}}`;
+                title = `Top Artistas - ${selectedLabel}`;
                 details.forEach(artist => {{
                     content += `<div class="popup-item">
-                        <span class="name">${{artist.name}}</span>
-                        <span class="count">${{artist.plays}} plays</span>
+                        <span class="name">${artist.name}</span>
+                        <span class="count">${artist.plays} plays</span>
                     </div>`;
                 }});
             }} else if (chartType === 'top_scrobbles') {{
-                title = `Top Artistas Coincidentes - ${{selectedLabel}}`;
+                title = `Top Artistas Coincidentes - ${selectedLabel}`;
                 if (details.artists) {{
                     Object.keys(details.artists).forEach(artist => {{
                         const artistData = details.artists[artist];
                         content += `<div class="popup-item">
-                            <span class="name">${{artist}}</span>
-                            <span class="count">${{artistData.user_plays + artistData.other_plays}} plays totales</span>
+                            <span class="name">${artist}</span>
+                            <span class="count">${artistData.user_plays + artistData.other_plays} plays totales</span>
                         </div>`;
                     }});
                 }}
             }} else if (chartType === 'top_days') {{
-                title = `Artistas "Vuelve a Casa" - ${{selectedLabel}}`;
+                title = `Artistas "Vuelve a Casa" - ${selectedLabel}`;
                 if (details.artists) {{
                     Object.keys(details.artists).forEach(artist => {{
                         const artistData = details.artists[artist];
                         content += `<div class="popup-item">
-                            <span class="name">${{artist}}</span>
-                            <span class="count">${{artistData.user_days + artistData.other_days}} días totales</span>
+                            <span class="name">${artist}</span>
+                            <span class="count">${artistData.user_days + artistData.other_days} días totales</span>
                         </div>`;
                     }});
                 }}
             }} else if (chartType === 'top_discography') {{
-                title = `Discografía Completada - ${{selectedLabel}}`;
+                title = `Discografía Completada - ${selectedLabel}`;
                 if (details.artists) {{
                     Object.keys(details.artists).forEach(artist => {{
                         const artistData = details.artists[artist];
                         content += `<div class="popup-item">
-                            <span class="name">${{artist}}</span>
-                            <span class="count">${{artistData.user_tracks + artistData.other_tracks}} canciones</span>
+                            <span class="name">${artist}</span>
+                            <span class="count">${artistData.user_tracks + artistData.other_tracks} canciones</span>
                         </div>`;
                     }});
                 }}
             }} else if (chartType === 'top_streaks') {{
-                title = `Streaks Coincidentes - ${{selectedLabel}}`;
+                title = `Streaks Coincidentes - ${selectedLabel}`;
                 if (details.artists) {{
                     Object.keys(details.artists).forEach(artist => {{
                         const artistData = details.artists[artist];
                         content += `<div class="popup-item">
-                            <span class="name">${{artist}}</span>
-                            <span class="count">Max: ${{Math.max(artistData.user_streak, artistData.other_streak)}} días</span>
+                            <span class="name">${artist}</span>
+                            <span class="count">Max: ${Math.max(artistData.user_streak, artistData.other_streak)} días</span>
                         </div>`;
                     }});
                 }}
@@ -2442,7 +2442,7 @@ class UserStatsHTMLGenerator:
 
                                 const limit = ['artists', 'albums', 'tracks'].includes(type) ? 10 : 5;
                                 const limitedDetails = detailsData[user][year].slice(0, limit);
-                                showLinearPopup(`Top ${{limit}} ${{typeLabel}} - ${{user}} (${{year}})`, limitedDetails);
+                                showLinearPopup(`Top ${limit} ${typeLabel} - ${user} (${year})`, limitedDetails);
                             }}
                         }}
                     }}
@@ -2460,32 +2460,32 @@ class UserStatsHTMLGenerator:
                 if (item.artist) {{
                     content += `<div class="popup-item">
                         <div style="margin-bottom: 5px;">
-                            <span class="name" style="font-weight: bold;">${{item.artist}}</span>
+                            <span class="name" style="font-weight: bold;">${item.artist}</span>
                         </div>`;
 
                     if (item.track) {{
                         content += `<div style="margin-left: 10px; color: #a6adc8;">
-                            ðŸŽµ ${{item.track}}
+                            ðŸŽµ ${item.track}
                         </div>`;
                     }}
 
                     if (item.album) {{
                         content += `<div style="margin-left: 10px; color: #a6adc8;">
-                            ðŸ’¿ ${{item.album}}
+                            ðŸ’¿ ${item.album}
                         </div>`;
                     }}
 
                     if (item.user1_plays && item.user2_plays) {{
                         content += `<div style="margin-left: 10px; font-size: 0.9em; color: #6c7086;">
-                            Usuario 1: ${{item.user1_plays}} plays | Usuario 2: ${{item.user2_plays}} plays
+                            Usuario 1: ${item.user1_plays} plays | Usuario 2: ${item.user2_plays} plays
                         </div>`;
                     }}
 
                     content += `</div>`;
                 }} else {{
                     content += `<div class="popup-item">
-                        <span class="name">${{item.name}}</span>
-                        <span class="count">${{item.plays}} plays</span>
+                        <span class="name">${item.name}</span>
+                        <span class="count">${item.plays} plays</span>
                     </div>`;
                 }}
             }});

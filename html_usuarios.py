@@ -23,7 +23,7 @@ except ImportError:
 # Importar las clases como propones
 from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database_extended import UserStatsDatabaseExtended
-from tools.users.user_stats_html_generator_fixed import UserStatsHTMLGeneratorFixed
+from tools.users.user_stats_html_generator import UserStatsHTMLGeneratorFixed
 
 
 def main():

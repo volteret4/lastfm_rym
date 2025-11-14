@@ -442,7 +442,7 @@ class UserStatsHTMLGeneratorFixed:
 
         .scatter-charts-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
             gap: 20px;
             margin-top: 20px;
         }}
@@ -464,7 +464,7 @@ class UserStatsHTMLGeneratorFixed:
 
         .evolution-charts {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
             gap: 25px;
         }}
 
@@ -696,7 +696,7 @@ class UserStatsHTMLGeneratorFixed:
                 </div>
 
 
-
+                <div class="charts-grid">
                     <div class="chart-card">
                         <div class="chart-header">
                             <h3 class="chart-title">👥 Top Artistas</h3>

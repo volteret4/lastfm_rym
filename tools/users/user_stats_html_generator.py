@@ -30,7 +30,7 @@ class UserStatsHTMLGeneratorFixed:
 
         # ✅ FIX: Añadir soporte para iconos de usuario
         icons_env = os.getenv('LASTFM_USERS_ICONS', '')
-        user_icons = {{}}
+        user_icons = {}
         if icons_env:
             for pair in icons_env.split(','):
                 if ':' in pair:

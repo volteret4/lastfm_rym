@@ -1109,7 +1109,7 @@ class GroupStatsHTMLGenerator:
                     userButton.textContent = icon;
                 }}
             }} else {{
-                userButton.textContent = 'ðŸ'¤';
+                userButton.textContent = '👤';
             }}
         }}
 

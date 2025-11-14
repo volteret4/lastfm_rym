@@ -1962,11 +1962,11 @@ class UserStatsHTMLGenerator:
                                             const details = chartData.details[item][year];
 
                                             if (title === 'One Hit Wonders' && details.track && details.artist) {{
-                                                return [`Artista: $${{details.artist}}`, `Canción: $${{details.track}}`];
+                                                return ['Artista: $${{details.artist}}', 'Canción: $${{details.track}}'];
                                             }} else if (title === 'Artistas con Mayor Streak' && details.days !== undefined) {{
-                                                return [`Días en $${{year}}: $${{details.days}}`];
+                                                return ['Días en $${{year}}: $${{details.days}}'];
                                             }} else if (title === 'Artistas con Mayor Discografía' && details.track_count !== undefined) {{
-                                                return [`Canciones únicas: $${{details.track_count}}`];
+                                                return ['Canciones únicas: $${{details.track_count}}'];
                                             }}
                                         }}
                                     }}

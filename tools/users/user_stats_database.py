@@ -259,8 +259,8 @@ class UserStatsDatabase:
                 FROM scrobbles s
                 JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
                 WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-                  AND ag.source = ?
-                  AND s.album IS NOT NULL AND s.album != ''
+                AND ag.source = ?
+                AND s.album IS NOT NULL AND s.album != ''
                 {mbid_filter}
                 GROUP BY ag.genre
                 ORDER BY plays DESC
@@ -273,8 +273,41 @@ class UserStatsDatabase:
         except sqlite3.OperationalError:
             pass  # Tabla no existe, continuar con fallback
 
-        # Para álbumes no tenemos fallback en la tabla antigua
-        # ya que no hay géneros de álbumes en artist_genres
+        # FALLBACK: Si es lastfm, usar géneros de artistas como aproximación para álbumes
+        if provider == 'lastfm':
+            try:
+                cursor.execute(f'''
+                    SELECT ag.genres, COUNT(*) as plays, s.album
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                    AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY s.album, ag.genres
+                    ORDER BY plays DESC
+                ''', (user, from_timestamp, to_timestamp))
+
+                # Procesar géneros por álbum
+                album_genre_counts = defaultdict(int)
+                for row in cursor.fetchall():
+                    genres_json = row['genres']
+                    album_plays = row['plays']
+                    try:
+                        genres_list = json.loads(genres_json) if genres_json else []
+                        for genre in genres_list[:3]:  # Solo primeros 3 géneros
+                            album_genre_counts[genre] += album_plays
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+                # Ordenar y limitar
+                sorted_genres = sorted(album_genre_counts.items(), key=lambda x: x[1], reverse=True)
+                return sorted_genres[:limit]
+
+            except sqlite3.OperationalError as e:
+                print(f"Error en fallback de géneros de álbumes: {e}")
+                return []
+
+        # Si no es lastfm y no hay tabla nueva, devolver vacío
         print(f"No hay datos de géneros de álbumes disponibles para {provider}")
         return []
 
@@ -305,7 +338,6 @@ class UserStatsDatabase:
             albums = cursor.fetchall()
             if albums:  # Si hay datos en la tabla nueva, procesarlos
                 albums_data = []
-
                 for album_row in albums:
                     artist_name = album_row['artist']
                     album_name = album_row['album']
@@ -338,9 +370,63 @@ class UserStatsDatabase:
 
                 return albums_data
         except sqlite3.OperationalError:
-            pass  # Tabla no existe
+            pass  # Tabla no existe, continuar con fallback
 
-        # Para álbumes no tenemos fallback
+        # FALLBACK: usar géneros de artistas para aproximar álbumes (solo lastfm)
+        if provider == 'lastfm':
+            try:
+                cursor.execute(f'''
+                    SELECT s.artist, s.album, COUNT(*) as total_plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND ag.genres LIKE ?
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY s.artist, s.album
+                    ORDER BY total_plays DESC
+                    LIMIT ?
+                ''', (user, from_timestamp, to_timestamp, f'%"{genre}"%', limit))
+
+                albums = cursor.fetchall()
+                albums_data = []
+
+                for album_row in albums:
+                    artist_name = album_row['artist']
+                    album_name = album_row['album']
+                    album_key = f"{artist_name} - {album_name}"
+
+                    # Obtener datos por año
+                    yearly_data = {}
+                    for year in range(from_year, to_year + 1):
+                        year_start = int(datetime(year, 1, 1).timestamp())
+                        year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+                        cursor.execute(f'''
+                            SELECT COUNT(*) as plays
+                            FROM scrobbles s
+                            JOIN artist_genres ag ON s.artist = ag.artist
+                            WHERE s.user = ? AND s.artist = ? AND s.album = ?
+                              AND s.timestamp >= ? AND s.timestamp <= ?
+                              AND ag.genres LIKE ?
+                            {mbid_filter}
+                        ''', (user, artist_name, album_name, year_start, year_end, f'%"{genre}"%'))
+
+                        year_result = cursor.fetchone()
+                        yearly_data[year] = year_result['plays'] if year_result else 0
+
+                    albums_data.append({
+                        'album': album_key,
+                        'yearly_data': yearly_data,
+                        'total_plays': album_row['total_plays']
+                    })
+
+                return albums_data
+            except sqlite3.OperationalError as e:
+                print(f"Error en fallback de álbumes por género: {e}")
+                return []
+
+        # Si no es lastfm y no hay tabla nueva, devolver vacío
         print(f"No hay datos de álbumes para género {genre} en {provider}")
         return []
 

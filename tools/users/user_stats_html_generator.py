@@ -1052,21 +1052,24 @@ class UserStatsHTMLGenerator:
             }});
 
             userOptions.addEventListener('click', (e) => {{
-                if (e.target.classList.contains('user-option')) {{
-                    const user = e.target.dataset.user;
-                    selectedUser = user;
+                const option = e.target.closest('.user-option');
+                if (!option) return;
 
-                    if (user) {{
-                        localStorage.setItem('lastfm_selected_user', user);
-                    }} else {{
-                        localStorage.removeItem('lastfm_selected_user');
-                    }}
+                const user = option.dataset.user;
 
-                    updateSelectedUserOption(user);
-                    updateUserButtonIcon(user);
-                    userModal.style.display = 'none';
+                selectedUser = user;
 
-                    selectUser(user);
+                if (user) {{
+                    localStorage.setItem('lastfm_selected_user', user);
+                }} else {{
+                    localStorage.removeItem('lastfm_selected_user');
+                }}
+
+                updateSelectedUserOption(user);
+                updateUserButtonIcon(user);
+                userModal.style.display = 'none';
+
+                selectUser(user);
                 }}
             }});
 
@@ -1254,40 +1257,50 @@ class UserStatsHTMLGenerator:
             }});
             charts = {{}};
 
+            const genresData = userStats.genres;
             if (!genresData || !genresData[currentProvider]) {{
                 // Mostrar mensaje de no datos
-                document.getElementById('genresPieChart').style.display = 'none';
-                document.getElementById('genresPieInfo').innerHTML = '<div class="no-data">No hay datos disponibles para ' + currentProvider + '</div>';
-                document.getElementById('albumGenresPieChart').style.display = 'none';
-                document.getElementById('albumGenresPieInfo').innerHTML = '<div class="no-data">No hay datos disponibles para ' + currentProvider + '</div>';
-                document.getElementById('genresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
-                document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
+                showNoGenresData();
                 return;
             }}
 
             const providerData = genresData[currentProvider];
 
-            // 1. GrÃ¡fico circular con top 15 gÃ©neros de artistas
+            // 1. Gráfico circular con top 15 géneros de artistas
             renderGenresPieChart(providerData.pie_chart, 'genresPieChart', 'genresPieInfo', 'Artistas');
 
-            // 2. 6 grÃ¡ficos de scatter para top 6 gÃ©neros de artistas
+            // 2. 6 gráficos de scatter para top 6 géneros de artistas
             renderGenresScatterCharts(providerData.scatter_charts, providerData.years, 'genresScatterGrid', false);
 
-            // 3. GrÃ¡fico circular con top 15 gÃ©neros de Ã¡lbumes
-            if (providerData.album_pie_chart) {{
-                renderGenresPieChart(providerData.album_pie_chart, 'albumGenresPieChart', 'albumGenresPieInfo', 'Ãlbumes');
+            // 3. Gráfico circular con top 15 géneros de álbumes (SOLO SI EXISTEN DATOS)
+            if (providerData.album_pie_chart && providerData.album_pie_chart.data && Object.keys(providerData.album_pie_chart.data).length > 0) {{
+                renderGenresPieChart(providerData.album_pie_chart, 'albumGenresPieChart', 'albumGenresPieInfo', 'Álbumes');
+
+                // 4. 6 gráficos de scatter para top 6 géneros de álbumes (SOLO SI EXISTEN DATOS)
+                if (providerData.album_scatter_charts && Object.keys(providerData.album_scatter_charts).length > 0) {{
+                    renderGenresScatterCharts(providerData.album_scatter_charts, providerData.years, 'albumGenresScatterGrid', true);
+                }} else {{
+                    document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de evolución de álbumes por género para ' + currentProvider + '</div>';
+                }}
             }} else {{
+                // Ocultar secciones de álbumes si no hay datos
+                const albumGenresSection = document.querySelector('h3').nextElementSibling;
+                if (albumGenresSection) {{
+                    albumGenresSection.style.display = 'none';
+                }}
                 document.getElementById('albumGenresPieChart').style.display = 'none';
                 document.getElementById('albumGenresPieInfo').innerHTML = '<div class="no-data">No hay datos de géneros de álbumes para ' + currentProvider + '</div>';
-
+                document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter de álbumes para ' + currentProvider + '</div>';
             }}
+        }}
 
-            // 4. 6 grÃ¡ficos de scatter para top 6 gÃ©neros de Ã¡lbumes
-            if (providerData.album_scatter_charts) {{
-                renderGenresScatterCharts(providerData.album_scatter_charts, providerData.years, 'albumGenresScatterGrid', true);
-            }} else {{
-                document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter de álbumes disponibles</div>';
-            }}
+        function showNoGenresData() {{
+            document.getElementById('genresPieChart').style.display = 'none';
+            document.getElementById('genresPieInfo').innerHTML = '<div class="no-data">No hay datos disponibles para ' + currentProvider + '</div>';
+            document.getElementById('albumGenresPieChart').style.display = 'none';
+            document.getElementById('albumGenresPieInfo').innerHTML = '<div class="no-data">No hay datos disponibles para ' + currentProvider + '</div>';
+            document.getElementById('genresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
+            document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
         }}
 
         function renderLabelsCharts(userStats) {{

@@ -8,6 +8,7 @@ FIXES:
 """
 
 import json
+import os
 from typing import Dict, List
 
 
@@ -26,6 +27,16 @@ class UserStatsHTMLGeneratorFixed:
         users_json = json.dumps(users, ensure_ascii=False)
         stats_json = json.dumps(all_user_stats, indent=2, ensure_ascii=False)
         colors_json = json.dumps(self.colors, ensure_ascii=False)
+
+        # ✅ FIX: Añadir soporte para iconos de usuario
+        icons_env = os.getenv('LASTFM_USERS_ICONS', '')
+        user_icons = {{}}
+        if icons_env:
+            for pair in icons_env.split(','):
+                if ':' in pair:
+                    user, icon = pair.split(':', 1)
+                    user_icons[user.strip()] = icon.strip()
+        user_icons_json = json.dumps(user_icons, ensure_ascii=False)
 
         return f"""<!DOCTYPE html>
 <html lang="es">
@@ -204,6 +215,12 @@ class UserStatsHTMLGeneratorFixed:
 
         .user-option:hover {{
             background: #45475a;
+            border-color: #cba6f7;
+        }}
+
+        .user-option.selected {{
+            background: #cba6f7;
+            color: #1e1e2e;
             border-color: #cba6f7;
         }}
 
@@ -873,6 +890,7 @@ class UserStatsHTMLGeneratorFixed:
         const allUsers = {users_json};
         const allStats = {stats_json};
         const colors = {colors_json};
+        const userIcons = {user_icons_json}; // ✅ FIX: Añadir iconos de usuario
 
         // Variables globales
         let currentUser = null;
@@ -892,9 +910,14 @@ class UserStatsHTMLGeneratorFixed:
             setupProviderButtons();
             setupPopup();
 
-            // Seleccionar primer usuario por defecto
-            if (allUsers.length > 0) {{
-                selectUser(allUsers[0]);
+            // ✅ FIX: Cargar usuario guardado o seleccionar el primero
+            const savedUser = loadSavedUser();
+            const userToSelect = savedUser || (allUsers.length > 0 ? allUsers[0] : null);
+
+            if (userToSelect) {{
+                selectUser(userToSelect);
+                updateUserButtonIcon(userToSelect);
+                updateSelectedUserOption(userToSelect);
             }}
         }}
 
@@ -904,10 +927,24 @@ class UserStatsHTMLGeneratorFixed:
             const closeModal = document.getElementById('closeModal');
             const userOptions = document.getElementById('userOptions');
 
-            // Llenar opciones de usuarios
-            userOptions.innerHTML = allUsers.map(user =>
-                `<div class="user-option" data-user="${{user}}">${{user}}</div>`
-            ).join('');
+            // Llenar opciones de usuarios con iconos
+            userOptions.innerHTML = allUsers.map(user => {{
+                const icon = userIcons[user];
+                let optionHTML = `<div class="user-option" data-user="${{user}}">`;
+
+                if (icon) {{
+                    if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {{
+                        optionHTML += `<img src="${{icon}}" alt="${{user}}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:8px;"> ${{user}}`;
+                    }} else {{
+                        optionHTML += `<span style="font-size:1.2em;margin-right:8px;">${{icon}}</span> ${{user}}`;
+                    }}
+                }} else {{
+                    optionHTML += user;
+                }}
+
+                optionHTML += '</div>';
+                return optionHTML;
+            }}).join('');
 
             // Event listeners
             userButton.addEventListener('click', () => {{
@@ -929,6 +966,14 @@ class UserStatsHTMLGeneratorFixed:
                     const username = e.target.dataset.user;
                     selectUser(username);
                     userModal.style.display = 'none';
+
+                    // Guardar usuario seleccionado en localStorage
+                    if (username) {{
+                        localStorage.setItem('lastfm_selected_user', username);
+                    }}
+
+                    updateUserButtonIcon(username);
+                    updateSelectedUserOption(username);
                 }}
             }});
         }}
@@ -996,6 +1041,39 @@ class UserStatsHTMLGeneratorFixed:
             }});
         }}
 
+        // ✅ FIX: Funciones para manejar iconos de usuario
+        function updateUserButtonIcon(user) {{
+            const userButton = document.getElementById('userButton');
+            const icon = userIcons[user];
+            if (icon) {{
+                if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {{
+                    userButton.innerHTML = `<img src="${{icon}}" alt="${{user}}" style="width:100%;height:100%;border-radius:50%;">`;
+                }} else {{
+                    userButton.textContent = icon;
+                }}
+            }} else {{
+                userButton.textContent = '👤';
+            }}
+        }}
+
+        function updateSelectedUserOption(selectedUser) {{
+            const userOptions = document.getElementById('userOptions');
+            userOptions.querySelectorAll('.user-option').forEach(option => {{
+                option.classList.remove('selected');
+                if (option.dataset.user === selectedUser) {{
+                    option.classList.add('selected');
+                }}
+            }});
+        }}
+
+        function loadSavedUser() {{
+            const savedUser = localStorage.getItem('lastfm_selected_user');
+            if (savedUser && allUsers.includes(savedUser)) {{
+                return savedUser;
+            }}
+            return null;
+        }}
+
         function selectUser(username) {{
             currentUser = username;
             const userStats = allStats[username];
@@ -1028,19 +1106,25 @@ class UserStatsHTMLGeneratorFixed:
         function updateSummaryStats(userStats) {{
             const totalScrobbles = Object.values(userStats.yearly_scrobbles).reduce((a, b) => a + b, 0);
 
-            const artistsChart = userStats.coincidences.charts.artists;
-            const albumsChart = userStats.coincidences.charts.albums;
-            const tracksChart = userStats.coincidences.charts.tracks;
-            const genresChart = userStats.coincidences.charts.genres;
-            const releaseYearsChart = userStats.coincidences.charts.release_years;
-            const labelsChart = userStats.coincidences.charts.labels;
+            // ✅ FIX: Calcular estadísticas correctamente desde los datos del usuario
+            const totalArtists = Object.keys(userStats.top_artists || {{}}).length;
+            const totalAlbums = Object.keys(userStats.top_albums || {{}}).length;
+            const totalTracks = Object.keys(userStats.top_tracks || {{}}).length;
 
-            const totalArtistCoincidences = Object.keys(artistsChart.data || {{}}).length;
-            const totalAlbumCoincidences = Object.keys(albumsChart.data || {{}}).length;
-            const totalTrackCoincidences = Object.keys(tracksChart.data || {{}}).length;
-            const totalGenres = Object.keys(genresChart.data || {{}}).length;
-            const totalReleaseYears = Object.keys(releaseYearsChart.data || {{}}).length;
-            const totalLabels = Object.keys(labelsChart.data || {{}}).length;
+            // Contar géneros del usuario (no coincidencias)
+            let totalGenres = 0;
+            if (genresData && genresData[currentProvider] && genresData[currentProvider].pie_chart) {{
+                totalGenres = Object.keys(genresData[currentProvider].pie_chart.data).length;
+            }}
+
+            // Contar sellos del usuario
+            let totalLabels = 0;
+            if (userStats.labels && userStats.labels.pie_chart) {{
+                totalLabels = Object.keys(userStats.labels.pie_chart.data).length;
+            }}
+
+            // Años únicos desde scrobbles
+            const years = Object.keys(userStats.yearly_scrobbles).length;
 
             const summaryHTML = `
                 <div class="summary-card">
@@ -1048,28 +1132,28 @@ class UserStatsHTMLGeneratorFixed:
                     <div class="label">Scrobbles</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalArtistCoincidences}}</div>
-                    <div class="label">Usuarios (Artistas)</div>
+                    <div class="number">${{totalArtists.toLocaleString()}}</div>
+                    <div class="label">Artistas</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalAlbumCoincidences}}</div>
-                    <div class="label">Usuarios (Álbumes)</div>
+                    <div class="number">${{totalAlbums.toLocaleString()}}</div>
+                    <div class="label">Álbumes</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalTrackCoincidences}}</div>
-                    <div class="label">Usuarios (Canciones)</div>
+                    <div class="number">${{totalTracks.toLocaleString()}}</div>
+                    <div class="label">Canciones</div>
                 </div>
                 <div class="summary-card">
                     <div class="number">${{totalGenres}}</div>
                     <div class="label">Géneros</div>
                 </div>
                 <div class="summary-card">
-                    <div class="number">${{totalReleaseYears}}</div>
-                    <div class="label">Décadas</div>
-                </div>
-                <div class="summary-card">
                     <div class="number">${{totalLabels}}</div>
                     <div class="label">Sellos</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${{years}}</div>
+                    <div class="label">Años</div>
                 </div>
             `;
 

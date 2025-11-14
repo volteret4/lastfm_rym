@@ -280,9 +280,9 @@ class UserStatsHTMLGeneratorFixed:
         }}
 
         .user-name {{
-            font-size: 1.8em;
+            font-size: 1.4em;
             color: #cba6f7;
-            font-weight: bold;
+            font-weight: regular;
             margin-bottom: 15px;
         }}
 
@@ -695,16 +695,16 @@ class UserStatsHTMLGeneratorFixed:
                     <button class="data-type-btn" data-type="cumulative">Acumulativo</button>
                 </div>
 
-                <div class="charts-grid">
-                    <div class="chart-card">
-                        <div class="chart-header">
-                            <h3 class="chart-title">🎵 Scrobbles por Año</h3>
-                        </div>
-                        <div class="chart-wrapper">
-                            <canvas id="yearlyChart"></canvas>
-                        </div>
-                        <div class="chart-info" id="yearlyInfo"></div>
-                    </div>
+                // <div class="charts-grid">
+                //     <div class="chart-card">
+                //         <div class="chart-header">
+                //             <h3 class="chart-title">🎵 Scrobbles por Año</h3>
+                //         </div>
+                //         <div class="chart-wrapper">
+                //             <canvas id="yearlyChart"></canvas>
+                //         </div>
+                //         <div class="chart-info" id="yearlyInfo"></div>
+                //     </div>
 
                     <div class="chart-card">
                         <div class="chart-header">

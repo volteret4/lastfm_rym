@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-Last.fm User Stats Generator - Versión Corregida con Soporte para Géneros por Proveedor MEJORADA
+Last.fm User Stats Generator - Versión Corregida con Soporte para Géneros por Proveedor COMPLETA
 Genera estadísticas individuales de usuarios con gráficos de coincidencias, evolución y géneros
 FIXES:
 - Corrige el enlace del botón TEMPORALES para que apunte a index.html#temporal
 - Arregla la inicialización de genresData para mostrar los gráficos de géneros
+- Restaura funciones completas para scatter charts y gráficos de evolución
+- Incluye popups interactivos para detalles
 """
 
 import os
@@ -26,11 +28,11 @@ except ImportError:
 # Importar las versiones corregidas desde los outputs
 from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database import UserStatsDatabase
-from tools.users.user_stats_html_generator_fixed import UserStatsHTMLGeneratorFixed
+from tools.users.user_stats_html_generator import UserStatsHTMLGeneratorFixed
 
 
 def main():
-    """Función principal para generar estadísticas de usuarios con sección de géneros CORREGIDA"""
+    """Función principal para generar estadísticas de usuarios con sección de géneros COMPLETA"""
     parser = argparse.ArgumentParser(description='Generador de estadísticas individuales de usuarios de Last.fm')
     parser.add_argument('--years-back', type=int, default=5,
                        help='Número de años hacia atrás para analizar (por defecto: 5)')
@@ -49,7 +51,7 @@ def main():
         if not users:
             raise ValueError("LASTFM_USERS no encontrada en las variables de entorno")
 
-        print("🎵 Iniciando análisis de usuarios con sección de géneros CORREGIDA...")
+        print("🎵 Iniciando análisis de usuarios con sección de géneros COMPLETA...")
 
         # Inicializar componentes
         database = UserStatsDatabase()
@@ -75,15 +77,18 @@ def main():
             f.write(html_content)
 
         print(f"✅ Archivo generado: {args.output}")
-        print(f"📊 Características CORREGIDAS:")
+        print(f"📊 Características COMPLETAS:")
         print(f"  • Géneros diferenciados por proveedor (Last.fm, MusicBrainz, Discogs)")
         print(f"  • Fallback automático a tabla antigua para Last.fm")
         print(f"  • Gráficos scatter con leyendas visibles y márgenes adecuados")
         print(f"  • Soporte para géneros de álbumes por separado")
         print(f"  • Sección de sellos completamente funcional")
         print(f"  • Manejo mejorado de datos vacíos")
-        print(f"  • ✅ NUEVO: Botón TEMPORALES apunta correctamente a index.html#temporal")
-        print(f"  • ✅ NUEVO: Gráficos de géneros se muestran correctamente")
+        print(f"  • ✅ CORREGIDO: Botón TEMPORALES apunta a index.html#temporal")
+        print(f"  • ✅ CORREGIDO: Gráficos de géneros se muestran correctamente")
+        print(f"  • ✅ RESTAURADO: Funciones completas de scatter charts")
+        print(f"  • ✅ RESTAURADO: Funciones completas de evolución")
+        print(f"  • ✅ AÑADIDO: Popups interactivos con detalles")
 
         # Mostrar resumen
         print("\n📈 Resumen:")

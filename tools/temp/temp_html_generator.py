@@ -249,9 +249,9 @@ class HTMLGenerator:
         }}
 
         .control-group {{
-            display: flex;
-            gap: 15px;
-            align-items: center;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
         }}
 
         .control-group label {{
@@ -619,7 +619,7 @@ class HTMLGenerator:
 
         <div class="controls">
             <div class="control-group">
-                <label>Mostrar categorías:</label>
+
                 <div class="category-filters">
                     {category_filters_html}
                 </div>

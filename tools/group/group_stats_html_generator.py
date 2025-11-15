@@ -101,6 +101,9 @@ class GroupStatsHTMLGenerator:
             h1 {{
                 font-size: 1.4em;
             }}
+            :root {{
+                --page-padding: 6px;
+            }}
         }}
 
         .subtitle {{
@@ -713,6 +716,7 @@ class GroupStatsHTMLGenerator:
         }}
 
         @media (max-width: 768px) {{
+
             .charts-grid {{
                 grid-template-columns: 1fr;
             }}
@@ -806,7 +810,7 @@ class GroupStatsHTMLGenerator:
 
         <!-- Filtros de usuarios para vistas específicas -->
         <div id="userFilters" class="user-filters">
-            <h4>Filtrar por usuarios activos:</h4>
+
             <div class="user-filter-buttons" id="userFilterButtons">
                 <!-- Se llenarán dinámicamente -->
             </div>
@@ -822,14 +826,14 @@ class GroupStatsHTMLGenerator:
                 <div class="data-section">
                     <div class="data-controls">
                         <div class="data-control-group">
-                            <label for="userLevelSelect">Nivel de coincidencia:</label>
+
                             <select id="userLevelSelect" class="data-select">
                                 <!-- Se llenará dinámicamente -->
                             </select>
                         </div>
 
                         <div class="data-control-group">
-                            <label>Mostrar categorías:</label>
+
                             <div class="data-categories">
                                 <button class="data-category-filter active" data-category="artists">Artistas</button>
                                 <button class="data-category-filter" data-category="albums">Álbumes</button>

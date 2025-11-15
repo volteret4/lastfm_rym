@@ -639,7 +639,7 @@ class OptimizedDatabase:
                 playcount INTEGER,
                 url TEXT,
                 image_url TEXT,
-                updated_at INTEGER NOT NULL
+                last_updated INTEGER NOT NULL
             )
         ''')
 
@@ -656,7 +656,7 @@ class OptimizedDatabase:
                 country TEXT,
                 barcode TEXT,
                 total_tracks INTEGER,
-                updated_at INTEGER NOT NULL,
+                last_updated INTEGER NOT NULL,
                 PRIMARY KEY (artist, album)
             )
         ''')
@@ -669,7 +669,7 @@ class OptimizedDatabase:
                 duration_ms INTEGER,
                 album TEXT,
                 isrc TEXT,
-                updated_at INTEGER NOT NULL,
+                last_updated INTEGER NOT NULL,
                 PRIMARY KEY (artist, track)
             )
         ''')
@@ -762,7 +762,7 @@ class OptimizedDatabase:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO artist_details
-                (artist, mbid, bio, tags, similar_artists, listeners, playcount, url, image_url, updated_at)
+                (artist, mbid, bio, tags, similar_artists, listeners, playcount, url, image_url, last_updated)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 artist,
@@ -788,14 +788,13 @@ class OptimizedDatabase:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO album_details
-                (artist, album, mbid, release_group_mbid, release_date, type, status, packaging,
-                 country, barcode, total_tracks, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (artist, album, mbid, release_group_mbid, album_type, status, packaging,
+                 country, barcode, total_tracks, last_updated)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 artist, album,
                 details.get('mbid'),
                 details.get('release_group_mbid'),
-                details.get('release_date'),
                 details.get('type'),
                 details.get('status'),
                 details.get('packaging'),
@@ -804,6 +803,21 @@ class OptimizedDatabase:
                 details.get('total_tracks'),
                 int(time.time())
             ))
+            cursor.execute('''
+                INSERT OR REPLACE INTO album_release_dates
+                (artist, album, release_date, updated_at)
+                VALUES (?, ?, ?, ?)
+            ''', (
+                artist,
+
+
+
+
+                album,
+                details.get('release_date'),
+                int(time.time())
+            ))
+
 
             self.pending_commits += 1
             if force_commit or self.pending_commits >= 20:
@@ -816,7 +830,7 @@ class OptimizedDatabase:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO track_details
-                (artist, track, mbid, duration_ms, album, isrc, updated_at)
+                (artist, track, mbid, duration_ms, album, isrc, last_updated)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 artist, track,
@@ -949,11 +963,14 @@ class OptimizedDatabase:
 
         if entity_type == 'artist':
             cursor.execute('''
-                SELECT DISTINCT artist FROM scrobbles s
+                SELECT DISTINCT s.artist
+                FROM scrobbles s
                 LEFT JOIN artist_details ad ON s.artist = ad.artist
                 WHERE ad.artist IS NULL
                 ORDER BY (
-                    SELECT COUNT(*) FROM scrobbles s2 WHERE s2.artist = s.artist
+                    SELECT COUNT(*)
+                    FROM scrobbles s2
+                    WHERE s2.artist = s.artist
                 ) DESC
                 LIMIT ?
             ''', (limit,))
@@ -961,7 +978,7 @@ class OptimizedDatabase:
 
         elif entity_type == 'album':
             cursor.execute('''
-                SELECT DISTINCT artist, album FROM scrobbles s
+                SELECT DISTINCT s.artist, s.album FROM scrobbles s
                 LEFT JOIN album_details ad ON s.artist = ad.artist AND s.album = ad.album
                 WHERE s.album IS NOT NULL AND s.album != '' AND ad.artist IS NULL
                 ORDER BY (
@@ -973,7 +990,7 @@ class OptimizedDatabase:
 
         elif entity_type == 'track':
             cursor.execute('''
-                SELECT DISTINCT artist, track FROM scrobbles s
+                SELECT DISTINCT s.artist, s.track FROM scrobbles s
                 LEFT JOIN track_details td ON s.artist = td.artist AND s.track = td.track
                 WHERE td.artist IS NULL
                 ORDER BY (
@@ -1228,7 +1245,19 @@ class MultithreadedLastFMUpdater:
                     'barcode': mb_data.get('barcode'),
                     'total_tracks': len(mb_data.get('media', [{}])[0].get('tracks', []))
                 })
+                # --- FECHAS SOLO A album_release_dates ---
+                if mb_data.get('date'):
+                    try:
+                        release_year = int(mb_data['date'][:4])
+                    except:
+                        release_year = None
 
+                    self.db.save_album_release_date(
+                        artist,
+                        album,
+                        release_year,
+                        mb_data.get('date')
+                    )
                 # Labels
                 if 'label-info' in mb_data and mb_data['label-info']:
                     label = mb_data['label-info'][0]['label']['name']
@@ -1265,12 +1294,18 @@ class MultithreadedLastFMUpdater:
                     result = discogs_data['results'][0]
 
                     if result.get('year'):
-                        details['release_date'] = str(result.get('year'))
+                        year = result.get('year')
                         try:
-                            release_year = int(result.get('year'))
-                            self.db.save_album_release_date(artist, album, release_year, str(release_year))
-                        except (ValueError, TypeError):
-                            pass
+                            release_year = int(year)
+                        except:
+                            release_year = None
+
+                        self.db.save_album_release_date(
+                            artist,
+                            album,
+                            release_year,
+                            str(year)
+                        )
 
                     if 'label' in result and result['label']:
                         self.db.save_album_label(artist, album, result['label'][0])

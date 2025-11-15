@@ -78,7 +78,7 @@ def scan_html_files(docs_dir='docs'):
 
         # Mensuales: monthly_name_YYYY.html
         if fn_norm.startswith('monthly'):
-            match = re.match(r'monthly_([a-z]+)_(\d{4})\.html', fn_norm)
+            match = re.match(r'monthly/monthly_([a-z]+)_(\d{4})\.html', fn_norm)
             if match:
                 month_name = match.group(1).capitalize()
                 year = match.group(2)
@@ -102,7 +102,7 @@ def scan_html_files(docs_dir='docs'):
 
         # Anuales
         if fn_norm.startswith('yearly'):
-            match = re.match(r'yearly_(\d{4})\.html', fn_norm)
+            match = re.match(r'yearly/yearly_(\d{4})\.html', fn_norm)
             if match:
                 year = match.group(1)
                 label = f"Año {year}"

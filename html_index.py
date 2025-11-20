@@ -24,7 +24,7 @@ def get_umami_config():
     """Obtiene la configuración de Umami Analytics desde variables de entorno"""
     umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
     umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
-    umami_use_local = os.getenv('UMAMI_USE_LOCAL', 'true').lower() == 'true'
+    umami_use_local = os.getenv('UMAMI_USE_LOCAL', 'false').lower() == 'true'
 
     # Verificar si existe script local (desde la perspectiva del script, docs/js/umami.js)
     local_script_path = "docs/js/umami.js"
@@ -304,25 +304,9 @@ def generate_index_html(files):
 
     # Agregar Umami Analytics si está configurado
     if umami_config['enabled']:
-        if umami_config['is_local']:
-            html += f"""
-        <!-- Umami Analytics (Script Local) -->
-        <script>
-            // Configuración de privacidad mejorada
-            window.umamiConfig = {{
-                websiteId: '{umami_config['website_id']}',
-            }};
-        </script>
-        <script async src="{umami_config['script_source']}"
-                data-website-id="{umami_config['website_id']}"
-                """
-        else:
-            # Script remoto (método tradicional)
-            html += f"""
-        <!-- Umami Analytics (Script Remoto) -->
-        <script async src="{umami_config['script_source']}"
-                data-website-id="{umami_config['website_id']}"
-"""
+        html += f"""
+        <!-- Umami Analytics -->
+        <script defer src="{umami_config['script_source']}" data-website-id="{umami_config['website_id']}"></script>"""
 
     html += """
         <style>

@@ -131,25 +131,11 @@ def get_local_script_info(output_dir="docs/js"):
 
 def create_privacy_compliant_script(website_id, local_script_path="js/umami.js"):
     """
-    Genera el código HTML para cargar el script local con configuración de privacidad
+    Genera el código HTML para cargar el script local con el formato exacto de Umami
     """
     script_html = f"""
-        <!-- Umami Analytics (Local) -->
-        <script>
-            // Configuración de privacidad mejorada
-            window.umamiConfig = {{
-                websiteId: '{website_id}',
-                respectDNT: true,
-                autoTrack: true,
-                enableLocalStorage: false,  // No usar localStorage para mayor privacidad
-                domains: [window.location.hostname]
-            }};
-        </script>
-        <script async src="{local_script_path}"
-                data-website-id="{website_id}"
-                data-auto-track="true"
-                data-do-not-track="true"
-                data-cache="true"></script>"""
+        <!-- Umami Analytics -->
+        <script defer src="{local_script_path}" data-website-id="{website_id}"></script>"""
 
     return script_html
 

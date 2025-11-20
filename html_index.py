@@ -20,6 +20,17 @@ try:
 except ImportError:
     pass
 
+def get_umami_config():
+    """Obtiene la configuración de Umami Analytics desde variables de entorno"""
+    umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
+    umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
+
+    return {
+        'script_url': umami_script_url,
+        'website_id': umami_website_id,
+        'enabled': bool(umami_script_url and umami_website_id)
+    }
+
 def scan_html_files(docs_dir='docs'):
     """Escanea la carpeta docs/ y subcarpetas en busca de archivos HTML de estadísticas.
     Normaliza nombres (unicode, espacios, mayúsculas) y hace debug explícito.
@@ -246,6 +257,13 @@ def generate_index_html(files):
 
     print(f"📋 Usuarios detectados para el selector: {', '.join(users)}")
 
+    # Configuración de Umami Analytics
+    umami_config = get_umami_config()
+    if umami_config['enabled']:
+        print(f"📊 Umami Analytics habilitado: {umami_config['script_url']}")
+    else:
+        print("📊 Umami Analytics no configurado (opcional)")
+
     # Agrupar archivos mensuales por año
     monthly_by_year = group_monthly_by_year(files['monthly'])
     available_years = sorted(monthly_by_year.keys(), reverse=True)
@@ -256,7 +274,15 @@ def generate_index_html(files):
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>RYM Hispano Estadísticas</title>
-        <link rel="icon" type="image/png" href="images/music.png">
+        <link rel="icon" type="image/png" href="images/music.png">"""
+
+    # Agregar Umami Analytics si está configurado
+    if umami_config['enabled']:
+        html += f"""
+        <!-- Umami Analytics -->
+        <script async src="{umami_config['script_url']}" data-website-id="{umami_config['website_id']}" data-domains="tu-dominio.github.io"></script>"""
+
+    html += """
         <style>
             * {
                 margin: 0;
@@ -1050,6 +1076,16 @@ def generate_index_html(files):
                                 <code>DISCOGS_TOKEN=tu_token</code> (opcional)
                             </li>
                         </ul>
+                        <p><strong>Configuración de Analytics (opcional):</strong></p>
+                        <ul>
+                            <li><code>UMAMI_SCRIPT_URL=https://analytics.umami.is/script.js</code></li>
+                            <li><code>UMAMI_WEBSITE_ID=tu-website-id</code></li>
+                        </ul>
+                        <p style="font-size: 0.9em; color: #a6adc8;">
+                            💡 Umami Analytics es una alternativa privada a Google Analytics.
+                            Visita <a href="https://umami.is" target="_blank" style="color: #cba6f7;">umami.is</a>
+                            para crear tu cuenta gratuita.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -1258,6 +1294,18 @@ def main():
         print("⚠️  Variable LASTFM_USERS no encontrada. El selector de usuarios usará valores por defecto.")
         print("💡 Asegúrate de tener un archivo .env con: LASTFM_USERS=usuario1,usuario2,usuario3")
 
+    # Verificar configuración de Umami Analytics
+    umami_config = get_umami_config()
+    if umami_config['enabled']:
+        print(f"📊 Umami Analytics configurado correctamente")
+        print(f"   Script URL: {umami_config['script_url']}")
+        print(f"   Website ID: {umami_config['website_id']}")
+    else:
+        print("📊 Umami Analytics no configurado (opcional)")
+        print("💡 Para habilitar Umami Analytics, agrega a tu .env:")
+        print("   UMAMI_SCRIPT_URL=https://analytics.umami.is/script.js")
+        print("   UMAMI_WEBSITE_ID=tu-website-id")
+
     docs_dir = 'docs'
 
     # Crear carpeta docs si no existe
@@ -1286,6 +1334,10 @@ def main():
 
     print(f"Archivo generado: {output_path}")
     print(f"🔗 El selector de usuarios está integrado con localStorage (clave: 'lastfm_selected_user')")
+
+    if umami_config['enabled']:
+        print(f"📈 Umami Analytics integrado - ¡Las visitas se registrarán automáticamente!")
+
     print("\n" + "=" * 60)
     print("😀 PROCESO COMPLETADO")
     print("=" * 60)

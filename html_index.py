@@ -311,26 +311,18 @@ def generate_index_html(files):
             // Configuración de privacidad mejorada
             window.umamiConfig = {{
                 websiteId: '{umami_config['website_id']}',
-                respectDNT: true,
-                autoTrack: true,
-                enableLocalStorage: false,  // Mayor privacidad
-                domains: [window.location.hostname]
             }};
         </script>
         <script async src="{umami_config['script_source']}"
                 data-website-id="{umami_config['website_id']}"
-                data-auto-track="true"
-                data-do-not-track="true"
-                data-cache="true"></script>"""
+                """
         else:
             # Script remoto (método tradicional)
             html += f"""
         <!-- Umami Analytics (Script Remoto) -->
         <script async src="{umami_config['script_source']}"
                 data-website-id="{umami_config['website_id']}"
-                data-domains="tu-dominio.github.io"
-                data-auto-track="true"
-                data-do-not-track="true"></script>"""
+"""
 
     html += """
         <style>

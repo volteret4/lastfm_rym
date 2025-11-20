@@ -280,7 +280,7 @@ def generate_index_html(files):
     if umami_config['enabled']:
         html += f"""
         <!-- Umami Analytics -->
-        <script async src="{umami_config['script_url']}" data-website-id="{umami_config['website_id']}" data-domains="tu-dominio.github.io"></script>"""
+        <script defer src="{umami_config['script_url']}" data-website-id="{umami_config['website_id']}"></script>"""
 
     html += """
         <style>

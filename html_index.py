@@ -15,7 +15,7 @@ import unicodedata
 # Cargar variables de entorno
 try:
     from dotenv import load_dotenv
-    if not os.getenv('LASTFM_USERS'):
+    if not os.getenv('LASTFM_USERS_ICONS'):
         load_dotenv()
 except ImportError:
     pass

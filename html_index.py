@@ -1104,14 +1104,14 @@ def generate_index_html(files):
                         </ul>
                         <p><strong>Configuración de Analytics (opcional):</strong></p>
                         <ul>
-                            <li><code>UMAMI_SCRIPT_URL=https://analytics.umami.is/script.js</code></li>
+                            <li><code>UMAMI_SCRIPT_URL=https://cloud.umami.is/script.js</code></li>
                             <li><code>UMAMI_WEBSITE_ID=tu-website-id</code></li>
-                            <li><code>UMAMI_USE_LOCAL=true</code> (recomendado)</li>
+                            <li><code>UMAMI_USE_LOCAL=false</code> (true para script local)</li>
                         </ul>
                         <p style="font-size: 0.9em; color: #a6adc8;">
-                            💡 Umami Analytics es una alternativa privada a Google Analytics.
-                            Para mayor privacidad y evitar bloqueos, se recomienda usar el script local.<br>
-                            Ejecuta <code>python3 download_umami.py</code> para descargar el script localmente.<br>
+                            💡 Umami Analytics es una alternativa privada a Google Analytics.<br>
+                            Por defecto usa el script remoto (más fácil). Para evitar bloqueos,
+                            configura UMAMI_USE_LOCAL=true y ejecuta python3 download_umami.py<br>
                             Visita <a href="https://umami.is" target="_blank" style="color: #cba6f7;">umami.is</a>
                             para crear tu cuenta gratuita.
                         </p>

@@ -15,7 +15,7 @@ import unicodedata
 # Cargar variables de entorno
 try:
     from dotenv import load_dotenv
-    if not os.getenv('LASTFM_USERS'):
+    if not os.getenv('LASTFM_USERS_ICONS'):
         load_dotenv()
 except ImportError:
     pass
@@ -24,30 +24,11 @@ def get_umami_config():
     """Obtiene la configuración de Umami Analytics desde variables de entorno"""
     umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
     umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
-    umami_use_local = os.getenv('UMAMI_USE_LOCAL', 'false').lower() == 'true'
-
-    # Verificar si existe script local (desde la perspectiva del script, docs/js/umami.js)
-    local_script_path = "docs/js/umami.js"
-    has_local_script = os.path.exists(local_script_path)
-
-    # Determinar qué script usar
-    if umami_use_local and has_local_script:
-        script_source = "js/umami.js"  # Ruta desde la web (GitHub Pages sirve docs/ como /)
-        is_local = True
-    elif umami_script_url:
-        script_source = umami_script_url
-        is_local = False
-    else:
-        script_source = ""
-        is_local = False
 
     return {
         'script_url': umami_script_url,
-        'script_source': script_source,
         'website_id': umami_website_id,
-        'is_local': is_local,
-        'has_local_script': has_local_script,
-        'enabled': bool(script_source and umami_website_id)
+        'enabled': bool(umami_script_url and umami_website_id)
     }
 
 def scan_html_files(docs_dir='docs'):
@@ -279,16 +260,9 @@ def generate_index_html(files):
     # Configuración de Umami Analytics
     umami_config = get_umami_config()
     if umami_config['enabled']:
-        if umami_config['is_local']:
-            print(f"📊 Umami Analytics habilitado (LOCAL): {umami_config['script_source']}")
-        else:
-            print(f"📊 Umami Analytics habilitado (REMOTO): {umami_config['script_source']}")
+        print(f"📊 Umami Analytics habilitado: {umami_config['script_url']}")
     else:
-        if umami_config['has_local_script']:
-            print("📊 Script local de Umami encontrado pero no configurado correctamente")
-        else:
-            print("📊 Umami Analytics no configurado (opcional)")
-            print("💡 Ejecuta 'python3 download_umami.py' para configurar script local")
+        print("📊 Umami Analytics no configurado (opcional)")
 
     # Agrupar archivos mensuales por año
     monthly_by_year = group_monthly_by_year(files['monthly'])
@@ -306,7 +280,7 @@ def generate_index_html(files):
     if umami_config['enabled']:
         html += f"""
         <!-- Umami Analytics -->
-        <script defer src="{umami_config['script_source']}" data-website-id="{umami_config['website_id']}"></script>"""
+        <script defer src="{umami_config['script_url']}" data-website-id="{umami_config['website_id']}"></script>"""
 
     html += """
         <style>
@@ -1104,14 +1078,11 @@ def generate_index_html(files):
                         </ul>
                         <p><strong>Configuración de Analytics (opcional):</strong></p>
                         <ul>
-                            <li><code>UMAMI_SCRIPT_URL=https://cloud.umami.is/script.js</code></li>
+                            <li><code>UMAMI_SCRIPT_URL=https://analytics.umami.is/script.js</code></li>
                             <li><code>UMAMI_WEBSITE_ID=tu-website-id</code></li>
-                            <li><code>UMAMI_USE_LOCAL=false</code> (true para script local)</li>
                         </ul>
                         <p style="font-size: 0.9em; color: #a6adc8;">
-                            💡 Umami Analytics es una alternativa privada a Google Analytics.<br>
-                            Por defecto usa el script remoto (más fácil). Para evitar bloqueos,
-                            configura UMAMI_USE_LOCAL=true y ejecuta python3 download_umami.py<br>
+                            💡 Umami Analytics es una alternativa privada a Google Analytics.
                             Visita <a href="https://umami.is" target="_blank" style="color: #cba6f7;">umami.is</a>
                             para crear tu cuenta gratuita.
                         </p>

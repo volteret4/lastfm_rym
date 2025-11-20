@@ -15,7 +15,7 @@ import unicodedata
 # Cargar variables de entorno
 try:
     from dotenv import load_dotenv
-    if not os.getenv('LASTFM_USERS_ICONS'):
+    if not os.getenv('LASTFM_USERS'):
         load_dotenv()
 except ImportError:
     pass
@@ -24,11 +24,30 @@ def get_umami_config():
     """Obtiene la configuración de Umami Analytics desde variables de entorno"""
     umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
     umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
+    umami_use_local = os.getenv('UMAMI_USE_LOCAL', 'true').lower() == 'true'
+
+    # Verificar si existe script local
+    local_script_path = "docs/js/umami.js"
+    has_local_script = os.path.exists(local_script_path)
+
+    # Determinar qué script usar
+    if umami_use_local and has_local_script:
+        script_source = "js/umami.js"  # Ruta relativa desde docs/
+        is_local = True
+    elif umami_script_url:
+        script_source = umami_script_url
+        is_local = False
+    else:
+        script_source = ""
+        is_local = False
 
     return {
         'script_url': umami_script_url,
+        'script_source': script_source,
         'website_id': umami_website_id,
-        'enabled': bool(umami_script_url and umami_website_id)
+        'is_local': is_local,
+        'has_local_script': has_local_script,
+        'enabled': bool(script_source and umami_website_id)
     }
 
 def scan_html_files(docs_dir='docs'):
@@ -260,9 +279,16 @@ def generate_index_html(files):
     # Configuración de Umami Analytics
     umami_config = get_umami_config()
     if umami_config['enabled']:
-        print(f"📊 Umami Analytics habilitado: {umami_config['script_url']}")
+        if umami_config['is_local']:
+            print(f"📊 Umami Analytics habilitado (LOCAL): {umami_config['script_source']}")
+        else:
+            print(f"📊 Umami Analytics habilitado (REMOTO): {umami_config['script_source']}")
     else:
-        print("📊 Umami Analytics no configurado (opcional)")
+        if umami_config['has_local_script']:
+            print("📊 Script local de Umami encontrado pero no configurado correctamente")
+        else:
+            print("📊 Umami Analytics no configurado (opcional)")
+            print("💡 Ejecuta 'python3 download_umami.py' para configurar script local")
 
     # Agrupar archivos mensuales por año
     monthly_by_year = group_monthly_by_year(files['monthly'])
@@ -278,9 +304,29 @@ def generate_index_html(files):
 
     # Agregar Umami Analytics si está configurado
     if umami_config['enabled']:
-        html += f"""
-        <!-- Umami Analytics -->
-        <script defer src="{umami_config['script_url']}" data-website-id="{umami_config['website_id']}"></script>"""
+        if umami_config['is_local']:
+            html += f"""
+        <!-- Umami Analytics (Script Local) -->
+        <script>
+            // Configuración de privacidad mejorada
+            window.umamiConfig = {{
+                websiteId: '{umami_config['website_id']}',
+                respectDNT: true,
+                autoTrack: true,
+                enableLocalStorage: false,  // Mayor privacidad
+                domains: [window.location.hostname]
+            }};
+        </script>
+        <script async src="{umami_config['script_source']}"
+                data-website-id="{umami_config['website_id']}"
+                """
+        else:
+            # Script remoto (método tradicional)
+            html += f"""
+        <!-- Umami Analytics (Script Remoto) -->
+        <script async src="{umami_config['script_source']}"
+                data-website-id="{umami_config['website_id']}"
+                """
 
     html += """
         <style>
@@ -1080,9 +1126,12 @@ def generate_index_html(files):
                         <ul>
                             <li><code>UMAMI_SCRIPT_URL=https://analytics.umami.is/script.js</code></li>
                             <li><code>UMAMI_WEBSITE_ID=tu-website-id</code></li>
+                            <li><code>UMAMI_USE_LOCAL=true</code> (recomendado)</li>
                         </ul>
                         <p style="font-size: 0.9em; color: #a6adc8;">
                             💡 Umami Analytics es una alternativa privada a Google Analytics.
+                            Para mayor privacidad y evitar bloqueos, se recomienda usar el script local.<br>
+                            Ejecuta <code>python3 download_umami.py</code> para descargar el script localmente.<br>
                             Visita <a href="https://umami.is" target="_blank" style="color: #cba6f7;">umami.is</a>
                             para crear tu cuenta gratuita.
                         </p>

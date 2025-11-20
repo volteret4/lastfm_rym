@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate Index
-Genera el index.html dinámicamente basándose en los archivos HTML en docs/
+Genera el index.html dinámicamente basándose en los archivos HTML en docs/ y subcarpetas
 """
 
 import os
@@ -21,7 +21,7 @@ except ImportError:
     pass
 
 def scan_html_files(docs_dir='docs'):
-    """Escanea la carpeta docs/ en busca de archivos HTML de estadísticas.
+    """Escanea la carpeta docs/ y subcarpetas en busca de archivos HTML de estadísticas.
     Normaliza nombres (unicode, espacios, mayúsculas) y hace debug explícito.
     """
     files = {
@@ -41,135 +41,175 @@ def scan_html_files(docs_dir='docs'):
         "esta-semana.html": "Esta semana",
         "semana-pasada.html": "Semana pasada",
         "hace-dos-semanas.html": "Hace dos semanas",
-    "hace-tres-semanas.html": "Hace tres semanas"
+        "hace-tres-semanas.html": "Hace tres semanas"
     }
     # normalizar las claves por si acaso
     weekly_map_norm = {unicodedata.normalize('NFC', k).strip().lower(): v for k, v in weekly_map.items()}
 
-    found_files = os.listdir(docs_dir)
-    print(f"DEBUG: archivos en {docs_dir} -> {len(found_files)} entradas")
-    for fn in found_files:
-        print(f"  - '{fn}'")
+    # Función recursiva para escanear directorios
+    def scan_directory(current_dir, relative_path=""):
+        """Escanea un directorio y sus archivos HTML"""
+        try:
+            found_files = os.listdir(current_dir)
+            print(f"DEBUG: archivos en {current_dir} -> {len(found_files)} entradas")
 
-    for filename in found_files:
-        # ignorar index y no-html
-        if not filename.lower().endswith('.html') or filename.lower() == 'index.html':
-            continue
+            for fn in found_files:
+                full_path = os.path.join(current_dir, fn)
 
-        # ignorar si es directorio (por si hay subcarpetas)
-        path = os.path.join(docs_dir, filename)
-        if os.path.isdir(path):
-            print(f"DEBUG: saltando directorio {filename}")
-            continue
+                # Si es un directorio, escanearlo recursivamente (solo subcarpetas relevantes)
+                if os.path.isdir(full_path):
+                    if fn.lower() in ['weekly', 'monthly', 'yearly', 'users', 'grupo']:
+                        print(f"DEBUG: escaneando subcarpeta {fn}")
+                        new_relative = os.path.join(relative_path, fn) if relative_path else fn
+                        scan_directory(full_path, new_relative)
+                    else:
+                        print(f"DEBUG: saltando directorio no relevante {fn}")
+                    continue
 
-        # normalizar nombre de archivo para comparación
-        fn_norm = unicodedata.normalize('NFC', filename).strip().lower()
+                # Solo procesar archivos HTML (excepto index.html)
+                if not fn.lower().endswith('.html') or fn.lower() == 'index.html':
+                    continue
 
-        # Semanales con nombres fijos
-        if fn_norm in weekly_map_norm:
-            label = weekly_map_norm[fn_norm]
-            files['weekly'].append({
-                'filename': filename,
-                'label': label,
-                'date': datetime.now()
-            })
-            print(f"DEBUG: detectado semanal -> {filename} como '{label}'")
-            continue
-
-        # Mensuales: monthly_name_YYYY.html
-        if fn_norm.startswith('monthly'):
-            match = re.match(r'monthly/monthly_([a-z]+)_(\d{4})\.html', fn_norm)
-            if match:
-                month_name = match.group(1).capitalize()
-                year = match.group(2)
-                label = f"{month_name} {year}"
-                months = {
-                    'january': 1, 'february': 2, 'march': 3, 'april': 4,
-                    'may': 5, 'june': 6, 'july': 7, 'august': 8,
-                    'september': 9, 'october': 10, 'november': 11, 'december': 12
-                }
-                month_num = months.get(match.group(1).lower(), 1)
-                date_obj = datetime(int(year), month_num, 1)
-                files['monthly'].append({
-                    'filename': filename,
-                    'label': label,
-                    'date': date_obj,
-                    'year': year,
-                    'month': month_name
-                })
-                print(f"DEBUG: detectado mensual -> {filename} como '{label}'")
-            continue
-
-        # Anuales
-        if fn_norm.startswith('yearly'):
-            match = re.match(r'yearly/yearly_(\d{4})\.html', fn_norm)
-            if match:
-                year = match.group(1)
-                label = f"Año {year}"
-                date_obj = datetime(int(year), 1, 1)
-                files['yearly'].append({
-                    'filename': filename,
-                    'label': label,
-                    'date': date_obj
-                })
-                print(f"DEBUG: detectado anual -> {filename} como '{label}'")
-            continue
-
-        # Usuarios
-        if fn_norm.startswith('usuarios'):
-            match = re.match(r'usuarios(?:_(\d{4})-(\d{4}))?\.html', fn_norm)
-            if match:
-                if match.group(1) and match.group(2):
-                    from_year = match.group(1)
-                    to_year = match.group(2)
-                    label = f"Usuarios {from_year}-{to_year}"
-                    date_obj = datetime(int(to_year), 12, 31)
+                # Construir la ruta relativa desde docs/
+                if relative_path:
+                    filename_with_path = os.path.join(relative_path, fn)
                 else:
-                    label = "Estadísticas de Usuarios"
-                    date_obj = datetime.now()
-                files['users'].append({
-                    'filename': filename,
-                    'label': label,
-                    'date': date_obj
-                })
-                print(f"DEBUG: detectado usuarios -> {filename} como '{label}'")
-            continue
+                    filename_with_path = fn
 
-        # Grupo
-        if fn_norm.startswith('grupo'):
-            match = re.match(r'grupo(?:_(\d{4})-(\d{4}))?\.html', fn_norm)
-            if match:
-                if match.group(1) and match.group(2):
-                    from_year = match.group(1)
-                    to_year = match.group(2)
-                    label = f"Grupo {from_year}-{to_year}"
-                    date_obj = datetime(int(to_year), 12, 31)
-                else:
-                    label = "Estadísticas Grupales"
-                    date_obj = datetime.now()
-                files['grupo'].append({
-                    'filename': filename,
-                    'label': label,
-                    'date': date_obj
-                })
-                print(f"DEBUG: detectado grupo -> {filename} como '{label}'")
-            continue
+                print(f"DEBUG: procesando archivo {filename_with_path}")
 
-        # Si llega aquí es un html que no encaja en patrones conocidos
-        print(f"DEBUG: archivo HTML no categorizado -> {filename}")
+                # normalizar nombre de archivo para comparación
+                fn_norm = unicodedata.normalize('NFC', fn).strip().lower()
+
+                # Detectar tipo de archivo basado en la carpeta o nombre
+                if relative_path.lower() == 'weekly' or (not relative_path and fn_norm in weekly_map_norm):
+                    # Archivos semanales
+                    if fn_norm in weekly_map_norm:
+                        label = weekly_map_norm[fn_norm]
+                    else:
+                        # Para archivos en weekly/ que no coinciden con el patrón esperado
+                        label = fn.replace('.html', '').replace('-', ' ').title()
+
+                    files['weekly'].append({
+                        'filename': filename_with_path,
+                        'label': label,
+                        'date': datetime.now()
+                    })
+                    print(f"DEBUG: detectado semanal -> {filename_with_path} como '{label}'")
+                    continue
+
+                elif relative_path.lower() == 'monthly' or fn_norm.startswith('monthly'):
+                    # Archivos mensuales: monthly_name_YYYY.html
+                    match = re.match(r'monthly_([a-z]+)_(\d{4})\.html', fn_norm)
+                    if match:
+                        month_name = match.group(1).capitalize()
+                        year = match.group(2)
+                        label = f"{month_name} {year}"
+                        months = {
+                            'january': 1, 'february': 2, 'march': 3, 'april': 4,
+                            'may': 5, 'june': 6, 'july': 7, 'august': 8,
+                            'september': 9, 'october': 10, 'november': 11, 'december': 12
+                        }
+                        month_num = months.get(match.group(1).lower(), 1)
+                        date_obj = datetime(int(year), month_num, 1)
+                        files['monthly'].append({
+                            'filename': filename_with_path,
+                            'label': label,
+                            'date': date_obj,
+                            'year': year,
+                            'month': month_name
+                        })
+                        print(f"DEBUG: detectado mensual -> {filename_with_path} como '{label}'")
+                    continue
+
+                elif relative_path.lower() == 'yearly' or fn_norm.startswith('yearly'):
+                    # Archivos anuales: yearly_YYYY.html
+                    match = re.match(r'yearly_(\d{4})\.html', fn_norm)
+                    if match:
+                        year = match.group(1)
+                        label = f"Año {year}"
+                        date_obj = datetime(int(year), 1, 1)
+                        files['yearly'].append({
+                            'filename': filename_with_path,
+                            'label': label,
+                            'date': date_obj
+                        })
+                        print(f"DEBUG: detectado anual -> {filename_with_path} como '{label}'")
+                    continue
+
+                elif fn_norm.startswith('usuarios'):
+                    # Archivos de usuarios
+                    match = re.match(r'usuarios(?:_(\d{4})-(\d{4}))?\.html', fn_norm)
+                    if match:
+                        if match.group(1) and match.group(2):
+                            from_year = match.group(1)
+                            to_year = match.group(2)
+                            label = f"Usuarios {from_year}-{to_year}"
+                            date_obj = datetime(int(to_year), 12, 31)
+                        else:
+                            label = "Estadísticas de Usuarios"
+                            date_obj = datetime.now()
+                        files['users'].append({
+                            'filename': filename_with_path,
+                            'label': label,
+                            'date': date_obj
+                        })
+                        print(f"DEBUG: detectado usuarios -> {filename_with_path} como '{label}'")
+                    continue
+
+                elif fn_norm.startswith('grupo'):
+                    # Archivos de grupo
+                    match = re.match(r'grupo(?:_(\d{4})-(\d{4}))?\.html', fn_norm)
+                    if match:
+                        if match.group(1) and match.group(2):
+                            from_year = match.group(1)
+                            to_year = match.group(2)
+                            label = f"Grupo {from_year}-{to_year}"
+                            date_obj = datetime(int(to_year), 12, 31)
+                        else:
+                            label = "Estadísticas Grupales"
+                            date_obj = datetime.now()
+                        files['grupo'].append({
+                            'filename': filename_with_path,
+                            'label': label,
+                            'date': date_obj
+                        })
+                        print(f"DEBUG: detectado grupo -> {filename_with_path} como '{label}'")
+                    continue
+
+                # Si llega aquí es un html que no encaja en patrones conocidos
+                print(f"DEBUG: archivo HTML no categorizado -> {filename_with_path}")
+
+        except PermissionError:
+            print(f"⚠️  Sin permisos para acceder a {current_dir}")
+        except Exception as e:
+            print(f"⚠️  Error al escanear {current_dir}: {e}")
+
+    # Iniciar el escaneo desde la carpeta docs
+    scan_directory(docs_dir)
 
     # Asegurar orden fijo si existen los cuatro semanales
     order = ["esta-semana.html", "semana-pasada.html", "hace-dos-semanas.html", "hace-tres-semanas.html"]
-    files['weekly'].sort(key=lambda x: order.index(unicodedata.normalize('NFC', x['filename']).strip().lower()) if unicodedata.normalize('NFC', x['filename']).strip().lower() in order else 99)
+    def get_weekly_order(x):
+        # Extraer solo el nombre del archivo sin la ruta
+        base_name = os.path.basename(x['filename']).lower()
+        normalized = unicodedata.normalize('NFC', base_name).strip()
+        try:
+            return order.index(normalized)
+        except ValueError:
+            return 99
+
+    files['weekly'].sort(key=get_weekly_order)
 
     # Ordenar otras categorías por fecha (más reciente primero)
     for category in ['monthly', 'yearly', 'users', 'grupo']:
         files[category].sort(key=lambda x: x['date'], reverse=True)
 
     print(f"DEBUG: semanales detectadas -> {[f['filename'] for f in files['weekly']]}")
+    print(f"DEBUG: mensuales detectadas -> {[f['filename'] for f in files['monthly']]}")
+    print(f"DEBUG: anuales detectadas -> {[f['filename'] for f in files['yearly']]}")
+
     return files
-
-
 
 
 def group_monthly_by_year(monthly_files):
@@ -614,7 +654,7 @@ def generate_index_html(files):
             /* Estilos responsive para móviles */
             @media (max-width: 768px) {
                 .container {
-                    padding: 0 15px; /* MARGEN REDUCIDO - puedes cambiarlo aquí */
+                    padding: 0 15px;
                 }
 
                 h1 {
@@ -629,14 +669,13 @@ def generate_index_html(files):
                     flex: 1 1 50%;
                 }
 
-                /* Temporal en 2 columnas en móvil */
                 .period-grid {
-                    grid-template-columns: repeat(2, 1fr); /* 2 COLUMNAS EN MÓVIL - puedes cambiar a 1fr para 1 columna */
-                    gap: 0.8rem; /* Gap más pequeño en móvil */
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 0.8rem;
                 }
 
                 .period-link {
-                    padding: 0.8rem; /* Padding más pequeño */
+                    padding: 0.8rem;
                     font-size: 0.9em;
                 }
 
@@ -656,11 +695,11 @@ def generate_index_html(files):
                 }
 
                 .section-header {
-                    padding: 15px 18px; /* Padding más pequeño en header */
+                    padding: 15px 18px;
                 }
 
                 .section-content {
-                    padding: 18px; /* Padding más pequeño en content */
+                    padding: 18px;
                 }
 
                 .user-button {
@@ -672,15 +711,14 @@ def generate_index_html(files):
                 }
 
                 .info-box {
-                    padding: 1.5rem; /* Padding más pequeño en info boxes */
+                    padding: 1.5rem;
                     margin-bottom: 1.5rem;
                 }
             }
 
-            /* Para pantallas muy pequeñas */
             @media (max-width: 480px) {
                 .container {
-                    padding: 0 10px; /* MARGEN AÚN MÁS REDUCIDO - ajústalo aquí si quieres menos margen */
+                    padding: 0 10px;
                 }
 
                 .period-grid {
@@ -1054,8 +1092,6 @@ def generate_index_html(files):
                     }
 
                     userOptions.appendChild(option);
-
-
                 });
 
                 // Marcar opción seleccionada
@@ -1230,7 +1266,7 @@ def main():
         os.makedirs(docs_dir)
 
     # Escanear archivos
-    print(f"Escaneando archivos en '{docs_dir}'...")
+    print(f"Escaneando archivos en '{docs_dir}' y subcarpetas...")
     files = scan_html_files(docs_dir)
 
     print(f"Semanales: {len(files['weekly'])}")
@@ -1251,7 +1287,7 @@ def main():
     print(f"Archivo generado: {output_path}")
     print(f"🔗 El selector de usuarios está integrado con localStorage (clave: 'lastfm_selected_user')")
     print("\n" + "=" * 60)
-    print("😃 PROCESO COMPLETADO")
+    print("😀 PROCESO COMPLETADO")
     print("=" * 60)
 
 

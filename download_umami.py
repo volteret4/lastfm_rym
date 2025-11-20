@@ -70,7 +70,7 @@ def download_umami_script(script_url, output_dir="docs/js"):
         print(f"🔒 Hash: {script_hash}")
 
         return {
-            'local_path': f"js/umami.js",  # Ruta relativa desde docs/
+            'local_path': "js/umami.js",  # Ruta relativa desde la raíz web (GitHub Pages sirve docs/ como /)
             'full_path': main_script_path,
             'hash': script_hash,
             'size': len(script_content)

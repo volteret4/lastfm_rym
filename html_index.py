@@ -26,13 +26,13 @@ def get_umami_config():
     umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
     umami_use_local = os.getenv('UMAMI_USE_LOCAL', 'true').lower() == 'true'
 
-    # Verificar si existe script local
+    # Verificar si existe script local (desde la perspectiva del script, docs/js/umami.js)
     local_script_path = "docs/js/umami.js"
     has_local_script = os.path.exists(local_script_path)
 
     # Determinar qué script usar
     if umami_use_local and has_local_script:
-        script_source = "js/umami.js"  # Ruta relativa desde docs/
+        script_source = "js/umami.js"  # Ruta desde la web (GitHub Pages sirve docs/ como /)
         is_local = True
     elif umami_script_url:
         script_source = umami_script_url
@@ -319,14 +319,18 @@ def generate_index_html(files):
         </script>
         <script async src="{umami_config['script_source']}"
                 data-website-id="{umami_config['website_id']}"
-                """
+                data-auto-track="true"
+                data-do-not-track="true"
+                data-cache="true"></script>"""
         else:
             # Script remoto (método tradicional)
             html += f"""
         <!-- Umami Analytics (Script Remoto) -->
         <script async src="{umami_config['script_source']}"
                 data-website-id="{umami_config['website_id']}"
-                """
+                data-domains="tu-dominio.github.io"
+                data-auto-track="true"
+                data-do-not-track="true"></script>"""
 
     html += """
         <style>

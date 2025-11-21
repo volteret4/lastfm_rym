@@ -459,6 +459,133 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
             print(f"Proveedor no válido: {provider}")
             return []
 
+    def get_user_discoveries_stats_by_year(self, user: str, from_year: int, to_year: int,
+                                         discovery_type: str = 'artists', mbid_only: bool = False) -> Dict[int, int]:
+        """
+        Obtiene estadísticas de novedades por año (solo conteos)
+
+        Returns:
+            Dict con año: número_de_novedades
+        """
+        discoveries = self.get_user_discoveries_by_year(user, from_year, to_year, discovery_type, mbid_only)
+
+        stats = {}
+        for year in range(from_year, to_year + 1):
+            stats[year] = len(discoveries.get(year, []))
+
+        return stats
+
+    def get_user_discoveries_by_year(self, user: str, from_year: int, to_year: int,
+                                   discovery_type: str = 'artists', mbid_only: bool = False) -> Dict[int, List[Dict]]:
+        """
+        Obtiene las novedades (primeras escuchas) del usuario por año
+
+        Args:
+            user: Usuario
+            from_year: Año inicial
+            to_year: Año final
+            discovery_type: 'artists', 'albums', 'tracks', 'labels'
+            mbid_only: Solo scrobbles con MBID
+
+        Returns:
+            Dict con año: [{'name': str, 'first_timestamp': int}]
+        """
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        discoveries_by_year = {}
+
+        if discovery_type == 'artists':
+            # Obtener primeras escuchas de artistas dentro del periodo
+            cursor.execute('''
+                SELECT artist, first_timestamp
+                FROM user_first_artist_listen
+                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
+                ORDER BY first_timestamp ASC
+            ''', (user, from_timestamp, to_timestamp))
+
+            for row in cursor.fetchall():
+                # Convertir timestamp a año
+                first_date = datetime.fromtimestamp(row['first_timestamp'])
+                year = first_date.year
+
+                if year not in discoveries_by_year:
+                    discoveries_by_year[year] = []
+
+                discoveries_by_year[year].append({
+                    'name': row['artist'],
+                    'first_timestamp': row['first_timestamp'],
+                    'first_date': first_date.strftime('%Y-%m-%d')
+                })
+
+        elif discovery_type == 'albums':
+            cursor.execute('''
+                SELECT artist, album, first_timestamp
+                FROM user_first_album_listen
+                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
+                ORDER BY first_timestamp ASC
+            ''', (user, from_timestamp, to_timestamp))
+
+            for row in cursor.fetchall():
+                first_date = datetime.fromtimestamp(row['first_timestamp'])
+                year = first_date.year
+
+                if year not in discoveries_by_year:
+                    discoveries_by_year[year] = []
+
+                album_display = f"{row['artist']} - {row['album']}" if row['album'] else f"{row['artist']} - [Unknown Album]"
+                discoveries_by_year[year].append({
+                    'name': album_display,
+                    'first_timestamp': row['first_timestamp'],
+                    'first_date': first_date.strftime('%Y-%m-%d')
+                })
+
+        elif discovery_type == 'tracks':
+            cursor.execute('''
+                SELECT artist, track, first_timestamp
+                FROM user_first_track_listen
+                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
+                ORDER BY first_timestamp ASC
+            ''', (user, from_timestamp, to_timestamp))
+
+            for row in cursor.fetchall():
+                first_date = datetime.fromtimestamp(row['first_timestamp'])
+                year = first_date.year
+
+                if year not in discoveries_by_year:
+                    discoveries_by_year[year] = []
+
+                discoveries_by_year[year].append({
+                    'name': f"{row['artist']} - {row['track']}",
+                    'first_timestamp': row['first_timestamp'],
+                    'first_date': first_date.strftime('%Y-%m-%d')
+                })
+
+        elif discovery_type == 'labels':
+            cursor.execute('''
+                SELECT label, first_timestamp
+                FROM user_first_label_listen
+                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
+                ORDER BY first_timestamp ASC
+            ''', (user, from_timestamp, to_timestamp))
+
+            for row in cursor.fetchall():
+                first_date = datetime.fromtimestamp(row['first_timestamp'])
+                year = first_date.year
+
+                if year not in discoveries_by_year:
+                    discoveries_by_year[year] = []
+
+                discoveries_by_year[year].append({
+                    'name': row['label'],
+                    'first_timestamp': row['first_timestamp'],
+                    'first_date': first_date.strftime('%Y-%m-%d')
+                })
+
+        return discoveries_by_year
+
     def get_top_albums_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
         """
         FUNCIÓN CORREGIDA: Obtiene álbumes por género según proveedor

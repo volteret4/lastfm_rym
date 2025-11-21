@@ -30,7 +30,7 @@ from tools.users.user_stats_html_generator import UserStatsHTMLGeneratorFixed
 # Importar generador de datos de novedades
 try:
     sys.path.append(os.path.dirname(__file__))
-    from generate_discoveries_data import DiscoveriesDataGenerator
+    from tools.users.user_stats_discoveries import DiscoveriesDataGenerator
 except ImportError:
     print("⚠️  Generador de datos de novedades no encontrado. La funcionalidad de novedades no estará disponible.")
     DiscoveriesDataGenerator = None

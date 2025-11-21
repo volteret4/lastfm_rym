@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-UserStatsDatabase - VersiÃ³n extendida con funciones faltantes para conteos Ãºnicos
-AÃ±ade: get_user_top_artists, get_user_top_albums, get_user_top_tracks
+UserStatsDatabase - Versión extendida CORREGIDA con funciones faltantes para conteos únicos
+Añade: get_user_top_artists, get_user_top_albums, get_user_top_tracks
+CORRIGE: Lógica de géneros (artistas: lastfm, álbumes: lastfm/musicbrainz/discogs)
 Hereda de la clase original para mantener TODA la funcionalidad
 """
 
@@ -16,7 +17,7 @@ from .user_stats_database import UserStatsDatabase
 
 
 class UserStatsDatabaseExtended(UserStatsDatabase):
-    """VersiÃ³n extendida con funciones adicionales para conteos Ãºnicos"""
+    """Versión extendida CORREGIDA con funciones adicionales para conteos únicos"""
 
     def get_user_top_artists(self, user: str, from_year: int, to_year: int,
                            limit: Optional[int] = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
@@ -44,7 +45,7 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
 
     def get_user_top_albums(self, user: str, from_year: int, to_year: int,
                           limit: Optional[int] = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
-        """Obtiene top Ã¡lbumes del usuario con conteo de reproducciones"""
+        """Obtiene top álbumes del usuario con conteo de reproducciones"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -97,7 +98,7 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
 
     def get_user_unique_count_artists(self, user: str, from_year: int, to_year: int,
                                     mbid_only: bool = False) -> int:
-        """Obtiene el nÃºmero total de artistas Ãºnicos del usuario"""
+        """Obtiene el número total de artistas únicos del usuario"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -117,7 +118,7 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
 
     def get_user_unique_count_albums(self, user: str, from_year: int, to_year: int,
                                    mbid_only: bool = False) -> int:
-        """Obtiene el nÃºmero total de Ã¡lbumes Ãºnicos del usuario"""
+        """Obtiene el número total de álbumes únicos del usuario"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -137,7 +138,7 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
 
     def get_user_unique_count_tracks(self, user: str, from_year: int, to_year: int,
                                    mbid_only: bool = False) -> int:
-        """Obtiene el nÃºmero total de canciones Ãºnicas del usuario"""
+        """Obtiene el número total de canciones únicas del usuario"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -158,47 +159,73 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
 
     def get_user_unique_count_genres_by_provider(self, user: str, from_year: int, to_year: int,
                                                provider: str = 'lastfm', mbid_only: bool = False) -> int:
-        """Obtiene el nÃºmero total de gÃ©neros Ãºnicos del usuario por proveedor"""
+        """
+        FUNCIÓN CORREGIDA: Obtiene el número total de géneros únicos del usuario por proveedor
+        - lastfm: géneros de artistas (artist_genres)
+        - musicbrainz/discogs: géneros de álbumes (album_genres)
+        """
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
 
-        mbid_filter = self._get_mbid_filter(mbid_only)
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
-        # Primero intentar con la tabla de gÃ©neros detallados
-        cursor.execute(f'''
-            SELECT COUNT(DISTINCT agd.genre) as unique_genres
-            FROM scrobbles s
-            JOIN artist_genres_detailed agd ON s.artist = agd.artist
-            WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-              AND agd.source = ?
-            {mbid_filter}
-        ''', (user, from_timestamp, to_timestamp, provider))
+        if provider == 'lastfm':
+            # Para Last.fm: contar géneros únicos de artistas
+            try:
+                cursor.execute(f'''
+                    SELECT ag.genres, COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                    {mbid_filter}
+                    GROUP BY ag.genres
+                ''', (user, from_timestamp, to_timestamp))
 
-        result = cursor.fetchone()
-        count = result['unique_genres'] if result else 0
+                unique_genres = set()
+                for row in cursor.fetchall():
+                    genres_json = row['genres']
+                    try:
+                        genres_list = json.loads(genres_json) if genres_json else []
+                        for genre in genres_list[:3]:  # Solo primeros 3 géneros
+                            unique_genres.add(genre)
+                    except (json.JSONDecodeError, TypeError):
+                        continue
 
-        # Si no hay datos, intentar con tabla antigua (fallback para Last.fm)
-        if count == 0 and provider == 'lastfm':
-            cursor.execute(f'''
-                SELECT COUNT(DISTINCT genre_extracted.value) as unique_genres
-                FROM scrobbles s
-                JOIN artist_genres ag ON s.artist = ag.artist,
-                json_each(ag.genres) AS genre_extracted
-                WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
-                  AND json_valid(ag.genres)
-                {mbid_filter}
-            ''', (user, from_timestamp, to_timestamp))
+                return len(unique_genres)
 
-            result = cursor.fetchone()
-            count = result['unique_genres'] if result else 0
+            except sqlite3.OperationalError as e:
+                print(f"Error contando géneros Last.fm: {e}")
+                return 0
 
-        return count
+        elif provider in ['musicbrainz', 'discogs']:
+            # Para MusicBrainz y Discogs: contar géneros únicos de álbumes
+            try:
+                cursor.execute(f'''
+                    SELECT COUNT(DISTINCT ag.genre) as unique_genres
+                    FROM scrobbles s
+                    JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND ag.source = ?
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                ''', (user, from_timestamp, to_timestamp, provider))
+
+                result = cursor.fetchone()
+                return result['unique_genres'] if result else 0
+
+            except sqlite3.OperationalError as e:
+                print(f"Error contando géneros {provider}: {e}")
+                return 0
+
+        else:
+            print(f"Proveedor no válido: {provider}")
+            return 0
 
     def get_user_unique_count_labels(self, user: str, from_year: int, to_year: int,
                                    mbid_only: bool = False) -> int:
-        """Obtiene el nÃºmero total de sellos Ãºnicos del usuario"""
+        """Obtiene el número total de sellos únicos del usuario"""
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
@@ -218,129 +245,339 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
         result = cursor.fetchone()
         return result['unique_labels'] if result else 0
 
-    def get_user_discoveries_by_year(self, user: str, from_year: int, to_year: int,
-                                   discovery_type: str = 'artists', mbid_only: bool = False) -> Dict[int, List[Dict]]:
+    # ================================================================
+    # FUNCIONES DE GÉNEROS CORREGIDAS - Sobrescriben las del padre
+    # ================================================================
+
+    def get_user_top_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
         """
-        Obtiene las novedades (primeras escuchas) del usuario por año
-
-        Args:
-            user: Usuario
-            from_year: Año inicial
-            to_year: Año final
-            discovery_type: 'artists', 'albums', 'tracks', 'labels'
-            mbid_only: Solo scrobbles con MBID
-
-        Returns:
-            Dict con año: [{'name': str, 'first_timestamp': int}]
+        FUNCIÓN CORREGIDA: Obtiene géneros según el proveedor
+        - lastfm: géneros de artistas (artist_genres)
+        - musicbrainz/discogs: géneros de álbumes (album_genres)
         """
         cursor = self.conn.cursor()
 
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
 
-        discoveries_by_year = {}
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
 
-        if discovery_type == 'artists':
-            # Obtener primeras escuchas de artistas dentro del periodo
-            cursor.execute('''
-                SELECT artist, first_timestamp
-                FROM user_first_artist_listen
-                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
-                ORDER BY first_timestamp ASC
-            ''', (user, from_timestamp, to_timestamp))
+        if provider == 'lastfm':
+            # Para Last.fm: usar artist_genres (géneros de artistas)
+            try:
+                cursor.execute(f'''
+                    SELECT ag.genres, COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                    {mbid_filter}
+                    GROUP BY ag.genres
+                    ORDER BY plays DESC
+                ''', (user, from_timestamp, to_timestamp))
 
-            for row in cursor.fetchall():
-                # Convertir timestamp a año
-                first_date = datetime.fromtimestamp(row['first_timestamp'])
-                year = first_date.year
+                genre_counts = defaultdict(int)
+                for row in cursor.fetchall():
+                    genres_json = row['genres']
+                    try:
+                        genres_list = json.loads(genres_json) if genres_json else []
+                        for genre in genres_list[:3]:  # Solo primeros 3 géneros
+                            genre_counts[genre] += row['plays']
+                    except (json.JSONDecodeError, TypeError):
+                        continue
 
-                if year not in discoveries_by_year:
-                    discoveries_by_year[year] = []
+                # Ordenar y limitar
+                sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)
+                return sorted_genres[:limit]
 
-                discoveries_by_year[year].append({
-                    'name': row['artist'],
-                    'first_timestamp': row['first_timestamp'],
-                    'first_date': first_date.strftime('%Y-%m-%d')
-                })
+            except sqlite3.OperationalError as e:
+                print(f"Error en géneros Last.fm: {e}")
+                return []
 
-        elif discovery_type == 'albums':
-            cursor.execute('''
-                SELECT artist, album, first_timestamp
-                FROM user_first_album_listen
-                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
-                ORDER BY first_timestamp ASC
-            ''', (user, from_timestamp, to_timestamp))
+        elif provider in ['musicbrainz', 'discogs']:
+            # Para MusicBrainz y Discogs: usar album_genres (géneros de álbumes)
+            try:
+                cursor.execute(f'''
+                    SELECT ag.genre, COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND ag.source = ?
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY ag.genre
+                    ORDER BY plays DESC
+                    LIMIT ?
+                ''', (user, from_timestamp, to_timestamp, provider, limit))
 
-            for row in cursor.fetchall():
-                first_date = datetime.fromtimestamp(row['first_timestamp'])
-                year = first_date.year
+                return [(row['genre'], row['plays']) for row in cursor.fetchall()]
 
-                if year not in discoveries_by_year:
-                    discoveries_by_year[year] = []
+            except sqlite3.OperationalError as e:
+                print(f"Error en géneros {provider}: {e}")
+                return []
 
-                album_display = f"{row['artist']} - {row['album']}" if row['album'] else f"{row['artist']} - [Unknown Album]"
-                discoveries_by_year[year].append({
-                    'name': album_display,
-                    'first_timestamp': row['first_timestamp'],
-                    'first_date': first_date.strftime('%Y-%m-%d')
-                })
+        else:
+            print(f"Proveedor no válido: {provider}")
+            return []
 
-        elif discovery_type == 'tracks':
-            cursor.execute('''
-                SELECT artist, track, first_timestamp
-                FROM user_first_track_listen
-                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
-                ORDER BY first_timestamp ASC
-            ''', (user, from_timestamp, to_timestamp))
-
-            for row in cursor.fetchall():
-                first_date = datetime.fromtimestamp(row['first_timestamp'])
-                year = first_date.year
-
-                if year not in discoveries_by_year:
-                    discoveries_by_year[year] = []
-
-                discoveries_by_year[year].append({
-                    'name': f"{row['artist']} - {row['track']}",
-                    'first_timestamp': row['first_timestamp'],
-                    'first_date': first_date.strftime('%Y-%m-%d')
-                })
-
-        elif discovery_type == 'labels':
-            cursor.execute('''
-                SELECT label, first_timestamp
-                FROM user_first_label_listen
-                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
-                ORDER BY first_timestamp ASC
-            ''', (user, from_timestamp, to_timestamp))
-
-            for row in cursor.fetchall():
-                first_date = datetime.fromtimestamp(row['first_timestamp'])
-                year = first_date.year
-
-                if year not in discoveries_by_year:
-                    discoveries_by_year[year] = []
-
-                discoveries_by_year[year].append({
-                    'name': row['label'],
-                    'first_timestamp': row['first_timestamp'],
-                    'first_date': first_date.strftime('%Y-%m-%d')
-                })
-
-        return discoveries_by_year
-
-    def get_user_discoveries_stats_by_year(self, user: str, from_year: int, to_year: int,
-                                         discovery_type: str = 'artists', mbid_only: bool = False) -> Dict[int, int]:
+    def get_top_artists_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str = 'lastfm', limit: int = 15, mbid_only: bool = False) -> List[Dict]:
         """
-        Obtiene estadísticas de novedades por año (solo conteos)
-
-        Returns:
-            Dict con año: número_de_novedades
+        FUNCIÓN CORREGIDA: Obtiene artistas por género
+        Solo Last.fm soporta géneros de artistas
         """
-        discoveries = self.get_user_discoveries_by_year(user, from_year, to_year, discovery_type, mbid_only)
+        cursor = self.conn.cursor()
 
-        stats = {}
-        for year in range(from_year, to_year + 1):
-            stats[year] = len(discoveries.get(year, []))
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
 
-        return stats
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        if provider == 'lastfm':
+            # Solo Last.fm tiene géneros de artistas
+            try:
+                cursor.execute(f'''
+                    SELECT s.artist, COUNT(*) as total_plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND ag.genres LIKE ?
+                    {mbid_filter}
+                    GROUP BY s.artist
+                    ORDER BY total_plays DESC
+                    LIMIT ?
+                ''', (user, from_timestamp, to_timestamp, f'%"{genre}"%', limit))
+
+                artists = cursor.fetchall()
+                artists_data = []
+
+                for artist_row in artists:
+                    artist_name = artist_row['artist']
+                    yearly_data = {}
+
+                    for year in range(from_year, to_year + 1):
+                        year_start = int(datetime(year, 1, 1).timestamp())
+                        year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+                        cursor.execute(f'''
+                            SELECT COUNT(*) as plays
+                            FROM scrobbles s
+                            JOIN artist_genres ag ON s.artist = ag.artist
+                            WHERE s.user = ? AND s.artist = ?
+                              AND s.timestamp >= ? AND s.timestamp <= ?
+                              AND ag.genres LIKE ?
+                            {mbid_filter}
+                        ''', (user, artist_name, year_start, year_end, f'%"{genre}"%'))
+
+                        year_result = cursor.fetchone()
+                        yearly_data[year] = year_result['plays'] if year_result else 0
+
+                    artists_data.append({
+                        'artist': artist_name,
+                        'yearly_data': yearly_data,
+                        'total_plays': artist_row['total_plays']
+                    })
+
+                return artists_data
+
+            except sqlite3.OperationalError as e:
+                print(f"Error en artistas por género Last.fm: {e}")
+                return []
+
+        else:
+            # MusicBrainz y Discogs no tienen géneros de artistas, solo de álbumes
+            print(f"❌ Géneros de artistas no disponibles para {provider}")
+            print(f"💡 {provider} solo tiene géneros de álbumes")
+            return []
+
+    def get_user_top_album_genres_by_provider(self, user: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
+        """
+        FUNCIÓN CORREGIDA: Obtiene géneros de álbumes por proveedor
+        """
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        if provider in ['musicbrainz', 'discogs']:
+            # Para MusicBrainz y Discogs: usar album_genres directamente
+            try:
+                cursor.execute(f'''
+                    SELECT ag.genre, COUNT(*) as plays
+                    FROM scrobbles s
+                    JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND ag.source = ?
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY ag.genre
+                    ORDER BY plays DESC
+                    LIMIT ?
+                ''', (user, from_timestamp, to_timestamp, provider, limit))
+
+                return [(row['genre'], row['plays']) for row in cursor.fetchall()]
+
+            except sqlite3.OperationalError as e:
+                print(f"Error en géneros de álbumes {provider}: {e}")
+                return []
+
+        elif provider == 'lastfm':
+            # Para Last.fm: aproximar con géneros de artistas aplicados a álbumes
+            try:
+                cursor.execute(f'''
+                    SELECT ag.genres, COUNT(*) as plays, s.album
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY s.album, ag.genres
+                    ORDER BY plays DESC
+                ''', (user, from_timestamp, to_timestamp))
+
+                # Procesar géneros por álbum
+                album_genre_counts = defaultdict(int)
+                for row in cursor.fetchall():
+                    genres_json = row['genres']
+                    album_plays = row['plays']
+                    try:
+                        genres_list = json.loads(genres_json) if genres_json else []
+                        for genre in genres_list[:3]:  # Solo primeros 3 géneros
+                            album_genre_counts[genre] += album_plays
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+                # Ordenar y limitar
+                sorted_genres = sorted(album_genre_counts.items(), key=lambda x: x[1], reverse=True)
+                return sorted_genres[:limit]
+
+            except sqlite3.OperationalError as e:
+                print(f"Error en géneros de álbumes Last.fm: {e}")
+                return []
+
+        else:
+            print(f"Proveedor no válido: {provider}")
+            return []
+
+    def get_top_albums_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
+        """
+        FUNCIÓN CORREGIDA: Obtiene álbumes por género según proveedor
+        """
+        cursor = self.conn.cursor()
+
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+
+        if provider in ['musicbrainz', 'discogs']:
+            # Para MusicBrainz y Discogs: usar album_genres directamente
+            try:
+                cursor.execute(f'''
+                    SELECT s.artist, s.album, COUNT(*) as total_plays
+                    FROM scrobbles s
+                    JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND ag.genre = ? AND ag.source = ?
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY s.artist, s.album
+                    ORDER BY total_plays DESC
+                    LIMIT ?
+                ''', (user, from_timestamp, to_timestamp, genre, provider, limit))
+
+                albums = cursor.fetchall()
+                albums_data = []
+
+                for album_row in albums:
+                    artist_name = album_row['artist']
+                    album_name = album_row['album']
+                    album_key = f"{artist_name} - {album_name}"
+
+                    yearly_data = {}
+                    for year in range(from_year, to_year + 1):
+                        year_start = int(datetime(year, 1, 1).timestamp())
+                        year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+                        cursor.execute(f'''
+                            SELECT COUNT(*) as plays
+                            FROM scrobbles s
+                            JOIN album_genres ag ON s.artist = ag.artist AND s.album = ag.album
+                            WHERE s.user = ? AND s.artist = ? AND s.album = ?
+                              AND s.timestamp >= ? AND s.timestamp <= ?
+                              AND ag.genre = ? AND ag.source = ?
+                            {mbid_filter}
+                        ''', (user, artist_name, album_name, year_start, year_end, genre, provider))
+
+                        year_result = cursor.fetchone()
+                        yearly_data[year] = year_result['plays'] if year_result else 0
+
+                    albums_data.append({
+                        'album': album_key,
+                        'yearly_data': yearly_data,
+                        'total_plays': album_row['total_plays']
+                    })
+
+                return albums_data
+
+            except sqlite3.OperationalError as e:
+                print(f"Error en álbumes por género {provider}: {e}")
+                return []
+
+        elif provider == 'lastfm':
+            # Para Last.fm: usar géneros de artistas aplicados a álbumes
+            try:
+                cursor.execute(f'''
+                    SELECT s.artist, s.album, COUNT(*) as total_plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND ag.genres LIKE ?
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY s.artist, s.album
+                    ORDER BY total_plays DESC
+                    LIMIT ?
+                ''', (user, from_timestamp, to_timestamp, f'%"{genre}"%', limit))
+
+                albums = cursor.fetchall()
+                albums_data = []
+
+                for album_row in albums:
+                    artist_name = album_row['artist']
+                    album_name = album_row['album']
+                    album_key = f"{artist_name} - {album_name}"
+
+                    yearly_data = {}
+                    for year in range(from_year, to_year + 1):
+                        year_start = int(datetime(year, 1, 1).timestamp())
+                        year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+                        cursor.execute(f'''
+                            SELECT COUNT(*) as plays
+                            FROM scrobbles s
+                            JOIN artist_genres ag ON s.artist = ag.artist
+                            WHERE s.user = ? AND s.artist = ? AND s.album = ?
+                              AND s.timestamp >= ? AND s.timestamp <= ?
+                              AND ag.genres LIKE ?
+                            {mbid_filter}
+                        ''', (user, artist_name, album_name, year_start, year_end, f'%"{genre}"%'))
+
+                        year_result = cursor.fetchone()
+                        yearly_data[year] = year_result['plays'] if year_result else 0
+
+                    albums_data.append({
+                        'album': album_key,
+                        'yearly_data': yearly_data,
+                        'total_plays': album_row['total_plays']
+                    })
+
+                return albums_data
+
+            except sqlite3.OperationalError as e:
+                print(f"Error en álbumes por género Last.fm: {e}")
+                return []
+
+        else:
+            print(f"Proveedor no válido: {provider}")
+            return []

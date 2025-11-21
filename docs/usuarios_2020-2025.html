@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Usuarios - Estadísticas Individuales (Optimizado)</title>
+    <title>Last.fm Usuarios - Estadísticas Individuales</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* Mismo CSS que antes pero agregando estilos para loading */
         * {
             margin: 0;
             padding: 0;
@@ -77,6 +76,7 @@
         .nav-button:hover {
             border-color: #cba6f7;
             background: #45475a;
+            color: #cdd6f4;
         }
 
         .nav-button.current {
@@ -99,11 +99,89 @@
             align-items: center;
             justify-content: center;
             transition: all 0.3s;
+            flex-shrink: 0;
         }
 
         .user-button:hover {
             background: #b4a3e8;
             transform: scale(1.1);
+        }
+
+        .user-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .user-modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 400px;
+            border: 2px solid #cba6f7;
+        }
+
+        .user-modal-header {
+            color: #cba6f7;
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .user-modal-close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .user-modal-close:hover {
+            color: #cba6f7;
+        }
+
+        .user-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .user-option {
+            padding: 12px 20px;
+            background: #313244;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            color: #cdd6f4;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .user-option:hover {
+            background: #45475a;
+            border-color: #cba6f7;
+        }
+
+        .user-option.selected {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
         }
 
         .content {
@@ -143,12 +221,242 @@
             border-bottom-color: #181825;
         }
 
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #181825;
+        }
+
+        .user-header {
+            background: linear-gradient(135deg, #1e1e2e, #181825);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .user-name {
+            font-size: 1.4em;
+            color: #cba6f7;
+            font-weight: regular;
+            margin-bottom: 15px;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .summary-card {
+            background: rgba(203, 166, 247, 0.1);
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid rgba(203, 166, 247, 0.3);
+        }
+
+        .summary-card .number {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #cba6f7;
+            margin-bottom: 2px;
+        }
+
+        .summary-card .label {
+            font-size: 0.8em;
+            color: #a6adc8;
+            text-transform: uppercase;
+        }
+
         .tab-content {
             display: none;
         }
 
         .tab-content.active {
             display: block;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+        }
+
+        .chart-card {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid #313244;
+            transition: border-color 0.3s;
+        }
+
+        .chart-card:hover {
+            border-color: #cba6f7;
+        }
+
+        .chart-header {
+            margin-bottom: 15px;
+        }
+
+        .chart-title {
+            font-size: 1.2em;
+            color: #cba6f7;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .chart-info {
+            font-size: 0.9em;
+            color: #a6adc8;
+            padding: 8px 12px;
+            background: #313244;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .chart-wrapper {
+            width: 100%;
+            height: 300px;
+            position: relative;
+        }
+
+        .scatter-chart-wrapper {
+            width: 100%;
+            height: 250px;
+            position: relative;
+        }
+
+        .no-data {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            background: #313244;
+            border-radius: 8px;
+            color: #a6adc8;
+            font-style: italic;
+        }
+
+        .provider-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .provider-btn {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+
+        .provider-btn:hover {
+            background: #45475a;
+            border-color: #cba6f7;
+        }
+
+        .provider-btn.active {
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }
+
+        .genres-section {
+            margin-bottom: 40px;
+        }
+
+        .genres-section h3 {
+            color: #cba6f7;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            text-align: center;
+        }
+
+        .genres-pie-container {
+            background: #1e1e2e;
+            border-radius: 12px;
+            padding: 25px;
+            border: 2px solid #313244;
+        }
+
+        .genres-pie-container h4 {
+            color: #fab387;
+            margin-bottom: 15px;
+            text-align: center;
+            font-size: 1.1em;
+        }
+
+        .scatter-charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .scatter-chart-card {
+            background: #1e1e2e;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #313244;
+        }
+
+        .scatter-chart-card h5 {
+            color: #cba6f7;
+            font-size: 1em;
+            margin-bottom: 10px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .evolution-charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 25px;
+        }
+
+        .data-type-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .data-type-btn {
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .data-type-btn:hover {
+            border-color: #f38ba8;
+            background: #45475a;
+        }
+
+        .data-type-btn.active {
+            background: #f38ba8;
+            color: #1e1e2e;
+            border-color: #f38ba8;
         }
 
         .evolution-section {
@@ -161,12 +469,6 @@
             margin-bottom: 20px;
             border-bottom: 2px solid #cba6f7;
             padding-bottom: 10px;
-        }
-
-        .evolution-charts {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
-            gap: 25px;
         }
 
         .evolution-chart {
@@ -188,37 +490,121 @@
             height: 400px;
         }
 
-        .loading-spinner {
-            display: none;
-            text-align: center;
-            padding: 40px;
-            color: #a6adc8;
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 999;
+            backdrop-filter: blur(5px);
         }
 
-        .loading-spinner.active {
-            display: block;
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1e1e2e;
+            border: 2px solid #cba6f7;
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 500px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
         }
 
-        .discoveries-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 20px;
-        }
-
-        .no-data {
+        .popup-header {
+            color: #cba6f7;
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #313244;
+            padding-bottom: 10px;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            height: 200px;
-            background: #313244;
-            border-radius: 8px;
+        }
+
+        .popup-close {
+            background: none;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .popup-close:hover {
+            color: #cba6f7;
+        }
+
+        .popup-content {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .popup-item {
+            padding: 8px 12px;
+            background: #181825;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border-left: 3px solid #45475a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .popup-item .name {
+            color: #cdd6f4;
+            font-weight: 600;
+        }
+
+        .popup-item .count {
             color: #a6adc8;
-            font-style: italic;
+            font-size: 0.9em;
         }
 
         @media (max-width: 768px) {
-            .discoveries-grid {
+            .charts-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .scatter-charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .evolution-charts {
+                grid-template-columns: 1fr;
+            }
+
+            .summary-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .nav-tabs {
+                justify-content: center;
+            }
+
+            .provider-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .user-name {
+                font-size: 1.5em;
+            }
+
+            .popup {
+                width: 90%;
+                max-width: none;
             }
         }
     </style>
@@ -227,7 +613,7 @@
     <div class="container">
         <header>
             <div class="header-content">
-                <h1>🎵 RYM Hispano Estadísticas (Optimizado)</h1>
+                <h1>🎵 RYM Hispano Estadísticas</h1>
                 <div class="nav-buttons">
                     <a href="index.html#temporal" class="nav-button">TEMPORALES</a>
                     <a href="index.html#grupo" class="nav-button">GRUPO</a>
@@ -237,82 +623,398 @@
             <button class="user-button" id="userButton">👤</button>
         </header>
 
+        <div id="userModal" class="user-modal">
+            <div class="user-modal-content">
+                <button class="user-modal-close" id="closeModal">&times;</button>
+                <div class="user-modal-header">Seleccionar Usuario</div>
+                <div class="user-options" id="userOptions">
+                    <!-- Se llenarán dinámicamente -->
+                </div>
+            </div>
+        </div>
+
         <div class="content">
+            <div class="user-header">
+                <div class="user-name" id="currentUserName">Selecciona un usuario</div>
+                <div class="summary-stats" id="summaryStats">
+                    <!-- Se llenarán dinámicamente -->
+                </div>
+            </div>
+
             <div class="nav-tabs">
                 <div class="nav-tab active" data-view="individual">📊 Individual</div>
-                <div class="nav-tab" data-view="discoveries">✨ Novedades</div>
                 <div class="nav-tab" data-view="genres">🎵 Géneros</div>
                 <div class="nav-tab" data-view="labels">💿 Sellos</div>
                 <div class="nav-tab" data-view="coincidences">🤝 Coincidencias</div>
                 <div class="nav-tab" data-view="evolution">📈 Evolución</div>
+                <div class="nav-tab" data-view="discoveries">✨ Novedades</div>
             </div>
 
             <div id="individualTab" class="tab-content active">
-                <p>Contenido de estadísticas individuales (original)...</p>
-            </div>
+                <div class="data-type-buttons">
+                    <button class="data-type-btn active" data-type="annual">Por Año</button>
+                    <button class="data-type-btn" data-type="cumulative">Acumulativo</button>
+                </div>
 
-            <!-- Nueva pestaña de Novedades -->
-            <div id="discoveriesTab" class="tab-content">
-                <div class="evolution-section">
-                    <h3>✨ Descubrimientos Musicales</h3>
 
-                    <div class="loading-spinner" id="discoveriesLoading">
-                        <p>🔄 Cargando datos de novedades...</p>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">👥 Top Artistas</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="topArtistsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topArtistsInfo"></div>
                     </div>
 
-                    <div class="discoveries-grid" id="discoveriesGrid" style="display: none;">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">💿 Top Álbumes</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="topAlbumsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topAlbumsInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">🎶 Top Canciones</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="topTracksChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="topTracksInfo"></div>
+                    </div>
+                </div>
+
+                <!-- Sección de evolución individual -->
+                <div class="evolution-section">
+                    <h3>🎭 Evolución de Géneros Individuales</h3>
+                    <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Nuevos Artistas por Año</h4>
+                            <h4>Top 10 Géneros por Año</h4>
                             <div class="line-chart-wrapper">
-                                <canvas id="discoveriesArtistsChart"></canvas>
+                                <canvas id="individualGenresChart"></canvas>
                             </div>
                         </div>
+                    </div>
+                </div>
 
+                <div class="evolution-section">
+                    <h3>🏷️ Evolución de Sellos Individuales</h3>
+                    <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Nuevos Álbumes por Año</h4>
+                            <h4>Top 10 Sellos por Año</h4>
                             <div class="line-chart-wrapper">
-                                <canvas id="discoveriesAlbumsChart"></canvas>
+                                <canvas id="individualLabelsChart"></canvas>
                             </div>
                         </div>
+                    </div>
+                </div>
 
+                <div class="evolution-section">
+                    <h3>🎤 Evolución de Artistas Individuales</h3>
+                    <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Nuevas Canciones por Año</h4>
+                            <h4>Top 15 Artistas por Año</h4>
                             <div class="line-chart-wrapper">
-                                <canvas id="discoveriesTracksChart"></canvas>
+                                <canvas id="individualArtistsChart"></canvas>
                             </div>
                         </div>
+                    </div>
+                </div>
 
+                <div class="evolution-section">
+                    <h3>🎯 One Hit Wonders</h3>
+                    <div class="evolution-charts">
                         <div class="evolution-chart">
-                            <h4>Nuevos Sellos por Año</h4>
+                            <h4>Top 15 Artistas con 1 Canción (+25 scrobbles)</h4>
                             <div class="line-chart-wrapper">
-                                <canvas id="discoveriesLabelsChart"></canvas>
+                                <canvas id="individualOneHitChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>🔥 Artistas con Mayor Streak</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas con Más Días Consecutivos</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualStreakChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📚 Artistas con Mayor Discografía</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas con Más Canciones Únicas</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualTrackCountChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>✨ Artistas Nuevos</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas Nuevos (Sin Escuchas Previas)</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualNewArtistsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📈 Artistas en Ascenso</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas que Más Rápido Subieron</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualRisingChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="evolution-section">
+                    <h3>📉 Artistas en Declive</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 15 Artistas que Más Rápido Bajaron</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="individualFallingChart"></canvas>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Resto de pestañas existentes -->
             <div id="genresTab" class="tab-content">
-                <p>Contenido de géneros (original)...</p>
+                <div class="provider-buttons">
+                    <button class="provider-btn active" data-provider="lastfm">Last.fm</button>
+                    <button class="provider-btn" data-provider="musicbrainz">MusicBrainz</button>
+                    <button class="provider-btn" data-provider="discogs">Discogs</button>
+                </div>
+
+                <div class="genres-section">
+                    <h3>🎶 Distribución de Géneros (Artistas)</h3>
+                    <div class="genres-pie-container">
+                        <h4>Top 15 Géneros del Usuario</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="genresPieChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="genresPieInfo"></div>
+                    </div>
+                </div>
+
+                <div class="genres-section">
+                    <h3>📈 Evolución de Artistas por Género</h3>
+                    <div class="scatter-charts-grid" id="genresScatterGrid">
+                        <!-- Se llenarán dinámicamente los 6 gráficos de scatter -->
+                    </div>
+                </div>
+
+                <div class="genres-section">
+                    <h3>💿 Distribución de Géneros (Álbumes)</h3>
+                    <div class="genres-pie-container">
+                        <h4>Top 15 Géneros de álbumes del Usuario</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="albumGenresPieChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="albumGenresPieInfo"></div>
+                    </div>
+                </div>
+
+                <div class="genres-section">
+                    <h3>📈 Evolución de Álbumes por Género</h3>
+                    <div class="scatter-charts-grid" id="albumGenresScatterGrid">
+                        <!-- Se llenarán dinámicamente los 6 gráficos de scatter para álbumes -->
+                    </div>
+                </div>
             </div>
 
             <div id="labelsTab" class="tab-content">
-                <p>Contenido de sellos (original)...</p>
+                <div class="genres-section">
+                    <h3>💿 Distribución de Sellos</h3>
+                    <div class="genres-pie-container">
+                        <h4>Top 15 Sellos Discográficos del Usuario</h4>
+                        <div class="chart-wrapper">
+                            <canvas id="labelsPieChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="labelsPieInfo"></div>
+                    </div>
+                </div>
+
+                <div class="genres-section">
+                    <h3>📈 Evolución de Álbumes por Sello</h3>
+                    <div class="scatter-charts-grid" id="labelsScatterGrid">
+                        <!-- Se llenarán dinámicamente los 6 gráficos de scatter para sellos -->
+                    </div>
+                </div>
             </div>
 
             <div id="coincidencesTab" class="tab-content">
-                <p>Contenido de coincidencias (original)...</p>
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">👥 Coincidencias de Artistas</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="artistsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="artistsInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">💿 Coincidencias de Álbumes</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="albumsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="albumsInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">🎶 Coincidencias de Canciones</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="tracksChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="tracksInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">🎵 Coincidencias de Géneros</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="genresChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="genresInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">🔄 Géneros Compartidos</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="genreCoincidencesChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="genreCoincidencesInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">💿 Coincidencias de Sellos</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="labelsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="labelsInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">📅 Años de Lanzamiento</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="releaseYearsChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="releaseYearsInfo"></div>
+                    </div>
+                </div>
             </div>
 
             <div id="evolutionTab" class="tab-content">
-                <p>Contenido de evolución (original)...</p>
+                <div class="evolution-charts">
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">🎵 Evolución de Géneros</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="genresEvolutionChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="genresEvolutionInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">💿 Evolución de Sellos</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="labelsEvolutionChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="labelsEvolutionInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">📅 Evolución de Años</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="releaseYearsEvolutionChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="releaseYearsEvolutionInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">👥 Evolución de Artistas</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="artistsEvolutionChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="artistsEvolutionInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">💿 Evolución de Álbumes</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="albumsEvolutionChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="albumsEvolutionInfo"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-header">
+                            <h3 class="chart-title">🎶 Evolución de Canciones</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="tracksEvolutionChart"></canvas>
+                        </div>
+                        <div class="chart-info" id="tracksEvolutionInfo"></div>
+                    </div>
+                </div>
             </div>
+        </div>
+
+        <!-- Popup para mostrar detalles -->
+        <div id="popupOverlay" class="popup-overlay" style="display: none;"></div>
+        <div id="popup" class="popup" style="display: none;">
+            <div class="popup-header">
+                <span id="popupTitle">Detalles</span>
+                <button id="popupClose" class="popup-close">X</button>
+            </div>
+            <div id="popupContent" class="popup-content"></div>
         </div>
     </div>
 
     <script>
-        // Configuración global
+        // Datos globales
         const allUsers = ["alberto_gu", "EliasJ72", "Frikomid", "GabredMared", "Lonsonxd", "Nubis84", "paqueradejere", "Rocky_stereo", "sdecandelario"];
         const allStats = {
   "alberto_gu": {
@@ -3283,17 +3985,17 @@
               "count": 2,
               "total_track_count": 363,
               "artists": {
-                "Bad Bunny": {
-                  "user_tracks": 80,
-                  "other_tracks": 84,
-                  "user_plays": 558,
-                  "other_plays": 745
-                },
                 "Kanye West": {
                   "user_tracks": 126,
                   "other_tracks": 73,
                   "user_plays": 1005,
                   "other_plays": 292
+                },
+                "Bad Bunny": {
+                  "user_tracks": 80,
+                  "other_tracks": 84,
+                  "user_plays": 558,
+                  "other_plays": 745
                 }
               }
             }
@@ -33555,7 +34257,7 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:37:34"
+    "generated_at": "2025-11-21 15:54:23"
   },
   "EliasJ72": {
     "user": "EliasJ72",
@@ -65113,7 +65815,7 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:38:25"
+    "generated_at": "2025-11-21 15:55:14"
   },
   "Frikomid": {
     "user": "Frikomid",
@@ -68598,21 +69300,21 @@
               "count": 4,
               "total_days": 4837,
               "artists": {
-                "Charli xcx": {
-                  "user_days": 324,
-                  "other_days": 484
-                },
                 "Arca": {
                   "user_days": 307,
                   "other_days": 1020
                 },
-                "ROSALÍA": {
-                  "user_days": 269,
-                  "other_days": 766
+                "Charli xcx": {
+                  "user_days": 324,
+                  "other_days": 484
                 },
                 "Lana Del Rey": {
                   "user_days": 755,
                   "other_days": 912
+                },
+                "ROSALÍA": {
+                  "user_days": 269,
+                  "other_days": 766
                 }
               }
             }
@@ -68656,17 +69358,17 @@
               "count": 2,
               "total_track_count": 611,
               "artists": {
-                "King Gizzard & The Lizard Wizard": {
-                  "user_tracks": 149,
-                  "other_tracks": 166,
-                  "user_plays": 257,
-                  "other_plays": 380
-                },
                 "Mogwai": {
                   "user_tracks": 159,
                   "other_tracks": 137,
                   "user_plays": 699,
                   "other_plays": 160
+                },
+                "King Gizzard & The Lizard Wizard": {
+                  "user_tracks": 149,
+                  "other_tracks": 166,
+                  "user_plays": 257,
+                  "other_plays": 380
                 }
               }
             }
@@ -68684,14 +69386,6 @@
               "count": 2,
               "total_streak_days": 2702,
               "artists": {
-                "ROSALÍA": {
-                  "user_streak": 20,
-                  "other_streak": 56,
-                  "user_days": 269,
-                  "other_days": 766,
-                  "user_plays": 745,
-                  "other_plays": 4016
-                },
                 "Lana Del Rey": {
                   "user_streak": 29,
                   "other_streak": 41,
@@ -68699,6 +69393,14 @@
                   "other_days": 912,
                   "user_plays": 2647,
                   "other_plays": 4950
+                },
+                "ROSALÍA": {
+                  "user_streak": 20,
+                  "other_streak": 56,
+                  "user_days": 269,
+                  "other_days": 766,
+                  "user_plays": 745,
+                  "other_plays": 4016
                 }
               }
             }
@@ -101159,7 +101861,7 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:41:09"
+    "generated_at": "2025-11-21 15:57:50"
   },
   "GabredMared": {
     "user": "GabredMared",
@@ -104303,21 +105005,21 @@
               "count": 4,
               "total_days": 4837,
               "artists": {
-                "Charli xcx": {
-                  "user_days": 484,
-                  "other_days": 324
-                },
                 "Arca": {
                   "user_days": 1020,
                   "other_days": 307
                 },
-                "ROSALÍA": {
-                  "user_days": 766,
-                  "other_days": 269
+                "Charli xcx": {
+                  "user_days": 484,
+                  "other_days": 324
                 },
                 "Lana Del Rey": {
                   "user_days": 912,
                   "other_days": 755
+                },
+                "ROSALÍA": {
+                  "user_days": 766,
+                  "other_days": 269
                 }
               }
             }
@@ -104396,14 +105098,6 @@
               "count": 2,
               "total_streak_days": 2702,
               "artists": {
-                "ROSALÍA": {
-                  "user_streak": 56,
-                  "other_streak": 20,
-                  "user_days": 766,
-                  "other_days": 269,
-                  "user_plays": 4016,
-                  "other_plays": 745
-                },
                 "Lana Del Rey": {
                   "user_streak": 41,
                   "other_streak": 29,
@@ -104411,6 +105105,14 @@
                   "other_days": 755,
                   "user_plays": 4950,
                   "other_plays": 2647
+                },
+                "ROSALÍA": {
+                  "user_streak": 56,
+                  "other_streak": 20,
+                  "user_days": 766,
+                  "other_days": 269,
+                  "user_plays": 4016,
+                  "other_plays": 745
                 }
               }
             }
@@ -135207,7 +135909,7 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:43:21"
+    "generated_at": "2025-11-21 15:59:53"
   },
   "Lonsonxd": {
     "user": "Lonsonxd",
@@ -138173,17 +138875,17 @@
               "count": 3,
               "total_plays": 9890,
               "artists": {
-                "Radiohead": {
-                  "user_plays": 2565,
-                  "other_plays": 229
+                "Porcupine Tree": {
+                  "user_plays": 2584,
+                  "other_plays": 432
                 },
                 "The Cure": {
                   "user_plays": 3852,
                   "other_plays": 228
                 },
-                "Porcupine Tree": {
-                  "user_plays": 2584,
-                  "other_plays": 432
+                "Radiohead": {
+                  "user_plays": 2565,
+                  "other_plays": 229
                 }
               }
             },
@@ -138191,13 +138893,13 @@
               "count": 2,
               "total_plays": 8951,
               "artists": {
-                "Radiohead": {
-                  "user_plays": 2565,
-                  "other_plays": 897
-                },
                 "The Cure": {
                   "user_plays": 3852,
                   "other_plays": 1637
+                },
+                "Radiohead": {
+                  "user_plays": 2565,
+                  "other_plays": 897
                 }
               }
             },
@@ -138226,13 +138928,13 @@
               "count": 2,
               "total_days": 1663,
               "artists": {
-                "Radiohead": {
-                  "user_days": 705,
-                  "other_days": 131
-                },
                 "Porcupine Tree": {
                   "user_days": 698,
                   "other_days": 129
+                },
+                "Radiohead": {
+                  "user_days": 705,
+                  "other_days": 131
                 }
               }
             },
@@ -138240,13 +138942,13 @@
               "count": 2,
               "total_days": 2111,
               "artists": {
-                "Radiohead": {
-                  "user_days": 705,
-                  "other_days": 299
-                },
                 "The Cure": {
                   "user_days": 766,
                   "other_days": 341
+                },
+                "Radiohead": {
+                  "user_days": 705,
+                  "other_days": 299
                 }
               }
             }
@@ -138267,11 +138969,11 @@
               "count": 3,
               "total_track_count": 1159,
               "artists": {
-                "Pink Floyd": {
-                  "user_tracks": 198,
-                  "other_tracks": 95,
-                  "user_plays": 1691,
-                  "other_plays": 202
+                "Porcupine Tree": {
+                  "user_tracks": 203,
+                  "other_tracks": 176,
+                  "user_plays": 2584,
+                  "other_plays": 432
                 },
                 "The Beatles": {
                   "user_tracks": 227,
@@ -138279,11 +138981,11 @@
                   "user_plays": 1492,
                   "other_plays": 580
                 },
-                "Porcupine Tree": {
-                  "user_tracks": 203,
-                  "other_tracks": 176,
-                  "user_plays": 2584,
-                  "other_plays": 432
+                "Pink Floyd": {
+                  "user_tracks": 198,
+                  "other_tracks": 95,
+                  "user_plays": 1691,
+                  "other_plays": 202
                 }
               }
             },
@@ -138303,11 +139005,11 @@
               "count": 3,
               "total_track_count": 1047,
               "artists": {
-                "Pink Floyd": {
-                  "user_tracks": 198,
-                  "other_tracks": 121,
-                  "user_plays": 1691,
-                  "other_plays": 1536
+                "The Beatles": {
+                  "user_tracks": 227,
+                  "other_tracks": 92,
+                  "user_plays": 1492,
+                  "other_plays": 1148
                 },
                 "The Cure": {
                   "user_tracks": 311,
@@ -138315,11 +139017,11 @@
                   "user_plays": 3852,
                   "other_plays": 1637
                 },
-                "The Beatles": {
-                  "user_tracks": 227,
-                  "other_tracks": 92,
-                  "user_plays": 1492,
-                  "other_plays": 1148
+                "Pink Floyd": {
+                  "user_tracks": 198,
+                  "other_tracks": 121,
+                  "user_plays": 1691,
+                  "other_plays": 1536
                 }
               }
             },
@@ -173941,7 +174643,7 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:46:25"
+    "generated_at": "2025-11-21 16:02:43"
   },
   "Nubis84": {
     "user": "Nubis84",
@@ -176563,17 +177265,17 @@
               "count": 3,
               "total_plays": 9890,
               "artists": {
-                "Radiohead": {
-                  "user_plays": 229,
-                  "other_plays": 2565
+                "Porcupine Tree": {
+                  "user_plays": 432,
+                  "other_plays": 2584
                 },
                 "The Cure": {
                   "user_plays": 228,
                   "other_plays": 3852
                 },
-                "Porcupine Tree": {
-                  "user_plays": 432,
-                  "other_plays": 2584
+                "Radiohead": {
+                  "user_plays": 229,
+                  "other_plays": 2565
                 }
               }
             },
@@ -176581,17 +177283,17 @@
               "count": 3,
               "total_plays": 4719,
               "artists": {
-                "Radiohead": {
-                  "user_plays": 229,
-                  "other_plays": 897
+                "The Beatles": {
+                  "user_plays": 580,
+                  "other_plays": 1148
                 },
                 "The Cure": {
                   "user_plays": 228,
                   "other_plays": 1637
                 },
-                "The Beatles": {
-                  "user_plays": 580,
-                  "other_plays": 1148
+                "Radiohead": {
+                  "user_plays": 229,
+                  "other_plays": 897
                 }
               }
             },
@@ -176620,13 +177322,13 @@
               "count": 2,
               "total_days": 1663,
               "artists": {
-                "Radiohead": {
-                  "user_days": 131,
-                  "other_days": 705
-                },
                 "Porcupine Tree": {
                   "user_days": 129,
                   "other_days": 698
+                },
+                "Radiohead": {
+                  "user_days": 131,
+                  "other_days": 705
                 }
               }
             },
@@ -176634,17 +177336,17 @@
               "count": 3,
               "total_days": 1293,
               "artists": {
-                "Radiohead": {
-                  "user_days": 131,
-                  "other_days": 299
+                "The Beatles": {
+                  "user_days": 158,
+                  "other_days": 275
                 },
                 "Pink Floyd": {
                   "user_days": 95,
                   "other_days": 335
                 },
-                "The Beatles": {
-                  "user_days": 158,
-                  "other_days": 275
+                "Radiohead": {
+                  "user_days": 131,
+                  "other_days": 299
                 }
               }
             }
@@ -176677,11 +177379,11 @@
               "count": 3,
               "total_track_count": 1159,
               "artists": {
-                "Pink Floyd": {
-                  "user_tracks": 95,
-                  "other_tracks": 198,
-                  "user_plays": 202,
-                  "other_plays": 1691
+                "Porcupine Tree": {
+                  "user_tracks": 176,
+                  "other_tracks": 203,
+                  "user_plays": 432,
+                  "other_plays": 2584
                 },
                 "The Beatles": {
                   "user_tracks": 260,
@@ -176689,11 +177391,11 @@
                   "user_plays": 580,
                   "other_plays": 1492
                 },
-                "Porcupine Tree": {
-                  "user_tracks": 176,
-                  "other_tracks": 203,
-                  "user_plays": 432,
-                  "other_plays": 2584
+                "Pink Floyd": {
+                  "user_tracks": 95,
+                  "other_tracks": 198,
+                  "user_plays": 202,
+                  "other_plays": 1691
                 }
               }
             },
@@ -176713,17 +177415,17 @@
               "count": 2,
               "total_track_count": 568,
               "artists": {
-                "Pink Floyd": {
-                  "user_tracks": 95,
-                  "other_tracks": 121,
-                  "user_plays": 202,
-                  "other_plays": 1536
-                },
                 "The Beatles": {
                   "user_tracks": 260,
                   "other_tracks": 92,
                   "user_plays": 580,
                   "other_plays": 1148
+                },
+                "Pink Floyd": {
+                  "user_tracks": 95,
+                  "other_tracks": 121,
+                  "user_plays": 202,
+                  "other_plays": 1536
                 }
               }
             }
@@ -199808,7 +200510,7 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:47:42"
+    "generated_at": "2025-11-21 16:03:55"
   },
   "paqueradejere": {
     "user": "paqueradejere",
@@ -225242,7 +225944,7 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:48:30"
+    "generated_at": "2025-11-21 16:04:39"
   },
   "Rocky_stereo": {
     "user": "Rocky_stereo",
@@ -228255,13 +228957,13 @@
               "count": 2,
               "total_plays": 8951,
               "artists": {
-                "Radiohead": {
-                  "user_plays": 897,
-                  "other_plays": 2565
-                },
                 "The Cure": {
                   "user_plays": 1637,
                   "other_plays": 3852
+                },
+                "Radiohead": {
+                  "user_plays": 897,
+                  "other_plays": 2565
                 }
               }
             },
@@ -228269,17 +228971,17 @@
               "count": 3,
               "total_plays": 4719,
               "artists": {
-                "Radiohead": {
-                  "user_plays": 897,
-                  "other_plays": 229
+                "The Beatles": {
+                  "user_plays": 1148,
+                  "other_plays": 580
                 },
                 "The Cure": {
                   "user_plays": 1637,
                   "other_plays": 228
                 },
-                "The Beatles": {
-                  "user_plays": 1148,
-                  "other_plays": 580
+                "Radiohead": {
+                  "user_plays": 897,
+                  "other_plays": 229
                 }
               }
             },
@@ -228319,13 +229021,13 @@
               "count": 2,
               "total_days": 2111,
               "artists": {
-                "Radiohead": {
-                  "user_days": 299,
-                  "other_days": 705
-                },
                 "The Cure": {
                   "user_days": 341,
                   "other_days": 766
+                },
+                "Radiohead": {
+                  "user_days": 299,
+                  "other_days": 705
                 }
               }
             },
@@ -228333,17 +229035,17 @@
               "count": 3,
               "total_days": 1293,
               "artists": {
-                "Radiohead": {
-                  "user_days": 299,
-                  "other_days": 131
+                "The Beatles": {
+                  "user_days": 275,
+                  "other_days": 158
                 },
                 "Pink Floyd": {
                   "user_days": 335,
                   "other_days": 95
                 },
-                "The Beatles": {
-                  "user_days": 275,
-                  "other_days": 158
+                "Radiohead": {
+                  "user_days": 299,
+                  "other_days": 131
                 }
               }
             }
@@ -228367,17 +229069,17 @@
               "count": 2,
               "total_track_count": 363,
               "artists": {
-                "Bad Bunny": {
-                  "user_tracks": 84,
-                  "other_tracks": 80,
-                  "user_plays": 745,
-                  "other_plays": 558
-                },
                 "Kanye West": {
                   "user_tracks": 73,
                   "other_tracks": 126,
                   "user_plays": 292,
                   "other_plays": 1005
+                },
+                "Bad Bunny": {
+                  "user_tracks": 84,
+                  "other_tracks": 80,
+                  "user_plays": 745,
+                  "other_plays": 558
                 }
               }
             },
@@ -228409,11 +229111,11 @@
               "count": 3,
               "total_track_count": 1047,
               "artists": {
-                "Pink Floyd": {
-                  "user_tracks": 121,
-                  "other_tracks": 198,
-                  "user_plays": 1536,
-                  "other_plays": 1691
+                "The Beatles": {
+                  "user_tracks": 92,
+                  "other_tracks": 227,
+                  "user_plays": 1148,
+                  "other_plays": 1492
                 },
                 "The Cure": {
                   "user_tracks": 98,
@@ -228421,11 +229123,11 @@
                   "user_plays": 1637,
                   "other_plays": 3852
                 },
-                "The Beatles": {
-                  "user_tracks": 92,
-                  "other_tracks": 227,
-                  "user_plays": 1148,
-                  "other_plays": 1492
+                "Pink Floyd": {
+                  "user_tracks": 121,
+                  "other_tracks": 198,
+                  "user_plays": 1536,
+                  "other_plays": 1691
                 }
               }
             },
@@ -228433,17 +229135,17 @@
               "count": 2,
               "total_track_count": 568,
               "artists": {
-                "Pink Floyd": {
-                  "user_tracks": 121,
-                  "other_tracks": 95,
-                  "user_plays": 1536,
-                  "other_plays": 202
-                },
                 "The Beatles": {
                   "user_tracks": 92,
                   "other_tracks": 260,
                   "user_plays": 1148,
                   "other_plays": 580
+                },
+                "Pink Floyd": {
+                  "user_tracks": 121,
+                  "other_tracks": 95,
+                  "user_plays": 1536,
+                  "other_plays": 202
                 }
               }
             },
@@ -251798,7 +252500,7 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:49:29"
+    "generated_at": "2025-11-21 16:05:35"
   },
   "sdecandelario": {
     "user": "sdecandelario",
@@ -283169,18 +283871,23 @@
         2025
       ]
     },
-    "generated_at": "2025-11-21 14:52:01"
+    "generated_at": "2025-11-21 16:07:55"
   }
 };
         const colors = ["#cba6f7", "#f38ba8", "#fab387", "#f9e2af", "#a6e3a1", "#94e2d5", "#89dceb", "#74c7ec", "#89b4fa", "#b4befe", "#f5c2e7", "#f2cdcd", "#ddb6f2", "#ffc6ff", "#caffbf"];
-        const userIcons = {"alberto_gu": "🎹", "EliasJ72": "🎸", "Frikomid": "🎺", "GabredMared": "🎤", "Lonsonxd": "🎷", "Nubis84": "🎻", "paqueradejere": "🐥", "Rocky_stereo": "🥁", "sdecandelario": "🕺"};
-        const dataPeriod = '2020-2025';
+        const userIcons = {"alberto_gu": "🎹", "EliasJ72": "🎸", "Frikomid": "🎺", "GabredMared": "🎤", "Lonsonxd": "🎷", "Nubis84": "🎻", "paqueradejere": "🐥", "Rocky_stereo": "🥁", "sdecandelario": "🕺"}; // ✅ FIX: Añadir iconos de usuario
 
         // Variables globales
         let currentUser = null;
         let currentView = 'individual';
+        let currentProvider = 'lastfm';
+        let currentDataType = 'annual';
         let charts = {};
+        let genresData = null;
+        
         let discoveriesData = {}; // Cache para datos de novedades
+        const yearsBackConfig = 5; // Configuración de años
+ // ✅ FIX: Inicializar variable global genresData
 
         // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
@@ -283188,12 +283895,77 @@
         });
 
         function initializeApp() {
+            setupUserModal();
             setupNavigation();
+            setupProviderButtons();
+            setupPopup();
 
-            // Seleccionar primer usuario por defecto
-            if (allUsers.length > 0) {
-                selectUser(allUsers[0]);
+            // ✅ FIX: Cargar usuario guardado o seleccionar el primero
+            const savedUser = loadSavedUser();
+            const userToSelect = savedUser || (allUsers.length > 0 ? allUsers[0] : null);
+
+            if (userToSelect) {
+                selectUser(userToSelect);
+                updateUserButtonIcon(userToSelect);
+                updateSelectedUserOption(userToSelect);
             }
+        }
+
+        function setupUserModal() {
+            const userButton = document.getElementById('userButton');
+            const userModal = document.getElementById('userModal');
+            const closeModal = document.getElementById('closeModal');
+            const userOptions = document.getElementById('userOptions');
+
+            // Llenar opciones de usuarios con iconos
+            userOptions.innerHTML = allUsers.map(user => {
+                const icon = userIcons[user];
+                let optionHTML = `<div class="user-option" data-user="${user}">`;
+
+                if (icon) {
+                    if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {
+                        optionHTML += `<img src="${icon}" alt="${user}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:8px;"> ${user}`;
+                    } else {
+                        optionHTML += `<span style="font-size:1.2em;margin-right:8px;">${icon}</span> ${user}`;
+                    }
+                } else {
+                    optionHTML += user;
+                }
+
+                optionHTML += '</div>';
+                return optionHTML;
+            }).join('');
+
+            // Event listeners
+            userButton.addEventListener('click', () => {
+                userModal.style.display = 'block';
+            });
+
+            closeModal.addEventListener('click', () => {
+                userModal.style.display = 'none';
+            });
+
+            userModal.addEventListener('click', (e) => {
+                if (e.target === userModal) {
+                    userModal.style.display = 'none';
+                }
+            });
+
+            userOptions.addEventListener('click', (e) => {
+                if (e.target.classList.contains('user-option')) {
+                    const username = e.target.dataset.user;
+                    selectUser(username);
+                    userModal.style.display = 'none';
+
+                    // Guardar usuario seleccionado en localStorage
+                    if (username) {
+                        localStorage.setItem('lastfm_selected_user', username);
+                    }
+
+                    updateUserButtonIcon(username);
+                    updateSelectedUserOption(username);
+                }
+            });
         }
 
         function setupNavigation() {
@@ -283214,141 +283986,291 @@
                     });
 
                     document.getElementById(view + 'Tab').classList.add('active');
+
                     currentView = view;
 
-                    // Cargar datos específicos de la vista
-                    if (currentUser && view === 'discoveries') {
-                        loadDiscoveriesData(currentUser);
+                    // Re-render para la nueva vista
+                    if (currentUser) {
+                        if (view === 'discoveries') {
+                            loadDiscoveriesData(currentUser);
+                        } else {
+                            selectUser(currentUser);
+                        }
                     }
                 });
             });
         }
 
+        function setupProviderButtons() {
+            const providerBtns = document.querySelectorAll('.provider-btn');
+
+            providerBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const provider = btn.dataset.provider;
+
+                    // Actualizar botones activos
+                    providerBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    currentProvider = provider;
+
+                    // ✅ FIX: Recalcular estadísticas principales al cambiar proveedor
+                    if (currentUser) {
+                        updateSummaryStats(allStats[currentUser]);
+                    }
+
+                    // Re-render gráficos de géneros
+                    if (currentUser && currentView === 'genres') {
+                        renderGenresCharts(allStats[currentUser]);
+                    }
+                });
+            });
+
+            // ✅ FIX: Configurar botones de tipo de datos
+            const dataTypeBtns = document.querySelectorAll('.data-type-btn');
+
+            dataTypeBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const dataType = btn.dataset.type;
+
+                    // Actualizar botones activos
+                    dataTypeBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+
+                    currentDataType = dataType;
+
+                    // Re-render gráficos individuales
+                    if (currentUser && currentView === 'individual') {
+                        renderIndividualCharts(allStats[currentUser]);
+                    }
+                });
+            });
+        }
+
+        function setupPopup() {
+            // Configurar cierre de popup
+            document.getElementById('popupClose').addEventListener('click', function() {
+                document.getElementById('popupOverlay').style.display = 'none';
+                document.getElementById('popup').style.display = 'none';
+            });
+
+            document.getElementById('popupOverlay').addEventListener('click', function() {
+                document.getElementById('popupOverlay').style.display = 'none';
+                document.getElementById('popup').style.display = 'none';
+            });
+        }
+
+        // ✅ FIX: Funciones para manejar iconos de usuario
+        function updateUserButtonIcon(user) {
+            const userButton = document.getElementById('userButton');
+            const icon = userIcons[user];
+            if (icon) {
+                if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {
+                    userButton.innerHTML = `<img src="${icon}" alt="${user}" style="width:100%;height:100%;border-radius:50%;">`;
+                } else {
+                    userButton.textContent = icon;
+                }
+            } else {
+                userButton.textContent = '👤';
+            }
+        }
+
+        function updateSelectedUserOption(selectedUser) {
+            const userOptions = document.getElementById('userOptions');
+            userOptions.querySelectorAll('.user-option').forEach(option => {
+                option.classList.remove('selected');
+                if (option.dataset.user === selectedUser) {
+                    option.classList.add('selected');
+                }
+            });
+        }
+
+        function loadSavedUser() {
+            const savedUser = localStorage.getItem('lastfm_selected_user');
+            if (savedUser && allUsers.includes(savedUser)) {
+                return savedUser;
+            }
+            return null;
+        }
+
         function selectUser(username) {
             currentUser = username;
-            console.log(`Usuario seleccionado: ${username}`);
+            const userStats = allStats[username];
 
-            // Si estamos en la vista de novedades, cargar datos
-            if (currentView === 'discoveries') {
-                loadDiscoveriesData(username);
+            if (!userStats) {
+                console.error('No stats found for user:', username);
+                return;
+            }
+
+            // ✅ FIX: Inicializar genresData cuando se selecciona un usuario
+            genresData = userStats.genres || null;
+
+            document.getElementById('currentUserName').textContent = username;
+
+            updateSummaryStats(userStats);
+
+            if (currentView === 'individual') {
+                renderIndividualCharts(userStats);
+            } else if (currentView === 'genres') {
+                renderGenresCharts(userStats);
+            } else if (currentView === 'labels') {
+                renderLabelsCharts(userStats);
+            } else if (currentView === 'coincidences') {
+                renderCoincidenceCharts(userStats);
+            } else if (currentView === 'evolution') {
+                renderEvolutionCharts(userStats);
             }
         }
 
-        async function loadDiscoveriesData(username) {
-            console.log(`Cargando datos de novedades para ${username}...`);
+        function updateSummaryStats(userStats) {
+            const totalScrobbles = Object.values(userStats.yearly_scrobbles).reduce((a, b) => a + b, 0);
 
-            // Mostrar loading
-            document.getElementById('discoveriesLoading').classList.add('active');
-            document.getElementById('discoveriesGrid').style.display = 'none';
+            // ✅ FIX: Usar conteos únicos reales del analizador
+            const totalArtists = userStats.unique_counts ? userStats.unique_counts.total_artists : 0;
+            const totalAlbums = userStats.unique_counts ? userStats.unique_counts.total_albums : 0;
+            const totalTracks = userStats.unique_counts ? userStats.unique_counts.total_tracks : 0;
 
-            try {
-                // Verificar cache
-                if (discoveriesData[username]) {
-                    console.log('Usando datos del cache');
-                    renderDiscoveriesCharts(discoveriesData[username]);
-                    return;
-                }
-
-                // Cargar desde archivo JSON
-                const dataUrl = `data/usuarios/${dataPeriod}/${username}.json`;
-                console.log(`Cargando desde: ${dataUrl}`);
-
-                const response = await fetch(dataUrl);
-
-                if (!response.ok) {
-                    throw new Error(`Error HTTP: ${response.status}`);
-                }
-
-                const userData = await response.json();
-
-                // Guardar en cache
-                discoveriesData[username] = userData;
-
-                // Renderizar gráficos
-                renderDiscoveriesCharts(userData);
-
-            } catch (error) {
-                console.error('Error cargando datos de novedades:', error);
-                showDiscoveriesError(error.message);
+            // ✅ NUEVO: Usar conteos únicos de géneros del proveedor seleccionado
+            let totalGenres = 0;
+            if (userStats.unique_counts && userStats.unique_counts.total_genres && userStats.unique_counts.total_genres[currentProvider]) {
+                totalGenres = userStats.unique_counts.total_genres[currentProvider];
             }
+
+            // ✅ NUEVO: Usar conteos únicos de sellos del usuario
+            const totalLabels = userStats.unique_counts ? userStats.unique_counts.total_labels : 0;
+
+            // Años únicos con scrobbles
+            const totalYears = Object.keys(userStats.yearly_scrobbles || {}).length;
+
+            console.log('📊 Stats calculados:', {
+                totalScrobbles, totalArtists, totalAlbums, totalTracks,
+                totalGenres, totalLabels, totalYears, currentProvider
+            });
+
+            const summaryHTML = `
+                <div class="summary-card">
+                    <div class="number">${totalScrobbles.toLocaleString()}</div>
+                    <div class="label">Scrobbles</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalArtists}</div>
+                    <div class="label">Artistas</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalAlbums}</div>
+                    <div class="label">Álbumes</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalTracks}</div>
+                    <div class="label">Canciones</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalGenres}</div>
+                    <div class="label">Géneros</div>
+                </div>
+                <div class="summary-card">
+                    <div class="number">${totalLabels}</div>
+                    <div class="label">Sellos</div>
+                </div>
+            `;
+
+            document.getElementById('summaryStats').innerHTML = summaryHTML;
         }
 
-        function renderDiscoveriesCharts(userData) {
-            console.log('Renderizando gráficos de novedades...', userData);
-
-            // Ocultar loading
-            document.getElementById('discoveriesLoading').classList.remove('active');
-            document.getElementById('discoveriesGrid').style.display = 'grid';
-
-            // Destruir gráficos existentes
+        function renderGenresCharts(userStats) {
+            // Destruir charts existentes
             Object.values(charts).forEach(chart => {
-                if (chart && typeof chart.destroy === 'function') {
-                    chart.destroy();
-                }
+                if (chart) chart.destroy();
             });
+            charts = {};
 
-            // Renderizar cada tipo de gráfico
-            const discoveryTypes = ['artists', 'albums', 'tracks', 'labels'];
+            if (!genresData || !genresData[currentProvider]) {
+                // Mostrar mensaje de no datos
+                document.getElementById('genresPieChart').style.display = 'none';
+                document.getElementById('genresPieInfo').innerHTML = '<div class="no-data">No hay datos disponibles para ' + currentProvider + '</div>';
+                document.getElementById('albumGenresPieChart').style.display = 'none';
+                document.getElementById('albumGenresPieInfo').innerHTML = '<div class="no-data">No hay datos disponibles para ' + currentProvider + '</div>';
+                document.getElementById('genresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
+                document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
+                return;
+            }
 
-            discoveryTypes.forEach(type => {
-                const canvasId = `discoveries${type.charAt(0).toUpperCase() + type.slice(1)}Chart`;
-                const typeData = userData.discoveries[type];
+            const providerData = genresData[currentProvider];
 
-                if (typeData) {
-                    renderDiscoveryChart(canvasId, typeData, type);
-                } else {
-                    showNoDataForChart(canvasId);
-                }
-            });
+            // 1. Gráfico circular con top 15 géneros de artistas
+            renderGenresPieChart(providerData.pie_chart, 'genresPieChart', 'genresPieInfo', 'Artistas');
+
+            // 2. 6 gráficos de scatter para top 6 géneros de artistas
+            renderGenresScatterCharts(providerData.scatter_charts, providerData.years, 'genresScatterGrid', false);
+
+            // 3. Gráfico circular con top 15 géneros de álbumes
+            if (providerData.album_pie_chart) {
+                renderGenresPieChart(providerData.album_pie_chart, 'albumGenresPieChart', 'albumGenresPieInfo', 'Álbumes');
+            } else {
+                document.getElementById('albumGenresPieChart').style.display = 'none';
+                document.getElementById('albumGenresPieInfo').innerHTML = '<div class="no-data">No hay datos de géneros de álbumes para ' + currentProvider + '</div>';
+            }
+
+            // 4. 6 gráficos de scatter para top 6 géneros de álbumes
+            if (providerData.album_scatter_charts) {
+                renderGenresScatterCharts(providerData.album_scatter_charts, providerData.years, 'albumGenresScatterGrid', true);
+            } else {
+                document.getElementById('albumGenresScatterGrid').innerHTML = '<div class="no-data">No hay datos de scatter de álbumes disponibles</div>';
+            }
         }
 
-        function renderDiscoveryChart(canvasId, typeData, typeName) {
-            const canvas = document.getElementById(canvasId);
-
-            if (!canvas) {
-                console.error(`Canvas ${canvasId} no encontrado`);
-                return;
-            }
-
-            // Preparar datos para el gráfico
-            const years = [];
-            const counts = [];
-            const details = {};
-
-            // Ordenar años y extraer conteos
-            const sortedYears = Object.keys(typeData).sort((a, b) => parseInt(a) - parseInt(b));
-
-            sortedYears.forEach(year => {
-                if (!isNaN(year)) {
-                    years.push(parseInt(year));
-                    counts.push(typeData[year].count || 0);
-                    details[year] = typeData[year].items || [];
-                }
+        function renderLabelsCharts(userStats) {
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
             });
+            charts = {};
 
-            if (years.length === 0) {
-                showNoDataForChart(canvasId);
+            const labelsData = userStats.labels;
+            if (!labelsData) {
+                console.log('No hay datos de sellos disponibles');
                 return;
             }
+
+            // 1. Gráfico circular con top 15 sellos
+            renderGenresPieChart(labelsData.pie_chart, 'labelsPieChart', 'labelsPieInfo', 'Sellos');
+
+            // 2. 6 gráficos de scatter para top 6 sellos
+            renderLabelsScatterCharts(labelsData.scatter_charts, labelsData.years, 'labelsScatterGrid');
+        }
+
+        function renderGenresPieChart(pieData, canvasId, infoId, type) {
+            const canvas = document.getElementById(canvasId);
+            const info = document.getElementById(infoId);
+
+            if (!canvas || !info) {
+                console.error(`No se encontró el canvas o info para ${canvasId}`);
+                return;
+            }
+
+            if (!pieData || !pieData.data || Object.keys(pieData.data).length === 0) {
+                canvas.style.display = 'none';
+                info.innerHTML = '<div class="no-data">No hay datos disponibles</div>';
+                return;
+            }
+
+            canvas.style.display = 'block';
+            const provider = type === 'Sellos' ? 'Sellos Discográficos' : `${currentProvider} (${type})`;
+            info.innerHTML = `Total: ${pieData.total.toLocaleString()} scrobbles | Tipo: ${provider}`;
+
+            const data = {
+                labels: Object.keys(pieData.data),
+                datasets: [{
+                    data: Object.values(pieData.data),
+                    backgroundColor: colors.slice(0, Object.keys(pieData.data).length),
+                    borderColor: '#181825',
+                    borderWidth: 2
+                }]
+            };
 
             const config = {
-                type: 'line',
-                data: {
-                    labels: years,
-                    datasets: [{
-                        label: `Nuevos ${typeName}`,
-                        data: counts,
-                        borderColor: '#cba6f7',
-                        backgroundColor: '#cba6f7' + '30',
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 6,
-                        pointHoverRadius: 10,
-                        pointBackgroundColor: '#cba6f7',
-                        pointBorderColor: '#1e1e2e',
-                        pointBorderWidth: 2
-                    }]
-                },
+                type: 'pie',
+                data: data,
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -283358,7 +284280,919 @@
                             labels: {
                                 color: '#cdd6f4',
                                 padding: 15,
-                                font: { size: 12 }
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }
+                    }
+                }
+            };
+
+            charts[canvasId] = new Chart(canvas, config);
+        }
+
+        // ✅ FIX: Función corregida para scatter charts de géneros
+        function renderGenresScatterCharts(scatterData, years, containerId, isAlbums = false) {
+            const container = document.getElementById(containerId);
+            if (!container) {
+                console.error(`No se encontró el contenedor ${containerId}`);
+                return;
+            }
+
+            container.innerHTML = '';
+
+            if (!scatterData || Object.keys(scatterData).length === 0) {
+                container.innerHTML = '<div class="no-data">No hay datos de scatter disponibles</div>';
+                return;
+            }
+
+            Object.keys(scatterData).forEach((genre, index) => {
+                const items = scatterData[genre];
+
+                if (!items || items.length === 0) return;
+
+                // Crear contenedor para este género
+                const genreContainer = document.createElement('div');
+                genreContainer.className = 'genres-pie-container';
+
+                const title = document.createElement('h4');
+                const itemType = isAlbums ? 'Álbumes' : 'Artistas';
+                title.textContent = `${genre} - Top ${items.length} ${itemType}`;
+                title.style.color = '#cba6f7';
+                title.style.textAlign = 'center';
+                title.style.marginBottom = '15px';
+                genreContainer.appendChild(title);
+
+                const canvasWrapper = document.createElement('div');
+                canvasWrapper.className = 'chart-wrapper';
+                canvasWrapper.style.height = '300px';
+
+                const canvas = document.createElement('canvas');
+                const canvasId = `scatterChart_${genre.replace(/[^a-zA-Z0-9]/g, '_')}_${index}_${containerId}`;
+                canvas.id = canvasId;
+                canvasWrapper.appendChild(canvas);
+
+                genreContainer.appendChild(canvasWrapper);
+                container.appendChild(genreContainer);
+
+                // Crear dataset para scatter plot
+                const datasets = [];
+
+                items.forEach((itemData, itemIndex) => {
+                    const points = [];
+
+                    years.forEach(year => {
+                        const plays = itemData.yearly_data[year] || 0;
+                        if (plays > 0) {
+                            points.push({
+                                x: year,
+                                y: plays,
+                                itemName: isAlbums ? itemData.album : itemData.artist
+                            });
+                        }
+                    });
+
+                    if (points.length > 0) {
+                        datasets.push({
+                            label: isAlbums ? itemData.album : itemData.artist,
+                            data: points,
+                            backgroundColor: colors[itemIndex % colors.length],
+                            borderColor: colors[itemIndex % colors.length],
+                            pointRadius: 6,
+                            pointHoverRadius: 10,
+                            showLine: false
+                        });
+                    }
+                });
+
+                if (datasets.length === 0) {
+                    canvas.parentElement.innerHTML = '<div class="no-data">No hay datos temporales para este género</div>';
+                    return;
+                }
+
+                const config = {
+                    type: 'scatter',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                position: 'bottom',
+                                title: {
+                                    display: true,
+                                    text: 'Año',
+                                    color: '#a6adc8'
+                                },
+                                ticks: {
+                                    color: '#a6adc8',
+                                    stepSize: 1
+                                },
+                                grid: {
+                                    color: '#313244'
+                                },
+                                min: Math.min(...years) - 0.8,
+                                max: Math.max(...years) + 0.8
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Scrobbles',
+                                    color: '#a6adc8'
+                                },
+                                ticks: {
+                                    color: '#a6adc8'
+                                },
+                                grid: {
+                                    color: '#313244'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom',
+                                labels: {
+                                    color: '#cdd6f4',
+                                    padding: 12,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    font: {
+                                        size: 11
+                                    },
+                                    boxHeight: 10,
+                                    boxWidth: 10,
+                                    maxWidth: 100,
+                                    textAlign: 'left'
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: '#1e1e2e',
+                                titleColor: '#cba6f7',
+                                bodyColor: '#cdd6f4',
+                                borderColor: '#cba6f7',
+                                borderWidth: 1,
+                                callbacks: {
+                                    title: function(context) {
+                                        const point = context[0].raw;
+                                        return point.itemName;
+                                    },
+                                    label: function(context) {
+                                        const point = context.raw;
+                                        return `${point.x}: ${point.y} scrobbles`;
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            mode: 'point'
+                        },
+                        onClick: function(event, elements) {
+                            if (elements.length > 0) {
+                                const element = elements[0];
+                                const point = this.data.datasets[element.datasetIndex].data[element.index];
+                                const itemType = isAlbums ? 'Álbum' : 'Artista';
+                                showArtistPopup(point.itemName, genre, currentProvider, point.x, point.y, itemType);
+                            }
+                        }
+                    }
+                };
+
+                charts[canvasId] = new Chart(canvas, config);
+            });
+        }
+
+        // ✅ FIX: Función corregida para scatter charts de sellos
+        function renderLabelsScatterCharts(scatterData, years, containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) {
+                console.error(`No se encontró el contenedor ${containerId}`);
+                return;
+            }
+
+            container.innerHTML = '';
+
+            if (!scatterData || Object.keys(scatterData).length === 0) {
+                container.innerHTML = '<div class="no-data">No hay datos de sellos disponibles</div>';
+                return;
+            }
+
+            Object.keys(scatterData).forEach((label, index) => {
+                const artists = scatterData[label];
+
+                if (!artists || artists.length === 0) return;
+
+                // Crear contenedor para este sello
+                const labelContainer = document.createElement('div');
+                labelContainer.className = 'genres-pie-container';
+
+                const title = document.createElement('h4');
+                title.textContent = `${label} - Top ${artists.length} Artistas`;
+                title.style.color = '#cba6f7';
+                title.style.textAlign = 'center';
+                title.style.marginBottom = '15px';
+                labelContainer.appendChild(title);
+
+                const canvasWrapper = document.createElement('div');
+                canvasWrapper.className = 'chart-wrapper';
+                canvasWrapper.style.height = '300px';
+
+                const canvas = document.createElement('canvas');
+                const canvasId = `labelScatterChart_${label.replace(/[^a-zA-Z0-9]/g, '_')}_${index}`;
+                canvas.id = canvasId;
+                canvasWrapper.appendChild(canvas);
+
+                labelContainer.appendChild(canvasWrapper);
+                container.appendChild(labelContainer);
+
+                // Crear dataset para scatter plot
+                const datasets = [];
+
+                artists.forEach((artistData, artistIndex) => {
+                    const points = [];
+
+                    years.forEach(year => {
+                        const plays = artistData.yearly_data[year] || 0;
+                        if (plays > 0) {
+                            points.push({
+                                x: year,
+                                y: plays,
+                                artistName: artistData.artist
+                            });
+                        }
+                    });
+
+                    if (points.length > 0) {
+                        datasets.push({
+                            label: artistData.artist,
+                            data: points,
+                            backgroundColor: colors[artistIndex % colors.length],
+                            borderColor: colors[artistIndex % colors.length],
+                            pointRadius: 6,
+                            pointHoverRadius: 10,
+                            showLine: false
+                        });
+                    }
+                });
+
+                if (datasets.length === 0) {
+                    canvas.parentElement.innerHTML = '<div class="no-data">No hay datos temporales para este sello</div>';
+                    return;
+                }
+
+                const config = {
+                    type: 'scatter',
+                    data: { datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: {
+                                type: 'linear',
+                                position: 'bottom',
+                                title: {
+                                    display: true,
+                                    text: 'Año',
+                                    color: '#a6adc8'
+                                },
+                                ticks: {
+                                    color: '#a6adc8',
+                                    stepSize: 1
+                                },
+                                grid: {
+                                    color: '#313244'
+                                },
+                                min: Math.min(...years) - 0.8,
+                                max: Math.max(...years) + 0.8
+                            },
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Scrobbles',
+                                    color: '#a6adc8'
+                                },
+                                ticks: {
+                                    color: '#a6adc8'
+                                },
+                                grid: {
+                                    color: '#313244'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom',
+                                labels: {
+                                    color: '#cdd6f4',
+                                    padding: 12,
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    font: {
+                                        size: 11
+                                    },
+                                    boxHeight: 10,
+                                    boxWidth: 10,
+                                    maxWidth: 100,
+                                    textAlign: 'left'
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: '#1e1e2e',
+                                titleColor: '#cba6f7',
+                                bodyColor: '#cdd6f4',
+                                borderColor: '#cba6f7',
+                                borderWidth: 1,
+                                callbacks: {
+                                    title: function(context) {
+                                        const point = context[0].raw;
+                                        return point.artistName;
+                                    },
+                                    label: function(context) {
+                                        const point = context.raw;
+                                        return `${point.x}: ${point.y} scrobbles`;
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            mode: 'point'
+                        },
+                        onClick: function(event, elements) {
+                            if (elements.length > 0) {
+                                const element = elements[0];
+                                const point = this.data.datasets[element.datasetIndex].data[element.index];
+                                showArtistPopup(point.artistName, label, 'Sello', point.x, point.y, 'Artista');
+                            }
+                        }
+                    }
+                };
+
+                charts[canvasId] = new Chart(canvas, config);
+            });
+        }
+
+        function renderIndividualCharts(userStats) {
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+
+            try {
+                // Gráfico de scrobbles por año
+                // if (userStats.yearly_scrobbles) {
+                //     renderYearlyChart(userStats.yearly_scrobbles);
+                // }
+
+                // Top artistas, álbumes y canciones (pie charts)
+                renderTopChart(userStats.top_artists, 'topArtistsChart', 'topArtistsInfo', '👥 Top Artistas');
+                renderTopChart(userStats.top_albums, 'topAlbumsChart', 'topAlbumsInfo', '💿 Top Álbumes');
+                renderTopChart(userStats.top_tracks, 'topTracksChart', 'topTracksInfo', '🎶 Top Canciones');
+
+                // ✅ FIX: Gráficos de evolución individual
+                if (userStats.individual) {
+                    const individualData = currentDataType === 'annual' ? userStats.individual.annual : userStats.individual.cumulative;
+
+                    if (individualData) {
+                        console.log('Renderizando gráficos individuales con datos:', Object.keys(individualData));
+
+                        // Solo renderizar si existen los datos
+                        if (individualData.genres) renderIndividualLineChart('individualGenresChart', individualData.genres, 'Géneros');
+                        if (individualData.labels) renderIndividualLineChart('individualLabelsChart', individualData.labels, 'Sellos');
+                        if (individualData.artists) renderIndividualLineChart('individualArtistsChart', individualData.artists, 'Artistas');
+                        if (individualData.one_hit_wonders) renderIndividualLineChart('individualOneHitChart', individualData.one_hit_wonders, 'One Hit Wonders');
+                        if (individualData.streak_artists) renderIndividualLineChart('individualStreakChart', individualData.streak_artists, 'Artistas con Mayor Streak');
+                        if (individualData.track_count_artists) renderIndividualLineChart('individualTrackCountChart', individualData.track_count_artists, 'Artistas con Mayor Discografía');
+                        if (individualData.new_artists) renderIndividualLineChart('individualNewArtistsChart', individualData.new_artists, 'Artistas Nuevos');
+                        if (individualData.rising_artists) renderIndividualLineChart('individualRisingChart', individualData.rising_artists, 'Artistas en Ascenso');
+                        if (individualData.falling_artists) renderIndividualLineChart('individualFallingChart', individualData.falling_artists, 'Artistas en Declive');
+                    } else {
+                        console.warn('No hay datos individuales para el tipo:', currentDataType);
+                    }
+                } else {
+                    console.warn('No hay datos individuales en userStats');
+                }
+            } catch (error) {
+                console.error('Error renderizando gráficos individuales:', error);
+            }
+        }
+
+        function renderYearlyChart(yearlyData) {
+            const canvas = document.getElementById('yearlyChart');
+            const info = document.getElementById('yearlyInfo');
+
+            if (!canvas) {
+                console.error('Canvas yearlyChart no encontrado');
+                return;
+            }
+            if (!info) {
+                console.error('Info yearlyInfo no encontrado');
+                return;
+            }
+
+            const years = Object.keys(yearlyData).sort();
+            const scrobbles = years.map(year => yearlyData[year]);
+            const totalScrobbles = scrobbles.reduce((a, b) => a + b, 0);
+
+            info.innerHTML = `Total: ${totalScrobbles.toLocaleString()} scrobbles | Años: ${years.length}`;
+
+            const data = {
+                labels: years,
+                datasets: [{
+                    label: 'Scrobbles',
+                    data: scrobbles,
+                    backgroundColor: colors[0],
+                    borderColor: colors[0],
+                    borderWidth: 2,
+                    fill: false
+                }]
+            };
+
+            const config = {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Año',
+                                color: '#cdd6f4'
+                            },
+                            grid: {
+                                color: '#313244'
+                            },
+                            ticks: {
+                                color: '#cdd6f4'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Scrobbles',
+                                color: '#cdd6f4'
+                            },
+                            grid: {
+                                color: '#313244'
+                            },
+                            ticks: {
+                                color: '#cdd6f4'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#cdd6f4'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }
+                    }
+                }
+            };
+
+            charts['yearlyChart'] = new Chart(canvas, config);
+        }
+
+        function renderTopChart(topData, canvasId, infoId, title) {
+            const canvas = document.getElementById(canvasId);
+            const info = document.getElementById(infoId);
+
+            if (!canvas) {
+                console.error(`Canvas ${canvasId} no encontrado`);
+                return;
+            }
+            if (!info) {
+                console.error(`Info ${infoId} no encontrado`);
+                return;
+            }
+
+            if (!topData || Object.keys(topData).length === 0) {
+                canvas.style.display = 'none';
+                info.innerHTML = '<div class="no-data">No hay datos disponibles</div>';
+                return;
+            }
+
+            canvas.style.display = 'block';
+
+            const entries = Object.entries(topData)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15);
+
+            const totalPlays = Object.values(topData).reduce((a, b) => a + b, 0);
+            info.innerHTML = `Total: ${totalPlays.toLocaleString()} reproducciones | Elementos: ${Object.keys(topData).length}`;
+
+            const data = {
+                labels: entries.map(([name, _]) => name),
+                datasets: [{
+                    data: entries.map(([_, count]) => count),
+                    backgroundColor: colors.slice(0, entries.length),
+                    borderColor: '#181825',
+                    borderWidth: 2
+                }]
+            };
+
+            const config = {
+                type: 'pie',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#cdd6f4',
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }
+                    }
+                }
+            };
+
+            charts[canvasId] = new Chart(canvas, config);
+        }
+
+        function renderCoincidenceCharts(userStats) {
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+
+            // Gráficos básicos
+            renderPieChart('artistsChart', userStats.coincidences.charts.artists, 'artistsInfo');
+            renderPieChart('albumsChart', userStats.coincidences.charts.albums, 'albumsInfo');
+            renderPieChart('tracksChart', userStats.coincidences.charts.tracks, 'tracksInfo');
+            renderPieChart('genresChart', userStats.coincidences.charts.genres, 'genresInfo');
+
+            // Nuevos gráficos de coincidencias
+            renderPieChart('genreCoincidencesChart', userStats.coincidences.charts.genre_coincidences, 'genreCoincidencesInfo');
+            renderPieChart('labelsChart', userStats.coincidences.charts.labels, 'labelsInfo');
+            renderPieChart('releaseYearsChart', userStats.coincidences.charts.release_years, 'releaseYearsInfo');
+        }
+
+        function renderPieChart(canvasId, chartData, infoId) {
+            const canvas = document.getElementById(canvasId);
+            const info = document.getElementById(infoId);
+
+            if (!canvas || !info) {
+                console.error(`No se encontró canvas o info para ${canvasId}`);
+                return;
+            }
+
+            if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {
+                canvas.style.display = 'none';
+                info.innerHTML = '<div class="no-data">No hay datos disponibles</div>';
+                return;
+            }
+
+            canvas.style.display = 'block';
+
+            const entries = Object.entries(chartData.data)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 15);
+
+            info.innerHTML = `Total: ${chartData.total.toLocaleString()} elementos compartidos | Usuarios: ${Object.keys(chartData.data).length}`;
+
+            const data = {
+                labels: entries.map(([user, _]) => user),
+                datasets: [{
+                    data: entries.map(([_, count]) => count),
+                    backgroundColor: colors.slice(0, entries.length),
+                    borderColor: '#181825',
+                    borderWidth: 2
+                }]
+            };
+
+            const config = {
+                type: 'pie',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#cdd6f4',
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }
+                    }
+                }
+            };
+
+            charts[canvasId] = new Chart(canvas, config);
+        }
+
+        // ✅ FIX: Función corregida para gráficos de evolución
+        function renderEvolutionCharts(userStats) {
+            // Destruir charts existentes
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+
+            // Ahora todos son de coincidencias
+            renderCoincidencesEvolution('genres', userStats.evolution.genres);
+            renderCoincidencesEvolution('labels', userStats.evolution.labels);
+            renderCoincidencesEvolution('release_years', userStats.evolution.release_years);
+            renderCoincidencesEvolution('artists', userStats.evolution.coincidences);
+            renderCoincidencesEvolution('albums', userStats.evolution.coincidences);
+            renderCoincidencesEvolution('tracks', userStats.evolution.coincidences);
+        }
+
+        // ✅ FIX: Función corregida para evolución de coincidencias
+        function renderCoincidencesEvolution(type, evolutionData) {
+            let canvas, chartId;
+
+            if (type === 'genres') {
+                canvas = document.getElementById('genresEvolutionChart');
+                chartId = 'genresEvolutionChart';
+            } else if (type === 'labels') {
+                canvas = document.getElementById('labelsEvolutionChart');
+                chartId = 'labelsEvolutionChart';
+            } else if (type === 'release_years') {
+                canvas = document.getElementById('releaseYearsEvolutionChart');
+                chartId = 'releaseYearsEvolutionChart';
+            } else {
+                canvas = document.getElementById(type + 'EvolutionChart');
+                chartId = type + 'EvolutionChart';
+            }
+
+            if (!canvas) {
+                console.error(`Canvas no encontrado para ${chartId}`);
+                return;
+            }
+
+            if (!evolutionData || !evolutionData.data) {
+                console.log(`No hay datos de evolución para ${type}`);
+                return;
+            }
+
+            let typeData, detailsData;
+            if (['artists', 'albums', 'tracks'].includes(type)) {
+                typeData = evolutionData.data[type];
+                detailsData = evolutionData.details[type];
+            } else {
+                typeData = evolutionData.data;
+                detailsData = evolutionData.details;
+            }
+
+            if (!typeData) {
+                console.log(`No hay datos de tipo para ${type}`);
+                return;
+            }
+
+            const datasets = [];
+            let colorIndex = 0;
+
+            Object.keys(typeData).forEach(user => {
+                datasets.push({
+                    label: user,
+                    data: evolutionData.years.map(year => typeData[user][year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false
+                });
+                colorIndex++;
+            });
+
+            const config = {
+                type: 'line',
+                data: {
+                    labels: evolutionData.years,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#cdd6f4',
+                                padding: 10,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#a6adc8'
+                            },
+                            grid: {
+                                color: '#313244'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#a6adc8'
+                            },
+                            grid: {
+                                color: '#313244'
+                            }
+                        }
+                    },
+                    onClick: function(event, elements) {
+                        if (elements.length > 0) {
+                            const datasetIndex = elements[0].datasetIndex;
+                            const pointIndex = elements[0].index;
+                            const user = this.data.datasets[datasetIndex].label;
+                            const year = this.data.labels[pointIndex];
+                            const coincidences = this.data.datasets[datasetIndex].data[pointIndex];
+
+                            if (coincidences > 0 && detailsData && detailsData[user] && detailsData[user][year]) {
+                                const typeLabel = type === 'artists' ? 'Artistas' :
+                                               type === 'albums' ? 'Álbumes' :
+                                               type === 'tracks' ? 'Canciones' :
+                                               type === 'genres' ? 'Géneros' :
+                                               type === 'labels' ? 'Sellos' :
+                                               type === 'release_years' ? 'Décadas' : type;
+
+                                const limit = ['artists', 'albums', 'tracks'].includes(type) ? 10 : 5;
+                                const limitedDetails = detailsData[user][year].slice(0, limit);
+                                showLinearPopup(`Top ${limit} ${typeLabel} - ${user} (${year})`, limitedDetails);
+                            }
+                        }
+                    }
+                }
+            };
+
+            charts[chartId] = new Chart(canvas, config);
+        }
+
+        // ✅ FIX: Función para popup de artistas
+        function showArtistPopup(itemName, category, provider, year, scrobbles, itemType = 'Artista') {
+            const title = `${itemName} - ${category} (${year})`;
+            const content = `
+                <div class="popup-item">
+                    <span class="name">${itemType}: ${itemName}</span>
+                </div>
+                <div class="popup-item">
+                    <span class="name">${provider === 'Sello' ? 'Sello' : 'Género'}: ${category}</span>
+                </div>
+                <div class="popup-item">
+                    <span class="name">Año: ${year}</span>
+                    <span class="count">${scrobbles} scrobbles</span>
+                </div>
+                <div class="popup-item">
+                    <span class="name">Proveedor: ${provider}</span>
+                </div>
+            `;
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }
+
+        // ✅ FIX: Función para popup lineal
+        function showLinearPopup(title, details) {
+            if (!details || details.length === 0) return;
+
+            let content = '';
+            details.slice(0, 10).forEach(item => {
+                if (item.artist) {
+                    content += `<div class="popup-item">
+                        <div style="margin-bottom: 5px;">
+                            <span class="name" style="font-weight: bold;">${item.artist}</span>
+                        </div>`;
+
+                    if (item.track) {
+                        content += `<div style="margin-left: 10px; color: #a6adc8;">
+                            🎵 ${item.track}
+                        </div>`;
+                    }
+
+                    if (item.album) {
+                        content += `<div style="margin-left: 10px; color: #a6adc8;">
+                            💿 ${item.album}
+                        </div>`;
+                    }
+
+                    if (item.user1_plays && item.user2_plays) {
+                        content += `<div style="margin-left: 10px; font-size: 0.9em; color: #6c7086;">
+                            Usuario 1: ${item.user1_plays} plays | Usuario 2: ${item.user2_plays} plays
+                        </div>`;
+                    }
+
+                    content += `</div>`;
+                } else {
+                    content += `<div class="popup-item">
+                        <span class="name">${item.name}</span>
+                        <span class="count">${item.plays} plays</span>
+                    </div>`;
+                }
+            });
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
+        }
+
+        // ✅ FIX: Función para gráficos de líneas individuales
+        function renderIndividualLineChart(canvasId, chartData, title) {
+            const canvas = document.getElementById(canvasId);
+
+            if (!canvas) {
+                console.warn(`Canvas ${canvasId} no encontrado para ${title}`);
+                return;
+            }
+
+            if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {
+                console.log(`No hay datos para ${title} en ${canvasId}`);
+                return;
+            }
+
+            const datasets = [];
+            let colorIndex = 0;
+
+            // Obtener top 15 elementos con más datos
+            const sortedItems = Object.entries(chartData.data)
+                .sort((a, b) => {
+                    const aTotal = Object.values(a[1]).reduce((sum, val) => sum + val, 0);
+                    const bTotal = Object.values(b[1]).reduce((sum, val) => sum + val, 0);
+                    return bTotal - aTotal;
+                })
+                .slice(0, 15);
+
+            sortedItems.forEach(([item, yearlyData]) => {
+                datasets.push({
+                    label: item,
+                    data: chartData.years.map(year => yearlyData[year] || 0),
+                    borderColor: colors[colorIndex % colors.length],
+                    backgroundColor: colors[colorIndex % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false,
+                    pointRadius: 3,
+                    pointHoverRadius: 6
+                });
+                colorIndex++;
+            });
+
+            const config = {
+                type: 'line',
+                data: {
+                    labels: chartData.years,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                color: '#cdd6f4',
+                                padding: 10,
+                                usePointStyle: true,
+                                font: {
+                                    size: 10
+                                }
                             }
                         },
                         tooltip: {
@@ -283376,31 +285210,24 @@
                                 text: 'Año',
                                 color: '#cdd6f4'
                             },
-                            ticks: { color: '#a6adc8' },
-                            grid: { color: '#313244' }
+                            ticks: {
+                                color: '#a6adc8'
+                            },
+                            grid: {
+                                color: '#313244'
+                            }
                         },
                         y: {
                             title: {
                                 display: true,
-                                text: 'Número de Novedades',
+                                text: currentDataType === 'annual' ? 'Scrobbles/Año' : 'Scrobbles Acumulados',
                                 color: '#cdd6f4'
                             },
                             ticks: {
-                                color: '#a6adc8',
-                                precision: 0
+                                color: '#a6adc8'
                             },
-                            grid: { color: '#313244' },
-                            beginAtZero: true
-                        }
-                    },
-                    onClick: function(event, elements) {
-                        if (elements.length > 0) {
-                            const pointIndex = elements[0].index;
-                            const year = this.data.labels[pointIndex];
-                            const count = this.data.datasets[0].data[pointIndex];
-
-                            if (count > 0 && details[year]) {
-                                showDiscoveryDetails(year, details[year], typeName, count);
+                            grid: {
+                                color: '#313244'
                             }
                         }
                     }
@@ -283410,62 +285237,171 @@
             charts[canvasId] = new Chart(canvas, config);
         }
 
-        function showDiscoveryDetails(year, items, typeName, count) {
-            const title = `${typeName.toUpperCase()} - ${year} (${count} nuevos)`;
+        // 🆕 Funciones para manejo de novedades
+        async function loadDiscoveriesData(username) {
+            console.log(`Cargando datos de novedades para ${username}...`);
 
-            let content = '<div style="max-height: 300px; overflow-y: auto;">';
-            items.slice(0, 30).forEach(item => {
-                content += `<div style="padding: 8px; margin: 4px 0; background: #313244; border-radius: 6px; display: flex; justify-content: space-between;">
-                    <span style="color: #cdd6f4; font-weight: 600;">${item.name}</span>
-                    <span style="color: #a6adc8; font-size: 0.9em;">${item.date}</span>
+            const loadingElement = document.getElementById('discoveriesLoading');
+            const gridElement = document.getElementById('discoveriesGrid');
+
+            if (loadingElement) loadingElement.style.display = 'block';
+            if (gridElement) gridElement.style.display = 'none';
+
+            try {
+                if (discoveriesData[username]) {
+                    renderDiscoveriesCharts(discoveriesData[username]);
+                    return;
+                }
+
+                const currentYear = new Date().getFullYear();
+                const fromYear = currentYear - yearsBackConfig;
+                const period = `${fromYear}-${currentYear}`;
+                const dataUrl = `data/usuarios/${period}/${username}.json`;
+
+                const response = await fetch(dataUrl);
+                if (!response.ok) throw new Error(`Error HTTP: ${response.status}`);
+
+                const userData = await response.json();
+                discoveriesData[username] = userData;
+                renderDiscoveriesCharts(userData);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showDiscoveriesError(error.message);
+            }
+        }
+
+        function renderDiscoveriesCharts(userData) {
+            const loadingElement = document.getElementById('discoveriesLoading');
+            const gridElement = document.getElementById('discoveriesGrid');
+
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (gridElement) gridElement.style.display = 'grid';
+
+            const discoveryTypes = [
+                {type: 'artists', canvasId: 'discoveriesArtistsChart', title: 'Nuevos Artistas'},
+                {type: 'albums', canvasId: 'discoveriesAlbumsChart', title: 'Nuevos Álbumes'},
+                {type: 'tracks', canvasId: 'discoveriesTracksChart', title: 'Nuevas Canciones'},
+                {type: 'labels', canvasId: 'discoveriesLabelsChart', title: 'Nuevos Sellos'}
+            ];
+
+            discoveryTypes.forEach(config => {
+                const typeData = userData.discoveries[config.type];
+                if (typeData) {
+                    renderDiscoveryChart(config.canvasId, typeData, config.title);
+                } else {
+                    showNoDataForChart(config.canvasId);
+                }
+            });
+        }
+
+        function renderDiscoveryChart(canvasId, typeData, title) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const years = [];
+            const counts = [];
+            const details = {};
+
+            Object.keys(typeData).sort((a, b) => parseInt(a) - parseInt(b)).forEach(year => {
+                if (!isNaN(year)) {
+                    const yearInt = parseInt(year);
+                    years.push(yearInt);
+                    counts.push(typeData[year].count || 0);
+                    details[yearInt] = typeData[year].items || [];
+                }
+            });
+
+            if (years.length === 0) {
+                showNoDataForChart(canvasId);
+                return;
+            }
+
+            const config = {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: title,
+                        data: counts,
+                        borderColor: '#cba6f7',
+                        backgroundColor: '#cba6f7' + '30',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 6,
+                        pointHoverRadius: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {position: 'bottom', labels: {color: '#cdd6f4'}},
+                        tooltip: {backgroundColor: '#1e1e2e', titleColor: '#cba6f7', bodyColor: '#cdd6f4'}
+                    },
+                    scales: {
+                        x: {title: {display: true, text: 'Año', color: '#cdd6f4'}, ticks: {color: '#a6adc8'}},
+                        y: {title: {display: true, text: 'Novedades', color: '#cdd6f4'}, ticks: {color: '#a6adc8'}, beginAtZero: true}
+                    },
+                    onClick: function(event, elements) {
+                        if (elements.length > 0) {
+                            const pointIndex = elements[0].index;
+                            const year = this.data.labels[pointIndex];
+                            const count = this.data.datasets[0].data[pointIndex];
+
+                            if (count > 0 && details[year]) {
+                                showDiscoveryPopup(year, details[year], title, count);
+                            }
+                        }
+                    }
+                }
+            };
+
+            if (charts[canvasId]) charts[canvasId].destroy();
+            charts[canvasId] = new Chart(canvas, config);
+        }
+
+        function showDiscoveryPopup(year, items, title, count) {
+            const popupTitle = `${title} - ${year} (${count} nuevos)`;
+            let content = '';
+
+            items.forEach(item => {
+                content += `<div class="popup-item">
+                    <span class="name">${item.name}</span>
+                    <span class="count">${item.date}</span>
                 </div>`;
             });
 
-            if (count > 30) {
+            if (count > items.length) {
                 content += `<div style="text-align: center; padding: 10px; color: #a6adc8; font-style: italic;">
-                    ... y ${count - 30} más
+                    ... y ${count - items.length} más
                 </div>`;
             }
-            content += '</div>';
 
-            // Mostrar en un alert simple por ahora (se puede mejorar con modal)
-            alert(`${title}\n\nPrimeros elementos mostrados en consola.`);
-            console.log(title, items);
+            document.getElementById('popupTitle').textContent = popupTitle;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
         }
 
         function showDiscoveriesError(errorMessage) {
-            document.getElementById('discoveriesLoading').classList.remove('active');
-            document.getElementById('discoveriesGrid').innerHTML = `
-                <div class="no-data">
-                    <div>
-                        <p>❌ Error cargando datos de novedades</p>
-                        <p style="font-size: 0.9em; margin-top: 10px;">${errorMessage}</p>
-                        <p style="font-size: 0.8em; margin-top: 10px; color: #6c7086;">
-                            Ejecuta: python generate_discoveries_data.py
-                        </p>
-                    </div>
-                </div>
-            `;
+            const gridElement = document.getElementById('discoveriesGrid');
+            if (gridElement) {
+                gridElement.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">
+                    <p>❌ Error: ${errorMessage}</p>
+                    <p style="font-size: 0.8em; color: #6c7086;">Ejecuta: python create_first_listen_tables.py</p>
+                </div>`;
+                gridElement.style.display = 'grid';
+            }
         }
 
         function showNoDataForChart(canvasId) {
             const canvas = document.getElementById(canvasId);
             if (canvas) {
                 canvas.style.display = 'none';
-                canvas.parentElement.innerHTML = '<div class="no-data">Sin datos de novedades</div>';
+                canvas.parentElement.innerHTML = '<div class="no-data">Sin datos</div>';
             }
         }
-
-        // Función simple para seleccionar usuario (para pruebas)
-        function selectUserFromList() {
-            const user = prompt(`Selecciona usuario (${allUsers.join(', ')}):`, allUsers[0]);
-            if (user && allUsers.includes(user)) {
-                selectUser(user);
-            }
-        }
-
-        // Event listener para botón de usuario
-        document.getElementById('userButton').addEventListener('click', selectUserFromList);
 
     </script>
 </body>

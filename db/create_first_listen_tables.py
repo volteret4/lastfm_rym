@@ -2,6 +2,7 @@
 """
 Script para precalcular las fechas de primera escucha de usuarios
 Crea tablas con las fechas en que cada usuario escucha por primera vez cada elemento
+MODIFICADO: Solo acepta artistas con MBID válido en artist_details
 """
 
 import os
@@ -19,9 +20,9 @@ except ImportError:
 
 
 def create_first_listen_tables(db_path='db/lastfm_cache.db'):
-    """Crea las tablas de primeras escuchas y las llena con datos"""
+    """Crea las tablas de primeras escuchas y las llena con datos (solo artistas con MBID)"""
 
-    print("🔄 Creando tablas de primeras escuchas...")
+    print("📄 Creando tablas de primeras escuchas (solo artistas con MBID)...")
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -78,14 +79,49 @@ def create_first_listen_tables(db_path='db/lastfm_cache.db'):
     cursor.execute('DELETE FROM user_first_label_listen')
     conn.commit()
 
+    # Verificar que la tabla artist_details existe y obtener artistas válidos
+    print("🔍 Obteniendo artistas con MBID válido...")
+    try:
+        cursor.execute('''
+            SELECT COUNT(*) FROM artist_details
+            WHERE mbid IS NOT NULL AND mbid != ""
+        ''')
+        valid_artists_count = cursor.fetchone()[0]
+        print(f"   Encontrados {valid_artists_count:,} artistas con MBID válido")
+
+        if valid_artists_count == 0:
+            print("⚠️  No hay artistas con MBID válido en artist_details")
+            print("   Continuando con todos los artistas...")
+            use_mbid_filter = False
+        else:
+            use_mbid_filter = True
+
+    except sqlite3.OperationalError:
+        print("⚠️  Tabla artist_details no encontrada")
+        print("   Continuando con todos los artistas...")
+        use_mbid_filter = False
+
     print("📊 Calculando primeras escuchas por usuario...")
 
-    # Obtener todos los scrobbles ordenados por timestamp
-    cursor.execute('''
-        SELECT user, artist, track, album, timestamp
-        FROM scrobbles
-        ORDER BY user, timestamp ASC
-    ''')
+    # Query modificada para incluir solo artistas con MBID
+    if use_mbid_filter:
+        print("   ✅ Aplicando filtro de MBID...")
+        scrobbles_query = '''
+            SELECT s.user, s.artist, s.track, s.album, s.timestamp
+            FROM scrobbles s
+            INNER JOIN artist_details ad ON s.artist = ad.artist
+            WHERE ad.mbid IS NOT NULL AND ad.mbid != ""
+            ORDER BY s.user, s.timestamp ASC
+        '''
+    else:
+        print("   ⚠️  Sin filtro de MBID...")
+        scrobbles_query = '''
+            SELECT user, artist, track, album, timestamp
+            FROM scrobbles
+            ORDER BY user, timestamp ASC
+        '''
+
+    cursor.execute(scrobbles_query)
 
     # Diccionarios para trackear las primeras escuchas
     first_artists = defaultdict(dict)      # user -> artist -> first_timestamp
@@ -93,15 +129,23 @@ def create_first_listen_tables(db_path='db/lastfm_cache.db'):
     first_tracks = defaultdict(dict)       # user -> (artist,track) -> first_timestamp
     first_labels = defaultdict(dict)       # user -> label -> first_timestamp
 
-    print("🔄 Procesando scrobbles...")
+    print("📄 Procesando scrobbles...")
 
     processed_count = 0
+    filtered_count = 0
+
     for row in cursor.fetchall():
         user, artist, track, album, timestamp = row
         processed_count += 1
 
+        # Solo contamos los que pasan el filtro
+        filtered_count += 1
+
         if processed_count % 100000 == 0:
-            print(f"   Procesados {processed_count:,} scrobbles...")
+            if use_mbid_filter:
+                print(f"   Procesados {processed_count:,} scrobbles (con MBID: {filtered_count:,})")
+            else:
+                print(f"   Procesados {processed_count:,} scrobbles")
 
         # Primera escucha de artista
         if artist not in first_artists[user]:
@@ -118,7 +162,10 @@ def create_first_listen_tables(db_path='db/lastfm_cache.db'):
             if album_key not in first_albums[user]:
                 first_albums[user][album_key] = timestamp
 
-    print(f"✅ Procesados {processed_count:,} scrobbles")
+    if use_mbid_filter:
+        print(f"✅ Procesados {processed_count:,} scrobbles (filtrados: {filtered_count:,} con MBID)")
+    else:
+        print(f"✅ Procesados {processed_count:,} scrobbles")
 
     # Insertar datos de artistas
     print("💾 Guardando primeras escuchas de artistas...")
@@ -156,15 +203,24 @@ def create_first_listen_tables(db_path='db/lastfm_cache.db'):
         VALUES (?, ?, ?, ?)
     ''', album_data)
 
-    # Calcular primeras escuchas de sellos
+    # Calcular primeras escuchas de sellos (también filtrado por MBID)
     print("💾 Calculando primeras escuchas de sellos...")
 
-    # Obtener datos de sellos de álbumes
-    cursor.execute('''
-        SELECT DISTINCT artist, album, label
-        FROM album_labels
-        WHERE label IS NOT NULL AND label != ""
-    ''')
+    # Query modificada para obtener solo sellos de artistas con MBID
+    if use_mbid_filter:
+        cursor.execute('''
+            SELECT DISTINCT al.artist, al.album, al.label
+            FROM album_labels al
+            INNER JOIN artist_details ad ON al.artist = ad.artist
+            WHERE al.label IS NOT NULL AND al.label != ""
+            AND ad.mbid IS NOT NULL AND ad.mbid != ""
+        ''')
+    else:
+        cursor.execute('''
+            SELECT DISTINCT artist, album, label
+            FROM album_labels
+            WHERE label IS NOT NULL AND label != ""
+        ''')
 
     album_labels = {}
     for artist, album, label in cursor.fetchall():
@@ -231,13 +287,44 @@ def create_first_listen_tables(db_path='db/lastfm_cache.db'):
     cursor.execute('SELECT COUNT(*) FROM user_first_label_listen')
     label_count = cursor.fetchone()[0]
 
-    conn.close()
+    # Mostrar estadísticas de filtrado
+    if use_mbid_filter:
+        cursor.execute('SELECT COUNT(DISTINCT user) FROM user_first_artist_listen')
+        users_count = cursor.fetchone()[0]
 
-    print(f"\n📊 Estadísticas finales:")
-    print(f"   - Primeras escuchas de artistas: {artist_count:,}")
-    print(f"   - Primeras escuchas de álbumes: {album_count:,}")
-    print(f"   - Primeras escuchas de canciones: {track_count:,}")
-    print(f"   - Primeras escuchas de sellos: {label_count:,}")
+        print(f"\n📊 Estadísticas finales (solo artistas con MBID):")
+        print(f"   - Usuarios procesados: {users_count}")
+        print(f"   - Primeras escuchas de artistas: {artist_count:,}")
+        print(f"   - Primeras escuchas de álbumes: {album_count:,}")
+        print(f"   - Primeras escuchas de canciones: {track_count:,}")
+        print(f"   - Primeras escuchas de sellos: {label_count:,}")
+
+        # Mostrar comparación con datos sin filtrar
+        cursor.execute('SELECT COUNT(DISTINCT artist) FROM scrobbles')
+        total_artists_in_scrobbles = cursor.fetchone()[0]
+
+        cursor.execute('''
+            SELECT COUNT(DISTINCT s.artist)
+            FROM scrobbles s
+            INNER JOIN artist_details ad ON s.artist = ad.artist
+            WHERE ad.mbid IS NOT NULL AND ad.mbid != ""
+        ''')
+        filtered_artists_in_scrobbles = cursor.fetchone()[0]
+
+        print(f"\n🔍 Comparación de filtrado:")
+        print(f"   - Total artistas únicos en scrobbles: {total_artists_in_scrobbles:,}")
+        print(f"   - Artistas con MBID válido: {filtered_artists_in_scrobbles:,}")
+        print(f"   - Filtrados: {total_artists_in_scrobbles - filtered_artists_in_scrobbles:,}")
+        print(f"   - % retenido: {(filtered_artists_in_scrobbles/total_artists_in_scrobbles)*100:.1f}%")
+
+    else:
+        print(f"\n📊 Estadísticas finales (todos los artistas):")
+        print(f"   - Primeras escuchas de artistas: {artist_count:,}")
+        print(f"   - Primeras escuchas de álbumes: {album_count:,}")
+        print(f"   - Primeras escuchas de canciones: {track_count:,}")
+        print(f"   - Primeras escuchas de sellos: {label_count:,}")
+
+    conn.close()
 
 
 def main():

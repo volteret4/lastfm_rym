@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Script para generar archivos JSON de novedades por usuario
-Crea docs/data/usuarios/{periodo}/usuario.json para cada usuario
+Script simplificado para generar archivos JSON de novedades por usuario
+Compatible con el sistema de directorios tools/users/ - Solo top 10 por año
 """
 
 import os
@@ -20,12 +20,15 @@ except ImportError:
 
 
 class DiscoveriesDataGenerator:
-    """Generador de archivos JSON con datos de novedades por usuario"""
+    """Generador simplificado de archivos JSON con datos de novedades por usuario"""
 
     def __init__(self, db_path='db/lastfm_cache.db'):
         self.db_path = db_path
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
+        try:
+            self.conn = sqlite3.connect(db_path)
+            self.conn.row_factory = sqlite3.Row
+        except sqlite3.Error as e:
+            raise Exception(f"No se pudo conectar a la base de datos: {e}")
 
     def get_user_discoveries_by_year(self, user: str, from_year: int, to_year: int,
                                    discovery_type: str = 'artists') -> dict:
@@ -123,8 +126,7 @@ class DiscoveriesDataGenerator:
                 user, from_year, to_year, discovery_type
             )
 
-            # Guardar solo los primeros 50 elementos por año para el JSON
-            # (el resto se puede cargar dinámicamente si se necesita)
+            # Guardar solo los primeros 10 elementos por año para popup
             limited_discoveries = {}
             yearly_counts = {}
 
@@ -133,11 +135,11 @@ class DiscoveriesDataGenerator:
                 count = len(year_data)
                 yearly_counts[year] = count
 
-                # Limitar a 50 elementos por año
+                # Limitar a 10 elementos por año para popup
                 limited_discoveries[year] = {
                     'count': count,
-                    'items': year_data[:50],  # Solo primeros 50
-                    'has_more': count > 50
+                    'items': year_data[:10],  # Solo primeros 10 para popup
+                    'has_more': count > 10
                 }
 
                 stats['yearly_totals'][year][discovery_type] = count
@@ -236,15 +238,15 @@ class DiscoveriesDataGenerator:
             'files': [f"{user}.json" for user in users],
             'structure': {
                 'discoveries': {
-                    'artists': 'Nuevos artistas por año',
-                    'albums': 'Nuevos álbumes por año',
-                    'tracks': 'Nuevas canciones por año',
-                    'labels': 'Nuevos sellos por año'
+                    'artists': 'Nuevos artistas por año (top 10)',
+                    'albums': 'Nuevos álbumes por año (top 10)',
+                    'tracks': 'Nuevas canciones por año (top 10)',
+                    'labels': 'Nuevos sellos por año (top 10)'
                 },
                 'yearly_format': {
                     'count': 'Número total de novedades',
-                    'items': 'Lista de elementos (máximo 50)',
-                    'has_more': 'True si hay más elementos'
+                    'items': 'Lista de elementos (máximo 10 para popup)',
+                    'has_more': 'True si hay más de 10'
                 }
             }
         }
@@ -258,13 +260,13 @@ class DiscoveriesDataGenerator:
 
     def close(self):
         """Cerrar conexión"""
-        self.conn.close()
+        if hasattr(self, 'conn'):
+            self.conn.close()
 
 
 def main():
-    """Función principal"""
+    """Función principal independiente"""
     try:
-        # Obtener usuarios de variables de entorno
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
         if not users:
             print("❌ Variable LASTFM_USERS no configurada")
@@ -280,20 +282,13 @@ def main():
         if output_dir:
             print(f"\n🎉 Archivos JSON generados correctamente!")
             print(f"📁 Directorio: {output_dir}")
-            print(f"📊 Archivos por usuario: [usuario].json")
+            print(f"📊 Archivos por usuario: [usuario].json (top 10 por año)")
             print(f"📋 Índice: _index.json")
-
-            print(f"\n💡 Para usar en el HTML:")
-            print(f"   - Los archivos JSON son mucho más pequeños")
-            print(f"   - Se cargan dinámicamente cuando el usuario selecciona un gráfico")
-            print(f"   - Mejor rendimiento y tamaño de archivo")
 
         generator.close()
 
     except Exception as e:
         print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
         sys.exit(1)
 
 

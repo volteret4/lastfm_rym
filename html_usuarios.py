@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Last.fm User Stats Generator - Versión FINAL con conteos únicos correctos + NOVEDADES
+Last.fm User Stats Generator - Versión FINAL con conteos únicos correctos + NOVEDADES CORREGIDA
 Genera estadísticas individuales de usuarios usando clases extendidas + pestaña de novedades integrada
 """
 
@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from typing import List, Dict, Tuple, Optional
 import argparse
 from pathlib import Path
+import re
 
 try:
     from dotenv import load_dotenv
@@ -25,8 +26,14 @@ except ImportError:
 from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database_extended import UserStatsDatabaseExtended
 from tools.users.user_stats_html_generator import UserStatsHTMLGeneratorFixed
-from tools.users.user_stats_discoveries import DiscoveriesDataGenerator
 
+# Importar generador de datos de novedades
+try:
+    sys.path.append(os.path.dirname(__file__))
+    from generate_discoveries_data import DiscoveriesDataGenerator
+except ImportError:
+    print("⚠️  Generador de datos de novedades no encontrado. La funcionalidad de novedades no estará disponible.")
+    DiscoveriesDataGenerator = None
 
 
 def generate_discoveries_data(users: List[str], years_back: int, output_dir: str) -> bool:
@@ -43,7 +50,7 @@ def generate_discoveries_data(users: List[str], years_back: int, output_dir: str
         # Verificar que las tablas de primeras escuchas existan
         if not generator._check_tables():
             print("⚠️  Tablas de primeras escuchas no encontradas.")
-            print("💡 Ejecuta: python create_first_listen_tables.py")
+            print("💡 Ejecuta: python create_first_listen_tables_mbid.py")
             generator.close()
             return False
 
@@ -81,20 +88,39 @@ def generate_discoveries_data(users: List[str], years_back: int, output_dir: str
 
 
 def modify_html_for_discoveries(html_content: str, users: List[str], years_back: int) -> str:
-    """Modifica el HTML generado para agregar la funcionalidad de novedades"""
+    """Modifica el HTML generado para agregar la funcionalidad de novedades - VERSIÓN CORREGIDA"""
 
-    # 1. Agregar pestaña de novedades en nav-tabs
-    discoveries_tab = '                <div class="nav-tab" data-view="discoveries">✨ Novedades</div>'
+    print("🔧 Modificando HTML para agregar funcionalidad de novedades...")
 
-    # Buscar donde está la pestaña de evolución y agregar después
-    evolution_tab = 'data-view="evolution">📈 Evolución</div>'
-    if evolution_tab in html_content:
-        html_content = html_content.replace(
-            evolution_tab,
-            evolution_tab + '\n' + discoveries_tab
-        )
+    # 1. Verificar que el HTML base tenga la estructura esperada
+    if 'nav-tabs' not in html_content:
+        print("⚠️  Estructura nav-tabs no encontrada en HTML")
+        return html_content
 
-    # 2. Agregar el contenido del tab de discoveries
+    # 2. Agregar pestaña de novedades en nav-tabs de forma más robusta
+    # Buscar el patrón específico de la pestaña evolution
+    evolution_patterns = [
+        r'(<div class="nav-tab" data-view="evolution">.*?</div>)',
+        r'(<div class="nav-tab" data-view="evolution">[^<]*📈[^<]*</div>)',
+        r'(data-view="evolution">[^<]*</div>)'
+    ]
+
+    tab_added = False
+    for pattern in evolution_patterns:
+        matches = re.findall(pattern, html_content, re.DOTALL)
+        if matches:
+            evolution_tab = matches[0]
+            discoveries_tab = '                <div class="nav-tab" data-view="discoveries">✨ Novedades</div>'
+            html_content = html_content.replace(evolution_tab, evolution_tab + '\n' + discoveries_tab)
+            print("  ✅ Pestaña Novedades agregada")
+            tab_added = True
+            break
+
+    if not tab_added:
+        print("  ⚠️  No se pudo agregar la pestaña Novedades")
+        return html_content
+
+    # 3. Agregar el contenido del tab de discoveries de forma más robusta
     discoveries_content = f'''
             <div id="discoveriesTab" class="tab-content">
                 <div class="evolution-section">
@@ -134,31 +160,74 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
                         </div>
                     </div>
                 </div>
-            </div>'''
+            </div>
 
-    # Buscar donde termina evolutionTab y agregar después
-    evolution_end = '            </div>\n\n        </div>'
-    if evolution_end in html_content:
-        html_content = html_content.replace(evolution_end, evolution_end + discoveries_content + '\n\n')
+        '''
 
-    # 3. Agregar variables JavaScript necesarias
-    js_vars = f'''
+    # Buscar diferentes patrones posibles donde insertar el contenido
+    insertion_patterns = [
+        # Patrón más específico primero
+        r'(</div>\s*</div>\s*</div>\s*</div>\s*<!-- Popup para mostrar detalles -->)',
+        # Patrones más generales como fallback
+        r'(</div>\s*</div>\s*</div>\s*<!-- Popup para mostrar detalles -->)',
+        r'(</div>\s*<!-- Popup para mostrar detalles -->)',
+        r'(<!-- Popup para mostrar detalles -->)',
+        # Si no encuentra popup, buscar antes del cierre del contenedor principal
+        r'(</div>\s*</div>\s*<script>)',
+        r'(</div>\s*<script>)'
+    ]
+
+    content_inserted = False
+    for pattern in insertion_patterns:
+        matches = re.findall(pattern, html_content, re.DOTALL)
+        if matches:
+            before_insertion = matches[0]
+            html_content = html_content.replace(before_insertion, discoveries_content + '\n        ' + before_insertion)
+            print("  ✅ Contenido del tab Novedades agregado")
+            content_inserted = True
+            break
+
+    if not content_inserted:
+        print("  ⚠️  No se pudo insertar el contenido del tab")
+        return html_content
+
+    # 4. Agregar variables JavaScript necesarias de forma más robusta
+    js_vars_patterns = [
+        r'(let genresData = null;[^\n]*)',
+        r'(let charts = \{\}[^;]*;)',
+        r'(// Variables globales[^\n]*)'
+    ]
+
+    vars_added = False
+    for pattern in js_vars_patterns:
+        matches = re.findall(pattern, html_content)
+        if matches:
+            original_line = matches[0]
+            new_vars = f'''{original_line}
         let discoveriesData = {{}}; // Cache para datos de novedades
-        const yearsBackConfig = {years_back}; // Configuración de años
-'''
+        const yearsBackConfig = {years_back}; // Configuración de años'''
+            html_content = html_content.replace(original_line, new_vars)
+            print("  ✅ Variables JavaScript agregadas")
+            vars_added = True
+            break
 
-    # Buscar donde están las variables JavaScript y agregar
-    existing_vars = 'let genresData = null;'
-    if existing_vars in html_content:
-        html_content = html_content.replace(existing_vars, existing_vars + '\n        ' + js_vars)
+    if not vars_added:
+        print("  ⚠️  No se pudieron agregar las variables JavaScript")
 
-    # 4. Modificar setupNavigation para manejar discoveries
-    original_setup = '''                    // Re-render para la nueva vista
-                    if (currentUser) {
-                        selectUser(currentUser);
-                    }'''
+    # 5. Modificar setupNavigation para manejar discoveries de forma más robusta
+    setup_patterns = [
+        r'(// Re-render para la nueva vista\s*if \(currentUser\) \{\{\s*selectUser\(currentUser\);\s*\}\})',
+        r'(if \(currentUser\) \{\{\s*selectUser\(currentUser\);\s*\}\})',
+        r'(selectUser\(currentUser\);)'
+    ]
 
-    new_setup = '''                    // Re-render para la nueva vista
+    setup_modified = False
+    for pattern in setup_patterns:
+        matches = re.findall(pattern, html_content, re.DOTALL)
+        if matches:
+            original_setup = matches[0]
+
+            new_setup = '''// Re-render para la nueva vista
                     if (currentUser) {
                         if (view === 'discoveries') {
                             loadDiscoveriesData(currentUser);
@@ -167,10 +236,15 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
                         }
                     }'''
 
-    if original_setup in html_content:
-        html_content = html_content.replace(original_setup, new_setup)
+            html_content = html_content.replace(original_setup, new_setup)
+            print("  ✅ setupNavigation modificado")
+            setup_modified = True
+            break
 
-    # 5. Agregar funciones JavaScript para novedades
+    if not setup_modified:
+        print("  ⚠️  No se pudo modificar setupNavigation")
+
+    # 6. Agregar funciones JavaScript para novedades antes del cierre del script
     discoveries_js = f'''
         // 🆕 Funciones para manejo de novedades
         async function loadDiscoveriesData(username) {{
@@ -184,6 +258,7 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
 
             try {{
                 if (discoveriesData[username]) {{
+                    console.log('Usando datos del cache');
                     renderDiscoveriesCharts(discoveriesData[username]);
                     return;
                 }}
@@ -193,20 +268,26 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
                 const period = `${{fromYear}}-${{currentYear}}`;
                 const dataUrl = `data/usuarios/${{period}}/${{username}}.json`;
 
+                console.log(`Cargando desde: ${{dataUrl}}`);
+
                 const response = await fetch(dataUrl);
-                if (!response.ok) throw new Error(`Error HTTP: ${{response.status}}`);
+                if (!response.ok) throw new Error(`Error HTTP: ${{response.status}} - ${{dataUrl}}`);
 
                 const userData = await response.json();
+                console.log('Datos cargados:', userData);
+
                 discoveriesData[username] = userData;
                 renderDiscoveriesCharts(userData);
 
             }} catch (error) {{
-                console.error('Error:', error);
+                console.error('Error cargando novedades:', error);
                 showDiscoveriesError(error.message);
             }}
         }}
 
         function renderDiscoveriesCharts(userData) {{
+            console.log('Renderizando gráficos de novedades...');
+
             const loadingElement = document.getElementById('discoveriesLoading');
             const gridElement = document.getElementById('discoveriesGrid');
 
@@ -222,9 +303,11 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
 
             discoveryTypes.forEach(config => {{
                 const typeData = userData.discoveries[config.type];
-                if (typeData) {{
+                if (typeData && Object.keys(typeData).length > 0) {{
+                    console.log(`Renderizando ${{config.type}}:`, typeData);
                     renderDiscoveryChart(config.canvasId, typeData, config.title);
                 }} else {{
+                    console.log(`Sin datos para ${{config.type}}`);
                     showNoDataForChart(config.canvasId);
                 }}
             }});
@@ -232,25 +315,34 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
 
         function renderDiscoveryChart(canvasId, typeData, title) {{
             const canvas = document.getElementById(canvasId);
-            if (!canvas) return;
+            if (!canvas) {{
+                console.error(`Canvas ${{canvasId}} no encontrado`);
+                return;
+            }}
+
+            console.log(`Renderizando gráfico ${{canvasId}} con datos:`, typeData);
 
             const years = [];
             const counts = [];
             const details = {{}};
 
+            // Procesar datos por año
             Object.keys(typeData).sort((a, b) => parseInt(a) - parseInt(b)).forEach(year => {{
-                if (!isNaN(year)) {{
-                    const yearInt = parseInt(year);
+                const yearInt = parseInt(year);
+                if (!isNaN(yearInt) && typeData[year]) {{
                     years.push(yearInt);
                     counts.push(typeData[year].count || 0);
                     details[yearInt] = typeData[year].items || [];
                 }}
             }});
 
-            if (years.length === 0) {{
+            if (years.length === 0 || counts.every(c => c === 0)) {{
+                console.log(`Sin datos válidos para ${{canvasId}}`);
                 showNoDataForChart(canvasId);
                 return;
             }}
+
+            console.log(`Años: ${{years}}, Conteos: ${{counts}}`);
 
             const config = {{
                 type: 'line',
@@ -260,23 +352,44 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
                         label: title,
                         data: counts,
                         borderColor: '#cba6f7',
-                        backgroundColor: '#cba6f7' + '30',
+                        backgroundColor: '#cba6f730',
                         tension: 0.4,
                         fill: true,
                         pointRadius: 6,
-                        pointHoverRadius: 10
+                        pointHoverRadius: 10,
+                        pointBackgroundColor: '#cba6f7',
+                        pointBorderColor: '#1e1e2e',
+                        pointBorderWidth: 2
                     }}]
                 }},
                 options: {{
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {{
-                        legend: {{position: 'bottom', labels: {{color: '#cdd6f4'}}}},
-                        tooltip: {{backgroundColor: '#1e1e2e', titleColor: '#cba6f7', bodyColor: '#cdd6f4'}}
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{color: '#cdd6f4', padding: 15}}
+                        }},
+                        tooltip: {{
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }}
                     }},
                     scales: {{
-                        x: {{title: {{display: true, text: 'Año', color: '#cdd6f4'}}, ticks: {{color: '#a6adc8'}}}},
-                        y: {{title: {{display: true, text: 'Novedades', color: '#cdd6f4'}}, ticks: {{color: '#a6adc8'}}, beginAtZero: true}}
+                        x: {{
+                            title: {{display: true, text: 'Año', color: '#cdd6f4'}},
+                            ticks: {{color: '#a6adc8'}},
+                            grid: {{color: '#313244'}}
+                        }},
+                        y: {{
+                            title: {{display: true, text: 'Novedades', color: '#cdd6f4'}},
+                            ticks: {{color: '#a6adc8', precision: 0}},
+                            grid: {{color: '#313244'}},
+                            beginAtZero: true
+                        }}
                     }},
                     onClick: function(event, elements) {{
                         if (elements.length > 0) {{
@@ -284,7 +397,9 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
                             const year = this.data.labels[pointIndex];
                             const count = this.data.datasets[0].data[pointIndex];
 
-                            if (count > 0 && details[year]) {{
+                            console.log(`Click en año ${{year}}, count: ${{count}}`);
+
+                            if (count > 0 && details[year] && details[year].length > 0) {{
                                 showDiscoveryPopup(year, details[year], title, count);
                             }}
                         }}
@@ -292,11 +407,20 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
                 }}
             }};
 
-            if (charts[canvasId]) charts[canvasId].destroy();
+            // Destruir gráfico existente si existe
+            if (charts[canvasId]) {{
+                console.log(`Destruyendo gráfico existente ${{canvasId}}`);
+                charts[canvasId].destroy();
+                delete charts[canvasId];
+            }}
+
+            console.log(`Creando nuevo gráfico ${{canvasId}}`);
             charts[canvasId] = new Chart(canvas, config);
         }}
 
         function showDiscoveryPopup(year, items, title, count) {{
+            console.log(`Mostrando popup para ${{title}} - ${{year}}:`, items);
+
             const popupTitle = `${{title}} - ${{year}} (${{count}} nuevos)`;
             let content = '';
 
@@ -320,11 +444,21 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
         }}
 
         function showDiscoveriesError(errorMessage) {{
+            console.error('Error en novedades:', errorMessage);
+
+            const loadingElement = document.getElementById('discoveriesLoading');
             const gridElement = document.getElementById('discoveriesGrid');
+
+            if (loadingElement) loadingElement.style.display = 'none';
+
             if (gridElement) {{
-                gridElement.innerHTML = `<div class="no-data" style="grid-column: 1/-1;">
-                    <p>❌ Error: ${{errorMessage}}</p>
-                    <p style="font-size: 0.8em; color: #6c7086;">Ejecuta: python create_first_listen_tables.py</p>
+                gridElement.innerHTML = `<div class="no-data" style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                    <h4 style="color: #f38ba8; margin-bottom: 15px;">❌ Error cargando novedades</h4>
+                    <p style="color: #cdd6f4; margin-bottom: 10px;">No se pudieron cargar los datos de descubrimientos.</p>
+                    <p style="font-size: 0.9em; color: #a6adc8; margin-bottom: 10px;">${{errorMessage}}</p>
+                    <p style="font-size: 0.8em; color: #6c7086;">
+                        Ejecuta: <code style="background: #313244; padding: 2px 6px; border-radius: 4px;">python create_first_listen_tables_mbid.py</code>
+                    </p>
                 </div>`;
                 gridElement.style.display = 'grid';
             }}
@@ -334,16 +468,34 @@ def modify_html_for_discoveries(html_content: str, users: List[str], years_back:
             const canvas = document.getElementById(canvasId);
             if (canvas) {{
                 canvas.style.display = 'none';
-                canvas.parentElement.innerHTML = '<div class="no-data">Sin datos</div>';
+                const wrapper = canvas.parentElement;
+                wrapper.innerHTML = '<div class="no-data" style="height: 200px; display: flex; align-items: center; justify-content: center; color: #a6adc8; font-style: italic;">Sin datos de descubrimientos</div>';
             }}
         }}
 '''
 
-    # Agregar las funciones antes del cierre del script
-    script_end = '    </script>'
-    if script_end in html_content:
-        html_content = html_content.replace(script_end, discoveries_js + '\n' + script_end)
+    # Buscar el cierre del script de forma más robusta
+    script_end_patterns = [
+        r'(\s*</script>\s*</body>\s*</html>"""\s*$)',
+        r'(\s*</script>\s*</body>\s*</html>)',
+        r'(\s*</script>)',
+        r'(</body>\s*</html>""")'
+    ]
 
+    js_added = False
+    for pattern in script_end_patterns:
+        matches = re.findall(pattern, html_content, re.MULTILINE | re.DOTALL)
+        if matches:
+            script_end = matches[0]
+            html_content = html_content.replace(script_end, discoveries_js + '\n' + script_end)
+            print("  ✅ Funciones JavaScript de novedades agregadas")
+            js_added = True
+            break
+
+    if not js_added:
+        print("  ⚠️  No se pudieron agregar las funciones JavaScript")
+
+    print("🎉 Modificación del HTML completada")
     return html_content
 
 
@@ -428,8 +580,9 @@ def main():
         if discoveries_available:
             print(f"  • ✨ NUEVO: Pestaña de Novedades integrada con carga dinámica")
             print(f"  • ✨ NUEVO: Popups con top 10 descubrimientos por año")
+            print(f"  • ✨ NUEVO: Filtro MBID para artistas únicos válidos")
         else:
-            print(f"  • ⚠️  Novedades omitidas (usar --skip-discoveries=false y ejecutar create_first_listen_tables.py)")
+            print(f"  • ⚠️  Novedades omitidas (usar --skip-discoveries=false y ejecutar create_first_listen_tables_mbid.py)")
 
         # Mostrar resumen con conteos reales
         print(f"\n📈 Resumen con conteos únicos REALES:")
@@ -469,6 +622,7 @@ def main():
             print(f"  3. Ve a la pestaña '✨ Novedades'")
             print(f"  4. Los datos se cargarán automáticamente")
             print(f"  5. Haz click en puntos de los gráficos para ver detalles")
+            print(f"  6. Solo se consideran artistas con MBID válido")
 
     except Exception as e:
         print(f"❌ Error: {e}")

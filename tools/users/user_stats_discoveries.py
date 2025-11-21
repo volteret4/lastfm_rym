@@ -191,7 +191,7 @@ class DiscoveriesDataGenerator:
         # Verificar que las tablas existan
         if not self._check_tables():
             print("❌ Las tablas de primeras escuchas no existen.")
-            print("Ejecuta: python create_first_listen_tables.py")
+            print("Ejecuta: python create_first_listen_tables_mbid.py")
             return ""
 
         generated_files = []

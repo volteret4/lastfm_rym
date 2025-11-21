@@ -42,6 +42,12 @@ Estructura de la tabla: artist_details
 (6, 'disambiguation', 'TEXT', 0, None, 0)
 (7, 'similar_artists', 'TEXT', 0, None, 0)
 (8, 'last_updated', 'INTEGER', 1, None, 0)
+(9, 'bio', 'TEXT', 0, None, 0)
+(10, 'tags', 'TEXT', 0, None, 0)
+(11, 'listeners', 'TEXT', 0, None, 0)
+(12, 'playcount', 'TEXT', 0, None, 0)
+(13, 'url', 'TEXT', 0, None, 0)
+(14, 'image_url', 'TEXT', 0, None, 0)
 
 Estructura de la tabla: album_details
 (0, 'artist', 'TEXT', 1, None, 1)
@@ -118,3 +124,53 @@ Estructura de la tabla: listenbrainz_file_imports
 (4, 'file_mtime', 'INTEGER', 1, None, 0)
 (5, 'listens_imported', 'INTEGER', 1, None, 0)
 (6, 'created_at', 'INTEGER', 1, None, 0)
+
+Estructura de la tabla: import_errors
+(0, 'id', 'INTEGER', 0, None, 1)
+(1, 'file_path', 'TEXT', 1, None, 0)
+(2, 'line_number', 'INTEGER', 0, None, 0)
+(3, 'error_type', 'TEXT', 1, None, 0)
+(4, 'error_message', 'TEXT', 1, None, 0)
+(5, 'raw_data', 'TEXT', 0, None, 0)
+(6, 'created_at', 'INTEGER', 1, None, 0)
+
+Estructura de la tabla: sqlite_stat1
+(0, 'tbl', '', 0, None, 0)
+(1, 'idx', '', 0, None, 0)
+(2, 'stat', '', 0, None, 0)
+
+Estructura de la tabla: sqlite_stat4
+(0, 'tbl', '', 0, None, 0)
+(1, 'idx', '', 0, None, 0)
+(2, 'neq', '', 0, None, 0)
+(3, 'nlt', '', 0, None, 0)
+(4, 'ndlt', '', 0, None, 0)
+(5, 'sample', '', 0, None, 0)
+
+Estructura de la tabla: user_first_artist_listen
+(0, 'user', 'TEXT', 0, None, 1)
+(1, 'artist', 'TEXT', 0, None, 2)
+(2, 'first_timestamp', 'INTEGER', 0, None, 0)
+
+Estructura de la tabla: user_first_album_listen
+(0, 'user', 'TEXT', 0, None, 1)
+(1, 'artist', 'TEXT', 0, None, 2)
+(2, 'album', 'TEXT', 0, None, 3)
+(3, 'first_timestamp', 'INTEGER', 0, None, 0)
+
+Estructura de la tabla: user_first_track_listen
+(0, 'user', 'TEXT', 0, None, 1)
+(1, 'artist', 'TEXT', 0, None, 2)
+(2, 'track', 'TEXT', 0, None, 3)
+(3, 'first_timestamp', 'INTEGER', 0, None, 0)
+
+Estructura de la tabla: user_first_label_listen
+(0, 'user', 'TEXT', 0, None, 1)
+(1, 'label', 'TEXT', 0, None, 2)
+(2, 'first_timestamp', 'INTEGER', 0, None, 0)
+
+Estructura de la tabla: cache_responses
+(0, 'cache_key', 'TEXT', 0, None, 1)
+(1, 'response_data', 'TEXT', 1, None, 0)
+(2, 'created_at', 'INTEGER', 1, None, 0)
+(3, 'expires_at', 'INTEGER', 1, None, 0)

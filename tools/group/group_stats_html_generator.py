@@ -6,7 +6,7 @@ GroupStatsHTMLGenerator - Clase para generar HTML con gráficos interactivos de 
 import json
 from datetime import datetime
 from typing import Dict, List
-
+import os
 
 class GroupStatsHTMLGenerator:
     """Clase para generar HTML con gráficos interactivos de estadísticas grupales"""
@@ -38,6 +38,11 @@ class GroupStatsHTMLGenerator:
         user_icons = self._get_user_icons()
         user_icons_json = json.dumps(user_icons, ensure_ascii=False)
 
+        # Configuración de Umami Analytics
+        umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
+        umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
+
+
         # Si no se proporciona period_folder, calcularlo desde group_stats
         if period_folder is None:
             period_parts = group_stats.get('period', '').split('-')
@@ -57,6 +62,9 @@ class GroupStatsHTMLGenerator:
     <title>Last.fm Grupo - Estadísticas Grupales</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Umami Analytics -->
+    <script defer src="{umami_script_url}" data-website-id="{umami_website_id}"></script>
+
     <style>
         :root {{
             --page-padding: 16px;

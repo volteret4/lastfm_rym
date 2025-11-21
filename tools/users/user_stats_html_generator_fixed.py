@@ -22,11 +22,19 @@ class UserStatsHTMLGeneratorFixed:
             '#f5c2e7', '#f2cdcd', '#ddb6f2', '#ffc6ff', '#caffbf'
         ]
 
+
+
+
     def generate_html(self, all_user_stats: Dict, users: List[str], years_back: int) -> str:
         """Genera el HTML completo para estadísticas de usuarios"""
         users_json = json.dumps(users, ensure_ascii=False)
         stats_json = json.dumps(all_user_stats, indent=2, ensure_ascii=False)
         colors_json = json.dumps(self.colors, ensure_ascii=False)
+
+        # Configuración de Umami Analytics
+        umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
+        umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
+
 
         # ✅ FIX: Añadir soporte para iconos de usuario
         icons_env = os.getenv('LASTFM_USERS_ICONS', '')
@@ -46,6 +54,8 @@ class UserStatsHTMLGeneratorFixed:
     <title>Last.fm Usuarios - Estadísticas Individuales</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Umami Analytics -->
+    <script defer src="{umami_script_url}" data-website-id="{umami_website_id}"></script>
     <style>
         * {{
             margin: 0;

@@ -6,9 +6,11 @@ Módulo generador de HTML para estadísticas de Last.fm
 
 import json
 from typing import Dict, List
-
+import os
 
 class HTMLGenerator:
+
+
     @staticmethod
     def create_html(stats: Dict, users: List[str], period_type: str = "semanal") -> str:
         """
@@ -24,6 +26,10 @@ class HTMLGenerator:
         """
         users_json = json.dumps(users, ensure_ascii=False)
         stats_json = json.dumps(stats, indent=2, ensure_ascii=False)
+
+        # Configuración de Umami Analytics
+        umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
+        umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
 
         # Determinar qué categorías incluir
         categories = ['artists', 'tracks', 'albums', 'genres', 'labels', 'years']
@@ -57,6 +63,8 @@ class HTMLGenerator:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Stats - {stats.get('period_label', 'Estadísticas')}</title>
     <link rel="icon" type="image/png" href="images/music.png">
+    <!-- Umami Analytics -->
+    <script defer src="{umami_script_url}" data-website-id="{umami_website_id}"></script>
 
     <style>
         * {{

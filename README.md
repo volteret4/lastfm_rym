@@ -295,3 +295,19 @@ A tener en cuenta:
 - Coincidencia con otro usuario en artistas que no desaparecen \* 1.4
 
 * 0.05 si coincide en genero, + 0.1 si coincide en sello
+
+# USUARIOS
+
+No esta diferenciando bien los generos, salen identicos los 3 graficos. Debes mirar en la tabla "artists_genres_detailed" tiene la columna "artist" "source" (aqui se ve el proveedor de generos, siendo lastfm, musicbrainz y discogs) y "genre". Suelen aparecer varios generos por artista, por lo que se debe diferenciar entre ellos.
+
+Por debajo de estos graficos circulares para los generos de los artistas, otros tantos para los generos de los albumes. En la tabla "album_genres" existen las columnas "artist", "album", "source" y "genre". Suelen aparecer varios generos por album, por lo que se debe diferenciar entre ellos.
+
+Quiero crear otro apartado similar al de generos pero para SELLOS. Un grafico principal con el top 15 sellos escuchados por el usuario seleccionado y 6 para los TOP 6 sellos escuchados, con 15 top artistas que lo componen y variando el tamaño de la porcion por escuchas de dicho artista.
+
+Los graficos de puntos de los generos no muestran leyendas. ademas deberia dejar algo de margen, los puntos del primer y ultimo año aparecen por la mitad.
+
+EVOLUCION
+En los graficos lineales, el "Coincidencias en decadas por año" lo vamos a convertir a años de lanzamiento del album. tabla "album_release_dates" columnas "artist", "album", "release_year".
+
+UPDATE DATABASE.
+se añaden sellos de albumes para TODOS LOS PROVEEDORES??

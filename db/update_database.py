@@ -2,7 +2,7 @@
 """
 Last.fm Database Updater - Multithreaded with Proxy Support
 Actualiza la base de datos con múltiples APIs de forma paralela y eficiente usando proxies
-Mejoras: multihilo optimizado, soporte de proxies, rotación de tokens, mejor rate limiting
+VERSIÓN CORREGIDA: Sin límites artificiales en la descarga de scrobbles
 """
 
 import os
@@ -187,7 +187,7 @@ class ProxyManager:
             print("   PROXY_PASS=contraseña (para todos los proxies)")
             self.use_proxies = False
         else:
-            print(f"🔄 Cargados {len(self.proxies)} proxies para rotación:")
+            print(f"📄 Cargados {len(self.proxies)} proxies para rotación:")
             for i, proxy in enumerate(self.proxies, 1):
                 # Ocultar contraseña en el log
                 display_proxy = self._mask_proxy_auth(proxy)
@@ -252,7 +252,7 @@ class ProxyManager:
 
             if not available_proxies:
                 # Resetear proxies fallidos y reintentar
-                print("🔄 Reseteando proxies fallidos...")
+                print("📄 Reseteando proxies fallidos...")
                 self.failed_proxies.clear()
                 available_proxies = self.proxies
 
@@ -388,14 +388,15 @@ class LastFMClient(ApiClient):
         super().__init__("https://ws.audioscrobbler.com/2.0/", 0.2, proxy_manager, debug_mode)
         self.api_key = api_key
 
-    def get_user_scrobbles(self, username: str, limit: int = 200, from_timestamp: int = None, to_timestamp: int = None) -> Optional[Dict]:
+    def get_user_scrobbles(self, username: str, limit: int = 200, from_timestamp: int = None, to_timestamp: int = None, page: int = 1) -> Optional[Dict]:
         """Obtiene scrobbles de usuario con paginación mejorada"""
         params = {
             'method': 'user.getRecentTracks',
             'user': username,
             'api_key': self.api_key,
             'format': 'json',
-            'limit': limit
+            'limit': limit,
+            'page': page
         }
 
         if from_timestamp:
@@ -581,10 +582,6 @@ class DiscogsClient(ApiClient):
             return None
 
         return self.get(f"{self.base_url}releases/{release_id}")
-
-
-# El resto del archivo se mantiene similar al original pero con las mejoras de multihilo y proxies aplicadas...
-# Continuará en la siguiente parte para no exceder el límite
 
 
 class OptimizedDatabase:
@@ -788,13 +785,14 @@ class OptimizedDatabase:
             cursor = self.conn.cursor()
             cursor.execute('''
                 INSERT OR REPLACE INTO album_details
-                (artist, album, mbid, release_group_mbid, album_type, status, packaging,
+                (artist, album, mbid, release_group_mbid, release_date, type, status, packaging,
                  country, barcode, total_tracks, last_updated)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 artist, album,
                 details.get('mbid'),
                 details.get('release_group_mbid'),
+                details.get('release_date'),
                 details.get('type'),
                 details.get('status'),
                 details.get('packaging'),
@@ -809,15 +807,10 @@ class OptimizedDatabase:
                 VALUES (?, ?, ?, ?)
             ''', (
                 artist,
-
-
-
-
                 album,
                 details.get('release_date'),
                 int(time.time())
             ))
-
 
             self.pending_commits += 1
             if force_commit or self.pending_commits >= 20:
@@ -1028,6 +1021,17 @@ class OptimizedDatabase:
         result = cursor.fetchone()
         return result['album'] if result else None
 
+    def get_last_scrobble_timestamp(self, username: str) -> Optional[int]:
+        """Obtiene timestamp del último scrobble de un usuario"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+            SELECT MAX(timestamp) as last_timestamp
+            FROM scrobbles
+            WHERE user = ?
+        ''', (username,))
+        result = cursor.fetchone()
+        return result['last_timestamp'] if result else None
+
     def force_commit(self):
         """Fuerza commit de cambios pendientes"""
         with self.lock:
@@ -1080,7 +1084,7 @@ class MultithreadedLastFMUpdater:
 
         if self.debug_mode:
             print(f"🔧 DEBUG MODE ACTIVADO")
-            print(f"🔄 Proxies: {'✅ Habilitados' if use_proxies else '❌ Deshabilitados'}")
+            print(f"📄 Proxies: {'✅ Habilitados' if use_proxies else '❌ Deshabilitados'}")
             print(f"🧵 Workers: {max_workers}")
             print(f"👥 Usuarios: {len(self.users)}")
 
@@ -1245,7 +1249,8 @@ class MultithreadedLastFMUpdater:
                     'barcode': mb_data.get('barcode'),
                     'total_tracks': len(mb_data.get('media', [{}])[0].get('tracks', []))
                 })
-                # --- FECHAS SOLO A album_release_dates ---
+
+                # Fechas de lanzamiento
                 if mb_data.get('date'):
                     try:
                         release_year = int(mb_data['date'][:4])
@@ -1258,6 +1263,7 @@ class MultithreadedLastFMUpdater:
                         release_year,
                         mb_data.get('date')
                     )
+
                 # Labels
                 if 'label-info' in mb_data and mb_data['label-info']:
                     label = mb_data['label-info'][0]['label']['name']
@@ -1278,14 +1284,6 @@ class MultithreadedLastFMUpdater:
 
                 if mb_album_genres:
                     self.db.save_album_genres(artist, album, 'musicbrainz', mb_album_genres)
-
-                # Fecha de lanzamiento
-                if mb_data.get('date'):
-                    try:
-                        release_year = int(mb_data.get('date')[:4])
-                        self.db.save_album_release_date(artist, album, release_year, mb_data.get('date'))
-                    except (ValueError, TypeError):
-                        pass
 
             # 3. Discogs como fallback
             if not details.get('release_date') and discogs.token:
@@ -1448,8 +1446,11 @@ class MultithreadedLastFMUpdater:
             self.db.force_commit()
             print(f"   ✅ Tracks completados")
 
-    def update_user_scrobbles_enhanced(self, username: str, download_all: bool = False, backfill: bool = False):
-        """Actualiza scrobbles de usuario con mejoras"""
+    def update_user_scrobbles_complete(self, username: str, download_all: bool = False, backfill: bool = False):
+        """
+        Actualiza scrobbles de usuario sin límites artificiales.
+        CORREGIDO: Descarga TODOS los scrobbles nuevos sin limitaciones
+        """
         print(f"\n👤 Actualizando usuario: {username}")
 
         lastfm, _, _ = self._create_worker_clients()
@@ -1457,50 +1458,91 @@ class MultithreadedLastFMUpdater:
         # Determinar timestamp de inicio
         from_timestamp = None
         if not download_all:
-            cursor = self.db.conn.cursor()
-            cursor.execute('''
-                SELECT MAX(timestamp) as last_timestamp FROM scrobbles WHERE user = ?
-            ''', (username,))
-            result = cursor.fetchone()
-
-            if result['last_timestamp']:
+            last_timestamp = self.db.get_last_scrobble_timestamp(username)
+            if last_timestamp:
                 if backfill:
+                    # Para backfill, empezar desde antes del primer scrobble
+                    cursor = self.db.conn.cursor()
                     cursor.execute('''
                         SELECT MIN(timestamp) as first_timestamp FROM scrobbles WHERE user = ?
                     ''', (username,))
                     first_result = cursor.fetchone()
                     from_timestamp = first_result['first_timestamp'] - 86400 if first_result['first_timestamp'] else None
+                    print(f"   📅 Backfill desde: {datetime.fromtimestamp(from_timestamp) if from_timestamp else 'origen'}")
                 else:
-                    from_timestamp = result['last_timestamp'] + 1
+                    # Para actualización normal, empezar DESPUÉS del último scrobble
+                    from_timestamp = last_timestamp + 1
+                    print(f"   📅 Último scrobble: {datetime.fromtimestamp(last_timestamp)}")
+                    print(f"   📅 Buscando desde: {datetime.fromtimestamp(from_timestamp)}")
+            else:
+                print(f"   📅 Primera sincronización completa para {username}")
+
+        # Obtener información inicial para calcular páginas totales
+        initial_data = lastfm.get_user_scrobbles(username, limit=1, from_timestamp=from_timestamp, page=1)
+
+        if not initial_data or 'recenttracks' not in initial_data:
+            print(f"   ❌ No se pudo obtener información de {username}")
+            return
+
+        # Calcular total de páginas basado en el límite máximo de Last.fm
+        tracks_attr = initial_data['recenttracks'].get('@attr', {})
+        total_tracks = int(tracks_attr.get('total', 0))
+
+        if total_tracks == 0:
+            print(f"   ✅ No hay nuevos scrobbles para {username}")
+            return
+
+        # Last.fm permite máximo 200 tracks por página
+        tracks_per_page = 200
+        total_pages = (total_tracks + tracks_per_page - 1) // tracks_per_page
+
+        print(f"   📊 Total scrobbles nuevos: {total_tracks}")
+        print(f"   📄 Páginas a procesar: {total_pages}")
 
         page = 1
-        total_pages = 1
         new_scrobbles = 0
+        processed_pages = 0
+        consecutive_empty_pages = 0
+        max_empty_pages = 5  # Límite de páginas vacías antes de parar
 
+        # ELIMINAR EL LÍMITE ARTIFICIAL DE PÁGINAS - procesar TODAS las páginas
         while page <= total_pages:
             if self.debug_mode:
-                print(f"   📄 Página {page}/{total_pages}")
+                print(f"   📄 Procesando página {page}/{total_pages}")
 
             data = lastfm.get_user_scrobbles(
                 username,
-                limit=200,
-                from_timestamp=from_timestamp
+                limit=tracks_per_page,
+                from_timestamp=from_timestamp,
+                page=page
             )
 
             if not data or 'recenttracks' not in data:
-                break
+                print(f"   ⚠️ Error obteniendo página {page}, continuando...")
+                consecutive_empty_pages += 1
+                if consecutive_empty_pages >= max_empty_pages:
+                    print(f"   ⚠️ Muchas páginas vacías consecutivas, finalizando")
+                    break
+                page += 1
+                continue
 
             tracks_data = data['recenttracks']
-            total_pages = int(tracks_data['@attr'].get('totalPages', 1))
 
             if 'track' not in tracks_data:
-                break
+                consecutive_empty_pages += 1
+                if consecutive_empty_pages >= max_empty_pages:
+                    print(f"   ✅ No más tracks disponibles")
+                    break
+                page += 1
+                continue
+            else:
+                consecutive_empty_pages = 0  # Reset contador
 
             tracks = tracks_data['track']
             if not isinstance(tracks, list):
                 tracks = [tracks]
 
-            batch_scrobbles = []
+            page_scrobbles = []
             for track in tracks:
                 # Saltar tracks que están "now playing"
                 if '@attr' in track and 'nowplaying' in track['@attr']:
@@ -1511,6 +1553,11 @@ class MultithreadedLastFMUpdater:
 
                 timestamp = int(track['date']['uts'])
 
+                # Para actualizaciones incrementales, verificar que no tengamos ya este scrobble
+                if not download_all and not backfill and from_timestamp:
+                    if timestamp <= from_timestamp - 1:  # Ya tenemos este scrobble
+                        continue
+
                 scrobble = ScrobbleData(
                     user=username,
                     artist=track.get('artist', {}).get('#text', '') if isinstance(track.get('artist'), dict) else track.get('artist', ''),
@@ -1519,38 +1566,51 @@ class MultithreadedLastFMUpdater:
                     timestamp=timestamp
                 )
 
-                batch_scrobbles.append(scrobble)
+                page_scrobbles.append(scrobble)
 
-            if batch_scrobbles:
-                self.db.save_scrobbles_batch(batch_scrobbles)
-                new_scrobbles += len(batch_scrobbles)
-                self._update_stats('scrobbles_added', len(batch_scrobbles))
+            if page_scrobbles:
+                self.db.save_scrobbles_batch(page_scrobbles)
+                new_scrobbles += len(page_scrobbles)
+                self._update_stats('scrobbles_added', len(page_scrobbles))
+
+                if self.debug_mode:
+                    print(f"   ➕ Página {page}: {len(page_scrobbles)} scrobbles")
+
+            processed_pages += 1
+
+            # Commit periódico para evitar acumulación excesiva en memoria
+            if processed_pages % 10 == 0:
+                self.db.force_commit()
+                print(f"   💾 Commit intermedio - {new_scrobbles} scrobbles hasta ahora")
 
             page += 1
 
-            # Para backfill, parar cuando alcancemos datos existentes
-            if backfill and batch_scrobbles:
-                latest_timestamp = max(s.timestamp for s in batch_scrobbles)
+            # Para backfill, verificar si estamos alcanzando datos existentes
+            if backfill and page_scrobbles and page > 10:  # Verificar solo después de algunas páginas
+                latest_timestamp = max(s.timestamp for s in page_scrobbles)
                 cursor = self.db.conn.cursor()
                 cursor.execute('''
                     SELECT COUNT(*) as count FROM scrobbles
-                    WHERE user = ? AND timestamp >= ?
-                ''', (username, latest_timestamp))
+                    WHERE user = ? AND timestamp >= ? AND timestamp <= ?
+                ''', (username, latest_timestamp, latest_timestamp + 3600))  # Ventana de 1 hora
 
-                if cursor.fetchone()['count'] > len(batch_scrobbles):
-                    print(f"   🔄 Backfill completado - datos existentes encontrados")
+                overlap_count = cursor.fetchone()['count']
+                if overlap_count > len(page_scrobbles) * 0.8:  # Si 80% ya existe
+                    print(f"   📄 Backfill completado - datos existentes detectados en página {page}")
                     break
 
         self.db.force_commit()
-        print(f"   ✅ {new_scrobbles} nuevos scrobbles agregados")
+        print(f"   ✅ {new_scrobbles} nuevos scrobbles agregados para {username}")
+        print(f"   📄 Páginas procesadas: {processed_pages}")
 
     def run(self, download_all: bool = False, backfill: bool = False, enrich_only: bool = False, limit: int = 1000):
         """Ejecuta el proceso optimizado"""
         print("=" * 60)
-        print("🚀 ACTUALIZADOR MULTITHREADED DE LAST.FM v3.0")
+        print("🚀 ACTUALIZADOR MULTITHREADED DE LAST.FM v3.1")
+        print("   🔧 VERSIÓN CORREGIDA - SIN LÍMITES DE DESCARGA")
         print("=" * 60)
         print(f"🧵 Workers: {self.max_workers}")
-        print(f"🔄 Proxies: {'Habilitados' if self.use_proxies else 'Deshabilitados'}")
+        print(f"📄 Proxies: {'Habilitados' if self.use_proxies else 'Deshabilitados'}")
 
         start_time = time.time()
 
@@ -1560,7 +1620,7 @@ class MultithreadedLastFMUpdater:
             else:
                 # Actualizar scrobbles para cada usuario
                 for user in self.users:
-                    self.update_user_scrobbles_enhanced(user, download_all, backfill)
+                    self.update_user_scrobbles_complete(user, download_all, backfill)
 
                 # Enriquecer entidades
                 self.enrich_entities_parallel(limit=limit)
@@ -1583,19 +1643,19 @@ class MultithreadedLastFMUpdater:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Actualizador multithreaded de Last.fm v3.0')
+    parser = argparse.ArgumentParser(description='Actualizador multithreaded de Last.fm v3.1 (CORREGIDO)')
     parser.add_argument('--all', action='store_true',
-                       help='Descargar TODOS los scrobbles')
+                       help='Descargar TODOS los scrobbles desde el inicio')
     parser.add_argument('--backfill', action='store_true',
-                       help='Completar historial hacia atrás')
+                       help='Completar historial hacia atrás (llenar huecos)')
     parser.add_argument('--enrich', action='store_true',
-                       help='Solo enriquecer datos existentes')
+                       help='Solo enriquecer datos existentes (no descargar scrobbles)')
     parser.add_argument('--limit', type=int, default=1000,
                        help='Número máximo de entidades a enriquecer por tipo (default: 1000)')
     parser.add_argument('--workers', type=int, default=8,
                        help='Número de hilos concurrentes (default: 8)')
     parser.add_argument('--proxied', action='store_true',
-                       help='Usar proxies para las consultas (lee del .env)')
+                       help='Usar proxies para las consultas (lee configuración del .env)')
     parser.add_argument('--debug', action='store_true',
                        help='Activar modo debug con logging detallado')
 
@@ -1603,6 +1663,9 @@ def main():
 
     if args.all and args.backfill:
         print("❌ No puedes usar --all y --backfill simultáneamente")
+        print("   --all: descarga TODOS los scrobbles desde el inicio")
+        print("   --backfill: completa huecos en el historial existente")
+        print("   (Sin flags): actualización incremental desde el último scrobble")
         sys.exit(1)
 
     # Validar número de workers

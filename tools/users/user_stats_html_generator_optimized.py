@@ -2456,127 +2456,129 @@ class UserStatsHTMLGeneratorFixed:
         async function loadDiscoveriesData(username) {{
             console.log(`Cargando datos de novedades para ${{username}}...`);
 
-            // Mostrar loading
             const loadingElement = document.getElementById('discoveriesLoading');
             const gridElement = document.getElementById('discoveriesGrid');
 
-            if (loadingElement) {{
-                loadingElement.style.display = 'block';
-            }}
-            if (gridElement) {{
-                gridElement.style.display = 'none';
-            }}
+            if (loadingElement) loadingElement.style.display = 'block';
+            if (gridElement) gridElement.style.display = 'none';
 
             try {{
-                // Verificar cache
                 if (discoveriesData[username]) {{
                     console.log('Usando datos del cache');
                     renderDiscoveriesCharts(discoveriesData[username]);
                     return;
                 }}
 
-                // Construir URL del archivo JSON
                 const currentYear = new Date().getFullYear();
-                const fromYear = currentYear - {years_back};
-                const toYear = currentYear;
-                const period = `${{fromYear}}-${{toYear}}`;
+                const fromYear = currentYear - yearsBackConfig;
+                const period = `${{fromYear}}-${{currentYear}}`;
                 const dataUrl = `data/usuarios/${{period}}/${{username}}.json`;
 
                 console.log(`Cargando desde: ${{dataUrl}}`);
 
                 const response = await fetch(dataUrl);
-
-                if (!response.ok) {{
-                    throw new Error(`Error HTTP: ${{response.status}} - Archivo no encontrado: ${{dataUrl}}`);
-                }}
+                if (!response.ok) throw new Error(`Error HTTP: ${{response.status}} - ${dataUrl}`);
 
                 const userData = await response.json();
+                console.log('Datos cargados:', userData);
 
-                // Guardar en cache
                 discoveriesData[username] = userData;
-
-                // Renderizar gráficos
                 renderDiscoveriesCharts(userData);
 
             }} catch (error) {{
-                console.error('Error cargando datos de novedades:', error);
+                console.error('Error cargando novedades:', error);
                 showDiscoveriesError(error.message);
             }}
         }}
 
+
         // 🆕 Función para renderizar todos los gráficos de novedades
         function renderDiscoveriesCharts(userData) {{
-            console.log('Renderizando gráficos de novedades...', userData);
+            console.log('Renderizando gráficos de novedades...');
 
-            // Ocultar loading y mostrar grid
             const loadingElement = document.getElementById('discoveriesLoading');
             const gridElement = document.getElementById('discoveriesGrid');
 
-            if (loadingElement) {{
-                loadingElement.style.display = 'none';
-            }}
-            if (gridElement) {{
-                gridElement.style.display = 'grid';
-            }}
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (gridElement) gridElement.style.display = 'grid';
 
-            // Destruir gráficos existentes de discoveries
-            const discoveryCanvases = ['discoveriesArtistsChart', 'discoveriesAlbumsChart', 'discoveriesTracksChart', 'discoveriesLabelsChart'];
-            discoveryCanvases.forEach(canvasId => {{
-                if (charts[canvasId]) {{
-                    charts[canvasId].destroy();
-                    delete charts[canvasId];
-                }}
-            }});
-
-            // Renderizar cada tipo de gráfico
             const discoveryTypes = [
-                {{ type: 'artists', canvasId: 'discoveriesArtistsChart', title: 'Nuevos Artistas' }},
-                {{ type: 'albums', canvasId: 'discoveriesAlbumsChart', title: 'Nuevos Álbumes' }},
-                {{ type: 'tracks', canvasId: 'discoveriesTracksChart', title: 'Nuevas Canciones' }},
-                {{ type: 'labels', canvasId: 'discoveriesLabelsChart', title: 'Nuevos Sellos' }}
+                {{type: 'artists', canvasId: 'discoveriesArtistsChart', title: 'Nuevos Artistas'}},
+                {{type: 'albums', canvasId: 'discoveriesAlbumsChart', title: 'Nuevos Álbumes'}},
+                {{type: 'tracks', canvasId: 'discoveriesTracksChart', title: 'Nuevas Canciones'}},
+                {{type: 'labels', canvasId: 'discoveriesLabelsChart', title: 'Nuevos Sellos'}}
             ];
 
-            discoveryTypes.forEach(config => {{
-                const typeData = userData.discoveries[config.type];
-
-                if (typeData && Object.keys(typeData).length > 0) {{
-                    renderDiscoveryChart(config.canvasId, typeData, config.title, config.type);
-                }} else {{
-                    showNoDataForChart(config.canvasId, `Sin datos de ${{config.title.toLowerCase()}}`);
-                }}
-            }});
+            // Pequeño retraso para asegurar que el DOM está listo
+            setTimeout(() => {{
+                discoveryTypes.forEach(config => {{
+                    const typeData = userData.discoveries[config.type];
+                    if (typeData && Object.keys(typeData).length > 0) {{
+                        console.log(`Renderizando ${{config.type}}:`, typeData);
+                        renderDiscoveryChart(config.canvasId, typeData, config.title);
+                    }} else {{
+                        console.log(`Sin datos para ${{config.type}}`);
+                        showNoDataForChart(config.canvasId);
+                    }}
+                }});
+            }}, 100); // 100ms de retraso
         }}
 
         // 🆕 Función para renderizar un gráfico individual de novedades
-        function renderDiscoveryChart(canvasId, typeData, title, typeName) {{
+        function renderDiscoveryChart(canvasId, typeData, title) {{
+            // Verificar que el canvas existe antes de proceder
             const canvas = document.getElementById(canvasId);
-
             if (!canvas) {{
-                console.error(`Canvas ${{canvasId}} no encontrado`);
-                return;
+                console.error(`❌ Canvas ${canvasId} no encontrado`);
+                // Intentar crear el canvas si no existe
+                const wrapper = document.querySelector(`#discoveriesGrid .evolution-chart:nth-child(${getChartIndex(canvasId)}) .line-chart-wrapper`);
+                if (wrapper) {{
+                    console.log(`Creando canvas faltante ${canvasId}`);
+                    const newCanvas = document.createElement('canvas');
+                    newCanvas.id = canvasId;
+                    wrapper.innerHTML = '';
+                    wrapper.appendChild(newCanvas);
+                }} else {{
+                    console.error(`No se pudo crear canvas ${canvasId}`);
+                    return;
+                }}
             }}
 
-            // Preparar datos para el gráfico
+            console.log(`Renderizando gráfico ${canvasId} con datos:`, typeData);
+
             const years = [];
             const counts = [];
             const details = {{}};
 
-            // Ordenar años y extraer conteos
-            const sortedYears = Object.keys(typeData).sort((a, b) => parseInt(a) - parseInt(b));
-
-            sortedYears.forEach(year => {{
-                if (!isNaN(year)) {{
-                    const yearInt = parseInt(year);
-                    const yearData = typeData[year];
-
+            // Procesar datos por año
+            Object.keys(typeData).sort((a, b) => parseInt(a) - parseInt(b)).forEach(year => {{
+                const yearInt = parseInt(year);
+                if (!isNaN(yearInt) && typeData[year]) {{
                     years.push(yearInt);
-                    counts.push(yearData.count || 0);
-                    details[yearInt] = yearData.items || [];
+                    counts.push(typeData[year].count || 0);
+                    details[yearInt] = typeData[year].items || [];
                 }}
             }});
 
-            if (years.length === 0) {{
-                showNoDataForChart(canvasId, `Sin datos para ${{title.toLowerCase()}}`);
+            if (years.length === 0 || counts.every(c => c === 0)) {{
+                console.log(`Sin datos válidos para ${canvasId}`);
+                showNoDataForChart(canvasId);
+                return;
+            }}
+
+            console.log(`Años: ${{years}}, Conteos: ${{counts}}`);
+
+            // Destruir gráfico existente si existe
+            if (charts[canvasId]) {{
+                console.log(`Destruyendo gráfico existente ${canvasId}`);
+                charts[canvasId].destroy();
+                delete charts[canvasId];
+            }}
+
+            // Obtener contexto del canvas
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            if (!ctx) {{
+                console.error(`No se pudo obtener contexto del canvas ${canvasId}`);
                 return;
             }}
 
@@ -2588,14 +2590,14 @@ class UserStatsHTMLGeneratorFixed:
                         label: title,
                         data: counts,
                         borderColor: '#cba6f7',
-                        backgroundColor: '#cba6f7' + '30',
+                        backgroundColor: 'rgba(203, 166, 247, 0.3)',
                         tension: 0.4,
                         fill: true,
-                        pointRadius: 6,
-                        pointHoverRadius: 10,
+                        pointRadius: 8,
+                        pointHoverRadius: 12,
                         pointBackgroundColor: '#cba6f7',
                         pointBorderColor: '#1e1e2e',
-                        pointBorderWidth: 2
+                        pointBorderWidth: 3
                     }}]
                 }},
                 options: {{
@@ -2607,7 +2609,9 @@ class UserStatsHTMLGeneratorFixed:
                             labels: {{
                                 color: '#cdd6f4',
                                 padding: 15,
-                                font: {{ size: 12 }}
+                                font: {{
+                                    size: 12
+                                }}
                             }}
                         }},
                         tooltip: {{
@@ -2616,10 +2620,11 @@ class UserStatsHTMLGeneratorFixed:
                             bodyColor: '#cdd6f4',
                             borderColor: '#cba6f7',
                             borderWidth: 1,
+                            cornerRadius: 8,
+                            displayColors: false,
                             callbacks: {{
                                 label: function(context) {{
-                                    const count = context.parsed.y;
-                                    return `${{title}}: ${{count}} nuevos`;
+                                    return `${context.parsed.y} nuevos`;
                                 }}
                             }}
                         }}
@@ -2629,22 +2634,42 @@ class UserStatsHTMLGeneratorFixed:
                             title: {{
                                 display: true,
                                 text: 'Año',
-                                color: '#cdd6f4'
+                                color: '#cdd6f4',
+                                font: {{
+                                    size: 14,
+                                    weight: 'bold'
+                                }}
                             }},
-                            ticks: {{ color: '#a6adc8' }},
-                            grid: {{ color: '#313244' }}
+                            ticks: {{
+                                color: '#a6adc8',
+                                font: {{
+                                    size: 12
+                                }}
+                            }},
+                            grid: {{
+                                color: 'rgba(49, 50, 68, 0.5)'
+                            }}
                         }},
                         y: {{
                             title: {{
                                 display: true,
-                                text: 'Número de Novedades',
-                                color: '#cdd6f4'
+                                text: 'Novedades',
+                                color: '#cdd6f4',
+                                font: {{
+                                    size: 14,
+                                    weight: 'bold'
+                                }}
                             }},
                             ticks: {{
                                 color: '#a6adc8',
-                                precision: 0
+                                precision: 0,
+                                font: {{
+                                    size: 12
+                                }}
                             }},
-                            grid: {{ color: '#313244' }},
+                            grid: {{
+                                color: 'rgba(49, 50, 68, 0.5)'
+                            }},
                             beginAtZero: true
                         }}
                     }},
@@ -2654,6 +2679,8 @@ class UserStatsHTMLGeneratorFixed:
                             const year = this.data.labels[pointIndex];
                             const count = this.data.datasets[0].data[pointIndex];
 
+                            console.log(`Click en año ${{year}}, count: ${{count}}`);
+
                             if (count > 0 && details[year] && details[year].length > 0) {{
                                 showDiscoveryPopup(year, details[year], title, count);
                             }}
@@ -2662,25 +2689,46 @@ class UserStatsHTMLGeneratorFixed:
                 }}
             }};
 
-            charts[canvasId] = new Chart(canvas, config);
+            try {{
+                console.log(`Creando nuevo gráfico ${{canvasId}}`);
+                charts[canvasId] = new Chart(ctx, config);
+                console.log(`✅ Gráfico ${{canvasId}} creado exitosamente`);
+            }} catch (error) {{
+                console.error(`Error creando gráfico ${{canvasId}}:`, error);
+                showNoDataForChart(canvasId);
+            }}
+        }}
+
+        function getChartIndex(canvasId) {{
+            const indices = {{
+                'discoveriesArtistsChart': 1,
+                'discoveriesAlbumsChart': 2,
+                'discoveriesTracksChart': 3,
+                'discoveriesLabelsChart': 4
+                }};
+            return indices[canvasId] || 1;
         }}
 
         // 🆕 Función para mostrar popup con detalles de novedades
         function showDiscoveryPopup(year, items, title, count) {{
-            const popupTitle = `${{title}} - ${{year}} (${{count}} nuevos)`;
+            console.log(`Mostrando popup para ${{title}} - ${{year}}:`, items);
 
+            const popupTitle = `${{title}} - ${{year}} (${{count}} nuevos)`;
             let content = '';
-            // Mostrar máximo 10 elementos (ya están limitados en el JSON)
-            items.forEach((item, index) => {{
+
+            // Mostrar hasta 15 items en el popup
+            const itemsToShow = items.slice(0, 15);
+
+            itemsToShow.forEach(item => {{
                 content += `<div class="popup-item">
                     <span class="name">${{item.name}}</span>
                     <span class="count">${{item.date}}</span>
                 </div>`;
             }});
 
-            if (count > items.length) {{
-                content += `<div style="text-align: center; padding: 10px; color: #a6adc8; font-style: italic;">
-                    ... y ${{count - items.length}} más
+            if (count > itemsToShow.length) {{
+                content += `<div style="text-align: center; padding: 15px; color: #a6adc8; font-style: italic; border-top: 1px solid #313244; margin-top: 10px;">
+                    ... y ${{count - itemsToShow.length}} más descubrimientos
                 </div>`;
             }}
 
@@ -2692,36 +2740,38 @@ class UserStatsHTMLGeneratorFixed:
 
         // 🆕 Función para mostrar error en carga de novedades
         function showDiscoveriesError(errorMessage) {{
+            console.error('Error en novedades:', errorMessage);
+
             const loadingElement = document.getElementById('discoveriesLoading');
             const gridElement = document.getElementById('discoveriesGrid');
 
-            if (loadingElement) {{
-                loadingElement.style.display = 'none';
-            }}
+            if (loadingElement) loadingElement.style.display = 'none';
 
             if (gridElement) {{
-                gridElement.innerHTML = `
-                    <div class="no-data" style="grid-column: 1/-1;">
-                        <div>
-                            <p>❌ Error cargando datos de novedades</p>
-                            <p style="font-size: 0.9em; margin-top: 10px; color: #f38ba8;">${{errorMessage}}</p>
-                            <p style="font-size: 0.8em; margin-top: 10px; color: #6c7086;">
-                                Ejecuta: <code>python generate_discoveries_data.py</code>
-                            </p>
-                        </div>
-                    </div>
-                `;
+                gridElement.innerHTML = `<div class="no-data" style="grid-column: 1/-1; text-align: center; padding: 40px;">
+                    <h4 style="color: #f38ba8; margin-bottom: 15px;">❌ Error cargando novedades</h4>
+                    <p style="color: #cdd6f4; margin-bottom: 10px;">No se pudieron cargar los datos de descubrimientos.</p>
+                    <p style="font-size: 0.9em; color: #a6adc8; margin-bottom: 10px;">${{errorMessage}}</p>
+                    <p style="font-size: 0.8em; color: #6c7086;">
+                        Ejecuta: <code style="background: #313244; padding: 2px 6px; border-radius: 4px;">python create_first_listen_tables_mbid.py</code>
+                    </p>
+                </div>`;
                 gridElement.style.display = 'grid';
-            }}
+                }}
         }}
 
+
+
         // 🆕 Función para mostrar "sin datos" en un gráfico específico
-        function showNoDataForChart(canvasId, message = 'Sin datos') {{
+        function showNoDataForChart(canvasId) {{
+            console.log(`Mostrando "sin datos" para ${{canvasId}}`);
             const canvas = document.getElementById(canvasId);
             if (canvas) {{
                 canvas.style.display = 'none';
                 const wrapper = canvas.parentElement;
-                wrapper.innerHTML = `<div class="no-data" style="height: 200px;">${{message}}</div>`;
+                if (wrapper) {{
+                    wrapper.innerHTML = '<div class="no-data" style="height: 200px; display: flex; align-items: center; justify-content: center; color: #a6adc8; font-style: italic; border: 2px dashed #313244; border-radius: 8px;">Sin datos de descubrimientos</div>';
+                }}
             }}
         }}
 

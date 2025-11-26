@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Novedades</title>
+    <style>
+        body { font-family: monospace; background: #1e1e2e; color: #cdd6f4; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { background: #181825; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        button { background: #cba6f7; color: #1e1e2e; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+        button:hover { background: #b4a3e8; }
+        #output { background: #313244; padding: 15px; border-radius: 6px; white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        .error { color: #f38ba8; }
+        .success { color: #a6e3a1; }
+        .info { color: #89dceb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Test de Carga de Novedades</h1>
+
+        <div class="test-section">
+            <h3>Test 1: Verificar Usuario</h3>
+            <input type="text" id="username" placeholder="nombre_usuario" value="paqueradejere" style="padding: 8px; border-radius: 4px; border: none; margin-right: 10px;">
+            <button onclick="testUser()">Probar Usuario</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 2: Cargar JSON Directo</h3>
+            <input type="text" id="jsonPath" placeholder="data/usuarios/2024-2025/usuario.json" value="data/usuarios/2024-2025/paqueradejere.json" style="width: 300px; padding: 8px; border-radius: 4px; border: none; margin-right: 10px;">
+            <button onclick="testDirectLoad()">Cargar JSON</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Test 3: Verificar Estructura</h3>
+            <button onclick="analyzeStructure()">Analizar Estructura</button>
+        </div>
+
+        <div class="test-section">
+            <h3>Resultados</h3>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script>
+        let loadedData = null;
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function testUser() {
+            const username = document.getElementById('username').value;
+            log(`🧪 Probando usuario: ${username}`);
+
+            const currentYear = new Date().getFullYear();
+            const fromYear = currentYear - 1; // Ajustar según tu configuración
+            const period = `${fromYear}-${currentYear}`;
+            const dataUrl = `data/usuarios/${period}/${username}.json`;
+
+            try {
+                log(`📡 Cargando desde: ${dataUrl}`);
+
+                const response = await fetch(dataUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const userData = await response.json();
+                loadedData = userData;
+
+                log(`✅ Datos cargados exitosamente`, 'success');
+                log(`📊 Usuario: ${userData.user}`);
+                log(`📊 Período: ${userData.period}`);
+                log(`📊 Claves principales: ${Object.keys(userData).join(', ')}`);
+
+                if (userData.discoveries) {
+                    const types = Object.keys(userData.discoveries);
+                    log(`🎵 Tipos de descubrimientos: ${types.join(', ')}`);
+
+                    types.forEach(type => {
+                        const typeData = userData.discoveries[type];
+                        const years = Object.keys(typeData);
+                        const totalItems = years.reduce((sum, year) => sum + (typeData[year]?.count || 0), 0);
+                        log(`  ${type}: ${years.length} años, ${totalItems} items total`);
+                    });
+                } else {
+                    log(`❌ No hay datos de discoveries`, 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                console.error('Error completo:', error);
+            }
+        }
+
+        async function testDirectLoad() {
+            const jsonPath = document.getElementById('jsonPath').value;
+            log(`🔗 Carga directa: ${jsonPath}`);
+
+            try {
+                const response = await fetch(jsonPath);
+
+                log(`📡 Status: ${response.status} ${response.statusText}`);
+                log(`📡 Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    log(`❌ Respuesta: ${text.substring(0, 200)}...`, 'error');
+                    return;
+                }
+
+                const data = await response.json();
+                loadedData = data;
+
+                log(`✅ JSON parseado correctamente`, 'success');
+                log(`📋 Estructura: ${JSON.stringify(data, null, 2).substring(0, 500)}...`);
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function analyzeStructure() {
+            if (!loadedData) {
+                log(`❌ No hay datos cargados. Ejecuta primero un test de carga.`, 'error');
+                return;
+            }
+
+            log(`🔬 Analizando estructura de datos...`);
+
+            // Verificar discoveries
+            if (loadedData.discoveries) {
+                Object.keys(loadedData.discoveries).forEach(type => {
+                    const typeData = loadedData.discoveries[type];
+                    log(`\n📋 Análisis de ${type}:`);
+                    log(`  Tipo: ${typeof typeData}`);
+                    log(`  Es objeto: ${typeof typeData === 'object' && !Array.isArray(typeData)}`);
+
+                    if (typeof typeData === 'object') {
+                        const years = Object.keys(typeData);
+                        log(`  Años encontrados: ${years.join(', ')}`);
+
+                        years.forEach(year => {
+                            const yearData = typeData[year];
+                            log(`    ${year}:`);
+                            log(`      Tipo: ${typeof yearData}`);
+                            log(`      Claves: ${Object.keys(yearData || {}).join(', ')}`);
+                            log(`      Count: ${yearData?.count || 'N/A'}`);
+                            log(`      Items: ${yearData?.items?.length || 'N/A'}`);
+
+                            if (yearData?.items && yearData.items.length > 0) {
+                                const sample = yearData.items[0];
+                                log(`      Ejemplo item: ${JSON.stringify(sample)}`);
+                            }
+                        });
+                    }
+                });
+            } else {
+                log(`❌ No se encontró el objeto 'discoveries'`, 'error');
+            }
+
+            // Test simulado de renderización
+            log(`\n🎨 Simulando renderización...`);
+            simulateRender();
+        }
+
+        function simulateRender() {
+            if (!loadedData || !loadedData.discoveries) {
+                log(`❌ No hay datos para renderizar`, 'error');
+                return;
+            }
+
+            const discoveryTypes = [
+                {type: 'artists', title: 'Nuevos Artistas'},
+                {type: 'albums', title: 'Nuevos Álbumes'},
+                {type: 'tracks', title: 'Nuevas Canciones'},
+                {type: 'labels', title: 'Nuevos Sellos'}
+            ];
+
+            discoveryTypes.forEach(config => {
+                const typeData = loadedData.discoveries[config.type];
+                log(`\n🎯 Renderizando ${config.type}:`);
+
+                if (typeData && Object.keys(typeData).length > 0) {
+                    const years = [];
+                    const counts = [];
+
+                    Object.keys(typeData).sort((a, b) => parseInt(a) - parseInt(b)).forEach(year => {
+                        const yearInt = parseInt(year);
+                        if (!isNaN(yearInt) && typeData[year]) {
+                            years.push(yearInt);
+                            counts.push(typeData[year].count || 0);
+                        }
+                    });
+
+                    if (years.length > 0) {
+                        log(`  ✅ Datos válidos: años ${years.join(', ')}, conteos ${counts.join(', ')}`, 'success');
+                        log(`  📊 Total a renderizar: ${counts.reduce((a, b) => a + b, 0)} items`);
+                    } else {
+                        log(`  ❌ No se encontraron años válidos`, 'error');
+                    }
+                } else {
+                    log(`  ❌ Sin datos de tipo`, 'error');
+                }
+            });
+        }
+
+        // Auto-test al cargar
+        window.addEventListener('load', () => {
+            log(`🚀 Test de novedades iniciado`);
+            log(`🔗 URL actual: ${window.location.href}`);
+            log(`📁 Base URL: ${window.location.origin}${window.location.pathname.replace(/[^/]*$/, '')}`);
+        });
+    </script>
+</body>
+</html>

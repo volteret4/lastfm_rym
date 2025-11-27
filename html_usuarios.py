@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """
-Last.fm User Stats Generator - VersiÃ³n FINAL con conteos Ãºnicos correctos + NOVEDADES CORREGIDA
-Genera estadÃ­sticas individuales de usuarios usando clases extendidas + pestaÃ±a de novedades integrada
+Last.fm User Stats Generator - Versión Optimizada
+Genera un HTML ligero que carga datos desde archivos JSON
 """
 
 import os
 import sys
 import json
-import sqlite3
-from datetime import datetime, timedelta
-from collections import Counter, defaultdict
-from typing import List, Dict, Tuple, Optional
 import argparse
+from datetime import datetime
 from pathlib import Path
-import re
 
 try:
     from dotenv import load_dotenv
@@ -22,504 +18,1156 @@ try:
 except ImportError:
     pass
 
-# Importar las clases como propones
+# Importar las clases necesarias
+
 from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database_extended import UserStatsDatabaseExtended
-
-# Usar el generador HTML corregido que mantiene TODA la funcionalidad
-
-from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
+from tools.users.user_stats_discoveries import DiscoveriesDataGenerator
 
 
-# Importar generador de datos de novedades
-try:
-    sys.path.append(os.path.dirname(__file__))
-    from tools.users.user_stats_discoveries import DiscoveriesDataGenerator
-except ImportError:
-    print("âš ï¸  Generador de datos de novedades no encontrado. La funcionalidad de novedades no estarÃ¡ disponible.")
-    DiscoveriesDataGenerator = None
+def generate_all_data_files(users, years_back, output_dir):
+    """Genera todos los archivos JSON necesarios"""
 
+    current_year = datetime.now().year
+    from_year = current_year - years_back
+    to_year = current_year
+    period = f"{from_year}-{to_year}"
 
-def generate_discoveries_data(users: List[str], years_back: int, output_dir: str) -> bool:
-    """Genera archivos JSON de novedades para cada usuario"""
-    if not DiscoveriesDataGenerator:
-        print("âš ï¸  Saltando generaciÃ³n de datos de novedades (mÃ³dulo no disponible)")
-        return False
+    print(f"📊 Generando datos para periodo {period}...")
 
-    print(f"ðŸ“Š Generando datos de novedades (top 10 por aÃ±o)...")
+    # Crear directorios necesarios
+    data_dir = Path(output_dir) / "data"
+    users_data_dir = data_dir / "usuarios" / period
+    users_data_dir.mkdir(parents=True, exist_ok=True)
 
-    try:
-        generator = DiscoveriesDataGenerator()
+    # 1. Generar datos de estadísticas principales para cada usuario
+    print(f"\n📈 Paso 1/2: Generando estadísticas principales...")
+    database = UserStatsDatabaseExtended()
+    analyzer = UserStatsAnalyzer(database, years_back=years_back)
 
-        # Verificar que las tablas de primeras escuchas existan
-        if not generator._check_tables():
-            print("âš ï¸  Tablas de primeras escuchas no encontradas.")
-            print("ðŸ’¡ Ejecuta: python create_first_listen_tables_mbid.py")
-            generator.close()
-            return False
+    for user in users:
+        print(f"  • Procesando {user}...")
+        user_stats = analyzer.analyze_user(user, users)
 
-        # Crear directorio especÃ­fico para el periodo
-        current_year = datetime.now().year
-        from_year = current_year - years_back
-        to_year = current_year
-        period = f"{from_year}-{to_year}"
+        # Remover discoveries si existen (se cargarán por separado)
+        if 'individual' in user_stats and 'discoveries' in user_stats['individual']:
+            del user_stats['individual']['discoveries']
 
-        discoveries_dir = f"{output_dir}/data/usuarios/{period}"
-        os.makedirs(discoveries_dir, exist_ok=True)
+        # Guardar stats en JSON
+        stats_file = users_data_dir / f"{user}_stats.json"
+        with open(stats_file, 'w', encoding='utf-8') as f:
+            json.dump(user_stats, f, indent=2, ensure_ascii=False)
 
-        # Generar archivos JSON para cada usuario
-        generated_files = []
+        # Mostrar resumen
+        total_scrobbles = sum(user_stats.get('yearly_scrobbles', {}).values())
+        unique_counts = user_stats.get('unique_counts', {})
+        print(f"    ✅ {total_scrobbles:,} scrobbles")
+        if unique_counts:
+            print(f"       {unique_counts.get('total_artists', 0)} artistas, "
+                  f"{unique_counts.get('total_albums', 0)} álbumes, "
+                  f"{unique_counts.get('total_tracks', 0)} tracks")
+
+    database.close()
+
+    # 2. Generar datos de descubrimientos/novedades
+    print(f"\n✨ Paso 2/2: Generando datos de novedades...")
+    discoveries_generator = DiscoveriesDataGenerator()
+
+    if not discoveries_generator._check_tables():
+        print("    ⚠️  Tablas de primeras escuchas no encontradas")
+        print("    💡 Ejecuta: python create_first_listen_tables_mbid.py")
+        discoveries_available = False
+    else:
+        discoveries_available = True
         for user in users:
             try:
-                output_file = generator.generate_user_json(user, from_year, to_year, discoveries_dir)
-                generated_files.append(output_file)
+                output_file = discoveries_generator.generate_user_json(
+                    user, from_year, to_year, str(users_data_dir)
+                )
             except Exception as e:
-                print(f"    âŒ Error generando datos para {user}: {e}")
+                print(f"    ❌ Error generando novedades para {user}: {e}")
 
-        # Generar archivo Ã­ndice
-        index_file = generator._generate_index_file(discoveries_dir, users, period)
+        # Generar índice
+        discoveries_generator._generate_index_file(str(users_data_dir), users, period)
 
-        generator.close()
+    discoveries_generator.close()
 
-        print(f"    âœ… Generados {len(generated_files)} archivos JSON")
-        print(f"    ðŸ“ Directorio: {discoveries_dir}")
+    # 3. Generar archivo de configuración
+    config = {
+        'period': period,
+        'from_year': from_year,
+        'to_year': to_year,
+        'users': users,
+        'discoveries_available': discoveries_available,
+        'generated_at': datetime.now().isoformat()
+    }
 
-        return True
+    config_file = data_dir / f"config_{period}.json"
+    with open(config_file, 'w', encoding='utf-8') as f:
+        json.dump(config, f, indent=2, ensure_ascii=False)
 
-    except Exception as e:
-        print(f"    âŒ Error generando datos de novedades: {e}")
-        return False
+    print(f"\n✅ Archivos de datos generados en: {users_data_dir}")
+    print(f"📋 Configuración guardada en: {config_file}")
+
+    return {
+        'data_dir': str(data_dir),
+        'users_data_dir': str(users_data_dir),
+        'config_file': str(config_file),
+        'discoveries_available': discoveries_available,
+        'period': period
+    }
 
 
-def modify_html_for_discoveries(html_content: str, users: List[str], years_back: int) -> str:
-    """Modifica el HTML generado para agregar la funcionalidad de novedades - VERSIÃ“N CORREGIDA"""
+def generate_optimized_html(data_info, output_file):
+    """Genera HTML optimizado que carga datos desde JSON"""
 
-    print("ðŸ”§ Modificando HTML para agregar funcionalidad de novedades...")
+    users = data_info.get('users', [])
+    period = data_info.get('period', '')
+    discoveries_available = data_info.get('discoveries_available', False)
 
-    # 1. Verificar que el HTML base tenga la estructura esperada
-    if 'nav-tabs' not in html_content:
-        print("âš ï¸  Estructura nav-tabs no encontrada en HTML")
-        return html_content
+    # Obtener iconos de usuarios
+    icons_env = os.getenv('LASTFM_USERS_ICONS', '')
+    user_icons = {}
+    if icons_env:
+        for pair in icons_env.split(','):
+            if ':' in pair:
+                user, icon = pair.split(':', 1)
+                user_icons[user.strip()] = icon.strip()
 
-    # 2. Agregar pestaÃ±a de novedades en nav-tabs de forma mÃ¡s robusta
-    # Buscar el patrÃ³n especÃ­fico de la pestaÃ±a evolution
-    evolution_patterns = [
-        r'(<div class="nav-tab" data-view="evolution">.*?</div>)',
-        r'(<div class="nav-tab" data-view="evolution">[^<]*ðŸ“ˆ[^<]*</div>)',
-        r'(data-view="evolution">[^<]*</div>)'
+    users_json = json.dumps(users, ensure_ascii=False)
+    user_icons_json = json.dumps(user_icons, ensure_ascii=False)
+
+    # Colores para gráficos
+    colors = [
+        '#cba6f7', '#f38ba8', '#fab387', '#f9e2af', '#a6e3a1',
+        '#94e2d5', '#89dceb', '#74c7ec', '#89b4fa', '#b4befe',
+        '#f5c2e7', '#f2cdcd', '#ddb6f2', '#ffc6ff', '#caffbf'
     ]
+    colors_json = json.dumps(colors, ensure_ascii=False)
 
-    tab_added = False
-    for pattern in evolution_patterns:
-        matches = re.findall(pattern, html_content, re.DOTALL)
-        if matches:
-            evolution_tab = matches[0]
-            discoveries_tab = '                <div class="nav-tab" data-view="discoveries">âœ¨ Novedades</div>'
-            html_content = html_content.replace(evolution_tab, evolution_tab + '\n' + discoveries_tab)
-            print("  âœ… PestaÃ±a Novedades agregada")
-            tab_added = True
-            break
+    html_content = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last.fm Usuarios - Estadísticas {period}</title>
+    <link rel="icon" type="image/png" href="images/music.png">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
 
-    if not tab_added:
-        print("  âš ï¸  No se pudo agregar la pestaÃ±a Novedades")
-        return html_content
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 20px;
+            line-height: 1.6;
+        }}
 
-    # 3. Agregar el contenido del tab de discoveries de forma mÃ¡s robusta
-    discoveries_content = f'''
-            <div id="discoveriesTab" class="tab-content">
-                <div class="evolution-section">
-                    <h3>âœ¨ Descubrimientos Musicales</h3>
+        .container {{
+            max-width: 1600px;
+            margin: 0 auto;
+            background: #181825;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }}
 
-                    <div class="loading-spinner" id="discoveriesLoading" style="display: none; text-align: center; padding: 40px; color: #a6adc8;">
-                        <p>ðŸ”„ Cargando datos de novedades...</p>
-                    </div>
+        header {{
+            background: #1e1e2e;
+            padding: 20px 30px;
+            border-bottom: 2px solid #cba6f7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 80px;
+        }}
 
-                    <div class="discoveries-grid" id="discoveriesGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px;">
-                        <div class="evolution-chart">
-                            <h4>Nuevos Artistas por AÃ±o</h4>
-                            <div class="line-chart-wrapper">
-                                <canvas id="discoveriesArtistsChart"></canvas>
-                            </div>
-                        </div>
+        .header-content {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
+        }}
 
-                        <div class="evolution-chart">
-                            <h4>Nuevos Ãlbumes por AÃ±o</h4>
-                            <div class="line-chart-wrapper">
-                                <canvas id="discoveriesAlbumsChart"></canvas>
-                            </div>
-                        </div>
+        h1 {{
+            font-size: 2em;
+            color: #cba6f7;
+            margin-bottom: 10px;
+        }}
 
-                        <div class="evolution-chart">
-                            <h4>Nuevas Canciones por AÃ±o</h4>
-                            <div class="line-chart-wrapper">
-                                <canvas id="discoveriesTracksChart"></canvas>
-                            </div>
-                        </div>
+        .period-badge {{
+            background: #313244;
+            color: #cba6f7;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }}
 
-                        <div class="evolution-chart">
-                            <h4>Nuevos Sellos por AÃ±o</h4>
-                            <div class="line-chart-wrapper">
-                                <canvas id="discoveriesLabelsChart"></canvas>
-                            </div>
-                        </div>
-                    </div>
+        .nav-buttons {{
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }}
+
+        .nav-button {{
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            font-weight: 500;
+        }}
+
+        .nav-button:hover {{
+            background: #45475a;
+            border-color: #cba6f7;
+            transform: translateY(-2px);
+        }}
+
+        .user-section {{
+            padding: 30px;
+        }}
+
+        .user-selector {{
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }}
+
+        .user-button {{
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1.1em;
+            font-weight: 500;
+        }}
+
+        .user-button:hover {{
+            background: #45475a;
+            border-color: #cba6f7;
+            transform: translateY(-2px);
+        }}
+
+        .user-button.active {{
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
+        }}
+
+        .user-content {{
+            display: none;
+        }}
+
+        .user-content.active {{
+            display: block;
+        }}
+
+        .tabs {{
+            display: flex;
+            gap: 10px;
+            border-bottom: 2px solid #313244;
+            margin-bottom: 30px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }}
+
+        .nav-tab {{
+            background: transparent;
+            color: #a6adc8;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1em;
+            white-space: nowrap;
+        }}
+
+        .nav-tab:hover {{
+            background: #313244;
+            color: #cdd6f4;
+        }}
+
+        .nav-tab.active {{
+            background: #313244;
+            color: #cba6f7;
+            border-bottom: 3px solid #cba6f7;
+        }}
+
+        .tab-content {{
+            display: none;
+            animation: fadeIn 0.3s;
+        }}
+
+        .tab-content.active {{
+            display: block;
+        }}
+
+        @keyframes fadeIn {{
+            from {{ opacity: 0; }}
+            to {{ opacity: 1; }}
+        }}
+
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }}
+
+        .stat-card {{
+            background: #1e1e2e;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #313244;
+            transition: all 0.3s;
+        }}
+
+        .stat-card:hover {{
+            border-color: #cba6f7;
+            transform: translateY(-2px);
+        }}
+
+        .stat-card h3 {{
+            color: #a6adc8;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }}
+
+        .stat-card .value {{
+            color: #cba6f7;
+            font-size: 2em;
+            font-weight: bold;
+        }}
+
+        .chart-container {{
+            background: #1e1e2e;
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #313244;
+            margin-bottom: 20px;
+        }}
+
+        .chart-container h3 {{
+            color: #cba6f7;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }}
+
+        .loading-spinner {{
+            text-align: center;
+            padding: 40px;
+            color: #a6adc8;
+        }}
+
+        .error-message {{
+            background: #f38ba8;
+            color: #1e1e2e;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }}
+
+        .top-list {{
+            background: #1e1e2e;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid #313244;
+        }}
+
+        .top-item {{
+            padding: 15px 20px;
+            border-bottom: 1px solid #313244;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }}
+
+        .top-item:hover {{
+            background: #313244;
+        }}
+
+        .top-item:last-child {{
+            border-bottom: none;
+        }}
+
+        .rank {{
+            color: #cba6f7;
+            font-weight: bold;
+            font-size: 1.2em;
+            min-width: 40px;
+        }}
+
+        .item-name {{
+            flex-grow: 1;
+            margin: 0 20px;
+        }}
+
+        .item-count {{
+            color: #a6adc8;
+            font-weight: 500;
+        }}
+
+        .popup-overlay {{
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }}
+
+        .popup-overlay.active {{
+            display: flex;
+        }}
+
+        .popup-content {{
+            background: #181825;
+            padding: 30px;
+            border-radius: 16px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            border: 2px solid #cba6f7;
+        }}
+
+        .popup-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }}
+
+        .popup-close {{
+            background: #313244;
+            border: none;
+            color: #cdd6f4;
+            font-size: 1.5em;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }}
+
+        .popup-close:hover {{
+            background: #45475a;
+        }}
+
+        .discoveries-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 20px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>🎵 Last.fm Estadísticas de Usuarios</h1>
+                <span class="period-badge">📅 Periodo: {period}</span>
+                <div class="nav-buttons">
+                    <a href="index.html" class="nav-button">🏠 Inicio</a>
+                    <a href="index.html#temporal" class="nav-button">⏰ Temporales</a>
                 </div>
             </div>
+        </header>
 
-        '''
+        <div class="user-section">
+            <div class="user-selector" id="userSelector">
+                <!-- Los botones de usuario se generarán dinámicamente -->
+            </div>
 
-    # Buscar diferentes patrones posibles donde insertar el contenido
-    insertion_patterns = [
-        # PatrÃ³n mÃ¡s especÃ­fico primero
-        r'(</div>\s*</div>\s*</div>\s*</div>\s*<!-- Popup para mostrar detalles -->)',
-        # Patrones mÃ¡s generales como fallback
-        r'(</div>\s*</div>\s*</div>\s*<!-- Popup para mostrar detalles -->)',
-        r'(</div>\s*<!-- Popup para mostrar detalles -->)',
-        r'(<!-- Popup para mostrar detalles -->)',
-        # Si no encuentra popup, buscar antes del cierre del contenedor principal
-        r'(</div>\s*</div>\s*<script>)',
-        r'(</div>\s*<script>)'
-    ]
+            <div id="userContentContainer">
+                <!-- El contenido de cada usuario se cargará dinámicamente -->
+            </div>
+        </div>
+    </div>
 
-    content_inserted = False
-    for pattern in insertion_patterns:
-        matches = re.findall(pattern, html_content, re.DOTALL)
-        if matches:
-            before_insertion = matches[0]
-            html_content = html_content.replace(before_insertion, discoveries_content + '\n        ' + before_insertion)
-            print("  âœ… Contenido del tab Novedades agregado")
-            content_inserted = True
-            break
+    <!-- Popup para mostrar detalles -->
+    <div class="popup-overlay" id="popupOverlay">
+        <div class="popup-content" id="popupContent">
+            <!-- Contenido del popup se generará dinámicamente -->
+        </div>
+    </div>
 
-    if not content_inserted:
-        print("  âš ï¸  No se pudo insertar el contenido del tab")
-        return html_content
+    <script>
+        // Configuración global
+        const CONFIG = {{
+            users: {users_json},
+            userIcons: {user_icons_json},
+            colors: {colors_json},
+            period: '{period}',
+            dataPath: 'data/usuarios/{period}/',
+            discoveriesAvailable: {str(discoveries_available).lower()}
+        }};
 
-    # 4. Agregar variables JavaScript necesarias de forma mÃ¡s robusta
-    js_vars_patterns = [
-        r'(let genresData = null;[^\n]*)',
-        r'(let charts = \{\}[^;]*;)',
-        r'(// Variables globales[^\n]*)'
-    ]
+        // Cache para datos cargados
+        const dataCache = {{}};
 
-    vars_added = False
-    for pattern in js_vars_patterns:
-        matches = re.findall(pattern, html_content)
-        if matches:
-            original_line = matches[0]
-            new_vars = f'''{original_line}
-        let discoveriesData = {{}}; // Cache para datos de novedades
-        const yearsBackConfig = {years_back}; // ConfiguraciÃ³n de aÃ±os'''
-            html_content = html_content.replace(original_line, new_vars)
-            print("  âœ… Variables JavaScript agregadas")
-            vars_added = True
-            break
+        // Estado de la aplicación
+        let currentUser = null;
+        let currentTab = 'overview';
+        let charts = {{}};
 
-    if not vars_added:
-        print("  âš ï¸  No se pudieron agregar las variables JavaScript")
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {{
+            initializeUserButtons();
 
-    # 5. Modificar setupNavigation para manejar discoveries de forma mÃ¡s robusta
-    setup_patterns = [
-        r'(// Re-render para la nueva vista\s*if \(currentUser\) \{\{\s*selectUser\(currentUser\);\s*\}\})',
-        r'(if \(currentUser\) \{\{\s*selectUser\(currentUser\);\s*\}\})',
-        r'(selectUser\(currentUser\);)'
-    ]
+            // Seleccionar primer usuario por defecto
+            if (CONFIG.users.length > 0) {{
+                selectUser(CONFIG.users[0]);
+            }}
+        }});
 
-    setup_modified = False
-    for pattern in setup_patterns:
-        matches = re.findall(pattern, html_content, re.DOTALL)
-        if matches:
-            original_setup = matches[0]
+        function initializeUserButtons() {{
+            const container = document.getElementById('userSelector');
+            container.innerHTML = '';
 
-            new_setup = '''// Re-render para la nueva vista
-                    if (currentUser) {
-                        if (view === 'discoveries') {
-                            loadDiscoveriesData(currentUser);
-                        } else {
-                            selectUser(currentUser);
-                        }
-                    }'''
+            CONFIG.users.forEach(user => {{
+                const button = document.createElement('button');
+                button.className = 'user-button';
 
-            html_content = html_content.replace(original_setup, new_setup)
-            print("  âœ… setupNavigation modificado")
-            setup_modified = True
-            break
+                const icon = CONFIG.userIcons[user] || '👤';
+                button.innerHTML = `${{icon}} ${{user}}`;
 
-    if not setup_modified:
-        print("  âš ï¸  No se pudo modificar setupNavigation")
+                button.onclick = () => selectUser(user);
+                container.appendChild(button);
+            }});
+        }}
 
-    # 6. Agregar funciones JavaScript para novedades antes del cierre del script
-    discoveries_js = f'''
-        // ðŸ†• Funciones para manejo de novedades
-        async function loadDiscoveriesData(username) {{
-            console.log(`Cargando datos de novedades para ${{username}}...`);
+        async function selectUser(user) {{
+            currentUser = user;
 
-            const loadingElement = document.getElementById('discoveriesLoading');
-            const gridElement = document.getElementById('discoveriesGrid');
+            // Actualizar botones
+            document.querySelectorAll('.user-button').forEach(btn => {{
+                btn.classList.remove('active');
+                if (btn.textContent.includes(user)) {{
+                    btn.classList.add('active');
+                }}
+            }});
 
-            if (loadingElement) loadingElement.style.display = 'block';
-            if (gridElement) gridElement.style.display = 'none';
+            // Cargar datos del usuario
+            await loadUserData(user);
+        }}
+
+        async function loadUserData(user) {{
+            const container = document.getElementById('userContentContainer');
+
+            // Mostrar spinner de carga
+            container.innerHTML = `
+                <div class="loading-spinner">
+                    <p>🔄 Cargando datos de ${{user}}...</p>
+                </div>
+            `;
 
             try {{
-                if (discoveriesData && discoveriesData[username]) {{
-                    console.log('Usando datos del cache');
-                    renderDiscoveriesCharts(discoveriesData[username]);
-                    return;
+                // Cargar stats principales
+                const statsData = await loadJSON(`${{CONFIG.dataPath}}${{user}}_stats.json`);
+                dataCache[user] = {{ stats: statsData }};
+
+                // Cargar discoveries si está disponible
+                if (CONFIG.discoveriesAvailable) {{
+                    try {{
+                        const discoveriesData = await loadJSON(`${{CONFIG.dataPath}}${{user}}.json`);
+                        dataCache[user].discoveries = discoveriesData;
+                    }} catch (e) {{
+                        console.warn('No se pudieron cargar discoveries para', user);
+                    }}
                 }}
 
-                const currentYear = new Date().getFullYear();
-                const fromYear = currentYear - (yearsBackConfig || 5);
-                const period = `${{fromYear}}-${{currentYear}}`;
-                const dataUrl = `data/usuarios/${{period}}/${{username}}.json`;
-
-                console.log(`Cargando desde: ${{dataUrl}}`);
-
-                const response = await fetch(dataUrl);
-                if (!response.ok) throw new Error(`Error HTTP: ${{response.status}} - ${{dataUrl}}`);
-
-                const userData = await response.json();
-                console.log('Datos cargados:', userData);
-
-                if (!discoveriesData) {{
-                    discoveriesData = {{}};
-                }}
-                discoveriesData[username] = userData;
-                renderDiscoveriesCharts(userData);
+                // Renderizar contenido
+                renderUserContent(user, statsData);
 
             }} catch (error) {{
-                console.error('Error cargando novedades:', error);
-                showDiscoveriesError(error.message);
+                console.error('Error cargando datos:', error);
+                container.innerHTML = `
+                    <div class="error-message">
+                        ❌ Error cargando datos de ${{user}}: ${{error.message}}
+                    </div>
+                `;
             }}
         }}
 
-        function renderDiscoveriesCharts(userData) {{
-            console.log('Renderizando grÃ¡ficos de novedades...');
-
-            const loadingElement = document.getElementById('discoveriesLoading');
-            const gridElement = document.getElementById('discoveriesGrid');
-
-            if (loadingElement) loadingElement.style.display = 'none';
-            if (gridElement) gridElement.style.display = 'grid';
-
-            const discoveryTypes = [
-                {{type: 'artists', canvasId: 'discoveriesArtistsChart', title: 'Nuevos Artistas'}},
-                {{type: 'albums', canvasId: 'discoveriesAlbumsChart', title: 'Nuevos Ãlbumes'}},
-                {{type: 'tracks', canvasId: 'discoveriesTracksChart', title: 'Nuevas Canciones'}},
-                {{type: 'labels', canvasId: 'discoveriesLabelsChart', title: 'Nuevos Sellos'}}
-            ];
-
-            discoveryTypes.forEach(config => {{
-                const typeData = userData.discoveries[config.type];
-                if (typeData && Object.keys(typeData).length > 0) {{
-                    console.log(`Renderizando ${{config.type}}:`, typeData);
-                    renderDiscoveryChart(config.canvasId, typeData, config.title);
-                }} else {{
-                    console.log(`Sin datos para ${{config.type}}`);
-                    showNoDataForChart(config.canvasId);
-                }}
-            }});
+        async function loadJSON(path) {{
+            const response = await fetch(path);
+            if (!response.ok) {{
+                throw new Error(`HTTP error! status: ${{response.status}}`);
+            }}
+            return await response.json();
         }}
 
-        function renderDiscoveryChart(canvasId, typeData, title) {{
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) {{
-                console.error(`Canvas ${{canvasId}} no encontrado`);
-                return;
+        function renderUserContent(user, data) {{
+            const container = document.getElementById('userContentContainer');
+
+            // Crear tabs
+            const tabs = ['overview', 'charts', 'genres', 'labels', 'evolution'];
+            if (CONFIG.discoveriesAvailable && dataCache[user].discoveries) {{
+                tabs.push('discoveries');
             }}
 
-            console.log(`Renderizando grÃ¡fico ${{canvasId}} con datos:`, typeData);
+            const tabNames = {{
+                'overview': '📊 Resumen',
+                'charts': '🎯 Rankings',
+                'genres': '🎭 Géneros',
+                'labels': '🏢 Sellos',
+                'evolution': '📈 Evolución',
+                'discoveries': '✨ Novedades'
+            }};
 
-            const years = [];
-            const counts = [];
-            const details = {{}};
-
-            // Procesar datos por aÃ±o
-            Object.keys(typeData).sort((a, b) => parseInt(a) - parseInt(b)).forEach(year => {{
-                const yearInt = parseInt(year);
-                if (!isNaN(yearInt) && typeData[year]) {{
-                    years.push(yearInt);
-                    counts.push(typeData[year].count || 0);
-                    details[yearInt] = typeData[year].items || [];
-                }}
+            let tabsHTML = '<div class="tabs">';
+            tabs.forEach(tab => {{
+                const active = tab === 'overview' ? 'active' : '';
+                tabsHTML += `<div class="nav-tab ${{active}}" onclick="switchTab('${{tab}}')">${{tabNames[tab]}}</div>`;
             }});
+            tabsHTML += '</div>';
 
-            if (years.length === 0 || counts.every(c => c === 0)) {{
-                console.log(`Sin datos vÃ¡lidos para ${{canvasId}}`);
-                showNoDataForChart(canvasId);
-                return;
+            container.innerHTML = tabsHTML + '<div id="tabContentContainer"></div>';
+
+            // Mostrar primera tab
+            switchTab('overview');
+        }}
+
+        function switchTab(tabName) {{
+            currentTab = tabName;
+
+            // Actualizar tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {{
+                tab.classList.remove('active');
+            }});
+            event.target.classList.add('active');
+
+            // Renderizar contenido de la tab
+            const container = document.getElementById('tabContentContainer');
+
+            switch(tabName) {{
+                case 'overview':
+                    renderOverview(container);
+                    break;
+                case 'charts':
+                    renderCharts(container);
+                    break;
+                case 'genres':
+                    renderGenres(container);
+                    break;
+                case 'labels':
+                    renderLabels(container);
+                    break;
+                case 'evolution':
+                    renderEvolution(container);
+                    break;
+                case 'discoveries':
+                    renderDiscoveries(container);
+                    break;
             }}
+        }}
 
-            console.log(`AÃ±os: ${{years}}, Conteos: ${{counts}}`);
+        function renderOverview(container) {{
+            const data = dataCache[currentUser].stats;
 
-            const config = {{
-                type: 'line',
+            const totalScrobbles = Object.values(data.yearly_scrobbles || {{}}).reduce((a, b) => a + b, 0);
+            const uniqueCounts = data.unique_counts || {{}};
+
+            container.innerHTML = `
+                <div class="tab-content active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>Total Scrobbles</h3>
+                            <div class="value">${{totalScrobbles.toLocaleString()}}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Artistas Únicos</h3>
+                            <div class="value">${{(uniqueCounts.total_artists || 0).toLocaleString()}}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Álbumes Únicos</h3>
+                            <div class="value">${{(uniqueCounts.total_albums || 0).toLocaleString()}}</div>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Canciones Únicas</h3>
+                            <div class="value">${{(uniqueCounts.total_tracks || 0).toLocaleString()}}</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <h3>Scrobbles por Año</h3>
+                        <canvas id="yearlyChart"></canvas>
+                    </div>
+                </div>
+            `;
+
+            // Renderizar gráfico de scrobbles por año
+            renderYearlyChart(data.yearly_scrobbles);
+        }}
+
+        function renderYearlyChart(yearlyData) {{
+            const ctx = document.getElementById('yearlyChart');
+            if (!ctx) return;
+
+            const years = Object.keys(yearlyData).sort();
+            const values = years.map(year => yearlyData[year]);
+
+            if (charts.yearly) charts.yearly.destroy();
+
+            charts.yearly = new Chart(ctx, {{
+                type: 'bar',
                 data: {{
                     labels: years,
                     datasets: [{{
-                        label: title,
-                        data: counts,
-                        borderColor: '#cba6f7',
-                        backgroundColor: '#cba6f730',
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 6,
-                        pointHoverRadius: 10,
-                        pointBackgroundColor: '#cba6f7',
-                        pointBorderColor: '#1e1e2e',
-                        pointBorderWidth: 2
+                        label: 'Scrobbles',
+                        data: values,
+                        backgroundColor: CONFIG.colors[0],
+                        borderColor: CONFIG.colors[0],
+                        borderWidth: 2
                     }}]
                 }},
                 options: {{
                     responsive: true,
-                    maintainAspectRatio: false,
+                    maintainAspectRatio: true,
                     plugins: {{
-                        legend: {{
-                            position: 'bottom',
-                            labels: {{color: '#cdd6f4', padding: 15}}
-                        }},
-                        tooltip: {{
-                            backgroundColor: '#1e1e2e',
-                            titleColor: '#cba6f7',
-                            bodyColor: '#cdd6f4',
-                            borderColor: '#cba6f7',
-                            borderWidth: 1
-                        }}
+                        legend: {{ display: false }}
                     }},
                     scales: {{
-                        x: {{
-                            title: {{display: true, text: 'AÃ±o', color: '#cdd6f4'}},
-                            ticks: {{color: '#a6adc8'}},
-                            grid: {{color: '#313244'}}
-                        }},
                         y: {{
-                            title: {{display: true, text: 'Novedades', color: '#cdd6f4'}},
-                            ticks: {{color: '#a6adc8', precision: 0}},
-                            grid: {{color: '#313244'}},
-                            beginAtZero: true
-                        }}
-                    }},
-                    onClick: function(event, elements) {{
-                        if (elements.length > 0) {{
-                            const pointIndex = elements[0].index;
-                            const year = this.data.labels[pointIndex];
-                            const count = this.data.datasets[0].data[pointIndex];
-
-                            console.log(`Click en aÃ±o ${{year}}, count: ${{count}}`);
-
-                            if (count > 0 && details[year] && details[year].length > 0) {{
-                                showDiscoveryPopup(year, details[year], title, count);
-                            }}
+                            beginAtZero: true,
+                            ticks: {{ color: '#a6adc8' }},
+                            grid: {{ color: '#313244' }}
+                        }},
+                        x: {{
+                            ticks: {{ color: '#a6adc8' }},
+                            grid: {{ color: '#313244' }}
                         }}
                     }}
                 }}
-            }};
-
-            // Destruir grÃ¡fico existente si existe
-            if (window.charts && window.charts[canvasId]) {{
-                console.log(`Destruyendo grÃ¡fico existente ${{canvasId}}`);
-                window.charts[canvasId].destroy();
-                delete window.charts[canvasId];
-            }}
-
-            console.log(`Creando nuevo grÃ¡fico ${{canvasId}}`);
-
-            if (!window.charts) {{
-                window.charts = {{}};
-            }}
-            window.charts[canvasId] = new Chart(canvas, config);
+            }});
         }}
 
-        function showDiscoveryPopup(year, items, title, count) {{
-            console.log(`Mostrando popup para ${{title}} - ${{year}}:`, items);
+        function renderCharts(container) {{
+            const data = dataCache[currentUser].stats;
 
-            const popupTitle = `${{title}} - ${{year}} (${{count}} nuevos)`;
-            let content = '';
+            // Renderizar rankings de artistas, álbumes y tracks
+            container.innerHTML = `
+                <div class="tab-content active">
+                    <div class="chart-container">
+                        <h3>🎤 Top Artistas</h3>
+                        <div id="topArtists" class="top-list"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h3>💿 Top Álbumes</h3>
+                        <div id="topAlbums" class="top-list"></div>
+                    </div>
+                    <div class="chart-container">
+                        <h3>🎵 Top Canciones</h3>
+                        <div id="topTracks" class="top-list"></div>
+                    </div>
+                </div>
+            `;
 
-            items.forEach(item => {{
-                content += `<div class="popup-item">
-                    <span class="name">${{item.name}}</span>
-                    <span class="count">${{item.date}}</span>
-                </div>`;
+            // Renderizar listas
+            renderTopList('topArtists', data.artists?.rankings?.all_time?.slice(0, 20) || []);
+            renderTopList('topAlbums', data.albums?.rankings?.all_time?.slice(0, 20) || []);
+            renderTopList('topTracks', data.tracks?.rankings?.all_time?.slice(0, 20) || []);
+        }}
+
+        function renderTopList(elementId, items) {{
+            const container = document.getElementById(elementId);
+            if (!container) return;
+
+            container.innerHTML = items.map((item, index) => `
+                <div class="top-item">
+                    <span class="rank">${{index + 1}}</span>
+                    <span class="item-name">${{item.name}}</span>
+                    <span class="item-count">${{item.count.toLocaleString()}} plays</span>
+                </div>
+            `).join('');
+        }}
+
+        function renderGenres(container) {{
+            const data = dataCache[currentUser].stats;
+            const genresData = data.genres || {{}};
+
+            container.innerHTML = `
+                <div class="tab-content active">
+                    <div class="chart-container">
+                        <h3>Distribución de Géneros</h3>
+                        <canvas id="genresChart"></canvas>
+                    </div>
+                </div>
+            `;
+
+            // Renderizar gráfico de géneros (usar datos de lastfm, musicbrainz o discogs)
+            const providers = ['lastfm', 'musicbrainz', 'discogs'];
+            let genresPieData = null;
+
+            for (const provider of providers) {{
+                if (genresData[provider]?.pie_chart) {{
+                    genresPieData = genresData[provider].pie_chart;
+                    break;
+                }}
+            }}
+
+            if (genresPieData && genresPieData.data) {{
+                renderPieChart('genresChart', genresPieData.data);
+            }}
+        }}
+
+        function renderLabels(container) {{
+            const data = dataCache[currentUser].stats;
+            const labelsData = data.labels?.pie_chart || {{}};
+
+            container.innerHTML = `
+                <div class="tab-content active">
+                    <div class="chart-container">
+                        <h3>Sellos Discográficos</h3>
+                        <canvas id="labelsChart"></canvas>
+                    </div>
+                </div>
+            `;
+
+            if (labelsData.data) {{
+                renderPieChart('labelsChart', labelsData.data);
+            }}
+        }}
+
+        function renderPieChart(canvasId, data) {{
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            const labels = data.map(item => item.label);
+            const values = data.map(item => item.count);
+
+            if (charts[canvasId]) charts[canvasId].destroy();
+
+            charts[canvasId] = new Chart(ctx, {{
+                type: 'pie',
+                data: {{
+                    labels: labels,
+                    datasets: [{{
+                        data: values,
+                        backgroundColor: CONFIG.colors,
+                        borderColor: '#181825',
+                        borderWidth: 2
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {{
+                        legend: {{
+                            position: 'right',
+                            labels: {{ color: '#cdd6f4' }}
+                        }}
+                    }}
+                }}
+            }});
+        }}
+
+        function renderEvolution(container) {{
+            const data = dataCache[currentUser].stats;
+            const evolution = data.evolution || {{}};
+
+            container.innerHTML = `
+                <div class="tab-content active">
+                    <div class="discoveries-grid">
+                        <div class="chart-container">
+                            <h3>Evolución Artistas</h3>
+                            <canvas id="evolutionArtistsChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Evolución Álbumes</h3>
+                            <canvas id="evolutionAlbumsChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Evolución Canciones</h3>
+                            <canvas id="evolutionTracksChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Renderizar gráficos de evolución
+            if (evolution.artists_timeline) {{
+                renderLineChart('evolutionArtistsChart', evolution.artists_timeline, 'Artistas');
+            }}
+            if (evolution.albums_timeline) {{
+                renderLineChart('evolutionAlbumsChart', evolution.albums_timeline, 'Álbumes');
+            }}
+            if (evolution.tracks_timeline) {{
+                renderLineChart('evolutionTracksChart', evolution.tracks_timeline, 'Canciones');
+            }}
+        }}
+
+        function renderLineChart(canvasId, timelineData, label) {{
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            const years = Object.keys(timelineData).sort();
+            const cumulative = [];
+            const yearly = [];
+
+            let total = 0;
+            years.forEach(year => {{
+                const yearData = timelineData[year];
+                const count = yearData.unique || yearData.count || 0;
+                total += count;
+                cumulative.push(total);
+                yearly.push(count);
             }});
 
-            if (count > items.length) {{
-                content += `<div style="text-align: center; padding: 10px; color: #a6adc8; font-style: italic;">
-                    ... y ${{count - items.length}} mÃ¡s
+            if (charts[canvasId]) charts[canvasId].destroy();
+
+            charts[canvasId] = new Chart(ctx, {{
+                type: 'line',
+                data: {{
+                    labels: years,
+                    datasets: [
+                        {{
+                            label: `${{label}} Acumulados`,
+                            data: cumulative,
+                            borderColor: CONFIG.colors[0],
+                            backgroundColor: CONFIG.colors[0] + '20',
+                            fill: true,
+                            tension: 0.4
+                        }},
+                        {{
+                            label: `${{label}} por Año`,
+                            data: yearly,
+                            borderColor: CONFIG.colors[1],
+                            backgroundColor: CONFIG.colors[1] + '20',
+                            fill: true,
+                            tension: 0.4
+                        }}
+                    ]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {{
+                        legend: {{
+                            display: true,
+                            labels: {{ color: '#cdd6f4' }}
+                        }}
+                    }},
+                    scales: {{
+                        y: {{
+                            beginAtZero: true,
+                            ticks: {{ color: '#a6adc8' }},
+                            grid: {{ color: '#313244' }}
+                        }},
+                        x: {{
+                            ticks: {{ color: '#a6adc8' }},
+                            grid: {{ color: '#313244' }}
+                        }}
+                    }}
+                }}
+            }});
+        }}
+
+        function renderDiscoveries(container) {{
+            const discoveries = dataCache[currentUser].discoveries;
+
+            if (!discoveries) {{
+                container.innerHTML = `
+                    <div class="tab-content active">
+                        <div class="error-message">
+                            ℹ️ Datos de novedades no disponibles
+                        </div>
+                    </div>
+                `;
+                return;
+            }}
+
+            container.innerHTML = `
+                <div class="tab-content active">
+                    <div class="discoveries-grid">
+                        <div class="chart-container">
+                            <h3>✨ Nuevos Artistas</h3>
+                            <canvas id="discoveriesArtistsChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>💿 Nuevos Álbumes</h3>
+                            <canvas id="discoveriesAlbumsChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>🎵 Nuevas Canciones</h3>
+                            <canvas id="discoveriesTracksChart"></canvas>
+                        </div>
+                        <div class="chart-container">
+                            <h3>🏢 Nuevos Sellos</h3>
+                            <canvas id="discoveriesLabelsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Renderizar gráficos de discoveries
+            const types = ['artists', 'albums', 'tracks', 'labels'];
+            types.forEach(type => {{
+                if (discoveries.discoveries && discoveries.discoveries[type]) {{
+                    renderDiscoveriesChart(`discoveries${{type.charAt(0).toUpperCase() + type.slice(1)}}Chart`,
+                                         discoveries.discoveries[type]);
+                }}
+            }});
+        }}
+
+        function renderDiscoveriesChart(canvasId, discoveriesData) {{
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            const years = Object.keys(discoveriesData).filter(y => !isNaN(y)).sort();
+            const counts = years.map(year => {{
+                const yearData = discoveriesData[year];
+                return typeof yearData === 'object' ? yearData.count : 0;
+            }});
+
+            if (charts[canvasId]) charts[canvasId].destroy();
+
+            charts[canvasId] = new Chart(ctx, {{
+                type: 'bar',
+                data: {{
+                    labels: years,
+                    datasets: [{{
+                        label: 'Descubrimientos',
+                        data: counts,
+                        backgroundColor: CONFIG.colors[2],
+                        borderColor: CONFIG.colors[2],
+                        borderWidth: 2
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {{
+                        legend: {{ display: false }}
+                    }},
+                    scales: {{
+                        y: {{
+                            beginAtZero: true,
+                            ticks: {{ color: '#a6adc8' }},
+                            grid: {{ color: '#313244' }}
+                        }},
+                        x: {{
+                            ticks: {{ color: '#a6adc8' }},
+                            grid: {{ color: '#313244' }}
+                        }}
+                    }},
+                    onClick: (event, elements) => {{
+                        if (elements.length > 0) {{
+                            const index = elements[0].index;
+                            const year = years[index];
+                            showDiscoveryPopup(year, discoveriesData[year]);
+                        }}
+                    }}
+                }}
+            }});
+        }}
+
+        function showDiscoveryPopup(year, yearData) {{
+            const overlay = document.getElementById('popupOverlay');
+            const content = document.getElementById('popupContent');
+
+            const items = yearData.items || [];
+            const hasMore = yearData.has_more || false;
+
+            let itemsHTML = items.map(item => `
+                <div class="top-item">
+                    <span class="item-name">${{item.name}}</span>
+                    <span class="item-count">${{item.date}}</span>
+                </div>
+            `).join('');
+
+            if (hasMore) {{
+                itemsHTML += `<div class="top-item" style="text-align: center; color: #a6adc8;">
+                    <span>... y ${{yearData.count - 10}} más</span>
                 </div>`;
             }}
 
-            document.getElementById('popupTitle').textContent = popupTitle;
-            document.getElementById('popupContent').innerHTML = content;
-            document.getElementById('popupOverlay').style.display = 'block';
-            document.getElementById('popup').style.display = 'block';
+            content.innerHTML = `
+                <div class="popup-header">
+                    <h3>Descubrimientos de ${{year}}</h3>
+                    <button class="popup-close" onclick="closePopup()">✕</button>
+                </div>
+                <div class="top-list">
+                    ${{itemsHTML}}
+                </div>
+            `;
+
+            overlay.classList.add('active');
         }}
 
-        function showDiscoveriesError(errorMessage) {{
-            console.error('Error en novedades:', errorMessage);
+        function closePopup() {{
+            document.getElementById('popupOverlay').classList.remove('active');
+        }}
 
-            const loadingElement = document.getElementById('discoveriesLoading');
-            const gridElement = document.getElementById('discoveriesGrid');
-
-            if (loadingElement) loadingElement.style.display = 'none';
-
-            if (gridElement) {{
-                gridElement.innerHTML = `<div class="no-data" style="grid-column: 1/-1; text-align: center; padding: 40px;">
-                    <h4 style="color: #f38ba8; margin-bottom: 15px;">âŒ Error cargando novedades</h4>
-                    <p style="color: #cdd6f4; margin-bottom: 10px;">No se pudieron cargar los datos de descubrimientos.</p>
-                    <p style="font-size: 0.9em; color: #a6adc8; margin-bottom: 10px;">${{errorMessage}}</p>
-                    <p style="font-size: 0.8em; color: #6c7086;">
-                        Ejecuta: <code style="background: #313244; padding: 2px 6px; border-radius: 4px;">python create_first_listen_tables_mbid.py</code>
-                    </p>
-                </div>`;
-                gridElement.style.display = 'grid';
+        // Cerrar popup al hacer click fuera
+        document.getElementById('popupOverlay').addEventListener('click', function(e) {{
+            if (e.target === this) {{
+                closePopup();
             }}
-        }}
+        }});
+    </script>
+</body>
+</html>
+"""
 
-        function showNoDataForChart(canvasId) {{
-            const canvas = document.getElementById(canvasId);
-            if (canvas) {{
-                canvas.style.display = 'none';
-                const wrapper = canvas.parentElement;
-                wrapper.innerHTML = '<div class="no-data" style="height: 200px; display: flex; align-items: center; justify-content: center; color: #a6adc8; font-style: italic;">Sin datos de descubrimientos</div>';
-            }}
-        }}
-'''
-
-    # Buscar el cierre del script de forma mÃ¡s robusta
-    script_end_patterns = [
-        r'(\s*</script>\s*</body>\s*</html>"""\s*$)',
-        r'(\s*</script>\s*</body>\s*</html>)',
-        r'(\s*</script>)',
-        r'(</body>\s*</html>""")'
-    ]
-
-    js_added = False
-    for pattern in script_end_patterns:
-        matches = re.findall(pattern, html_content, re.MULTILINE | re.DOTALL)
-        if matches:
-            script_end = matches[0]
-            html_content = html_content.replace(script_end, discoveries_js + '\n' + script_end)
-            print("  âœ… Funciones JavaScript de novedades agregadas")
-            js_added = True
-            break
-
-    if not js_added:
-        print("  âš ï¸  No se pudieron agregar las funciones JavaScript")
-
-    print("ðŸŽ‰ ModificaciÃ³n del HTML completada")
     return html_content
 
 
 def main():
-    """FunciÃ³n principal para generar estadÃ­sticas de usuarios con conteos Ãºnicos CORRECTOS + NOVEDADES"""
-    parser = argparse.ArgumentParser(description='Generador de estadÃ­sticas individuales de usuarios de Last.fm + Novedades')
-    parser.add_argument('--years-back', type=int, default=5,
-                       help='NÃºmero de aÃ±os hacia atrÃ¡s para analizar (por defecto: 5)')
-    parser.add_argument('--output', type=str, default=None,
-                       help='Archivo de salida HTML (por defecto: auto-generado con fecha)')
-    parser.add_argument('--skip-discoveries', action='store_true',
-                       help='Omitir generaciÃ³n de datos de novedades')
+    """Función principal"""
+    parser = argparse.ArgumentParser(
+        description='Generador optimizado de estadísticas de usuarios de Last.fm'
+    )
+    parser.add_argument(
+        '--years-back',
+        type=int,
+        default=5,
+        help='Número de años hacia atrás para analizar (por defecto: 5)'
+    )
+    parser.add_argument(
+        '--output',
+        type=str,
+        default=None,
+        help='Archivo de salida HTML (por defecto: auto-generado con fecha)'
+    )
+    parser.add_argument(
+        '--skip-data-generation',
+        action='store_true',
+        help='Omitir generación de archivos JSON (usar datos existentes)'
+    )
+
     args = parser.parse_args()
+
+    # Obtener usuarios
+    users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
+    if not users:
+        print("❌ Variable LASTFM_USERS no configurada")
+        print("Ejemplo: export LASTFM_USERS='usuario1,usuario2,usuario3'")
+        sys.exit(1)
 
     # Auto-generar nombre de archivo si no se especifica
     if args.output is None:
@@ -527,116 +1175,72 @@ def main():
         from_year = current_year - args.years_back
         args.output = f'docs/usuarios_{from_year}-{current_year}.html'
 
+    output_dir = os.path.dirname(args.output) or 'docs'
+
+    print("🎵 Generador Optimizado de Estadísticas de Usuarios")
+    print("=" * 60)
+    print(f"👥 Usuarios: {', '.join(users)}")
+    print(f"📅 Años atrás: {args.years_back}")
+    print(f"📁 Salida: {args.output}")
+
     try:
-        users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
-        if not users:
-            raise ValueError("LASTFM_USERS no encontrada en las variables de entorno")
+        # Paso 1: Generar archivos de datos JSON (si no se omite)
+        if not args.skip_data_generation:
+            data_info = generate_all_data_files(users, args.years_back, output_dir)
+            data_info['users'] = users
+        else:
+            print("\n⏭️  Omitiendo generación de datos JSON (usando existentes)")
+            current_year = datetime.now().year
+            from_year = current_year - args.years_back
+            period = f"{from_year}-{to_year}"
 
-        print("ðŸŽµ Iniciando anÃ¡lisis de usuarios con conteos Ãºnicos CORRECTOS + NOVEDADES...")
+            data_info = {
+                'users': users,
+                'period': period,
+                'discoveries_available': True  # Asumir que están disponibles
+            }
 
-        # Paso 1: Generar datos de novedades si no se salta
-        discoveries_available = False
-        if not args.skip_discoveries:
-            output_dir = os.path.dirname(args.output) or 'docs'
-            discoveries_available = generate_discoveries_data(users, args.years_back, output_dir)
+        # Paso 2: Generar HTML optimizado
+        print(f"\n🎨 Generando HTML optimizado...")
+        html_content = generate_optimized_html(data_info, args.output)
 
-        # Paso 2: Usar base de datos extendida con funciones adicionales
-        database = UserStatsDatabaseExtended()
-        analyzer = UserStatsAnalyzer(database, years_back=args.years_back)
-        html_generator = UserStatsHTMLGenerator()
-
-        # Paso 3: Analizar estadÃ­sticas para todos los usuarios
-        print(f"ðŸ‘¤ Analizando {len(users)} usuarios...")
-        all_user_stats = {}
-
-        for user in users:
-            print(f"  â€¢ Procesando {user}...")
-            user_stats = analyzer.analyze_user(user, users)
-
-            # Remover datos de novedades del JSON principal para optimizar
-            if 'individual' in user_stats and 'discoveries' in user_stats['individual']:
-                del user_stats['individual']['discoveries']
-
-            all_user_stats[user] = user_stats
-
-        # Paso 4: Generar HTML base
-        print("ðŸŽ¨ Generando HTML con conteos Ãºnicos...")
-        html_content = html_generator.generate_html(all_user_stats, users, args.years_back)
-
-        # Paso 5: Modificar HTML para agregar novedades si estÃ¡n disponibles
-        if discoveries_available:
-            print("âœ¨ Integrando funcionalidad de novedades...")
-            html_content = modify_html_for_discoveries(html_content, users, args.years_back)
-
-        # Paso 6: Guardar archivo
+        # Paso 3: Guardar HTML
         os.makedirs(os.path.dirname(args.output), exist_ok=True)
         with open(args.output, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
-        # Calcular tamaÃ±o del archivo
-        file_size = os.path.getsize(args.output) / 1024 / 1024  # MB
+        # Calcular tamaños
+        html_size = os.path.getsize(args.output) / 1024 / 1024  # MB
 
-        print(f"âœ… Archivo generado: {args.output} ({file_size:.2f} MB)")
-        print(f"ðŸ“Š CaracterÃ­sticas FINALES:")
-        print(f"  â€¢ GÃ©neros diferenciados por proveedor (Last.fm, MusicBrainz, Discogs)")
-        print(f"  â€¢ GrÃ¡ficos scatter con leyendas visibles y mÃ¡rgenes adecuados")
-        print(f"  â€¢ Soporte para gÃ©neros de Ã¡lbumes por separado")
-        print(f"  â€¢ SecciÃ³n de sellos completamente funcional")
-        print(f"  â€¢ Manejo mejorado de datos vacÃ­os")
-        print(f"  â€¢ âœ… CORREGIDO: GrÃ¡ficos de gÃ©neros se muestran correctamente")
-        print(f"  â€¢ âœ… RESTAURADO: Funciones completas de scatter charts")
-        print(f"  â€¢ âœ… RESTAURADO: Funciones completas de evoluciÃ³n")
-        print(f"  â€¢ âœ… AÃ‘ADIDO: Popups interactivos con detalles")
-        print(f"  â€¢ âœ… NUEVO: Conteos Ãºnicos reales del usuario (SOLUCIONADO)")
-        if discoveries_available:
-            print(f"  â€¢ âœ¨ NUEVO: PestaÃ±a de Novedades integrada con carga dinÃ¡mica")
-            print(f"  â€¢ âœ¨ NUEVO: Popups con top 10 descubrimientos por aÃ±o")
-            print(f"  â€¢ âœ¨ NUEVO: Filtro MBID para artistas Ãºnicos vÃ¡lidos")
-        else:
-            print(f"  â€¢ âš ï¸  Novedades omitidas (usar --skip-discoveries=false y ejecutar create_first_listen_tables_mbid.py)")
+        # Calcular tamaño de JSONs
+        json_dir = Path(output_dir) / "data" / "usuarios" / data_info['period']
+        json_size = 0
+        if json_dir.exists():
+            for json_file in json_dir.glob("*.json"):
+                json_size += os.path.getsize(json_file)
+        json_size = json_size / 1024 / 1024  # MB
 
-        # Mostrar resumen con conteos reales
-        print(f"\nðŸ“ˆ Resumen con conteos Ãºnicos REALES:")
-        for user, stats in all_user_stats.items():
-            total_scrobbles = sum(stats['yearly_scrobbles'].values())
+        print(f"\n✅ Generación completada!")
+        print(f"📄 HTML: {args.output} ({html_size:.2f} MB)")
+        print(f"📊 JSONs: {json_dir} ({json_size:.2f} MB)")
+        print(f"💾 Total: {html_size + json_size:.2f} MB")
 
-            # Mostrar conteos Ãºnicos reales
-            if 'unique_counts' in stats:
-                unique_counts = stats['unique_counts']
-                print(f"  â€¢ {user}: {total_scrobbles:,} scrobbles")
-                print(f"    - âœ… {unique_counts['total_artists']} artistas Ãºnicos")
-                print(f"    - âœ… {unique_counts['total_albums']} Ã¡lbumes Ãºnicos")
-                print(f"    - âœ… {unique_counts['total_tracks']} canciones Ãºnicas")
+        print(f"\n✨ Características:")
+        print(f"  ✅ HTML ligero (~{html_size:.1f}MB vs ~13MB anterior)")
+        print(f"  ✅ Carga dinámica desde archivos JSON separados")
+        print(f"  ✅ Navegación entre usuarios sin recargar")
+        print(f"  ✅ Tabs interactivas con gráficos")
+        print(f"  ✅ Pestaña de novedades con popups")
+        print(f"  ✅ Mejor rendimiento y tiempo de carga")
 
-                # Mostrar informaciÃ³n sobre gÃ©neros por proveedor
-                if 'genres' in stats:
-                    for provider in ['lastfm', 'musicbrainz', 'discogs']:
-                        if provider in stats['genres']:
-                            provider_data = stats['genres'][provider]
-                            if 'pie_chart' in provider_data and provider_data['pie_chart']['total'] > 0:
-                                genres_count = len(provider_data['pie_chart']['data'])
-                                print(f"    - {provider}: {genres_count} gÃ©neros")
-
-                # Mostrar informaciÃ³n sobre sellos
-                if 'labels' in stats and 'pie_chart' in stats['labels']:
-                    labels_count = len(stats['labels']['pie_chart']['data'])
-                    print(f"    - {labels_count} sellos discogrÃ¡ficos")
-            else:
-                print(f"  â€¢ {user}: {total_scrobbles:,} scrobbles (âŒ sin conteos Ãºnicos)")
-
-        database.close()
-
-        if discoveries_available:
-            print(f"\nðŸŽ¯ Uso de la funcionalidad de Novedades:")
-            print(f"  1. Abre {args.output}")
-            print(f"  2. Selecciona un usuario (botÃ³n ðŸ‘¤ con iconos)")
-            print(f"  3. Ve a la pestaÃ±a 'âœ¨ Novedades'")
-            print(f"  4. Los datos se cargarÃ¡n automÃ¡ticamente")
-            print(f"  5. Haz click en puntos de los grÃ¡ficos para ver detalles")
-            print(f"  6. Solo se consideran artistas con MBID vÃ¡lido")
+        print(f"\n🚀 Para usar:")
+        print(f"  1. Abre {args.output} en tu navegador")
+        print(f"  2. Selecciona un usuario con los botones superiores")
+        print(f"  3. Navega entre las diferentes pestañas")
+        print(f"  4. Los datos se cargan automáticamente bajo demanda")
 
     except Exception as e:
-        print(f"âŒ Error: {e}")
+        print(f"\n❌ Error: {e}")
         import traceback
         traceback.print_exc()
         sys.exit(1)

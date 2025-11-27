@@ -11,7 +11,7 @@ import os
 from typing import Dict, List
 
 
-class UserStatsHTMLGeneratorCompleto:
+class UserStatsHTMLGenerator:
     """TODOS los gráficos pero con datos optimizados para el navegador"""
 
     def __init__(self):

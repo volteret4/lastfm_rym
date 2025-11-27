@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Novedades</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .canvas-container { width: 400px; height: 300px; margin: 20px; }
+        canvas { border: 1px solid #ccc; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>Test de Gráficos de Novedades</h1>
+
+    <div id="status">Cargando...</div>
+
+    <div class="canvas-container">
+        <h3>Nuevos Artistas</h3>
+        <canvas id="testArtistsChart"></canvas>
+    </div>
+
+    <div class="canvas-container">
+        <h3>Nuevos Álbumes</h3>
+        <canvas id="testAlbumsChart"></canvas>
+    </div>
+
+    <script>
+        console.log('🚀 Iniciando test de novedades...');
+
+        // Datos de prueba
+        const testData = {
+            user: "test_user",
+            period: "2020-2025",
+            discoveries: {
+                artists: {
+                    "2023": { count: 15, items: [{name: "Artista Test", date: "2023-03-15"}] },
+                    "2024": { count: 20, items: [{name: "Artista Test 2", date: "2024-05-20"}] }
+                },
+                albums: {
+                    "2023": { count: 25, items: [{name: "Album Test", date: "2023-07-10"}] },
+                    "2024": { count: 30, items: [{name: "Album Test 2", date: "2024-09-15"}] }
+                }
+            }
+        };
+
+        let charts = {};
+
+        function renderTestChart(canvasId, typeData, title) {
+            console.log(`📊 Renderizando ${canvasId} con datos:`, typeData);
+
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) {
+                console.error(`❌ Canvas ${canvasId} no encontrado`);
+                return;
+            }
+
+            const years = [];
+            const counts = [];
+
+            Object.keys(typeData).sort().forEach(year => {
+                const yearInt = parseInt(year);
+                if (!isNaN(yearInt) && typeData[year]) {
+                    years.push(yearInt);
+                    counts.push(typeData[year].count || 0);
+                }
+            });
+
+            if (years.length === 0 || counts.every(c => c === 0)) {
+                console.log(`⚠️ Sin datos válidos para ${canvasId}`);
+                canvas.parentElement.innerHTML += '<p class="error">Sin datos</p>';
+                return;
+            }
+
+            console.log(`📈 Años: ${years}, Conteos: ${counts}`);
+
+            const config = {
+                type: 'line',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: title,
+                        data: counts,
+                        borderColor: '#cba6f7',
+                        backgroundColor: '#cba6f730',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            };
+
+            try {
+                if (charts[canvasId]) {
+                    charts[canvasId].destroy();
+                }
+                charts[canvasId] = new Chart(canvas, config);
+                console.log(`✅ Gráfico ${canvasId} creado exitosamente`);
+                return true;
+            } catch (error) {
+                console.error(`❌ Error creando gráfico ${canvasId}:`, error);
+                canvas.parentElement.innerHTML += `<p class="error">Error: ${error.message}</p>`;
+                return false;
+            }
+        }
+
+        // Test principal
+        function runTest() {
+            console.log('🔧 Ejecutando test de renderizado...');
+
+            const statusDiv = document.getElementById('status');
+
+            try {
+                const results = [];
+
+                // Test artistas
+                const artistsResult = renderTestChart('testArtistsChart', testData.discoveries.artists, 'Nuevos Artistas');
+                results.push({type: 'artists', success: artistsResult});
+
+                // Test álbumes
+                const albumsResult = renderTestChart('testAlbumsChart', testData.discoveries.albums, 'Nuevos Álbumes');
+                results.push({type: 'albums', success: albumsResult});
+
+                // Mostrar resultados
+                const successful = results.filter(r => r.success).length;
+                const total = results.length;
+
+                if (successful === total) {
+                    statusDiv.innerHTML = `<span class="success">✅ Test exitoso: ${successful}/${total} gráficos funcionan</span>`;
+                } else {
+                    statusDiv.innerHTML = `<span class="error">⚠️ Test parcial: ${successful}/${total} gráficos funcionan</span>`;
+                }
+
+                console.log('📊 Resultados del test:', results);
+
+            } catch (error) {
+                console.error('❌ Error en test principal:', error);
+                statusDiv.innerHTML = `<span class="error">❌ Error en test: ${error.message}</span>`;
+            }
+        }
+
+        // Ejecutar cuando esté listo
+        document.addEventListener('DOMContentLoaded', runTest);
+    </script>
+</body>
+</html>

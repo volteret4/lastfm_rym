@@ -543,7 +543,7 @@ def main():
         # Paso 2: Usar base de datos extendida con funciones adicionales
         database = UserStatsDatabaseExtended()
         analyzer = UserStatsAnalyzer(database, years_back=args.years_back)
-        html_generator = UserStatsHTMLGeneratorFixed()
+        html_generator = UserStatsHTMLGenerator()
 
         # Paso 3: Analizar estadÃ­sticas para todos los usuarios
         print(f"ðŸ‘¤ Analizando {len(users)} usuarios...")

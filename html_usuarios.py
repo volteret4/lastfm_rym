@@ -27,8 +27,8 @@ from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database_extended import UserStatsDatabaseExtended
 
 # Usar el generador HTML corregido que mantiene TODA la funcionalidad
-sys.path.append('/mnt/user-data/outputs')
-from user_stats_html_generator_RECUPERADO import UserStatsHTMLGeneratorFixed
+
+from tools.users.user_stats_html_generator import UserStatsHTMLGeneratorFixed
 
 # Importar generador de datos de novedades
 try:

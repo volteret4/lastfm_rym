@@ -12,7 +12,7 @@ import os
 from typing import Dict, List
 
 
-class UserStatsHTMLGeneratorFixed:
+class UserStatsHTMLGenerator:
     """Clase para generar HTML con grÃ¡ficos interactivos de estadÃ­sticas de usuarios - CORREGIDA"""
 
     def __init__(self):

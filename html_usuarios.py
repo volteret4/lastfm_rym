@@ -28,7 +28,8 @@ from tools.users.user_stats_database_extended import UserStatsDatabaseExtended
 
 # Usar el generador HTML corregido que mantiene TODA la funcionalidad
 
-from tools.users.user_stats_html_generator import UserStatsHTMLGeneratorFixed
+from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
+
 
 # Importar generador de datos de novedades
 try:

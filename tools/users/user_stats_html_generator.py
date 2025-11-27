@@ -8,7 +8,7 @@ import os
 from typing import Dict, List
 
 
-class UserStatsHTMLGeneratorFuncional:
+class UserStatsHTMLGenerator:
     """Generador HTML que funciona DE VERDAD - sin embeber JSONs gigantes"""
 
     def __init__(self):

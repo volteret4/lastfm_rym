@@ -2632,18 +2632,15 @@ class UserStatsHTMLGeneratorFixed:
                 }}
             }};
 
-            if (window.charts && window.charts[canvasId]) {{
+            if (charts && charts[canvasId]) {{
                 console.log(`Destruyendo grÃ¡fico existente ${{canvasId}}`);
-                window.charts[canvasId].destroy();
-                delete window.charts[canvasId];
+                charts[canvasId].destroy();
+                delete charts[canvasId];
             }}
 
             console.log(`Creando nuevo grÃ¡fico ${{canvasId}}`);
 
-            if (!window.charts) {{
-                window.charts = {{}};
-            }}
-            window.charts[canvasId] = new Chart(canvas, config);
+            charts[canvasId] = new Chart(canvas, config);
         }}
 
         function showDiscoveriesError(errorMessage) {{

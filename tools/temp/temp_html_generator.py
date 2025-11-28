@@ -779,6 +779,8 @@ class HTMLGenerator:
                     updateUserButtonIcon(user);
                     userModal.style.display = 'none';
                     renderStats(); // Re-renderizar con nuevo usuario
+
+                    location.reload()
                 }}
             }});
 

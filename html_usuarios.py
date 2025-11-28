@@ -82,20 +82,29 @@ def modify_html_for_discoveries(html_content, users, years_back):
     from_year = current_year - years_back
     period = f"{from_year}-{current_year}"
 
-    print("🔧 Modificando HTML para agregar novedades...")
+    print("🔧 Verificando funcionalidad de novedades en HTML...")
 
-    # 1. Agregar pestaña de novedades (solo una vez)
-    evolution_pattern = r'(<div class="nav-tab" data-view="evolution">.*?</div>)'
-    matches = re.findall(evolution_pattern, html_content, re.DOTALL)
-    if matches:
-        evolution_tab = matches[0]
-        discoveries_tab = '                <div class="nav-tab" data-view="discoveries">✨ Novedades</div>'
-        # Usar replace con count=1 para reemplazar solo la primera ocurrencia
-        html_content = html_content.replace(evolution_tab, evolution_tab + '\n' + discoveries_tab, 1)
-        print("  ✅ Pestaña Novedades agregada")
+    # Verificar si ya tiene la pestaña de novedades
+    if 'data-view="discoveries"' in html_content:
+        print("  ✅ Pestaña Novedades ya existe en el HTML")
+    else:
+        print("  ⚠️  Pestaña Novedades no encontrada (HTML antiguo)")
+        # Solo agregar si no existe
+        evolution_pattern = r'(<div class="nav-tab" data-view="evolution">.*?</div>)'
+        matches = re.findall(evolution_pattern, html_content, re.DOTALL)
+        if matches:
+            evolution_tab = matches[0]
+            discoveries_tab = '                <div class="nav-tab" data-view="discoveries">✨ Novedades</div>'
+            html_content = html_content.replace(evolution_tab, evolution_tab + '\n' + discoveries_tab, 1)
+            print("  ✅ Pestaña Novedades agregada")
 
-    # 2. Agregar contenido del tab (después del último tab-content)
-    discoveries_content = f'''
+    # Verificar si ya tiene el contenido del tab
+    if 'id="discoveriesTab"' in html_content:
+        print("  ✅ Contenido de novedades ya existe en el HTML")
+    else:
+        print("  ⚠️  Contenido de novedades no encontrado (HTML antiguo)")
+        # Solo agregar si no existe
+        discoveries_content = f'''
             <div id="discoveriesTab" class="tab-content">
                 <div class="evolution-section">
                     <h3>✨ Descubrimientos Musicales</h3>
@@ -137,137 +146,12 @@ def modify_html_for_discoveries(html_content, users, years_back):
             </div>
         '''
 
-    # Buscar antes del popup
-    popup_pattern = r'(<!-- Popup para mostrar detalles -->)'
-    html_content = re.sub(popup_pattern, discoveries_content + r'\n\1', html_content, count=1)
+        # Buscar antes del popup
+        popup_pattern = r'(<!-- Popup para mostrar detalles -->)'
+        html_content = re.sub(popup_pattern, discoveries_content + r'\n\1', html_content, count=1)
+        print("  ✅ Contenido de novedades agregado")
 
-    # 3. Agregar JavaScript para cargar novedades
-    discoveries_js = f'''
-        // Funcionalidad de novedades
-        const DISCOVERIES_PERIOD = '{period}';
-        let discoveriesData = null;
-
-        async function loadDiscoveriesData(user) {{
-            if (discoveriesData && discoveriesData.user === user) {{
-                return discoveriesData;
-            }}
-
-            try {{
-                const response = await fetch(`data/usuarios/${{DISCOVERIES_PERIOD}}/${{user}}.json`);
-                if (!response.ok) throw new Error(`HTTP ${{response.status}}`);
-                discoveriesData = await response.json();
-                return discoveriesData;
-            }} catch (error) {{
-                console.error('Error cargando novedades:', error);
-                return null;
-            }}
-        }}
-
-        function renderDiscoveriesTab() {{
-            const user = selectedUser;
-            if (!user) return;
-
-            document.getElementById('discoveriesLoading').style.display = 'block';
-            document.getElementById('discoveriesGrid').style.display = 'none';
-
-            loadDiscoveriesData(user).then(data => {{
-                document.getElementById('discoveriesLoading').style.display = 'none';
-
-                if (!data) {{
-                    document.getElementById('discoveriesGrid').innerHTML = '<p style="color: #a6adc8; text-align: center; padding: 40px;">No hay datos de novedades disponibles</p>';
-                    document.getElementById('discoveriesGrid').style.display = 'block';
-                    return;
-                }}
-
-                document.getElementById('discoveriesGrid').style.display = 'grid';
-
-                // Renderizar gráficos
-                renderDiscoveriesChart('discoveriesArtistsChart', data.discoveries.artists, 'Artistas');
-                renderDiscoveriesChart('discoveriesAlbumsChart', data.discoveries.albums, 'Álbumes');
-                renderDiscoveriesChart('discoveriesTracksChart', data.discoveries.tracks, 'Tracks');
-                renderDiscoveriesChart('discoveriesLabelsChart', data.discoveries.labels, 'Sellos');
-            }});
-        }}
-
-        function renderDiscoveriesChart(canvasId, discoveriesData, label) {{
-            const canvas = document.getElementById(canvasId);
-            if (!canvas) return;
-
-            const years = Object.keys(discoveriesData).filter(k => !isNaN(k)).sort();
-            const counts = years.map(year => discoveriesData[year].count || 0);
-
-            if (discoveryCharts[canvasId]) {{
-                discoveryCharts[canvasId].destroy();
-            }}
-
-            discoveryCharts[canvasId] = new Chart(canvas, {{
-                type: 'bar',
-                data: {{
-                    labels: years,
-                    datasets: [{{
-                        label: label,
-                        data: counts,
-                        backgroundColor: COLORS[2],
-                        borderColor: COLORS[2],
-                        borderWidth: 2
-                    }}]
-                }},
-                options: {{
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {{
-                        legend: {{ display: false }}
-                    }},
-                    scales: {{
-                        y: {{
-                            beginAtZero: true,
-                            ticks: {{ color: '#a6adc8' }},
-                            grid: {{ color: '#313244' }}
-                        }},
-                        x: {{
-                            ticks: {{ color: '#a6adc8' }},
-                            grid: {{ color: '#313244' }}
-                        }}
-                    }},
-                    onClick: (event, elements) => {{
-                        if (elements.length > 0) {{
-                            const index = elements[0].index;
-                            const year = years[index];
-                            showDiscoveryPopup(year, discoveriesData[year], label);
-                        }}
-                    }}
-                }}
-            }});
-        }}
-
-        function showDiscoveryPopup(year, yearData, type) {{
-            const items = yearData.items || [];
-            const hasMore = yearData.has_more || false;
-
-            let itemsHTML = items.map(item => `
-                <div style="padding: 10px; border-bottom: 1px solid #313244;">
-                    <div style="color: #cdd6f4;">${{item.name}}</div>
-                    <div style="color: #a6adc8; font-size: 0.9em;">${{item.date}}</div>
-                </div>
-            `).join('');
-
-            if (hasMore) {{
-                itemsHTML += `<div style="padding: 10px; text-align: center; color: #a6adc8;">
-                    ... y ${{yearData.count - 10}} más
-                </div>`;
-            }}
-
-            showPopup(`${{type}} descubiertos en ${{year}}`, itemsHTML);
-        }}
-
-        const discoveryCharts = {{}};
-'''
-
-    # Insertar antes del cierre del script
-    script_end_pattern = r'(\s*</script>\s*</body>\s*</html>""")'
-    html_content = re.sub(script_end_pattern, discoveries_js + r'\n\1', html_content, count=1)
-
-    print("🎉 Modificación del HTML completada")
+    print("🎉 HTML de novedades verificado")
     return html_content
 
 

@@ -20,6 +20,7 @@ except ImportError:
 
 from tools.temp.temp_database import Database
 from tools.temp.temp_analyzer import StatsAnalyzer
+# USAR EL GENERADOR CORREGIDO
 from tools.temp.temp_html_generator import HTMLGenerator
 
 
@@ -109,26 +110,30 @@ def rotate_weekly_files():
     ]
 
     docs_dir = 'docs'
-    if not os.path.exists(docs_dir):
-        os.makedirs(docs_dir)
+    weekly_dir = os.path.join(docs_dir, 'weekly')
 
-    file_paths = [os.path.join(docs_dir, f) for f in filenames]
+    # Crear carpeta weekly si no existe
+    if not os.path.exists(weekly_dir):
+        os.makedirs(weekly_dir)
+        print(f"📁 Creada carpeta: {weekly_dir}")
 
-    print("🔄 Rotando archivos semanales...")
+    file_paths = [os.path.join(weekly_dir, f) for f in filenames]
+
+    print("🔄 Rotando archivos semanales en weekly/...")
 
     # Eliminar el más antiguo (hace-tres-semanas)
     if os.path.exists(file_paths[3]):
         os.remove(file_paths[3])
-        print(f"   ❌ Eliminado: {filenames[3]}")
+        print(f"   ❌ Eliminado: weekly/{filenames[3]}")
 
     # Rotar los demás hacia atrás
     for i in range(2, -1, -1):  # [2, 1, 0]
         if os.path.exists(file_paths[i]):
             shutil.move(file_paths[i], file_paths[i + 1])
-            print(f"   📝 {filenames[i]} → {filenames[i + 1]}")
+            print(f"   📁 weekly/{filenames[i]} → weekly/{filenames[i + 1]}")
 
 
-def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, str, str]:
+def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, str, str, str]:
     """
     Genera estadísticas para el período especificado
 
@@ -138,13 +143,14 @@ def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, 
         **kwargs: Argumentos específicos del período
 
     Returns:
-        Tuple con (stats, period_label, filename)
+        Tuple con (stats, period_label, filename, folder)
     """
     # Calcular período
     if period_type == 'weekly':
         week_offset = kwargs.get('week_offset', 0)
         from_timestamp, to_timestamp, period_label = PeriodCalculator.get_week_period(week_offset)
         filename = 'esta-semana.html'
+        folder = 'weekly'
 
     elif period_type == 'monthly':
         month = kwargs.get('month', datetime.now().month)
@@ -154,11 +160,13 @@ def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, 
         month_names = ['', 'january', 'february', 'march', 'april', 'may', 'june',
                        'july', 'august', 'september', 'october', 'november', 'december']
         filename = f"monthly_{month_names[month]}_{year}.html"
+        folder = 'monthly'
 
     elif period_type == 'yearly':
         year = kwargs.get('year', datetime.now().year)
         from_timestamp, to_timestamp, period_label = PeriodCalculator.get_year_period(year)
         filename = f"yearly_{year}.html"
+        folder = 'yearly'
 
     else:
         raise ValueError(f"Tipo de período no válido: {period_type}")
@@ -173,14 +181,14 @@ def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, 
 
     # Incluir novedades para todos los períodos (no solo semanales)
     include_novelties = True
-    print(f"   🔍 Incluir novedades: {include_novelties} (período: {period_type})")
+    print(f"   📚 Incluir novedades: {include_novelties} (período: {period_type})")
 
     stats = analyzer.analyze_period(users, from_timestamp, to_timestamp, include_novelties)
 
     if not stats:
         print("❌ No se pudieron generar estadísticas")
         db.close()
-        return {}, period_label, filename
+        return {}, period_label, filename, folder
 
     # Añadir metadatos
     stats.update({
@@ -191,7 +199,7 @@ def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, 
     })
 
     db.close()
-    return stats, period_label, filename
+    return stats, period_label, filename, folder
 
 
 def main():
@@ -261,7 +269,7 @@ def main():
     elif args.period == 'yearly':
         period_kwargs['year'] = args.year
 
-    stats, period_label, filename = generate_stats(args.period, users, **period_kwargs)
+    stats, period_label, filename, folder = generate_stats(args.period, users, **period_kwargs)
 
     if not stats:
         print("❌ No se pudieron generar estadísticas")
@@ -269,19 +277,35 @@ def main():
 
     # Crear HTML
     print("🎨 Generando HTML...")
-    html_content = HTMLGenerator.create_html(stats, users, args.period.replace('ly', 'al'))
+    html_content = HTMLGenerator.create_html(stats, users, args.period.replace('ly', 'al'), folder)
 
-    # Crear directorio si no existe
+    # Crear directorio base si no existe
     docs_dir = 'docs'
     if not os.path.exists(docs_dir):
         os.makedirs(docs_dir)
 
-    # Guardar archivo
-    output_file = os.path.join(docs_dir, filename)
+    # Crear subdirectorio específico si no existe
+    folder_path = os.path.join(docs_dir, folder)
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        print(f"📁 Creada carpeta: {folder_path}")
+
+    # Guardar archivo en la subcarpeta correspondiente
+    output_file = os.path.join(folder_path, filename)
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(html_content)
 
     print(f"✅ Archivo generado: {output_file}")
+
+    # Caso especial: si es esta-semana.html, también copiarlo a la raíz de docs/
+    if filename == 'esta-semana.html':
+        root_file = os.path.join(docs_dir, filename)
+        # Necesitamos generar una versión con rutas para la raíz (folder_level="")
+        root_html_content = HTMLGenerator.create_html(stats, users, args.period.replace('ly', 'al'), "")
+        with open(root_file, 'w', encoding='utf-8') as f:
+            f.write(root_html_content)
+        print(f"✅ Copia en raíz generada: {root_file}")
+
     print(f"📅 Período: {stats['period_label']}")
     print(f"📈 Total scrobbles: {stats['total_scrobbles']:,}")
     print(f"🎵 Artistas únicos: {len(stats.get('artists', []))}")

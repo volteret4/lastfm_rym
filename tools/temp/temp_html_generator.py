@@ -11,7 +11,7 @@ import os
 class HTMLGenerator:
 
     @staticmethod
-    def create_html(stats: Dict, users: List[str], period_type: str = "semanal") -> str:
+    def create_html(stats: Dict, users: List[str], period_type: str = "semanal", folder_level: str = "") -> str:
         """
         Crea el HTML para las estadísticas con categorías desplegables
 
@@ -19,6 +19,7 @@ class HTMLGenerator:
             stats: Diccionario con las estadísticas
             users: Lista de usuarios
             period_type: Tipo de período ('semanal', 'mensual', 'anual')
+            folder_level: Nivel de carpeta ("", "weekly", "monthly", "yearly")
 
         Returns:
             String con el contenido HTML completo
@@ -40,6 +41,20 @@ class HTMLGenerator:
                     user_icons[user.strip()] = icon.strip()
 
         user_icons_json = json.dumps(user_icons, ensure_ascii=False)
+
+        # Calcular rutas de navegación según el nivel de carpeta
+        if folder_level:
+            # Estamos en una subcarpeta, necesitamos subir un nivel
+            base_path = "../"
+            temporales_link = "../esta-semana.html"  # Volver a docs/ y buscar esta-semana.html
+            grupo_link = "../index.html#grupo"
+            about_link = "../index.html#about"
+        else:
+            # Estamos en la raíz de docs/
+            base_path = ""
+            temporales_link = "esta-semana.html"
+            grupo_link = "index.html#grupo"
+            about_link = "index.html#about"
 
         # Determinar qué categorías incluir
         categories = ['artists', 'tracks', 'albums', 'genres', 'labels', 'years']
@@ -637,9 +652,9 @@ class HTMLGenerator:
             <div class="header-content">
                 <h1>📊 RYM Hispano Estadísticas</h1>
                 <div class="nav-buttons">
-                    <a href="esta-semana.html" class="nav-button">TEMPORALES</a>
-                    <a href="index.html#grupo" class="nav-button">GRUPO</a>
-                    <a href="index.html#about" class="nav-button">ACERCA DE</a>
+                    <a href="{temporales_link}" class="nav-button">TEMPORALES</a>
+                    <a href="{grupo_link}" class="nav-button">GRUPO</a>
+                    <a href="{about_link}" class="nav-button">ACERCA DE</a>
                 </div>
             </div>
             <button class="user-button" id="userButton">👤</button>

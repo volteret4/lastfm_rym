@@ -72,7 +72,7 @@ class HTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Stats - {stats.get('period_label', 'EstadÃ­sticas')}</title>
+    <title>Last.fm Stats - {{stats.get('period_label', 'EstadÃ­sticas')}}</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <!-- Umami Analytics -->
     <script defer src="{umami_script_url}" data-website-id="{umami_website_id}"></script>
@@ -641,13 +641,13 @@ class HTMLGenerator:
             <div class="control-group">
 
                 <div class="category-filters">
-                    {category_filters_html}
+                    {{category_filters_html}}
                 </div>
             </div>
         </div>
 
         <div class="period-header">
-            <h2>{stats.get('period_label', 'EstadÃ­sticas')}</h2>
+            <h2>{{stats.get('period_label', 'EstadÃ­sticas')}}</h2>
             <p class="period-info">
                 <span id="dateRange"></span> |
                 <span id="totalScrobbles"></span> scrobbles totales
@@ -667,9 +667,9 @@ class HTMLGenerator:
 
     <script>
         // Usuarios reales del entorno LASTFM_USERS e iconos de LASTFM_USERS_ICONS
-        const userIcons = {user_icons_json};
-        const availableUsers = {users_json};
-        const stats = {stats_json};
+        const userIcons = {{user_icons_json}};
+        const availableUsers = {{users_json}};
+        const stats = {{stats_json}};
         const hasNovelties = stats.novelties !== undefined;
 
         // FunciÃ³n para obtener novedades de usuario desde datos precalculados

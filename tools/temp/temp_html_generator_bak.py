@@ -780,6 +780,28 @@ class HTMLGenerator:
         let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
         let selectedUser = '';
 
+        document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} â†’ ${{stats.to_date || ''}}`;
+        document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
+        document.getElementById('generatedAt').textContent = stats.generated_at || '';
+
+        // Manejar filtros de categorÃ­as
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        categoryFilters.forEach(filter => {{
+            filter.addEventListener('click', () => {{
+                const category = filter.dataset.category;
+
+                if (activeCategories.has(category)) {{
+                    activeCategories.delete(category);
+                    filter.classList.remove('active');
+                }} else {{
+                    activeCategories.add(category);
+                    filter.classList.add('active');
+                }}
+
+                renderStats();
+            }});
+        }});
+
         function showArtistsPopup(itemName, category, user) {{
             const item = stats[category].find(item => item.name === itemName);
             if (!item || !item.user_artists || !item.user_artists[user]) return;
@@ -1256,31 +1278,7 @@ class HTMLGenerator:
 
         // InicializaciÃ³n
         document.addEventListener('DOMContentLoaded', function() {{
-            
-            // Inicializar elementos del DOM
-            document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} → ${{stats.to_date || ''}}`;
-            document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
-            document.getElementById('generatedAt').textContent = stats.generated_at || '';
-
-            // Manejar filtros de categorías
-            const categoryFilters = document.querySelectorAll('.category-filter');
-            categoryFilters.forEach(filter => {{
-                filter.addEventListener('click', () => {{
-                    const category = filter.dataset.category;
-
-                    if (activeCategories.has(category)) {{
-                        activeCategories.delete(category);
-                        filter.classList.remove('active');
-                    }} else {{
-                        activeCategories.add(category);
-                        filter.classList.add('active');
-                    }}
-
-                    renderStats();
-                }});
-            }});
-
-selectedUser = initializeUserSelector();
+            selectedUser = initializeUserSelector();
             renderStats();
         }});
     </script>

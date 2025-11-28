@@ -22,9 +22,9 @@ except ImportError:
 from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database_extended import UserStatsDatabaseExtended
 from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
+
+
 from tools.users.user_stats_discoveries import DiscoveriesDataGenerator
-
-
 
 
 def generate_discoveries_data(users, years_back, output_dir):
@@ -80,13 +80,14 @@ def modify_html_for_discoveries(html_content, users, years_back):
 
     print("🔧 Modificando HTML para agregar novedades...")
 
-    # 1. Agregar pestaña de novedades
+    # 1. Agregar pestaña de novedades (solo una vez)
     evolution_pattern = r'(<div class="nav-tab" data-view="evolution">.*?</div>)'
     matches = re.findall(evolution_pattern, html_content, re.DOTALL)
     if matches:
         evolution_tab = matches[0]
         discoveries_tab = '                <div class="nav-tab" data-view="discoveries">✨ Novedades</div>'
-        html_content = html_content.replace(evolution_tab, evolution_tab + '\n' + discoveries_tab)
+        # Usar replace con count=1 para reemplazar solo la primera ocurrencia
+        html_content = html_content.replace(evolution_tab, evolution_tab + '\n' + discoveries_tab, 1)
         print("  ✅ Pestaña Novedades agregada")
 
     # 2. Agregar contenido del tab (después del último tab-content)

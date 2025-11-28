@@ -689,14 +689,24 @@ def generate_index_html(files):
 
                 .nav-tabs {
                     flex-wrap: wrap;
+                    gap: 0.3rem;
+                }
+                .nav-tabs li {
+                    flex: 1 1 10%;
                 }
 
-                .nav-tabs li {
-                    flex: 1 1 50%;
+                .tab-link {
+                    padding: 12px 18px;
+                    background: #313244;
+                    color: #cdd6f4;
+                    text-decoration: none;
+                    border-radius: 8px;
+                    transition: all 0.3s;
+                    font-weight: 600;
                 }
 
                 .period-grid {
-                    grid-template-columns: repeat(2, 1fr);
+                    grid-template-columns: repeat(3, 1fr);
                     gap: 0.8rem;
                 }
 

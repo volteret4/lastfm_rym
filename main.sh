@@ -31,14 +31,23 @@ run_monthly() {
 }
 
 run_weekly() {
-    rm docs/esta-semana.html docs/semana-pasada.html docs/hace-dos-semanas.html docs/hace-tres-semanas.html
+    rm docs/weekly/esta-semana.html docs/weekly/semana-pasada.html docs/weekly/hace-dos-semanas.html docs/weekly/hace-tres-semanas.html
     for w in 0 1 2 3; do
         if [[ $w -eq 0 ]]; then
             "$python" html_temporal.py weekly
+            mv docs/weekly/esta-semana.html docs/weekly/esta-semana-safe.html
         else
             "$python" html_temporal.py weekly --week-offset "$w"
+            if [[ $w -eq 3 ]]; then
+                mv docs/weekly/esta-semana.html docs/weekly/hace-tres-semanas.html
+            elif [[ $w -eq 2 ]]; then
+                mv docs/weekly/esta-semana.html docs/weekly/hace-dos-semanas.html
+            elif [[ $w -eq 1 ]]; then
+                mv docs/weekly/esta-semana.html docs/weekly/semana-pasada.html
+            fi
         fi
     done
+    mv docs/weekly/esta-semana-safe.html docs/weekly/esta-semana.html
     "$python" html_index.py
     gtd
 }
@@ -48,7 +57,7 @@ case "$1" in
         run_years_back html_usuarios.py 1 5 10 15 18
         ;;
     grupo)
-        run_years_back html_grupo.py 1 5 10 15 18
+        run_years_back "html_grupo.py --no-json" 1 5 10 15 18
         ;;
     anuales)
         run_yearly

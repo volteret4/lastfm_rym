@@ -199,20 +199,40 @@
         }
 
         .control-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
         }
 
         .control-group label {
             color: #cba6f7;
             font-weight: 600;
+            margin-bottom: 10px;
+            display: none; /* Ocultar label ya que es obvio que son filtros */
         }
 
         .category-filters {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+        }
+
+        /* En pantallas grandes, forzar una sola línea */
+        @media (min-width: 1200px) {
+            .category-filters {
+                flex-wrap: nowrap;
+                gap: 8px;
+            }
+
+            .category-filter {
+                padding: 8px 14px;
+                font-size: 0.85em;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
         }
 
         .category-filter {
@@ -225,6 +245,7 @@
             transition: all 0.3s;
             font-size: 0.9em;
             font-weight: 600;
+            white-space: nowrap;
         }
 
         .category-filter:hover {
@@ -569,7 +590,6 @@
 
         <div class="controls">
             <div class="control-group">
-
                 <div class="category-filters">
                     <button class="category-filter active" data-category="artists">Artistas</button><button class="category-filter " data-category="tracks">Canciones</button><button class="category-filter " data-category="albums">Álbumes</button><button class="category-filter " data-category="genres">Géneros</button><button class="category-filter " data-category="labels">Sellos</button><button class="category-filter " data-category="years">Años</button><button class="category-filter " data-category="novelties">Novedades</button>
                 </div>
@@ -596,8 +616,9 @@
     </div>
 
     <script>
-        // Usuarios reales del entorno LASTFM_USERS
+        // Usuarios reales del entorno LASTFM_USERS e iconos de LASTFM_USERS_ICONS
         const availableUsers = ["alberto_gu", "EliasJ72", "Frikomid", "GabredMared", "Lonsonxd", "Nubis84", "paqueradejere", "Rocky_stereo", "sdecandelario"];
+        const userIcons = {"alberto_gu": "🎹", "EliasJ72": "🎸", "Frikomid": "🎺", "GabredMared": "🎤", "Lonsonxd": "🎷", "Nubis84": "🎻", "paqueradejere": "🐥", "Rocky_stereo": "🥁", "sdecandelario": "🕺"};
         const stats = {
   "total_scrobbles": 888,
   "artists": [],
@@ -620,18 +641,18 @@
           "Nick Cave & The Bad Seeds"
         ],
         "sdecandelario": [
-          "Led Zeppelin",
-          "The Who",
-          "Rainbow",
           "Ozzy Osbourne",
-          "Jethro Tull",
           "Metallica",
           "Mötley Crüe",
-          "Motörhead",
-          "Skid Row",
-          "Kiss",
           "Tesla",
+          "Motörhead",
+          "The Who",
+          "Rainbow",
           "Scorpions",
+          "Jethro Tull",
+          "Kiss",
+          "Led Zeppelin",
+          "Skid Row",
           "Rammstein"
         ]
       },
@@ -677,10 +698,10 @@
         ],
         "sdecandelario": [
           "Mötley Crüe",
-          "Skid Row",
-          "Kiss",
           "Tesla",
-          "Scorpions"
+          "Scorpions",
+          "Kiss",
+          "Skid Row"
         ]
       },
       "top_artists": [
@@ -723,8 +744,8 @@
           "Calexico"
         ],
         "sdecandelario": [
-          "Queensrÿche",
-          "HammerFall"
+          "HammerFall",
+          "Queensrÿche"
         ]
       },
       "top_artists": [
@@ -848,7 +869,7 @@
   "period_label": "April 2009",
   "from_date": "2009-04-01",
   "to_date": "2009-04-30",
-  "generated_at": "2025-11-21 13:27"
+  "generated_at": "2025-11-28 18:24"
 };
         const hasNovelties = stats.novelties !== undefined;
 
@@ -876,12 +897,24 @@
                 const option = document.createElement('div');
                 option.className = 'user-option';
                 option.dataset.user = user;
-                option.textContent = user;
+
+                const icon = userIcons[user];
+                if (icon) {
+                    if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {
+                        option.innerHTML = `<img src="${icon}" alt="${user}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:8px;"> ${user}`;
+                    } else {
+                        option.innerHTML = `<span style="font-size:1.2em;margin-right:8px;">${icon}</span> ${user}`;
+                    }
+                } else {
+                    option.textContent = user;
+                }
+
                 userOptions.appendChild(option);
             });
 
-            // Marcar opción seleccionada
+            // Marcar opción seleccionada y actualizar botón
             updateSelectedUserOption(selectedUser);
+            updateUserButtonIcon(selectedUser);
 
             // Event listeners
             userButton.addEventListener('click', () => {
@@ -911,12 +944,27 @@
                     }
 
                     updateSelectedUserOption(user);
+                    updateUserButtonIcon(user);
                     userModal.style.display = 'none';
                     renderStats(); // Re-renderizar con nuevo usuario
                 }
             });
 
             return selectedUser;
+        }
+
+        function updateUserButtonIcon(user) {
+            const userButton = document.getElementById('userButton');
+            const icon = userIcons[user];
+            if (icon) {
+                if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {
+                    userButton.innerHTML = `<img src="${icon}" alt="${user}" style="width:100%;height:100%;border-radius:50%;">`;
+                } else {
+                    userButton.textContent = icon;
+                }
+            } else {
+                userButton.textContent = '👤';
+            }
         }
 
         function updateSelectedUserOption(selectedUser) {
@@ -1217,6 +1265,8 @@
                         compartidosSection.appendChild(subsection);
                     });
 
+                    categoryDiv.appendChild(compartidosSection);
+
                     // NUEVOS PARA USUARIO SELECCIONADO
                     if (selectedUser) {
                         const usuarioSection = document.createElement('div');
@@ -1274,6 +1324,7 @@
 
                         categoryDiv.appendChild(usuarioSection);
                     }
+
                     container.appendChild(categoryDiv);
                     return;
                 }

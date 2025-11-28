@@ -46,13 +46,13 @@ class HTMLGenerator:
         if folder_level:
             # Estamos en una subcarpeta, necesitamos subir un nivel
             base_path = "../"
-            temporales_link = "../esta-semana.html"  # Volver a docs/ y buscar esta-semana.html
+            temporales_link = "../index.html#temporales"  # Volver a docs/ y buscar esta-semana.html
             grupo_link = "../index.html#grupo"
             about_link = "../index.html#about"
         else:
             # Estamos en la raíz de docs/
             base_path = ""
-            temporales_link = "esta-semana.html"
+            temporales_link = "index.html#temporales"
             grupo_link = "index.html#grupo"
             about_link = "index.html#about"
 

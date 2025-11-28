@@ -261,27 +261,47 @@ class HTMLGenerator:
             background: #1e1e2e;
             border-bottom: 1px solid #313244;
             display: flex;
-            gap: 10px;
+            gap: 20px;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: center;
-            overflow-x: auto;
         }}
 
         .control-group {{
             display: flex;
-            gap: 10px;
+            flex-direction: column;
             align-items: center;
+            width: 100%;
         }}
 
         .control-group label {{
             color: #cba6f7;
             font-weight: 600;
+            margin-bottom: 10px;
+            display: none; /* Ocultar label ya que es obvio que son filtros */
         }}
 
         .category-filters {{
             display: flex;
             gap: 10px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+        }}
+
+        /* En pantallas grandes, forzar una sola línea */
+        @media (min-width: 1200px) {{
+            .category-filters {{
+                flex-wrap: nowrap;
+                gap: 8px;
+            }}
+
+            .category-filter {{
+                padding: 8px 14px;
+                font-size: 0.85em;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }}
         }}
 
         .category-filter {{
@@ -294,6 +314,7 @@ class HTMLGenerator:
             transition: all 0.3s;
             font-size: 0.9em;
             font-weight: 600;
+            white-space: nowrap;
         }}
 
         .category-filter:hover {{
@@ -588,7 +609,6 @@ class HTMLGenerator:
 
             .category-filters {{
                 justify-content: center;
-                flex-wrap: wrap;
             }}
 
             .artists-popup {{
@@ -639,7 +659,6 @@ class HTMLGenerator:
 
         <div class="controls">
             <div class="control-group">
-
                 <div class="category-filters">
                     {category_filters_html}
                 </div>
@@ -667,8 +686,8 @@ class HTMLGenerator:
 
     <script>
         // Usuarios reales del entorno LASTFM_USERS e iconos de LASTFM_USERS_ICONS
-        const userIcons = {user_icons_json};
         const availableUsers = {users_json};
+        const userIcons = {user_icons_json};
         const stats = {stats_json};
         const hasNovelties = stats.novelties !== undefined;
 
@@ -711,7 +730,7 @@ class HTMLGenerator:
                 userOptions.appendChild(option);
             }});
 
-            // Marcar opciÃ³n seleccionada
+            // Marcar opciÃ³n seleccionada y actualizar botón
             updateSelectedUserOption(selectedUser);
             updateUserButtonIcon(selectedUser);
 
@@ -779,6 +798,28 @@ class HTMLGenerator:
         // Inicializar categorÃ­as activas
         let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
         let selectedUser = '';
+
+        document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} â†’ ${{stats.to_date || ''}}`;
+        document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
+        document.getElementById('generatedAt').textContent = stats.generated_at || '';
+
+        // Manejar filtros de categorÃ­as
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        categoryFilters.forEach(filter => {{
+            filter.addEventListener('click', () => {{
+                const category = filter.dataset.category;
+
+                if (activeCategories.has(category)) {{
+                    activeCategories.delete(category);
+                    filter.classList.remove('active');
+                }} else {{
+                    activeCategories.add(category);
+                    filter.classList.add('active');
+                }}
+
+                renderStats();
+            }});
+        }});
 
         function showArtistsPopup(itemName, category, user) {{
             const item = stats[category].find(item => item.name === itemName);
@@ -1256,31 +1297,7 @@ class HTMLGenerator:
 
         // InicializaciÃ³n
         document.addEventListener('DOMContentLoaded', function() {{
-            
-            // Inicializar elementos del DOM
-            document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} → ${{stats.to_date || ''}}`;
-            document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
-            document.getElementById('generatedAt').textContent = stats.generated_at || '';
-
-            // Manejar filtros de categorías
-            const categoryFilters = document.querySelectorAll('.category-filter');
-            categoryFilters.forEach(filter => {{
-                filter.addEventListener('click', () => {{
-                    const category = filter.dataset.category;
-
-                    if (activeCategories.has(category)) {{
-                        activeCategories.delete(category);
-                        filter.classList.remove('active');
-                    }} else {{
-                        activeCategories.add(category);
-                        filter.classList.add('active');
-                    }}
-
-                    renderStats();
-                }});
-            }});
-
-selectedUser = initializeUserSelector();
+            selectedUser = initializeUserSelector();
             renderStats();
         }});
     </script>

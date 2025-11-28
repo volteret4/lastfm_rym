@@ -31,17 +31,6 @@ class HTMLGenerator:
         umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
         umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
 
-        # Leer iconos de usuarios del entorno
-        icons_env = os.getenv('LASTFM_USERS_ICONS', '')
-        user_icons = {}
-        if icons_env:
-            for pair in icons_env.split(','):
-                if ':' in pair:
-                    user, icon = pair.split(':', 1)
-                    user_icons[user.strip()] = icon.strip()
-
-        user_icons_json = json.dumps(user_icons, ensure_ascii=False)
-
         # Determinar quÃ© categorÃ­as incluir
         categories = ['artists', 'tracks', 'albums', 'genres', 'labels', 'years']
         if 'novelties' in stats:
@@ -261,16 +250,16 @@ class HTMLGenerator:
             background: #1e1e2e;
             border-bottom: 1px solid #313244;
             display: flex;
-            gap: 10px;
+            gap: 20px;
+            flex-wrap: wrap;
             align-items: center;
             justify-content: center;
-            overflow-x: auto;
         }}
 
         .control-group {{
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 10px;
-            align-items: center;
         }}
 
         .control-group label {{
@@ -281,7 +270,7 @@ class HTMLGenerator:
         .category-filters {{
             display: flex;
             gap: 10px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
         }}
 
         .category-filter {{
@@ -588,7 +577,6 @@ class HTMLGenerator:
 
             .category-filters {{
                 justify-content: center;
-                flex-wrap: wrap;
             }}
 
             .artists-popup {{
@@ -616,14 +604,14 @@ class HTMLGenerator:
     <div class="container">
         <header>
             <div class="header-content">
-                <h1>📊 RYM Hispano EstadÃ­sticas</h1>
+                <h1>ðŸ“Š RYM Hispano EstadÃ­sticas</h1>
                 <div class="nav-buttons">
                     <a href="esta-semana.html" class="nav-button">TEMPORALES</a>
                     <a href="index.html#grupo" class="nav-button">GRUPO</a>
                     <a href="index.html#about" class="nav-button">ACERCA DE</a>
                 </div>
             </div>
-            <button class="user-button" id="userButton">👤</button>
+            <button class="user-button" id="userButton">ðŸ‘¤</button>
         </header>
 
         <!-- Modal de selecciÃ³n de usuario -->
@@ -666,8 +654,7 @@ class HTMLGenerator:
     </div>
 
     <script>
-        // Usuarios reales del entorno LASTFM_USERS e iconos de LASTFM_USERS_ICONS
-        const userIcons = {user_icons_json};
+        // Usuarios reales del entorno LASTFM_USERS
         const availableUsers = {users_json};
         const stats = {stats_json};
         const hasNovelties = stats.novelties !== undefined;
@@ -696,24 +683,12 @@ class HTMLGenerator:
                 const option = document.createElement('div');
                 option.className = 'user-option';
                 option.dataset.user = user;
-
-                const icon = userIcons[user];
-                if (icon) {{
-                    if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {{
-                        option.innerHTML = `<img src="${{icon}}" alt="${{user}}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:8px;"> ${{user}}`;
-                    }} else {{
-                        option.innerHTML = `<span style="font-size:1.2em;margin-right:8px;">${{icon}}</span> ${{user}}`;
-                    }}
-                }} else {{
-                    option.textContent = user;
-                }}
-
+                option.textContent = user;
                 userOptions.appendChild(option);
             }});
 
             // Marcar opciÃ³n seleccionada
             updateSelectedUserOption(selectedUser);
-            updateUserButtonIcon(selectedUser);
 
             // Event listeners
             userButton.addEventListener('click', () => {{
@@ -743,27 +718,12 @@ class HTMLGenerator:
                     }}
 
                     updateSelectedUserOption(user);
-                    updateUserButtonIcon(user);
                     userModal.style.display = 'none';
                     renderStats(); // Re-renderizar con nuevo usuario
                 }}
             }});
 
             return selectedUser;
-        }}
-
-        function updateUserButtonIcon(user) {{
-            const userButton = document.getElementById('userButton');
-            const icon = userIcons[user];
-            if (icon) {{
-                if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {{
-                    userButton.innerHTML = `<img src="${{icon}}" alt="${{user}}" style="width:100%;height:100%;border-radius:50%;">`;
-                }} else {{
-                    userButton.textContent = icon;
-                }}
-            }} else {{
-                userButton.textContent = 'ðŸ'¤';
-            }}
         }}
 
         function updateSelectedUserOption(selectedUser) {{
@@ -779,6 +739,28 @@ class HTMLGenerator:
         // Inicializar categorÃ­as activas
         let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
         let selectedUser = '';
+
+        document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} â†’ ${{stats.to_date || ''}}`;
+        document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
+        document.getElementById('generatedAt').textContent = stats.generated_at || '';
+
+        // Manejar filtros de categorÃ­as
+        const categoryFilters = document.querySelectorAll('.category-filter');
+        categoryFilters.forEach(filter => {{
+            filter.addEventListener('click', () => {{
+                const category = filter.dataset.category;
+
+                if (activeCategories.has(category)) {{
+                    activeCategories.delete(category);
+                    filter.classList.remove('active');
+                }} else {{
+                    activeCategories.add(category);
+                    filter.classList.add('active');
+                }}
+
+                renderStats();
+            }});
+        }});
 
         function showArtistsPopup(itemName, category, user) {{
             const item = stats[category].find(item => item.name === itemName);
@@ -1014,7 +996,7 @@ class HTMLGenerator:
                     compartidosSection.className = 'novelty-section';
 
                     const compartidosTitle = document.createElement('h4');
-                    compartidosTitle.textContent = '👥 Nuevos compartidos (50%+ del grupo)';
+                    compartidosTitle.textContent = 'ðŸ‘¥ Nuevos compartidos (50%+ del grupo)';
                     compartidosSection.appendChild(compartidosTitle);
 
                     ['artists', 'albums', 'tracks'].forEach(type => {{
@@ -1048,7 +1030,7 @@ class HTMLGenerator:
                         usuarioSection.className = 'novelty-section';
 
                         const usuarioTitle = document.createElement('h4');
-                        usuarioTitle.textContent = `👤 Nuevos para ${{selectedUser}} (ya conocidos por el grupo)`;
+                        usuarioTitle.textContent = `ðŸ‘¤ Nuevos para ${{selectedUser}} (ya conocidos por el grupo)`;
                         usuarioSection.appendChild(usuarioTitle);
 
                         // Calcular novedades para el usuario
@@ -1089,7 +1071,7 @@ class HTMLGenerator:
                         usuarioSection.className = 'novelty-section';
 
                         const usuarioTitle = document.createElement('h4');
-                        usuarioTitle.textContent = '👤 Nuevos para usuario especÃ­fico';
+                        usuarioTitle.textContent = 'ðŸ‘¤ Nuevos para usuario especÃ­fico';
                         usuarioSection.appendChild(usuarioTitle);
 
                         const infoDiv = document.createElement('div');
@@ -1256,31 +1238,7 @@ class HTMLGenerator:
 
         // InicializaciÃ³n
         document.addEventListener('DOMContentLoaded', function() {{
-
-            // Inicializar elementos del DOM
-            document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} → ${{stats.to_date || ''}}`;
-            document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
-            document.getElementById('generatedAt').textContent = stats.generated_at || '';
-
-            // Manejar filtros de categorías
-            const categoryFilters = document.querySelectorAll('.category-filter');
-            categoryFilters.forEach(filter => {{
-                filter.addEventListener('click', () => {{
-                    const category = filter.dataset.category;
-
-                    if (activeCategories.has(category)) {{
-                        activeCategories.delete(category);
-                        filter.classList.remove('active');
-                    }} else {{
-                        activeCategories.add(category);
-                        filter.classList.add('active');
-                    }}
-
-                    renderStats();
-                }});
-            }});
-
-selectedUser = initializeUserSelector();
+            selectedUser = initializeUserSelector();
             renderStats();
         }});
     </script>

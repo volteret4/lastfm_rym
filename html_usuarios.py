@@ -23,8 +23,12 @@ from tools.users.user_stats_analyzer import UserStatsAnalyzer
 from tools.users.user_stats_database_extended import UserStatsDatabaseExtended
 from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
 
-
-from tools.users.user_stats_discoveries import DiscoveriesDataGenerator
+# Importar generador de datos de novedades
+try:
+    from tools.users.user_stats_discoveries import DiscoveriesDataGenerator
+except ImportError:
+    print("⚠️  Generador de datos de novedades no encontrado.")
+    DiscoveriesDataGenerator = None
 
 
 def generate_discoveries_data(users, years_back, output_dir):
@@ -294,6 +298,11 @@ def main():
         action='store_true',
         help='Guardar JSONs separados además del HTML (para análisis)'
     )
+    parser.add_argument(
+        '--json-only',
+        action='store_true',
+        help='Usar JSONs existentes en vez de regenerar (más rápido)'
+    )
 
     args = parser.parse_args()
 
@@ -312,51 +321,75 @@ def main():
         print(f"👥 Usuarios: {', '.join(users)}")
         print(f"📅 Años: {args.years_back}")
 
+        # Configurar directorios
+        current_year = datetime.now().year
+        from_year = current_year - args.years_back
+        period = f"{from_year}-{current_year}"
+        output_dir = os.path.dirname(args.output) or 'docs'
+        data_dir = f"{output_dir}/data/usuarios/{period}"
+
         # Paso 1: Novedades
         discoveries_available = False
         if not args.skip_discoveries:
-            output_dir = os.path.dirname(args.output) or 'docs'
             discoveries_available = generate_discoveries_data(users, args.years_back, output_dir)
 
-        # Paso 2: Análisis
-        database = UserStatsDatabaseExtended()
-        analyzer = UserStatsAnalyzer(database, years_back=args.years_back)
-        html_generator = UserStatsHTMLGenerator()
-
-        print(f"📊 Analizando usuarios...")
+        # Paso 2: Análisis o carga de JSONs
         all_user_stats = {}
 
-        # Configurar directorio JSON si se solicita
-        if args.save_json:
-            current_year = datetime.now().year
-            from_year = current_year - args.years_back
-            period = f"{from_year}-{current_year}"
-            output_dir = os.path.dirname(args.output) or 'docs'
-            data_dir = f"{output_dir}/data/usuarios/{period}"
-            os.makedirs(data_dir, exist_ok=True)
-            print(f"💾 JSONs adicionales en: {data_dir}")
+        if args.json_only:
+            # Leer JSONs existentes
+            print(f"📂 Leyendo JSONs existentes desde: {data_dir}")
 
-        for user in users:
-            print(f"  • {user}...")
-            user_stats = analyzer.analyze_user(user, users)
+            if not os.path.exists(data_dir):
+                raise ValueError(f"❌ Directorio {data_dir} no existe. Ejecuta sin --json-only primero.")
 
-            if 'individual' in user_stats and 'discoveries' in user_stats['individual']:
-                del user_stats['individual']['discoveries']
+            for user in users:
+                json_file = f"{data_dir}/{user}.json"
+                if not os.path.exists(json_file):
+                    raise ValueError(f"❌ JSON no encontrado: {json_file}. Ejecuta sin --json-only primero.")
 
-            all_user_stats[user] = user_stats
+                print(f"  • Cargando {user}...")
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    all_user_stats[user] = json.load(f)
 
-            # Guardar JSON si se solicita
-            if args.save_json:
-                json_file = f"{data_dir}/{user}_stats.json"
-                with open(json_file, 'w', encoding='utf-8') as f:
-                    json.dump(user_stats, f, indent=2, ensure_ascii=False)
                 size_kb = os.path.getsize(json_file) / 1024
-                print(f"    ✓ JSON: {size_kb:.1f} KB")
+                print(f"    ✓ Leído: {size_kb:.1f} KB")
 
-        database.close()
+        else:
+            # Generar análisis normal
+            database = UserStatsDatabaseExtended()
+            analyzer = UserStatsAnalyzer(database, years_back=args.years_back)
+
+            print(f"📊 Analizando usuarios...")
+
+            # Crear directorio JSON si se va a guardar
+            if args.save_json:
+                os.makedirs(data_dir, exist_ok=True)
+                print(f"💾 JSONs adicionales en: {data_dir}")
+
+            for user in users:
+                print(f"  • {user}...")
+                user_stats = analyzer.analyze_user(user, users)
+
+                if 'individual' in user_stats and 'discoveries' in user_stats['individual']:
+                    del user_stats['individual']['discoveries']
+
+                all_user_stats[user] = user_stats
+
+                # Guardar JSON si se solicita
+                if args.save_json:
+                    json_file = f"{data_dir}/{user}.json"
+                    with open(json_file, 'w', encoding='utf-8') as f:
+                        json.dump(user_stats, f, indent=2, ensure_ascii=False)
+                    size_kb = os.path.getsize(json_file) / 1024
+                    print(f"    ✓ JSON: {size_kb:.1f} KB")
+
+            database.close()
 
         # Paso 3: Generar HTML (COMPLETO, estructura original)
         print("🎨 Generando HTML completo...")
+        from tools.users.user_stats_html_generator import UserStatsHTMLGenerator
+        html_generator = UserStatsHTMLGenerator()
         html_content = html_generator.generate_html(all_user_stats, users, args.years_back)
 
         # Paso 4: Agregar novedades
@@ -374,9 +407,9 @@ def main():
         print(f"\n✅ Generado: {args.output}")
         print(f"📊 Tamaño HTML: {html_size:.2f} MB")
 
-        if args.save_json:
-            json_size = sum(os.path.getsize(f"{data_dir}/{u}_stats.json")
-                          for u in users if os.path.exists(f"{data_dir}/{u}_stats.json"))
+        if args.save_json and not args.json_only:
+            json_size = sum(os.path.getsize(f"{data_dir}/{u}.json")
+                          for u in users if os.path.exists(f"{data_dir}/{u}.json"))
             json_size_mb = json_size / 1024 / 1024
             print(f"📂 Tamaño JSONs: {json_size_mb:.2f} MB")
             print(f"💡 Total: {html_size + json_size_mb:.2f} MB")
@@ -385,6 +418,8 @@ def main():
         print(f"  • Estructura HTML original completa")
         print(f"  • Todos los gráficos y pestañas")
         print(f"  • Estética original mantenida")
+        if args.json_only:
+            print(f"  • ⚡ Generación rápida (usando JSONs existentes)")
         if args.save_json:
             print(f"  • JSONs adicionales para análisis")
         if discoveries_available:

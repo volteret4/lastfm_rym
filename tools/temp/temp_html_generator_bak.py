@@ -616,14 +616,14 @@ class HTMLGenerator:
     <div class="container">
         <header>
             <div class="header-content">
-                <h1>ðŸ“Š RYM Hispano EstadÃ­sticas</h1>
+                <h1>📊 RYM Hispano EstadÃ­sticas</h1>
                 <div class="nav-buttons">
                     <a href="esta-semana.html" class="nav-button">TEMPORALES</a>
                     <a href="index.html#grupo" class="nav-button">GRUPO</a>
                     <a href="index.html#about" class="nav-button">ACERCA DE</a>
                 </div>
             </div>
-            <button class="user-button" id="userButton">ðŸ‘¤</button>
+            <button class="user-button" id="userButton">👤</button>
         </header>
 
         <!-- Modal de selecciÃ³n de usuario -->
@@ -779,28 +779,6 @@ class HTMLGenerator:
         // Inicializar categorÃ­as activas
         let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
         let selectedUser = '';
-
-        document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} â†’ ${{stats.to_date || ''}}`;
-        document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
-        document.getElementById('generatedAt').textContent = stats.generated_at || '';
-
-        // Manejar filtros de categorÃ­as
-        const categoryFilters = document.querySelectorAll('.category-filter');
-        categoryFilters.forEach(filter => {{
-            filter.addEventListener('click', () => {{
-                const category = filter.dataset.category;
-
-                if (activeCategories.has(category)) {{
-                    activeCategories.delete(category);
-                    filter.classList.remove('active');
-                }} else {{
-                    activeCategories.add(category);
-                    filter.classList.add('active');
-                }}
-
-                renderStats();
-            }});
-        }});
 
         function showArtistsPopup(itemName, category, user) {{
             const item = stats[category].find(item => item.name === itemName);
@@ -1036,7 +1014,7 @@ class HTMLGenerator:
                     compartidosSection.className = 'novelty-section';
 
                     const compartidosTitle = document.createElement('h4');
-                    compartidosTitle.textContent = 'ðŸ‘¥ Nuevos compartidos (50%+ del grupo)';
+                    compartidosTitle.textContent = '👥 Nuevos compartidos (50%+ del grupo)';
                     compartidosSection.appendChild(compartidosTitle);
 
                     ['artists', 'albums', 'tracks'].forEach(type => {{
@@ -1070,7 +1048,7 @@ class HTMLGenerator:
                         usuarioSection.className = 'novelty-section';
 
                         const usuarioTitle = document.createElement('h4');
-                        usuarioTitle.textContent = `ðŸ‘¤ Nuevos para ${{selectedUser}} (ya conocidos por el grupo)`;
+                        usuarioTitle.textContent = `👤 Nuevos para ${{selectedUser}} (ya conocidos por el grupo)`;
                         usuarioSection.appendChild(usuarioTitle);
 
                         // Calcular novedades para el usuario
@@ -1111,7 +1089,7 @@ class HTMLGenerator:
                         usuarioSection.className = 'novelty-section';
 
                         const usuarioTitle = document.createElement('h4');
-                        usuarioTitle.textContent = 'ðŸ‘¤ Nuevos para usuario especÃ­fico';
+                        usuarioTitle.textContent = '👤 Nuevos para usuario especÃ­fico';
                         usuarioSection.appendChild(usuarioTitle);
 
                         const infoDiv = document.createElement('div');
@@ -1278,7 +1256,31 @@ class HTMLGenerator:
 
         // InicializaciÃ³n
         document.addEventListener('DOMContentLoaded', function() {{
-            selectedUser = initializeUserSelector();
+
+            // Inicializar elementos del DOM
+            document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} → ${{stats.to_date || ''}}`;
+            document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
+            document.getElementById('generatedAt').textContent = stats.generated_at || '';
+
+            // Manejar filtros de categorías
+            const categoryFilters = document.querySelectorAll('.category-filter');
+            categoryFilters.forEach(filter => {{
+                filter.addEventListener('click', () => {{
+                    const category = filter.dataset.category;
+
+                    if (activeCategories.has(category)) {{
+                        activeCategories.delete(category);
+                        filter.classList.remove('active');
+                    }} else {{
+                        activeCategories.add(category);
+                        filter.classList.add('active');
+                    }}
+
+                    renderStats();
+                }});
+            }});
+
+selectedUser = initializeUserSelector();
             renderStats();
         }});
     </script>

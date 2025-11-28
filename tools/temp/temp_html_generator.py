@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 HTML generator module for Last.fm statistics
-Módulo generador de HTML para estadísticas de Last.fm
+MÃ³dulo generador de HTML para estadÃ­sticas de Last.fm
 """
 
 import json
@@ -14,12 +14,12 @@ class HTMLGenerator:
     @staticmethod
     def create_html(stats: Dict, users: List[str], period_type: str = "semanal") -> str:
         """
-        Crea el HTML para las estadísticas con categorías desplegables
+        Crea el HTML para las estadÃ­sticas con categorÃ­as desplegables
 
         Args:
-            stats: Diccionario con las estadísticas
+            stats: Diccionario con las estadÃ­sticas
             users: Lista de usuarios
-            period_type: Tipo de período ('semanal', 'mensual', 'anual')
+            period_type: Tipo de perÃ­odo ('semanal', 'mensual', 'anual')
 
         Returns:
             String con el contenido HTML completo
@@ -27,11 +27,22 @@ class HTMLGenerator:
         users_json = json.dumps(users, ensure_ascii=False)
         stats_json = json.dumps(stats, indent=2, ensure_ascii=False)
 
-        # Configuración de Umami Analytics
+        # ConfiguraciÃ³n de Umami Analytics
         umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
         umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
 
-        # Determinar qué categorías incluir
+        # Leer iconos de usuarios del entorno
+        icons_env = os.getenv('LASTFM_USERS_ICONS', '')
+        user_icons = {}
+        if icons_env:
+            for pair in icons_env.split(','):
+                if ':' in pair:
+                    user, icon = pair.split(':', 1)
+                    user_icons[user.strip()] = icon.strip()
+
+        user_icons_json = json.dumps(user_icons, ensure_ascii=False)
+
+        # Determinar quÃ© categorÃ­as incluir
         categories = ['artists', 'tracks', 'albums', 'genres', 'labels', 'years']
         if 'novelties' in stats:
             categories.append('novelties')
@@ -42,10 +53,10 @@ class HTMLGenerator:
             label = {
                 'artists': 'Artistas',
                 'tracks': 'Canciones',
-                'albums': 'Álbumes',
-                'genres': 'Géneros',
+                'albums': 'Ãlbumes',
+                'genres': 'GÃ©neros',
                 'labels': 'Sellos',
-                'years': 'Años',
+                'years': 'AÃ±os',
                 'novelties': 'Novedades'
             }.get(category, category.title())
 
@@ -61,7 +72,7 @@ class HTMLGenerator:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last.fm Stats - {stats.get('period_label', 'Estadísticas')}</title>
+    <title>Last.fm Stats - {stats.get('period_label', 'EstadÃ­sticas')}</title>
     <link rel="icon" type="image/png" href="images/music.png">
     <!-- Umami Analytics -->
     <script defer src="{umami_script_url}" data-website-id="{umami_website_id}"></script>
@@ -250,16 +261,16 @@ class HTMLGenerator:
             background: #1e1e2e;
             border-bottom: 1px solid #313244;
             display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
+            gap: 10px;
             align-items: center;
             justify-content: center;
+            overflow-x: auto;
         }}
 
         .control-group {{
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            display: flex;
             gap: 10px;
+            align-items: center;
         }}
 
         .control-group label {{
@@ -270,7 +281,7 @@ class HTMLGenerator:
         .category-filters {{
             display: flex;
             gap: 10px;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
         }}
 
         .category-filter {{
@@ -406,7 +417,7 @@ class HTMLGenerator:
         }}
 
         .expandable::after {{
-            content: '▼';
+            content: 'â–¼';
             position: absolute;
             right: 12px;
             top: 12px;
@@ -415,7 +426,7 @@ class HTMLGenerator:
         }}
 
         .expandable.expanded::after {{
-            content: '▲';
+            content: 'â–²';
         }}
 
         .details {{
@@ -577,6 +588,7 @@ class HTMLGenerator:
 
             .category-filters {{
                 justify-content: center;
+                flex-wrap: wrap;
             }}
 
             .artists-popup {{
@@ -604,23 +616,23 @@ class HTMLGenerator:
     <div class="container">
         <header>
             <div class="header-content">
-                <h1>📊 RYM Hispano Estadísticas</h1>
+                <h1>ðŸ“Š RYM Hispano EstadÃ­sticas</h1>
                 <div class="nav-buttons">
                     <a href="esta-semana.html" class="nav-button">TEMPORALES</a>
                     <a href="index.html#grupo" class="nav-button">GRUPO</a>
                     <a href="index.html#about" class="nav-button">ACERCA DE</a>
                 </div>
             </div>
-            <button class="user-button" id="userButton">👤</button>
+            <button class="user-button" id="userButton">ðŸ‘¤</button>
         </header>
 
-        <!-- Modal de selección de usuario -->
+        <!-- Modal de selecciÃ³n de usuario -->
         <div class="user-modal" id="userModal">
             <div class="user-modal-content">
-                <button class="user-modal-close" id="userModalClose">×</button>
+                <button class="user-modal-close" id="userModalClose">Ã—</button>
                 <div class="user-modal-header">Seleccionar Usuario</div>
                 <div class="user-options" id="userOptions">
-                    <!-- Se llenarán dinámicamente -->
+                    <!-- Se llenarÃ¡n dinÃ¡micamente -->
                 </div>
             </div>
         </div>
@@ -635,7 +647,7 @@ class HTMLGenerator:
         </div>
 
         <div class="period-header">
-            <h2>{stats.get('period_label', 'Estadísticas')}</h2>
+            <h2>{stats.get('period_label', 'EstadÃ­sticas')}</h2>
             <p class="period-info">
                 <span id="dateRange"></span> |
                 <span id="totalScrobbles"></span> scrobbles totales
@@ -644,7 +656,7 @@ class HTMLGenerator:
 
         <div class="stats-container">
             <div class="categories" id="categoriesContainer">
-                <!-- Se llenará dinámicamente -->
+                <!-- Se llenarÃ¡ dinÃ¡micamente -->
             </div>
         </div>
 
@@ -654,12 +666,13 @@ class HTMLGenerator:
     </div>
 
     <script>
-        // Usuarios reales del entorno LASTFM_USERS
+        // Usuarios reales del entorno LASTFM_USERS e iconos de LASTFM_USERS_ICONS
+        const userIcons = {user_icons_json};
         const availableUsers = {users_json};
         const stats = {stats_json};
         const hasNovelties = stats.novelties !== undefined;
 
-        // Función para obtener novedades de usuario desde datos precalculados
+        // FunciÃ³n para obtener novedades de usuario desde datos precalculados
         function getUserNovelties(user) {{
             if (!stats.novelties || !stats.novelties.nuevos_para_usuarios) {{
                 return {{ artists: [], albums: [], tracks: [] }};
@@ -668,7 +681,7 @@ class HTMLGenerator:
             return stats.novelties.nuevos_para_usuarios[user] || {{ artists: [], albums: [], tracks: [] }};
         }}
 
-        // Funcionalidad del botón de usuario
+        // Funcionalidad del botÃ³n de usuario
         function initializeUserSelector() {{
             const userButton = document.getElementById('userButton');
             const userModal = document.getElementById('userModal');
@@ -683,12 +696,24 @@ class HTMLGenerator:
                 const option = document.createElement('div');
                 option.className = 'user-option';
                 option.dataset.user = user;
-                option.textContent = user;
+
+                const icon = userIcons[user];
+                if (icon) {{
+                    if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {{
+                        option.innerHTML = `<img src="${{icon}}" alt="${{user}}" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:8px;"> ${{user}}`;
+                    }} else {{
+                        option.innerHTML = `<span style="font-size:1.2em;margin-right:8px;">${{icon}}</span> ${{user}}`;
+                    }}
+                }} else {{
+                    option.textContent = user;
+                }}
+
                 userOptions.appendChild(option);
             }});
 
-            // Marcar opción seleccionada
+            // Marcar opciÃ³n seleccionada
             updateSelectedUserOption(selectedUser);
+            updateUserButtonIcon(selectedUser);
 
             // Event listeners
             userButton.addEventListener('click', () => {{
@@ -718,12 +743,27 @@ class HTMLGenerator:
                     }}
 
                     updateSelectedUserOption(user);
+                    updateUserButtonIcon(user);
                     userModal.style.display = 'none';
                     renderStats(); // Re-renderizar con nuevo usuario
                 }}
             }});
 
             return selectedUser;
+        }}
+
+        function updateUserButtonIcon(user) {{
+            const userButton = document.getElementById('userButton');
+            const icon = userIcons[user];
+            if (icon) {{
+                if (icon.startsWith('http') || icon.startsWith('/') || icon.endsWith('.png') || icon.endsWith('.jpg')) {{
+                    userButton.innerHTML = `<img src="${{icon}}" alt="${{user}}" style="width:100%;height:100%;border-radius:50%;">`;
+                }} else {{
+                    userButton.textContent = icon;
+                }}
+            }} else {{
+                userButton.textContent = 'ðŸ'¤';
+            }}
         }}
 
         function updateSelectedUserOption(selectedUser) {{
@@ -736,15 +776,15 @@ class HTMLGenerator:
             }});
         }}
 
-        // Inicializar categorías activas
+        // Inicializar categorÃ­as activas
         let activeCategories = new Set(['artists']); // Por defecto mostrar artistas
         let selectedUser = '';
 
-        document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} → ${{stats.to_date || ''}}`;
+        document.getElementById('dateRange').textContent = `${{stats.from_date || ''}} â†’ ${{stats.to_date || ''}}`;
         document.getElementById('totalScrobbles').textContent = stats.total_scrobbles || 0;
         document.getElementById('generatedAt').textContent = stats.generated_at || '';
 
-        // Manejar filtros de categorías
+        // Manejar filtros de categorÃ­as
         const categoryFilters = document.querySelectorAll('.category-filter');
         categoryFilters.forEach(filter => {{
             filter.addEventListener('click', () => {{
@@ -781,7 +821,7 @@ class HTMLGenerator:
 
             const closeBtn = document.createElement('button');
             closeBtn.className = 'popup-close';
-            closeBtn.innerHTML = '×';
+            closeBtn.innerHTML = 'Ã—';
             closeBtn.onclick = () => {{
                 document.body.removeChild(overlay);
                 document.body.removeChild(popup);
@@ -881,15 +921,15 @@ class HTMLGenerator:
                 itemMeta.appendChild(totalBadge);
             }}
 
-            // Scrobbles en este período
+            // Scrobbles en este perÃ­odo
             if (item.period_count) {{
                 const periodBadge = document.createElement('span');
                 periodBadge.className = 'badge';
-                periodBadge.textContent = `${{item.period_count}} plays período`;
+                periodBadge.textContent = `${{item.period_count}} plays perÃ­odo`;
                 itemMeta.appendChild(periodBadge);
             }}
 
-            // Fecha de primera vez del usuario (si está disponible)
+            // Fecha de primera vez del usuario (si estÃ¡ disponible)
             if (item.first_date || item.user_first_date) {{
                 const date = new Date((item.first_date || item.user_first_date) * 1000);
                 const dateBadge = document.createElement('span');
@@ -900,7 +940,7 @@ class HTMLGenerator:
                 itemMeta.appendChild(dateBadge);
             }}
 
-            // Usuarios que también lo escucharon (coincidencias)
+            // Usuarios que tambiÃ©n lo escucharon (coincidencias)
             if (item.coincident_users && item.coincident_users.length > 0) {{
                 item.coincident_users.forEach(user => {{
                     const userBadge = document.createElement('span');
@@ -910,7 +950,7 @@ class HTMLGenerator:
                 }});
             }}
 
-            // Información de coincidencias
+            // InformaciÃ³n de coincidencias
             if (item.num_coincidences) {{
                 const coincidencesBadge = document.createElement('span');
                 coincidencesBadge.className = 'badge';
@@ -929,12 +969,12 @@ class HTMLGenerator:
             container.innerHTML = '';
 
             const categoryTitles = {{
-                artists: 'Artistas Más Escuchados',
-                tracks: 'Canciones Más Escuchadas',
-                albums: 'Álbumes Más Escuchados',
-                genres: 'Géneros Más Escuchados',
-                labels: 'Sellos Más Escuchados',
-                years: 'Años Más Escuchados',
+                artists: 'Artistas MÃ¡s Escuchados',
+                tracks: 'Canciones MÃ¡s Escuchadas',
+                albums: 'Ãlbumes MÃ¡s Escuchados',
+                genres: 'GÃ©neros MÃ¡s Escuchados',
+                labels: 'Sellos MÃ¡s Escuchados',
+                years: 'AÃ±os MÃ¡s Escuchados',
                 novelties: 'Novedades'
             }};
 
@@ -961,7 +1001,7 @@ class HTMLGenerator:
                     nuevosSection.className = 'novelty-section';
 
                     const nuevosTitle = document.createElement('h4');
-                    nuevosTitle.textContent = '🆕 Nuevos para todos';
+                    nuevosTitle.textContent = 'ðŸ†• Nuevos para todos';
                     nuevosSection.appendChild(nuevosTitle);
 
                     ['artists', 'albums', 'tracks'].forEach(type => {{
@@ -970,7 +1010,7 @@ class HTMLGenerator:
 
                         const subsectionTitle = document.createElement('h5');
                         subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
-                                                     type === 'albums' ? 'Álbumes' : 'Canciones';
+                                                     type === 'albums' ? 'Ãlbumes' : 'Canciones';
                         subsection.appendChild(subsectionTitle);
 
                         const items = stats.novelties.nuevos[type];
@@ -996,7 +1036,7 @@ class HTMLGenerator:
                     compartidosSection.className = 'novelty-section';
 
                     const compartidosTitle = document.createElement('h4');
-                    compartidosTitle.textContent = '👥 Nuevos compartidos (50%+ del grupo)';
+                    compartidosTitle.textContent = 'ðŸ‘¥ Nuevos compartidos (50%+ del grupo)';
                     compartidosSection.appendChild(compartidosTitle);
 
                     ['artists', 'albums', 'tracks'].forEach(type => {{
@@ -1005,7 +1045,7 @@ class HTMLGenerator:
 
                         const subsectionTitle = document.createElement('h5');
                         subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
-                                                     type === 'albums' ? 'Álbumes' : 'Canciones';
+                                                     type === 'albums' ? 'Ãlbumes' : 'Canciones';
                         subsection.appendChild(subsectionTitle);
 
                         const items = stats.novelties.nuevos_compartidos[type];
@@ -1030,7 +1070,7 @@ class HTMLGenerator:
                         usuarioSection.className = 'novelty-section';
 
                         const usuarioTitle = document.createElement('h4');
-                        usuarioTitle.textContent = `👤 Nuevos para ${{selectedUser}} (ya conocidos por el grupo)`;
+                        usuarioTitle.textContent = `ðŸ‘¤ Nuevos para ${{selectedUser}} (ya conocidos por el grupo)`;
                         usuarioSection.appendChild(usuarioTitle);
 
                         // Calcular novedades para el usuario
@@ -1042,7 +1082,7 @@ class HTMLGenerator:
 
                             const subsectionTitle = document.createElement('h5');
                             subsectionTitle.textContent = type === 'artists' ? 'Artistas' :
-                                                         type === 'albums' ? 'Álbumes' : 'Canciones';
+                                                         type === 'albums' ? 'Ãlbumes' : 'Canciones';
                             subsection.appendChild(subsectionTitle);
 
                             const items = userNovelties[type];
@@ -1055,9 +1095,9 @@ class HTMLGenerator:
                                 const emptyDiv = document.createElement('div');
                                 emptyDiv.className = 'novelty-empty';
                                 const typeText = type === 'artists' ? 'artistas' :
-                                               type === 'albums' ? 'álbumes' : 'canciones';
+                                               type === 'albums' ? 'Ã¡lbumes' : 'canciones';
                                 emptyDiv.textContent = items ?
-                                    `No hay ${{typeText}} nuevos para ${{selectedUser}} con coincidencias en el período` :
+                                    `No hay ${{typeText}} nuevos para ${{selectedUser}} con coincidencias en el perÃ­odo` :
                                     'Calculando novedades del usuario...';
                                 subsection.appendChild(emptyDiv);
                             }}
@@ -1071,7 +1111,7 @@ class HTMLGenerator:
                         usuarioSection.className = 'novelty-section';
 
                         const usuarioTitle = document.createElement('h4');
-                        usuarioTitle.textContent = '👤 Nuevos para usuario específico';
+                        usuarioTitle.textContent = 'ðŸ‘¤ Nuevos para usuario especÃ­fico';
                         usuarioSection.appendChild(usuarioTitle);
 
                         const infoDiv = document.createElement('div');
@@ -1104,14 +1144,14 @@ class HTMLGenerator:
                         itemDiv.classList.add('highlighted');
                     }}
 
-                    // Hacer clickeable si es género, año o sello y hay usuario seleccionado
+                    // Hacer clickeable si es gÃ©nero, aÃ±o o sello y hay usuario seleccionado
                     const isClickableForUser = ['genres', 'labels', 'years'].includes(categoryKey) &&
                                        selectedUser &&
                                        item.users.includes(selectedUser) &&
                                        item.user_artists &&
                                        item.user_artists[selectedUser];
 
-                    // Hacer expandible si tiene información detallada
+                    // Hacer expandible si tiene informaciÃ³n detallada
                     const isExpandable = ['genres', 'labels', 'years'].includes(categoryKey) &&
                                          ((item.top_artists && item.top_artists.length > 0) ||
                                           (item.top_albums && item.top_albums.length > 0));
@@ -1193,7 +1233,7 @@ class HTMLGenerator:
 
                             const albumTitle = document.createElement('div');
                             albumTitle.className = 'detail-title';
-                            albumTitle.textContent = 'Top Álbumes:';
+                            albumTitle.textContent = 'Top Ãlbumes:';
                             albumSection.appendChild(albumTitle);
 
                             const albumList = document.createElement('div');
@@ -1236,7 +1276,7 @@ class HTMLGenerator:
             }}
         }}
 
-        // Inicialización
+        // InicializaciÃ³n
         document.addEventListener('DOMContentLoaded', function() {{
             selectedUser = initializeUserSelector();
             renderStats();

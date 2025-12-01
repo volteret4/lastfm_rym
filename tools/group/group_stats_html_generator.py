@@ -2305,10 +2305,127 @@ class GroupStatsHTMLGenerator:
 
         // Función para procesar datos compartidos desde datos consolidados
         function processSharedData(activeUsersList) {{
-            // Esta función debería implementarse para procesar datos compartidos
-            // desde los datos consolidados cuando se filtran usuarios
-            console.warn('processSharedData no implementada aún');
-            return null;
+            if (!consolidatedData || !consolidatedData.raw_data) {{
+                console.error('No hay datos consolidados disponibles');
+                return null;
+            }}
+
+            console.log('Procesando datos compartidos para usuarios:', activeUsersList);
+
+            const result = {{
+                artists: {{
+                    title: 'Artistas (Por Usuarios Compartidos)',
+                    data: {{}},
+                    total: 0,
+                    details: {{}},
+                    type: 'shared'
+                }},
+                albums: {{
+                    title: 'Álbumes (Por Usuarios Compartidos)',
+                    data: {{}},
+                    total: 0,
+                    details: {{}},
+                    type: 'shared'
+                }},
+                tracks: {{
+                    title: 'Canciones (Por Usuarios Compartidos)',
+                    data: {{}},
+                    total: 0,
+                    details: {{}},
+                    type: 'shared'
+                }},
+                genres: {{
+                    title: 'Géneros (Por Usuarios Compartidos)',
+                    data: {{}},
+                    total: 0,
+                    details: {{}},
+                    type: 'shared'
+                }},
+                labels: {{
+                    title: 'Sellos (Por Usuarios Compartidos)',
+                    data: {{}},
+                    total: 0,
+                    details: {{}},
+                    type: 'shared'
+                }},
+                release_years: {{
+                    title: 'Años de Lanzamiento (Por Usuarios Compartidos)',
+                    data: {{}},
+                    total: 0,
+                    details: {{}},
+                    type: 'shared'
+                }}
+            }};
+
+            // Procesar cada categoría
+            const categories = ['artists', 'albums', 'tracks', 'genres', 'labels', 'release_years'];
+
+            categories.forEach(category => {{
+                const itemCounts = {{}};
+                const itemUsers = {{}};
+                const itemScrobbles = {{}};
+
+                // Agregar datos de cada usuario activo
+                activeUsersList.forEach(user => {{
+                    if (consolidatedData.raw_data[user] && consolidatedData.raw_data[user][category]) {{
+                        consolidatedData.raw_data[user][category].forEach(item => {{
+                            const itemName = item.name;
+
+                            if (!itemCounts[itemName]) {{
+                                itemCounts[itemName] = new Set();
+                                itemScrobbles[itemName] = 0;
+                            }}
+
+                            itemCounts[itemName].add(user);
+                            itemScrobbles[itemName] += item.total_scrobbles;
+
+                            if (!itemUsers[itemName]) {{
+                                itemUsers[itemName] = {{}};
+                            }}
+                            itemUsers[itemName][user] = item.total_scrobbles;
+                        }});
+                    }}
+                }});
+
+                // Filtrar items compartidos (al menos 2 usuarios) y crear ranking
+                const sharedItems = [];
+                Object.entries(itemCounts).forEach(([itemName, userSet]) => {{
+                    if (userSet.size >= 2) {{
+                        sharedItems.push({{
+                            name: itemName,
+                            user_count: userSet.size,
+                            total_scrobbles: itemScrobbles[itemName],
+                            shared_users: Array.from(userSet),
+                            user_plays: itemUsers[itemName] || {{}}
+                        }});
+                    }}
+                }});
+
+                // Ordenar por usuarios compartidos (desc), luego por scrobbles (desc)
+                sharedItems.sort((a, b) => {{
+                    if (a.user_count !== b.user_count) {{
+                        return b.user_count - a.user_count;
+                    }}
+                    return b.total_scrobbles - a.total_scrobbles;
+                }});
+
+                // Tomar top 15 y crear estructura de datos para gráficos
+                const top15 = sharedItems.slice(0, 15);
+
+                top15.forEach(item => {{
+                    result[category].data[item.name] = item.total_scrobbles;
+                    result[category].total += item.total_scrobbles;
+                    result[category].details[item.name] = {{
+                        user_count: item.user_count,
+                        total_scrobbles: item.total_scrobbles,
+                        shared_users: item.shared_users,
+                        user_plays: item.user_plays
+                    }};
+                }});
+            }});
+
+            console.log('Datos compartidos procesados:', result);
+            return result;
         }}
     </script>
 </body>

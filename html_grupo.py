@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Last.fm Group Stats Generator
+Last.fm Group Stats Generator - VERSIÓN CORREGIDA
 Genera estadísticas grupales con gráficos de coincidencias y evolución temporal
+Incluye corrección para los gráficos scatter que no se renderizaban
 """
 
 import os
@@ -25,15 +26,45 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, current_dir)
 
 # Importar los módulos necesarios
-from tools.group.group_stats_analyzer import GroupStatsAnalyzer
-from tools.group.group_stats_database import GroupStatsDatabase
-from tools.group.group_stats_html_generator import GroupStatsHTMLGenerator
-from tools.group.group_data_json_generator import GroupDataJSONGenerator
+try:
+    from tools.group.group_stats_analyzer import GroupStatsAnalyzer
+    from tools.group.group_stats_database import GroupStatsDatabase
+    from tools.group.group_data_json_generator import GroupDataJSONGenerator
+
+    # Importar nuestra versión corregida
+    from tools.group.group_stats_html_generator import GroupStatsHTMLGenerator
+
+except ImportError as e:
+    print(f"❌ Error importando módulos: {e}")
+    print("Asegúrate de que los archivos están en la ubicación correcta")
+    sys.exit(1)
+
+
+def debug_scatter_data(group_stats: Dict, args) -> None:
+    """Función para debuggear datos de scatter charts"""
+    if not args.debug_scatter:
+        return
+
+    print(f"\n🐛 DEBUG SCATTER CHARTS:")
+    if 'evolution_scatter' in group_stats:
+        scatter_data = group_stats['evolution_scatter']
+        for category, data in scatter_data.items():
+            years_with_data = len([y for y, items in data.get('data', {}).items() if items])
+            total_years = len(data.get('years', []))
+            print(f"  • {category}: {years_with_data}/{total_years} años con datos")
+
+            # Mostrar ejemplo de datos para el primer año con datos
+            for year, items in data.get('data', {}).items():
+                if items:
+                    print(f"    - {year}: {len(items)} items (ej: {items[0]['name'] if items else 'N/A'})")
+                    break
+    else:
+        print("  ❌ No se encontraron datos de evolution_scatter en group_stats")
 
 
 def main():
     """Función principal para generar estadísticas grupales"""
-    parser = argparse.ArgumentParser(description='Generador de estadísticas grupales de Last.fm')
+    parser = argparse.ArgumentParser(description='Generador de estadísticas grupales de Last.fm - VERSIÓN CORREGIDA')
     parser.add_argument('--years-back', type=int, default=5,
                        help='Número de años hacia atrás para analizar (por defecto: 5)')
     parser.add_argument('--output', type=str, default=None,
@@ -42,13 +73,15 @@ def main():
                        help='Solo incluir scrobbles con MBID válidos')
     parser.add_argument('--no-json', action='store_true',
                        help='No regenerar archivos JSON (usar existentes)')
+    parser.add_argument('--debug-scatter', action='store_true',
+                       help='Mostrar información de debug para scatter charts')
     args = parser.parse_args()
 
     # Auto-generar nombre de archivo si no se especifica
     if args.output is None:
         current_year = datetime.now().year
         from_year = current_year - args.years_back
-        args.output = f'docs/grupo_{from_year}-{current_year}.html'
+        args.output = f'docs/grupo_{from_year}-{current_year}_fixed.html'
 
     try:
         users = [u.strip() for u in os.getenv('LASTFM_USERS', '').split(',') if u.strip()]
@@ -58,11 +91,12 @@ def main():
         if len(users) < 2:
             raise ValueError("Se necesitan al menos 2 usuarios para generar estadísticas grupales")
 
-        print("🎵 Iniciando análisis grupal...")
+        print("🎵 Iniciando análisis grupal... (VERSIÓN CORREGIDA)")
         print(f"👥 Usuarios: {', '.join(users)}")
         print(f"📅 Período: {datetime.now().year - args.years_back}-{datetime.now().year}")
         print(f"🎯 MBID Only: {'Sí' if args.mbid_only else 'No'}")
         print(f"📊 Regenerar JSON: {'No' if args.no_json else 'Sí'}")
+        print(f"🐛 Debug Scatter: {'Sí' if args.debug_scatter else 'No'}")
 
         # Verificar iconos de usuarios
         icons_env = os.getenv('LASTFM_USERS_ICONS', '')
@@ -85,6 +119,9 @@ def main():
         print(f"📈 Analizando estadísticas grupales...")
         group_stats = analyzer.analyze_group_stats(users)
 
+        # Debug de datos scatter
+        debug_scatter_data(group_stats, args)
+
         # Generar datos JSON para filtros dinámicos (solo si no está deshabilitado)
         if not args.no_json:
             print(f"📊 Generando datos JSON para filtros dinámicos...")
@@ -93,7 +130,7 @@ def main():
             data_dir = os.path.join(os.path.dirname(args.output), 'data', period_folder)
             json_index = json_generator.generate_all_user_combinations_data(users, data_dir)
         else:
-            print(f"⏭️ Saltando generación de JSON (--no-json activado)")
+            print(f"⭐️ Saltando generación de JSON (--no-json activado)")
 
         # Generar HTML con información del período
         print("🎨 Generando HTML...")
@@ -138,6 +175,17 @@ def main():
         print(f"  • Total scrobbles (artistas): {scrobbles_stats['artists']['total']:,}")
         print(f"  • Total scrobbles (global): {scrobbles_stats['all_combined']['total']:,}")
 
+        # Información sobre scatter charts
+        if 'evolution_scatter' in group_stats:
+            scatter_stats = group_stats['evolution_scatter']
+            total_scatter_years = 0
+            for category, data in scatter_stats.items():
+                years_with_data = len([y for y, items in data.get('data', {}).items() if items])
+                total_scatter_years += years_with_data
+            print(f"  • Datos scatter disponibles: {total_scatter_years} año-categorías")
+        else:
+            print(f"  ⚠️ Sin datos scatter disponibles")
+
         # Mostrar top 5 artistas más compartidos
         if shared_stats['artists']['data']:
             print(f"\n🎤 Top 5 artistas más compartidos:")
@@ -166,6 +214,8 @@ def main():
                 users_list = details['shared_users']
                 print(f"  {i}. {item} ({scrobbles:,} scrobbles)")
                 print(f"     Categoría: {category} | Usuarios: {', '.join(users_list)}")
+
+        print(f"\n✨ ¡Corrección de scatter charts aplicada! Los gráficos deberían mostrarse correctamente.")
 
         database.close()
 

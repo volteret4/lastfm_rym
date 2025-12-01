@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-GroupStatsDatabase - Base de datos para estadÃƒÂ­sticas grupales
+GroupStatsDatabase - Base de datos para estadÃƒÆ’Ã‚Â­sticas grupales
 """
 
 import sqlite3
@@ -11,7 +11,7 @@ from collections import defaultdict
 
 
 class GroupStatsDatabase:
-    """Base de datos para estadÃƒÂ­sticas grupales con optimizaciones y caching"""
+    """Base de datos para estadÃƒÆ’Ã‚Â­sticas grupales con optimizaciones y caching"""
 
     def __init__(self, db_path='db/lastfm_cache.db'):
         self.db_path = db_path
@@ -20,7 +20,7 @@ class GroupStatsDatabase:
         self._create_group_stats_table()
 
     def _create_group_stats_table(self):
-        """Crear tabla para almacenar estadÃƒÂ­sticas grupales pre-calculadas"""
+        """Crear tabla para almacenar estadÃƒÆ’Ã‚Â­sticas grupales pre-calculadas"""
         self.conn.execute('''
             CREATE TABLE IF NOT EXISTS group_stats (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +39,7 @@ class GroupStatsDatabase:
         self.conn.commit()
 
     def _get_mbid_filter(self, mbid_only: bool, table_alias: str = 's') -> str:
-        """Genera filtro MBID segÃƒÂºn los parÃƒÂ¡metros"""
+        """Genera filtro MBID segÃƒÆ’Ã‚Âºn los parÃƒÆ’Ã‚Â¡metros"""
         if not mbid_only:
             return ""
         return f"""AND (
@@ -52,7 +52,7 @@ class GroupStatsDatabase:
                                       limit: int = 15, mbid_only: bool = False) -> List[Dict]:
         """
         Top artistas ordenados por:
-        1. NÃƒÂºmero de usuarios que lo escuchan (prioridad)
+        1. NÃƒÆ’Ã‚Âºmero de usuarios que lo escuchan (prioridad)
         2. Total de scrobbles (desempate)
         """
         cursor = self.conn.cursor()
@@ -100,7 +100,7 @@ class GroupStatsDatabase:
 
     def get_top_albums_by_shared_users(self, users: List[str], from_year: int, to_year: int,
                                      limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top ÃƒÂ¡lbumes por usuarios compartidos y scrobbles totales"""
+        """Top ÃƒÆ’Ã‚Â¡lbumes por usuarios compartidos y scrobbles totales"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -120,7 +120,7 @@ class GroupStatsDatabase:
             GROUP BY artist, album, user
         ''', users + [from_timestamp, to_timestamp])
 
-        # Procesar por ÃƒÂ¡lbum con user_plays
+        # Procesar por ÃƒÆ’Ã‚Â¡lbum con user_plays
         album_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'artist': '', 'album': ''})
 
         for row in cursor.fetchall():
@@ -136,7 +136,7 @@ class GroupStatsDatabase:
         # Filtrar y ordenar
         result = []
         for album_name, stats in album_stats.items():
-            if len(stats['users']) >= 2:  # Solo ÃƒÂ¡lbumes compartidos
+            if len(stats['users']) >= 2:  # Solo ÃƒÆ’Ã‚Â¡lbumes compartidos
                 result.append({
                     'name': album_name,
                     'artist': stats['artist'],
@@ -172,7 +172,7 @@ class GroupStatsDatabase:
             GROUP BY artist, track, user
         ''', users + [from_timestamp, to_timestamp])
 
-        # Procesar por canciÃƒÂ³n con user_plays
+        # Procesar por canciÃƒÆ’Ã‚Â³n con user_plays
         track_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'artist': '', 'track': ''})
 
         for row in cursor.fetchall():
@@ -205,7 +205,7 @@ class GroupStatsDatabase:
 
     def get_top_genres_by_shared_users(self, users: List[str], from_year: int, to_year: int,
                                      limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top gÃƒÂ©neros por usuarios compartidos y scrobbles totales"""
+        """Top gÃƒÆ’Ã‚Â©neros por usuarios compartidos y scrobbles totales"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -221,13 +221,13 @@ class GroupStatsDatabase:
             GROUP BY ag.genres, user
         ''', users + [from_timestamp, to_timestamp])
 
-        # Procesar gÃƒÂ©neros JSON
+        # Procesar gÃƒÆ’Ã‚Â©neros JSON
         genre_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
 
         for row in cursor.fetchall():
             try:
                 genres_list = json.loads(row['genres']) if row['genres'] else []
-                for genre in genres_list[:3]:  # Solo primeros 3 gÃƒÂ©neros por artista
+                for genre in genres_list[:3]:  # Solo primeros 3 gÃƒÆ’Ã‚Â©neros por artista
                     genre_stats[genre]['users'].add(row['user'])
                     genre_stats[genre]['total_scrobbles'] += row['plays']
                     genre_stats[genre]['user_plays'][row['user']] += row['plays']
@@ -237,7 +237,7 @@ class GroupStatsDatabase:
         # Filtrar y ordenar
         result = []
         for genre, stats in genre_stats.items():
-            if len(stats['users']) >= 2:  # Solo gÃƒÂ©neros compartidos
+            if len(stats['users']) >= 2:  # Solo gÃƒÆ’Ã‚Â©neros compartidos
                 result.append({
                     'name': genre,
                     'user_count': len(stats['users']),
@@ -298,7 +298,7 @@ class GroupStatsDatabase:
 
     def get_top_release_years_by_shared_users(self, users: List[str], from_year: int, to_year: int,
                                             limit: int = 15, mbid_only: bool = False, use_decades: bool = True) -> List[Dict]:
-        """Top aÃƒÂ±os/dÃƒÂ©cadas de lanzamiento por usuarios compartidos y scrobbles totales"""
+        """Top aÃƒÆ’Ã‚Â±os/dÃƒÆ’Ã‚Â©cadas de lanzamiento por usuarios compartidos y scrobbles totales"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -316,7 +316,7 @@ class GroupStatsDatabase:
         ''', users + [from_timestamp, to_timestamp])
 
         if use_decades:
-            # Procesar por dÃƒÂ©cadas
+            # Procesar por dÃƒÆ’Ã‚Â©cadas
             period_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
 
             for row in cursor.fetchall():
@@ -325,7 +325,7 @@ class GroupStatsDatabase:
                 period_stats[decade]['total_scrobbles'] += row['plays']
                 period_stats[decade]['user_plays'][row['user']] += row['plays']
         else:
-            # Procesar por aÃƒÂ±os individuales
+            # Procesar por aÃƒÆ’Ã‚Â±os individuales
             period_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
 
             for row in cursor.fetchall():
@@ -339,7 +339,7 @@ class GroupStatsDatabase:
         max_users = len(users)
 
         for period, stats in period_stats.items():
-            if len(stats['users']) >= 2:  # Solo perÃƒÂ­odos compartidos
+            if len(stats['users']) >= 2:  # Solo perÃƒÆ’Ã‚Â­odos compartidos
                 result.append({
                     'name': period,
                     'user_count': len(stats['users']),
@@ -354,18 +354,18 @@ class GroupStatsDatabase:
 
     def get_top_release_decades_by_shared_users(self, users: List[str], from_year: int, to_year: int,
                                               limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top dÃƒÂ©cadas de lanzamiento por usuarios compartidos"""
+        """Top dÃƒÆ’Ã‚Â©cadas de lanzamiento por usuarios compartidos"""
         return self.get_top_release_years_by_shared_users(users, from_year, to_year, limit, mbid_only, use_decades=True)
 
     def get_top_individual_years_by_shared_users(self, users: List[str], from_year: int, to_year: int,
                                                 limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top aÃƒÂ±os individuales de lanzamiento por usuarios compartidos"""
+        """Top aÃƒÆ’Ã‚Â±os individuales de lanzamiento por usuarios compartidos"""
         return self.get_top_release_years_by_shared_users(users, from_year, to_year, limit, mbid_only, use_decades=False)
 
     def get_top_by_total_scrobbles(self, users: List[str], from_year: int, to_year: int,
                                  limit: int = 15, mbid_only: bool = False) -> Dict[str, List[Dict]]:
         """
-        Top 15 de todo (artistas, ÃƒÂ¡lbumes, canciones) ordenado solo por scrobbles totales
+        Top 15 de todo (artistas, ÃƒÆ’Ã‚Â¡lbumes, canciones) ordenado solo por scrobbles totales
         """
         results = {
             'artists': self.get_top_artists_by_scrobbles_only(users, from_year, to_year, limit, mbid_only),
@@ -411,7 +411,7 @@ class GroupStatsDatabase:
 
     def get_top_albums_by_scrobbles_only(self, users: List[str], from_year: int, to_year: int,
                                        limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top ÃƒÂ¡lbumes solo por scrobbles totales"""
+        """Top ÃƒÆ’Ã‚Â¡lbumes solo por scrobbles totales"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -484,7 +484,7 @@ class GroupStatsDatabase:
 
     def get_top_genres_by_scrobbles_only(self, users: List[str], from_year: int, to_year: int,
                                        limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top gÃƒÂ©neros solo por scrobbles totales"""
+        """Top gÃƒÆ’Ã‚Â©neros solo por scrobbles totales"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -500,7 +500,7 @@ class GroupStatsDatabase:
             GROUP BY ag.genres, user
         ''', users + [from_timestamp, to_timestamp])
 
-        # Procesar gÃƒÂ©neros JSON
+        # Procesar gÃƒÆ’Ã‚Â©neros JSON
         genre_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0})
 
         for row in cursor.fetchall():
@@ -561,7 +561,7 @@ class GroupStatsDatabase:
 
     def get_top_release_years_by_scrobbles_only(self, users: List[str], from_year: int, to_year: int,
                                               limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top dÃƒÂ©cadas solo por scrobbles totales"""
+        """Top dÃƒÆ’Ã‚Â©cadas solo por scrobbles totales"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -599,7 +599,7 @@ class GroupStatsDatabase:
 
     def get_top_individual_release_years_by_scrobbles_only(self, users: List[str], from_year: int, to_year: int,
                                                          limit: int = 15, mbid_only: bool = False) -> List[Dict]:
-        """Top años individuales de lanzamiento solo por scrobbles totales"""
+        """Top aÃ±os individuales de lanzamiento solo por scrobbles totales"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -637,7 +637,7 @@ class GroupStatsDatabase:
 
     def get_evolution_data(self, users: List[str], from_year: int, to_year: int,
                          mbid_only: bool = False) -> Dict:
-        """Obtiene datos de evoluciÃƒÂ³n temporal para grÃƒÂ¡ficos lineales"""
+        """Obtiene datos de evoluciÃƒÆ’Ã‚Â³n temporal para grÃƒÆ’Ã‚Â¡ficos lineales"""
         years = list(range(from_year, to_year + 1))
 
         evolution = {
@@ -650,7 +650,7 @@ class GroupStatsDatabase:
             'years': years
         }
 
-        # Recopilar todos los elementos Ãºnicos por categorÃ­a primero
+        # Recopilar todos los elementos ÃƒÂºnicos por categorÃƒÂ­a primero
         all_items = {
             'artists': set(),
             'albums': set(),
@@ -660,14 +660,14 @@ class GroupStatsDatabase:
             'release_years': set()
         }
 
-        # Para cada aÃ±o, obtener tops y recopilar elementos Ãºnicos
+        # Para cada aÃƒÂ±o, obtener tops y recopilar elementos ÃƒÂºnicos
         for year in years:
             # Artistas
             top_artists = self.get_top_artists_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_artists:
                 all_items['artists'].add(item['name'])
 
-            # Ãlbumes
+            # ÃƒÂlbumes
             top_albums = self.get_top_albums_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_albums:
                 all_items['albums'].add(item['name'])
@@ -677,7 +677,7 @@ class GroupStatsDatabase:
             for item in top_tracks:
                 all_items['tracks'].add(item['name'])
 
-            # GÃ©neros
+            # GÃƒÂ©neros
             top_genres = self.get_top_genres_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_genres:
                 all_items['genres'].add(item['name'])
@@ -687,7 +687,7 @@ class GroupStatsDatabase:
             for item in top_labels:
                 all_items['labels'].add(item['name'])
 
-            # AÃ±os de lanzamiento
+            # AÃƒÂ±os de lanzamiento
             top_years = self.get_top_release_years_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_years:
                 all_items['release_years'].add(item['name'])
@@ -697,9 +697,9 @@ class GroupStatsDatabase:
             for item_name in all_items[category]:
                 evolution[category][item_name] = {y: {'total': 0, 'users': {}} for y in years}
 
-        # Ahora llenar con datos reales aÃ±o por aÃ±o
+        # Ahora llenar con datos reales aÃƒÂ±o por aÃƒÂ±o
         for year in years:
-            # Procesar artistas para este aÃ±o
+            # Procesar artistas para este aÃƒÂ±o
             top_artists = self.get_top_artists_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_artists:
                 if item['name'] in evolution['artists']:
@@ -707,7 +707,7 @@ class GroupStatsDatabase:
                     user_details = self._get_user_breakdown_for_artist(users, item['name'], year, year, mbid_only)
                     evolution['artists'][item['name']][year]['users'] = user_details
 
-            # Procesar Ã¡lbumes para este aÃ±o
+            # Procesar ÃƒÂ¡lbumes para este aÃƒÂ±o
             top_albums = self.get_top_albums_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_albums:
                 if item['name'] in evolution['albums']:
@@ -715,7 +715,7 @@ class GroupStatsDatabase:
                     user_details = self._get_user_breakdown_for_album(users, item['artist'], item['album'], year, year, mbid_only)
                     evolution['albums'][item['name']][year]['users'] = user_details
 
-            # Procesar canciones para este aÃ±o
+            # Procesar canciones para este aÃƒÂ±o
             top_tracks = self.get_top_tracks_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_tracks:
                 if item['name'] in evolution['tracks']:
@@ -723,7 +723,7 @@ class GroupStatsDatabase:
                     user_details = self._get_user_breakdown_for_track(users, item['artist'], item['track'], year, year, mbid_only)
                     evolution['tracks'][item['name']][year]['users'] = user_details
 
-            # Procesar gÃ©neros para este aÃ±o
+            # Procesar gÃƒÂ©neros para este aÃƒÂ±o
             top_genres = self.get_top_genres_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_genres:
                 if item['name'] in evolution['genres']:
@@ -731,7 +731,7 @@ class GroupStatsDatabase:
                     user_details = self._get_user_breakdown_for_genre(users, item['name'], year, year, mbid_only)
                     evolution['genres'][item['name']][year]['users'] = user_details
 
-            # Procesar sellos para este aÃ±o
+            # Procesar sellos para este aÃƒÂ±o
             top_labels = self.get_top_labels_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_labels:
                 if item['name'] in evolution['labels']:
@@ -739,7 +739,7 @@ class GroupStatsDatabase:
                     user_details = self._get_user_breakdown_for_label(users, item['name'], year, year, mbid_only)
                     evolution['labels'][item['name']][year]['users'] = user_details
 
-            # Procesar aÃ±os de lanzamiento para este aÃ±o
+            # Procesar aÃƒÂ±os de lanzamiento para este aÃƒÂ±o
             top_years = self.get_top_release_years_by_scrobbles_only(users, year, year, 15, mbid_only)
             for item in top_years:
                 if item['name'] in evolution['release_years']:
@@ -747,7 +747,7 @@ class GroupStatsDatabase:
                     user_details = self._get_user_breakdown_for_release_year(users, item['name'], year, year, mbid_only)
                     evolution['release_years'][item['name']][year]['users'] = user_details
 
-        # Reducir a top 15 por categorÃ­a para visualizaciÃ³n
+        # Reducir a top 15 por categorÃƒÂ­a para visualizaciÃƒÂ³n
         for category in ['artists', 'albums', 'tracks', 'genres', 'labels', 'release_years']:
             # Calcular total por elemento
             totals = {}
@@ -761,7 +761,7 @@ class GroupStatsDatabase:
         return evolution
 
     def get_total_shared_counts(self, users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, int]:
-        """Obtiene el nÃƒÂºmero total real de elementos compartidos por TODOS los usuarios"""
+        """Obtiene el nÃƒÆ’Ã‚Âºmero total real de elementos compartidos por TODOS los usuarios"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -786,7 +786,7 @@ class GroupStatsDatabase:
         result = cursor.fetchone()
         results['shared_artists'] = result['count'] if result else 0
 
-        # Total Ã¡lbumes compartidos por TODOS los usuarios
+        # Total ÃƒÂ¡lbumes compartidos por TODOS los usuarios
         cursor.execute(f'''
             SELECT COUNT(*) as count
             FROM (
@@ -821,7 +821,7 @@ class GroupStatsDatabase:
         result = cursor.fetchone()
         results['shared_tracks'] = result['count'] if result else 0
 
-        # Total gÃ©neros compartidos por TODOS los usuarios
+        # Total gÃƒÂ©neros compartidos por TODOS los usuarios
         cursor.execute(f'''
             SELECT ag.genres, COUNT(DISTINCT s.user) as user_count
             FROM scrobbles s
@@ -837,7 +837,7 @@ class GroupStatsDatabase:
         for row in cursor.fetchall():
             try:
                 genres_list = json.loads(row['genres']) if row['genres'] else []
-                genre_count += len(genres_list[:3])  # Contar hasta 3 gÃ©neros por artista
+                genre_count += len(genres_list[:3])  # Contar hasta 3 gÃƒÂ©neros por artista
             except json.JSONDecodeError:
                 continue
         results['shared_genres'] = genre_count
@@ -861,7 +861,7 @@ class GroupStatsDatabase:
         result = cursor.fetchone()
         results['shared_labels'] = result['count'] if result else 0
 
-        # Total aÃ±os de lanzamiento compartidos por TODOS los usuarios
+        # Total aÃƒÂ±os de lanzamiento compartidos por TODOS los usuarios
         cursor.execute(f'''
             SELECT ard.release_year, COUNT(DISTINCT s.user) as user_count
             FROM scrobbles s
@@ -884,7 +884,7 @@ class GroupStatsDatabase:
 
     def get_top_artists_for_genre(self, genre: str, users: List[str], from_year: int, to_year: int,
                                  limit: int = 5, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene top artistas que mÃƒÂ¡s contribuyen a un gÃƒÂ©nero especÃƒÂ­fico"""
+        """Obtiene top artistas que mÃƒÆ’Ã‚Â¡s contribuyen a un gÃƒÆ’Ã‚Â©nero especÃƒÆ’Ã‚Â­fico"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -919,7 +919,7 @@ class GroupStatsDatabase:
 
     def get_top_albums_for_label(self, label: str, users: List[str], from_year: int, to_year: int,
                                 limit: int = 5, mbid_only: bool = False) -> List[Dict]:
-        """Obtiene top ÃƒÂ¡lbumes que mÃƒÂ¡s contribuyen a un sello especÃƒÂ­fico"""
+        """Obtiene top ÃƒÆ’Ã‚Â¡lbumes que mÃƒÆ’Ã‚Â¡s contribuyen a un sello especÃƒÆ’Ã‚Â­fico"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -959,14 +959,14 @@ class GroupStatsDatabase:
 
     def get_top_artists_for_period(self, period: str, users: List[str], from_year: int, to_year: int,
                                   limit: int = 5, mbid_only: bool = False, use_decades: bool = True) -> List[Dict]:
-        """Obtiene top artistas que mÃƒÂ¡s contribuyen a un perÃƒÂ­odo especÃƒÂ­fico (dÃƒÂ©cada o aÃƒÂ±o)"""
+        """Obtiene top artistas que mÃƒÆ’Ã‚Â¡s contribuyen a un perÃƒÆ’Ã‚Â­odo especÃƒÆ’Ã‚Â­fico (dÃƒÆ’Ã‚Â©cada o aÃƒÆ’Ã‚Â±o)"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
         mbid_filter = self._get_mbid_filter(mbid_only)
 
         if use_decades:
-            # Convertir dÃƒÂ©cada a rango de aÃƒÂ±os
+            # Convertir dÃƒÆ’Ã‚Â©cada a rango de aÃƒÆ’Ã‚Â±os
             if period == "Antes de 1950":
                 year_condition = "ard.release_year < 1950"
             elif period == "2020s+":
@@ -976,7 +976,7 @@ class GroupStatsDatabase:
                 decade_end = decade_start + 9
                 year_condition = f"ard.release_year BETWEEN {decade_start} AND {decade_end}"
         else:
-            # AÃƒÂ±o individual
+            # AÃƒÆ’Ã‚Â±o individual
             year_condition = f"ard.release_year = {int(period)}"
 
         cursor.execute(f'''
@@ -1008,7 +1008,7 @@ class GroupStatsDatabase:
 
 
     def _get_user_breakdown_for_artist(self, users: List[str], artist: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, int]:
-        """Obtiene el desglose de scrobbles por usuario para un artista especÃ­fico"""
+        """Obtiene el desglose de scrobbles por usuario para un artista especÃƒÂ­fico"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -1027,7 +1027,7 @@ class GroupStatsDatabase:
         return {row['user']: row['plays'] for row in cursor.fetchall()}
 
     def _get_user_breakdown_for_album(self, users: List[str], artist: str, album: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, int]:
-        """Obtiene el desglose de scrobbles por usuario para un Ã¡lbum especÃ­fico"""
+        """Obtiene el desglose de scrobbles por usuario para un ÃƒÂ¡lbum especÃƒÂ­fico"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -1046,7 +1046,7 @@ class GroupStatsDatabase:
         return {row['user']: row['plays'] for row in cursor.fetchall()}
 
     def _get_user_breakdown_for_track(self, users: List[str], artist: str, track: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, int]:
-        """Obtiene el desglose de scrobbles por usuario para una canciÃ³n especÃ­fica"""
+        """Obtiene el desglose de scrobbles por usuario para una canciÃƒÂ³n especÃƒÂ­fica"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -1065,7 +1065,7 @@ class GroupStatsDatabase:
         return {row['user']: row['plays'] for row in cursor.fetchall()}
 
     def _get_user_breakdown_for_genre(self, users: List[str], genre: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, int]:
-        """Obtiene el desglose de scrobbles por usuario para un gÃ©nero especÃ­fico"""
+        """Obtiene el desglose de scrobbles por usuario para un gÃƒÂ©nero especÃƒÂ­fico"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -1085,7 +1085,7 @@ class GroupStatsDatabase:
         return {row['user']: row['plays'] for row in cursor.fetchall()}
 
     def _get_user_breakdown_for_label(self, users: List[str], label: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, int]:
-        """Obtiene el desglose de scrobbles por usuario para un sello especÃ­fico"""
+        """Obtiene el desglose de scrobbles por usuario para un sello especÃƒÂ­fico"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
@@ -1105,13 +1105,13 @@ class GroupStatsDatabase:
         return {row['user']: row['plays'] for row in cursor.fetchall()}
 
     def _get_user_breakdown_for_release_year(self, users: List[str], period: str, from_year: int, to_year: int, mbid_only: bool = False) -> Dict[str, int]:
-        """Obtiene el desglose de scrobbles por usuario para un perÃ­odo de lanzamiento especÃ­fico"""
+        """Obtiene el desglose de scrobbles por usuario para un perÃƒÂ­odo de lanzamiento especÃƒÂ­fico"""
         cursor = self.conn.cursor()
         from_timestamp = int(datetime(from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
         mbid_filter = self._get_mbid_filter(mbid_only)
 
-        # Convertir perÃ­odo a condiciÃ³n de aÃ±o
+        # Convertir perÃƒÂ­odo a condiciÃƒÂ³n de aÃƒÂ±o
         if period == "Antes de 1950":
             year_condition = "ard.release_year < 1950"
         elif period == "2020s+":
@@ -1135,8 +1135,98 @@ class GroupStatsDatabase:
         return {row['user']: row['plays'] for row in cursor.fetchall()}
 
 
+
+    def get_evolution_scatter_data(self, users: List[str], from_year: int, to_year: int,
+                                mbid_only: bool = False) -> Dict:
+        """Obtiene datos de evolución temporal para gráficos scatter (top 5 por año)"""
+        years = list(range(from_year, to_year + 1))
+
+        evolution_scatter = {
+            'artists': {},
+            'albums': {},
+            'tracks': {},
+            'genres': {},
+            'labels': {},
+            'release_years': {},
+            'years': years
+        }
+
+        # Para cada año, obtener el top 5 de ese año específico
+        for year in years:
+            # Top 5 artistas del año
+            top_artists = self.get_top_artists_by_scrobbles_only(users, year, year, 5, mbid_only)
+            evolution_scatter['artists'][year] = []
+            for idx, item in enumerate(top_artists):
+                evolution_scatter['artists'][year].append({
+                    'name': item['name'],
+                    'scrobbles': item['total_scrobbles'],
+                    'users': item['shared_users'],
+                    'position': idx + 1
+                })
+
+            # Top 5 álbumes del año
+            top_albums = self.get_top_albums_by_scrobbles_only(users, year, year, 5, mbid_only)
+            evolution_scatter['albums'][year] = []
+            for idx, item in enumerate(top_albums):
+                evolution_scatter['albums'][year].append({
+                    'name': item['name'],
+                    'scrobbles': item['total_scrobbles'],
+                    'users': item['shared_users'],
+                    'position': idx + 1,
+                    'artist': item.get('artist', ''),
+                    'album': item.get('album', '')
+                })
+
+            # Top 5 canciones del año
+            top_tracks = self.get_top_tracks_by_scrobbles_only(users, year, year, 5, mbid_only)
+            evolution_scatter['tracks'][year] = []
+            for idx, item in enumerate(top_tracks):
+                evolution_scatter['tracks'][year].append({
+                    'name': item['name'],
+                    'scrobbles': item['total_scrobbles'],
+                    'users': item['shared_users'],
+                    'position': idx + 1,
+                    'artist': item.get('artist', ''),
+                    'track': item.get('track', '')
+                })
+
+            # Top 5 géneros del año
+            top_genres = self.get_top_genres_by_scrobbles_only(users, year, year, 5, mbid_only)
+            evolution_scatter['genres'][year] = []
+            for idx, item in enumerate(top_genres):
+                evolution_scatter['genres'][year].append({
+                    'name': item['name'],
+                    'scrobbles': item['total_scrobbles'],
+                    'users': item['shared_users'],
+                    'position': idx + 1
+                })
+
+            # Top 5 sellos del año
+            top_labels = self.get_top_labels_by_scrobbles_only(users, year, year, 5, mbid_only)
+            evolution_scatter['labels'][year] = []
+            for idx, item in enumerate(top_labels):
+                evolution_scatter['labels'][year].append({
+                    'name': item['name'],
+                    'scrobbles': item['total_scrobbles'],
+                    'users': item['shared_users'],
+                    'position': idx + 1
+                })
+
+            # Top 5 años de lanzamiento del año
+            top_years = self.get_top_release_years_by_scrobbles_only(users, year, year, 5, mbid_only)
+            evolution_scatter['release_years'][year] = []
+            for idx, item in enumerate(top_years):
+                evolution_scatter['release_years'][year].append({
+                    'name': item['name'],
+                    'scrobbles': item['total_scrobbles'],
+                    'users': item['shared_users'],
+                    'position': idx + 1
+                })
+
+        return evolution_scatter
+
     def _get_decade(self, year: int) -> str:
-        """Convierte un aÃƒÂ±o a etiqueta de dÃƒÂ©cada"""
+        """Convierte un aÃƒÆ’Ã‚Â±o a etiqueta de dÃƒÆ’Ã‚Â©cada"""
         if year < 1950:
             return "Antes de 1950"
         elif year >= 2020:
@@ -1146,5 +1236,5 @@ class GroupStatsDatabase:
             return f"{decade_start}s"
 
     def close(self):
-        """Cerrar conexiÃƒÂ³n a la base de datos"""
+        """Cerrar conexiÃƒÆ’Ã‚Â³n a la base de datos"""
         self.conn.close()

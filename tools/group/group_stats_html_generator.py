@@ -42,7 +42,6 @@ class GroupStatsHTMLGenerator:
         umami_script_url = os.getenv('UMAMI_SCRIPT_URL', '')
         umami_website_id = os.getenv('UMAMI_WEBSITE_ID', '')
 
-
         # Si no se proporciona period_folder, calcularlo desde group_stats
         if period_folder is None:
             period_parts = group_stats.get('period', '').split('-')
@@ -724,7 +723,6 @@ class GroupStatsHTMLGenerator:
         }}
 
         @media (max-width: 768px) {{
-
             .charts-grid {{
                 grid-template-columns: 1fr;
             }}
@@ -758,11 +756,9 @@ class GroupStatsHTMLGenerator:
                 align-items: stretch;
             }}
 
-            @media (max-width: 768px) {{
-                .data-control-group {{
-                    flex-direction: column;
-                    align-items: flex-start;
-                }}
+            .data-control-group {{
+                flex-direction: column;
+                align-items: flex-start;
             }}
 
             .data-categories {{
@@ -770,7 +766,6 @@ class GroupStatsHTMLGenerator:
                 grid-template-columns: 1fr 1fr;
                 gap: 10px;
             }}
-
 
             .user-button {{
                 top: 15px;
@@ -785,7 +780,7 @@ class GroupStatsHTMLGenerator:
 <body>
     <div class="container">
         <!-- Botón de usuario circular -->
-        <button class="user-button" id="userButton" title="Seleccionar usuario destacado">ðŸ‘¤</button>
+        <button class="user-button" id="userButton" title="Seleccionar usuario destacado">🎤</button>
 
         <!-- Modal de selección de usuario -->
         <div class="user-modal" id="userModal">
@@ -818,7 +813,6 @@ class GroupStatsHTMLGenerator:
 
         <!-- Filtros de usuarios para vistas específicas -->
         <div id="userFilters" class="user-filters">
-
             <div class="user-filter-buttons" id="userFilterButtons">
                 <!-- Se llenarán dinámicamente -->
             </div>
@@ -828,20 +822,17 @@ class GroupStatsHTMLGenerator:
         </div>
 
         <div class="stats-container">
-
             <!-- Vista de Datos -->
             <div id="dataView" class="view active">
                 <div class="data-section">
                     <div class="data-controls">
                         <div class="data-control-group">
-
                             <select id="userLevelSelect" class="data-select">
-                                <!-- Se llenará dinámicamente -->
+                                <!-- Se llena dinámicamente -->
                             </select>
                         </div>
 
                         <div class="data-control-group">
-
                             <div class="data-categories">
                                 <button class="data-category-filter active" data-category="artists">Artistas</button>
                                 <button class="data-category-filter" data-category="albums">Álbumes</button>
@@ -859,7 +850,7 @@ class GroupStatsHTMLGenerator:
 
                     <!-- Resumen de estadísticas -->
                     <div id="summaryStats" class="summary-stats">
-                        <!-- Se llenará dinámicamente -->
+                        <!-- Se llena dinámicamente -->
                     </div>
                 </div>
             </div>
@@ -908,7 +899,7 @@ class GroupStatsHTMLGenerator:
                     </div>
 
                     <div class="chart-container">
-                    <h3>Top 15 Años de Lanzamiento</h3>
+                        <h3>Top 15 Años de Lanzamiento</h3>
                         <div class="chart-wrapper">
                             <canvas id="sharedReleaseYearsChart"></canvas>
                         </div>
@@ -1026,6 +1017,53 @@ class GroupStatsHTMLGenerator:
                         </div>
                     </div>
                 </div>
+
+                <div class="evolution-section">
+                    <h3>Top 5 Anuales - Evolución Scatter</h3>
+                    <div class="evolution-charts">
+                        <div class="evolution-chart">
+                            <h4>Top 5 Artistas Anuales</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionScatterArtistsChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>Top 5 Álbumes Anuales</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionScatterAlbumsChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>Top 5 Canciones Anuales</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionScatterTracksChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>Top 5 Géneros Anuales</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionScatterGenresChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>Top 5 Sellos Anuales</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionScatterLabelsChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="evolution-chart">
+                            <h4>Top 5 Años de Lanzamiento Anuales</h4>
+                            <div class="line-chart-wrapper">
+                                <canvas id="evolutionScatterReleaseYearsChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Popup para mostrar detalles -->
@@ -1058,6 +1096,73 @@ class GroupStatsHTMLGenerator:
         let activeUsers = new Set(groupStats.users); // Por defecto todos los usuarios activos
         let dynamicDataCache = {{}}; // Cache para datos cargados dinámicamente
         let isLoadingData = false;
+        let consolidatedData = null; // Datos consolidados cargados una sola vez
+
+        // Cargar datos consolidados al inicio
+        async function loadConsolidatedData() {{
+            if (consolidatedData) return consolidatedData;
+
+            try {{
+                console.log('Cargando datos consolidados...');
+                const response = await fetch(`data/${{periodFolder}}/consolidated_data.json`);
+                if (!response.ok) {{
+                    throw new Error(`HTTP error! status: ${{response.status}}`);
+                }}
+                consolidatedData = await response.json();
+                console.log('Datos consolidados cargados exitosamente');
+                return consolidatedData;
+            }} catch (error) {{
+                console.error('Error cargando datos consolidados:', error);
+                // Usar datos estáticos si no hay consolidados
+                return null;
+            }}
+        }}
+
+        // Función para procesar datos scatter desde datos consolidados
+        function processScatterDataFromConsolidated(activeUsersList, category) {{
+            if (!consolidatedData || !consolidatedData.evolution_scatter || !consolidatedData.evolution_scatter[category]) {{
+                console.log(`No hay datos scatter para ${{category}}`);
+                return null;
+            }}
+
+            const scatterData = consolidatedData.evolution_scatter[category];
+            const years = consolidatedData.metadata.years;
+
+            // Filtrar datos por usuarios activos y recalcular
+            const filteredData = {{}};
+
+            years.forEach(year => {{
+                if (scatterData[year]) {{
+                    filteredData[year] = scatterData[year].filter(item => {{
+                        // Filtrar solo items que tienen al menos un usuario activo
+                        const hasActiveUser = item.users.some(user => activeUsersList.includes(user));
+                        return hasActiveUser;
+                    }}).map(item => {{
+                        // Recalcular scrobbles solo para usuarios activos
+                        const activeUsersForItem = item.users.filter(user => activeUsersList.includes(user));
+                        // Para scatter necesitamos mantener los scrobbles totales originales
+                        // pero solo mostrar los usuarios activos
+                        return {{
+                            ...item,
+                            users: activeUsersForItem
+                        }};
+                    }});
+
+                    // Reordenar por scrobbles y actualizar posiciones
+                    filteredData[year].sort((a, b) => b.scrobbles - a.scrobbles);
+                    filteredData[year] = filteredData[year].slice(0, 5); // Top 5
+                    filteredData[year].forEach((item, index) => {{
+                        item.position = index + 1;
+                    }});
+                }}
+            }});
+
+            return {{
+                title: `Top 5 ${{category}} Anuales`,
+                data: filteredData,
+                years: years
+            }};
+        }}
 
         // Funcionalidad del botón de usuario
         function initializeUserSelector() {{
@@ -1142,7 +1247,7 @@ class GroupStatsHTMLGenerator:
                     userButton.textContent = icon;
                 }}
             }} else {{
-                userButton.textContent = '👤';
+                userButton.textContent = '🎤';
             }}
         }}
 
@@ -1273,113 +1378,150 @@ class GroupStatsHTMLGenerator:
             document.getElementById('summaryStats').innerHTML = summaryHTML;
         }}
 
-        function renderSharedCharts() {{
-            // Destruir charts existentes
-            Object.values(charts).forEach(chart => {{
-                if (chart) chart.destroy();
-            }});
-            charts = {{}};
-
-            // Renderizar gráficos por usuarios compartidos
-            renderPieChart('sharedArtistsChart', groupStats.shared_charts.artists, 'sharedArtistsInfo');
-            renderPieChart('sharedAlbumsChart', groupStats.shared_charts.albums, 'sharedAlbumsInfo');
-            renderPieChart('sharedTracksChart', groupStats.shared_charts.tracks, 'sharedTracksInfo');
-            renderPieChart('sharedGenresChart', groupStats.shared_charts.genres, 'sharedGenresInfo');
-            renderPieChart('sharedLabelsChart', groupStats.shared_charts.labels, 'sharedLabelsInfo');
-            renderPieChart('sharedReleaseYearsChart', groupStats.shared_charts.release_years, 'sharedReleaseYearsInfo');
-        }}
-
-        function renderScrobblesCharts() {{
-            // Destruir charts existentes
-            Object.values(charts).forEach(chart => {{
-                if (chart) chart.destroy();
-            }});
-            charts = {{}};
-
-            // Renderizar gráficos por scrobbles totales
-            renderPieChart('scrobblesArtistsChart', groupStats.scrobbles_charts.artists, 'scrobblesArtistsInfo');
-            renderPieChart('scrobblesAlbumsChart', groupStats.scrobbles_charts.albums, 'scrobblesAlbumsInfo');
-            renderPieChart('scrobblesTracksChart', groupStats.scrobbles_charts.tracks, 'scrobblesTracksInfo');
-            renderPieChart('scrobblesGenresChart', groupStats.scrobbles_charts.genres, 'scrobblesGenresInfo');
-            renderPieChart('scrobblesLabelsChart', groupStats.scrobbles_charts.labels, 'scrobblesLabelsInfo');
-            renderPieChart('scrobblesReleaseYearsChart', groupStats.scrobbles_charts.release_years, 'scrobblesReleaseYearsInfo');
-            renderPieChart('scrobblesAllCombinedChart', groupStats.scrobbles_charts.all_combined, 'scrobblesAllCombinedInfo');
-        }}
-
-        function renderEvolutionCharts() {{
-            // Destruir charts existentes
-            Object.values(charts).forEach(chart => {{
-                if (chart) chart.destroy();
-            }});
-            charts = {{}};
-
-            // Renderizar gráficos de evolución
-            renderLineChart('evolutionArtistsChart', groupStats.evolution.artists);
-            renderLineChart('evolutionAlbumsChart', groupStats.evolution.albums);
-            renderLineChart('evolutionTracksChart', groupStats.evolution.tracks);
-            renderLineChart('evolutionGenresChart', groupStats.evolution.genres);
-            renderLineChart('evolutionLabelsChart', groupStats.evolution.labels);
-            renderLineChart('evolutionReleaseYearsChart', groupStats.evolution.release_years);
-        }}
-
-        function renderPieChart(canvasId, chartData, infoId) {{
+        function renderScatterChart(canvasId, chartData) {{
             const canvas = document.getElementById(canvasId);
-            const info = document.getElementById(infoId);
 
             if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {{
-                canvas.style.display = 'none';
-                info.innerHTML = '<div class="no-data">No hay datos disponibles</div>';
+                console.log(`No hay datos para el gráfico scatter: ${{canvasId}}`);
                 return;
             }}
 
-            canvas.style.display = 'block';
-            const unit = chartData.type === 'shared' ? 'usuarios' : 'scrobbles';
-            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}} ${{unit}} | Click para detalles`;
+            console.log(`Renderizando scatter chart: ${{canvasId}}`, chartData);
 
-            const data = {{
-                labels: Object.keys(chartData.data),
-                datasets: [{{
-                    data: Object.values(chartData.data),
-                    backgroundColor: colors.slice(0, Object.keys(chartData.data).length),
-                    borderColor: '#181825',
-                    borderWidth: 2
-                }}]
-            }};
+            // Preparar datos para scatter plot
+            const datasets = [];
+            const colorMap = {{}};
+            let colorIndex = 0;
+
+            // Mapear colores únicos para cada elemento
+            const allItems = new Set();
+            chartData.years.forEach(year => {{
+                if (chartData.data[year]) {{
+                    chartData.data[year].forEach(item => {{
+                        allItems.add(item.name);
+                    }});
+                }}
+            }});
+
+            Array.from(allItems).forEach(item => {{
+                colorMap[item] = colors[colorIndex % colors.length];
+                colorIndex++;
+            }});
+
+            // Crear un dataset por cada elemento único
+            const itemDatasets = {{}};
+
+            chartData.years.forEach((year, yearIndex) => {{
+                if (chartData.data[year] && chartData.data[year].length > 0) {{
+                    chartData.data[year].forEach(item => {{
+                        if (!itemDatasets[item.name]) {{
+                            itemDatasets[item.name] = {{
+                                label: item.name,
+                                data: [],
+                                backgroundColor: colorMap[item.name],
+                                borderColor: colorMap[item.name],
+                                borderWidth: 2,
+                                pointRadius: 6,
+                                pointHoverRadius: 8,
+                                showLine: false
+                            }};
+                        }}
+
+                        itemDatasets[item.name].data.push({{
+                            x: year,
+                            y: item.scrobbles,
+                            itemData: item
+                        }});
+                    }});
+                }}
+            }});
+
+            // Convertir a array de datasets
+            Object.values(itemDatasets).forEach(dataset => {{
+                datasets.push(dataset);
+            }});
+
+            if (datasets.length === 0) {{
+                console.log(`No hay datasets para renderizar en ${{canvasId}}`);
+                return;
+            }}
 
             const config = {{
-                type: 'pie',
-                data: data,
+                type: 'scatter',
+                data: {{
+                    datasets: datasets
+                }},
                 options: {{
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {{
                         legend: {{
-                            position: 'bottom',
-                            labels: {{
-                                color: '#cdd6f4',
-                                padding: 15,
-                                usePointStyle: true
-                            }}
+                            display: false // Ocultar leyenda porque sería muy grande
                         }},
                         tooltip: {{
                             backgroundColor: '#1e1e2e',
                             titleColor: '#cba6f7',
                             bodyColor: '#cdd6f4',
                             borderColor: '#cba6f7',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            callbacks: {{
+                                title: function(context) {{
+                                    return context[0].dataset.label;
+                                }},
+                                label: function(context) {{
+                                    const item = context.raw.itemData;
+                                    return [
+                                        `Año: ${{context.parsed.x}}`,
+                                        `Scrobbles: ${{context.parsed.y.toLocaleString()}}`,
+                                        `Posición: #${{item.position}}`,
+                                        `Usuarios: ${{item.users.join(', ')}}`
+                                    ];
+                                }}
+                            }}
+                        }}
+                    }},
+                    scales: {{
+                        x: {{
+                            type: 'linear',
+                            position: 'bottom',
+                            ticks: {{
+                                color: '#a6adc8',
+                                stepSize: 1,
+                                callback: function(value) {{
+                                    return value; // Mostrar años como enteros
+                                }}
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }}
+                        }},
+                        y: {{
+                            ticks: {{
+                                color: '#a6adc8'
+                            }},
+                            grid: {{
+                                color: '#313244'
+                            }},
+                            title: {{
+                                display: true,
+                                text: 'Scrobbles',
+                                color: '#cba6f7'
+                            }}
                         }}
                     }},
                     onClick: function(event, elements) {{
                         if (elements.length > 0) {{
-                            const index = elements[0].index;
-                            const label = data.labels[index];
-                            showGroupPopup(chartData, label);
+                            const dataIndex = elements[0].index;
+                            const datasetIndex = elements[0].datasetIndex;
+                            const item = datasets[datasetIndex].data[dataIndex].itemData;
+                            showScatterPopup(item, datasets[datasetIndex].label);
                         }}
                     }}
                 }}
             }};
 
             charts[canvasId] = new Chart(canvas, config);
+            console.log(`Scatter chart renderizado exitosamente: ${{canvasId}}`);
         }}
 
         function renderLineChart(canvasId, chartData) {{
@@ -1498,6 +1640,95 @@ class GroupStatsHTMLGenerator:
             }};
 
             charts[canvasId] = new Chart(canvas, config);
+        }}
+
+        function renderPieChart(canvasId, chartData, infoId) {{
+            const canvas = document.getElementById(canvasId);
+            const info = document.getElementById(infoId);
+
+            if (!chartData || !chartData.data || Object.keys(chartData.data).length === 0) {{
+                canvas.style.display = 'none';
+                info.innerHTML = '<div class="no-data">No hay datos disponibles</div>';
+                return;
+            }}
+
+            canvas.style.display = 'block';
+            const unit = chartData.type === 'shared' ? 'usuarios' : 'scrobbles';
+            info.innerHTML = `Total: ${{chartData.total.toLocaleString()}} ${{unit}} | Click para detalles`;
+
+            const data = {{
+                labels: Object.keys(chartData.data),
+                datasets: [{{
+                    data: Object.values(chartData.data),
+                    backgroundColor: colors.slice(0, Object.keys(chartData.data).length),
+                    borderColor: '#181825',
+                    borderWidth: 2
+                }}]
+            }};
+
+            const config = {{
+                type: 'pie',
+                data: data,
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{
+                                color: '#cdd6f4',
+                                padding: 15,
+                                usePointStyle: true
+                            }}
+                        }},
+                        tooltip: {{
+                            backgroundColor: '#1e1e2e',
+                            titleColor: '#cba6f7',
+                            bodyColor: '#cdd6f4',
+                            borderColor: '#cba6f7',
+                            borderWidth: 1
+                        }}
+                    }},
+                    onClick: function(event, elements) {{
+                        if (elements.length > 0) {{
+                            const index = elements[0].index;
+                            const label = data.labels[index];
+                            showGroupPopup(chartData, label);
+                        }}
+                    }}
+                }}
+            }};
+
+            charts[canvasId] = new Chart(canvas, config);
+        }}
+
+        function showScatterPopup(itemData, itemName) {{
+            let title = `${{itemName}}`;
+            let content = '';
+
+            content += `<div class="popup-item">
+                <div class="name">${{itemName}}</div>
+                <div class="details">
+                    Posición: #${{itemData.position}} |
+                    Scrobbles: ${{itemData.scrobbles.toLocaleString()}}
+                </div>`;
+
+            if (itemData.users && itemData.users.length > 0) {{
+                content += `<div class="users">Usuarios: ${{itemData.users.join(', ')}}</div>`;
+            }}
+
+            if (itemData.artist && itemData.album) {{
+                content += `<div class="details">Artista: ${{itemData.artist}} | Álbum: ${{itemData.album}}</div>`;
+            }} else if (itemData.artist && itemData.track) {{
+                content += `<div class="details">Artista: ${{itemData.artist}} | Canción: ${{itemData.track}}</div>`;
+            }}
+
+            content += `</div>`;
+
+            document.getElementById('popupTitle').textContent = title;
+            document.getElementById('popupContent').innerHTML = content;
+            document.getElementById('popupOverlay').style.display = 'block';
+            document.getElementById('popup').style.display = 'block';
         }}
 
         function showGroupPopup(chartData, selectedLabel) {{
@@ -1929,11 +2160,19 @@ class GroupStatsHTMLGenerator:
             console.log('Renderizando gráficos compartidos con filtro...');
             showLoadingMessage('Cargando datos...');
 
-            const userKey = getUserKey();
-            const sharedData = await loadDynamicData('shared', userKey);
+            // Asegurarse de que los datos consolidados estén cargados
+            if (!consolidatedData) {{
+                await loadConsolidatedData();
+            }}
+
+            // Obtener usuarios activos
+            const activeUsersList = Array.from(activeUsers);
+
+            // Procesar datos compartidos desde datos consolidados
+            const sharedData = processSharedData(activeUsersList);
 
             if (!sharedData) {{
-                showLoadingMessage('Error cargando datos');
+                showLoadingMessage('Error procesando datos');
                 isLoadingData = false;
                 return;
             }}
@@ -1996,20 +2235,27 @@ class GroupStatsHTMLGenerator:
             console.log('Renderizando gráficos de evolución con filtro...');
             showLoadingMessage('Cargando datos...');
 
-            const userKey = getUserKey();
-            const evolutionData = await loadDynamicData('evolution', userKey);
-
-            if (!evolutionData) {{
-                showLoadingMessage('Error cargando datos');
-                isLoadingData = false;
-                return;
+            // Asegurarse de que los datos consolidados estén cargados
+            if (!consolidatedData) {{
+                await loadConsolidatedData();
             }}
+
+            const activeUsersList = Array.from(activeUsers);
 
             // Destruir charts existentes
             Object.values(charts).forEach(chart => {{
                 if (chart) chart.destroy();
             }});
             charts = {{}};
+
+            const userKey = getUserKey();
+            const evolutionData = await loadDynamicData('evolution', userKey);
+
+            if (!evolutionData) {{
+                showLoadingMessage('Error cargando datos de evolución');
+                isLoadingData = false;
+                return;
+            }}
 
             // Renderizar gráficos de evolución
             renderLineChart('evolutionArtistsChart', evolutionData.artists);
@@ -2019,7 +2265,50 @@ class GroupStatsHTMLGenerator:
             renderLineChart('evolutionLabelsChart', evolutionData.labels);
             renderLineChart('evolutionReleaseYearsChart', evolutionData.release_years);
 
+            // Procesar y renderizar gráficos scatter desde datos consolidados
+            console.log('Procesando datos scatter desde datos consolidados...');
+
+            const scatterArtists = processScatterDataFromConsolidated(activeUsersList, 'artists');
+            const scatterAlbums = processScatterDataFromConsolidated(activeUsersList, 'albums');
+            const scatterTracks = processScatterDataFromConsolidated(activeUsersList, 'tracks');
+            const scatterGenres = processScatterDataFromConsolidated(activeUsersList, 'genres');
+            const scatterLabels = processScatterDataFromConsolidated(activeUsersList, 'labels');
+            const scatterReleaseYears = processScatterDataFromConsolidated(activeUsersList, 'release_years');
+
+            if (scatterArtists) {{
+                console.log('Renderizando scatter artistas:', scatterArtists);
+                renderScatterChart('evolutionScatterArtistsChart', scatterArtists);
+            }}
+            if (scatterAlbums) {{
+                console.log('Renderizando scatter álbumes:', scatterAlbums);
+                renderScatterChart('evolutionScatterAlbumsChart', scatterAlbums);
+            }}
+            if (scatterTracks) {{
+                console.log('Renderizando scatter canciones:', scatterTracks);
+                renderScatterChart('evolutionScatterTracksChart', scatterTracks);
+            }}
+            if (scatterGenres) {{
+                console.log('Renderizando scatter géneros:', scatterGenres);
+                renderScatterChart('evolutionScatterGenresChart', scatterGenres);
+            }}
+            if (scatterLabels) {{
+                console.log('Renderizando scatter sellos:', scatterLabels);
+                renderScatterChart('evolutionScatterLabelsChart', scatterLabels);
+            }}
+            if (scatterReleaseYears) {{
+                console.log('Renderizando scatter años:', scatterReleaseYears);
+                renderScatterChart('evolutionScatterReleaseYearsChart', scatterReleaseYears);
+            }}
+
             isLoadingData = false;
+        }}
+
+        // Función para procesar datos compartidos desde datos consolidados
+        function processSharedData(activeUsersList) {{
+            // Esta función debería implementarse para procesar datos compartidos
+            // desde los datos consolidados cuando se filtran usuarios
+            console.warn('processSharedData no implementada aún');
+            return null;
         }}
     </script>
 </body>

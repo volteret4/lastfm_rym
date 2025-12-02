@@ -1134,10 +1134,10 @@ class GroupStatsHTMLGenerator:
     </div>
 
     <script>
-        const groupStats = {stats_json};
-        const colors = {colors_json};
-        const userIcons = {user_icons_json};
-        const periodFolder = "{period_folder}";
+        const groupStats = {{stats_json}};
+        const colors = {{colors_json}};
+        const userIcons = {{user_icons_json}};
+        const periodFolder = "{{period_folder}}";
 
         let currentView = 'data';
         let charts = {{}};

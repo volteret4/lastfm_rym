@@ -66,22 +66,22 @@ class GroupDataAnalyzer:
 
         # CORRIGIDO: Usar las funciones específicas para niveles exactos
         # Top 25 artistas con exactamente min_users
-        top_artists = self._get_top_artists_by_exact_users(users, min_users, 25)
+        top_artists = self._get_top_artists_by_exact_users(users, min_users, 2500)
 
         # Top 25 álbumes con exactamente min_users
-        top_albums = self._get_top_albums_by_exact_users(users, min_users, 25)
+        top_albums = self._get_top_albums_by_exact_users(users, min_users, 2500)
 
         # Top 25 canciones con exactamente min_users
-        top_tracks = self._get_top_tracks_by_exact_users(users, min_users, 25)
+        top_tracks = self._get_top_tracks_by_exact_users(users, min_users, 2500)
 
         # Top 25 géneros con exactamente min_users
-        top_genres = self._get_top_genres_by_exact_users(users, min_users, 25)
+        top_genres = self._get_top_genres_by_exact_users(users, min_users, 2500)
 
         # Top 25 sellos con exactamente min_users
-        top_labels = self._get_top_labels_by_exact_users(users, min_users, 25)
+        top_labels = self._get_top_labels_by_exact_users(users, min_users, 2500)
 
         # Top 25 décadas con exactamente min_users
-        top_decades = self._get_top_release_decades_by_exact_users(users, min_users, 25)
+        top_decades = self._get_top_release_decades_by_exact_users(users, min_users, 2500)
 
         return {
             'min_users': min_users,

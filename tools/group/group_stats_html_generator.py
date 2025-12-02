@@ -94,14 +94,57 @@ class GroupStatsHTMLGenerator:
 
         header {{
             background: #1e1e2e;
-            padding: 30px;
+            padding: 20px 30px;
             border-bottom: 2px solid #cba6f7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 80px;
+        }}
+
+        .header-content {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-grow: 1;
         }}
 
         h1 {{
             font-size: 1.8em;
             color: #cba6f7;
             margin-bottom: 10px;
+        }}
+
+        .nav-buttons {{
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+        }}
+
+        .nav-button {{
+            padding: 8px 16px;
+            background: #313244;
+            color: #cdd6f4;
+            border: 2px solid #45475a;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-block;
+        }}
+
+        .nav-button:hover {{
+            border-color: #cba6f7;
+            background: #45475a;
+            color: #cdd6f4;
+        }}
+
+        .nav-button.current {{
+            background: #cba6f7;
+            color: #1e1e2e;
+            border-color: #cba6f7;
         }}
 
         @media (max-width: 768px) {{
@@ -111,14 +154,19 @@ class GroupStatsHTMLGenerator:
             :root {{
                 --page-padding: 6px;
             }}
+
+            .nav-buttons {{
+                flex-wrap: wrap;
+                gap: 8px;
+            }}
+
+            .nav-button {{
+                font-size: 0.8em;
+                padding: 6px 12px;
+            }}
         }}
 
-        .subtitle {{
-            color: #a6adc8;
-            font-size: 1em;
-        }}
-
-        /* BotÃ³n de usuario circular */
+/* BotÃ³n de usuario circular */
         .user-button {{
             position: fixed;
             top: 20px;
@@ -795,8 +843,15 @@ class GroupStatsHTMLGenerator:
         </div>
 
         <header>
-            <h1>EstadÃ­sticas Grupales</h1>
-            <p class="subtitle">AnÃ¡lisis global del grupo</p>
+            <div class="header-content">
+                <h1>RYM Hispano - Estadísticas Grupales</h1>
+                <div class="nav-buttons">
+                    <a href="index.html#temporal" class="nav-button">TEMPORALES</a>
+                    <a href="index.html#grupo" class="nav-button current">GRUPO</a>
+                    <a href="index.html#about" class="nav-button">ACERCA DE</a>
+                </div>
+            </div>
+            <button class="user-button" id="userButton" title="Seleccionar usuario destacado">🎤</button>
         </header>
 
         <div class="controls">
@@ -1326,15 +1381,81 @@ class GroupStatsHTMLGenerator:
                 renderDataView();
             }} else if (view === 'shared') {{
                 renderSharedChartsWithFilter();
+                updateSummaryStats(); // Estadísticas globales para otras vistas
             }} else if (view === 'scrobbles') {{
                 renderScrobblesChartsWithFilter();
+                updateSummaryStats(); // Estadísticas globales para otras vistas
             }} else if (view === 'evolution') {{
                 renderEvolutionChartsWithFilter();
+                updateSummaryStats(); // Estadísticas globales para otras vistas
             }}
         }}
 
-        function updateSummaryStats() {{
-            // Usar los totales reales de elementos compartidos por TODOS los usuarios
+        function updateSummaryStats(levelKey = null) {{
+            // Si estamos en vista de datos, usar estadísticas del nivel actual
+            if (currentView === 'data' && levelKey && groupStats.data_by_levels && groupStats.data_by_levels[levelKey]) {{
+                console.log('Actualizando estadísticas para nivel:', levelKey);
+                const levelData = groupStats.data_by_levels[levelKey];
+                const levelCounts = levelData.counts || {{}};
+
+                // Calcular totales para el nivel específico
+                const totalItems = levelCounts.artists + levelCounts.albums + levelCounts.tracks +
+                                 levelCounts.genres + levelCounts.labels + levelCounts.decades;
+
+                // Calcular scrobbles totales para el nivel (suma de todos los elementos)
+                let totalScrobbles = 0;
+                ['artists', 'albums', 'tracks', 'genres', 'labels', 'decades'].forEach(category => {{
+                    if (levelData[category]) {{
+                        levelData[category].forEach(item => {{
+                            totalScrobbles += item.count || 0;
+                        }});
+                    }}
+                }});
+
+                const levelLabel = getLevelLabel(levelKey);
+                const usersCount = levelData.min_users || groupStats.user_count;
+
+                const summaryHTML = `
+                    <div class="summary-card">
+                        <div class="number">${{usersCount}}</div>
+                        <div class="label">Usuarios (Nivel)</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="number">${{levelCounts.artists || 0}}</div>
+                        <div class="label">Artistas</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="number">${{levelCounts.albums || 0}}</div>
+                        <div class="label">Álbumes</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="number">${{levelCounts.tracks || 0}}</div>
+                        <div class="label">Canciones</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="number">${{levelCounts.genres || 0}}</div>
+                        <div class="label">Géneros</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="number">${{levelCounts.labels || 0}}</div>
+                        <div class="label">Sellos</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="number">${{levelCounts.decades || 0}}</div>
+                        <div class="label">Décadas</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="number">${{totalScrobbles.toLocaleString()}}</div>
+                        <div class="label">Scrobbles (Total)</div>
+                    </div>
+                `;
+
+                document.getElementById('summaryStats').innerHTML = summaryHTML;
+                return;
+            }}
+
+            // Vista global por defecto (para otras vistas)
+
             const totalCounts = groupStats.total_counts || {{}};
             const scrobblesCharts = groupStats.scrobbles_charts;
 
@@ -2012,6 +2133,9 @@ class GroupStatsHTMLGenerator:
             dataDisplay.offsetHeight; // trigger reflow
             dataDisplay.style.display = '';
             console.log('Repaint forzado'); // Debug
+
+            // Actualizar estadísticas generales con el nivel actual
+            updateSummaryStats(currentUserLevel);
         }}
 
         // ==================== FUNCIONES PARA FILTRADO DINÃMICO ====================

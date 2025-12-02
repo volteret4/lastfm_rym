@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-GroupDataJSONGenerator - Generador de datos JSON para filtros dinÃ¡micos por usuarios
+GroupDataJSONGenerator CORREGIDO - Generador de datos JSON para filtros dinÃ¡micos por usuarios
 Crea archivos JSON con datos pre-calculados para diferentes combinaciones de usuarios
+AHORA GENERA TODOS LOS ARCHIVOS NECESARIOS PARA QUE FUNCIONEN TODAS LAS PESTAÃ‘AS
 """
 
 import os
@@ -12,7 +13,7 @@ from itertools import combinations
 
 
 class GroupDataJSONGenerator:
-    """Generador de datos JSON para filtros dinÃ¡micos de usuarios"""
+    """Generador de datos JSON para filtros dinÃ¡micos de usuarios - VERSIÃ“N CORREGIDA"""
 
     def __init__(self, database, years_back: int = 5, mbid_only: bool = False):
         self.database = database
@@ -23,26 +24,66 @@ class GroupDataJSONGenerator:
         self.to_year = self.current_year
 
     def generate_all_user_combinations_data(self, users: List[str], output_dir: str = "docs/data") -> Dict:
-        """Genera un archivo JSON consolidado con todos los datos por usuario"""
-        print("    • Generando archivo JSON consolidado para filtros dinámicos...")
-        print(f"    • Directorio de salida: {output_dir}")
+        """Genera archivos JSON para TODAS las combinaciones de usuarios necesarias"""
+        print("    â€¢ Generando archivos JSON completos para filtros dinÃ¡micos...")
+        print(f"    â€¢ Directorio de salida: {output_dir}")
 
         # Crear directorio de salida si no existe
         os.makedirs(output_dir, exist_ok=True)
 
-        # Generar datos consolidados
-        print("      • Recopilando datos por usuario...")
-        consolidated_data = self._generate_consolidated_user_data(users)
-
-        # Guardar archivo consolidado
+        # 1. Generar datos consolidados (para procesamiento en el frontend)
         consolidated_file = f"{output_dir}/consolidated_data.json"
-        print("      • Guardando archivo consolidado...")
-        with open(consolidated_file, 'w', encoding='utf-8') as f:
-            json.dump(consolidated_data, f, indent=2, ensure_ascii=False)
+        if not os.path.exists(consolidated_file):
+            print("      â€¢ Generando archivo consolidado...")
+            consolidated_data = self._generate_consolidated_user_data(users)
+            with open(consolidated_file, 'w', encoding='utf-8') as f:
+                json.dump(consolidated_data, f, indent=2, ensure_ascii=False)
+        else:
+            print("      â€¢ Archivo consolidado ya existe, omitiendo...")
 
         file_size_mb = os.path.getsize(consolidated_file) / (1024*1024)
 
-        # Generar archivo de índice con metadatos
+        # 2. Â¡NUEVO! Generar archivos JSON individuales para combinaciones de usuarios
+        print("      â€¢ Generando archivos JSON por combinaciones de usuarios...")
+
+        # Generar para todas las combinaciones relevantes (2 a N usuarios)
+        generated_files = []
+        total_combinations = 0
+        skipped_files = 0
+
+        for r in range(2, len(users) + 1):  # Desde 2 usuarios hasta todos
+            for user_combination in combinations(users, r):
+                user_list = list(user_combination)
+                user_key = '_'.join(sorted(user_list))
+
+                # Definir archivos para esta combinaciÃ³n
+                shared_file = f"{output_dir}/shared_{user_key}.json"
+                scrobbles_file = f"{output_dir}/scrobbles_{user_key}.json"
+                evolution_file = f"{output_dir}/evolution_{user_key}.json"
+                scatter_file = f"{output_dir}/evolution_scatter_{user_key}.json"
+
+                files_to_generate = [
+                    ("shared", shared_file, lambda ul=user_list: self._generate_shared_charts_data(ul)),
+                    ("scrobbles", scrobbles_file, lambda ul=user_list: self._generate_scrobbles_charts_data(ul)),
+                    ("evolution", evolution_file, lambda ul=user_list: self._generate_evolution_data(ul)),
+                    ("evolution_scatter", scatter_file, lambda ul=user_list: self._generate_evolution_scatter_data(ul))
+                ]
+
+                for file_type, file_path, data_generator in files_to_generate:
+                    if not os.path.exists(file_path):
+                        print(f"        â€¢ Generando {file_type}_{user_key}.json...")
+                        data = data_generator()
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            json.dump(data, f, indent=2, ensure_ascii=False)
+                        generated_files.append(f"{file_type}_{user_key}.json")
+                    else:
+                        print(f"        â€¢ {file_type}_{user_key}.json ya existe, omitiendo...")
+                        generated_files.append(f"{file_type}_{user_key}.json")
+                        skipped_files += 1
+
+                total_combinations += 1
+
+        # Generar archivo de Ã­ndice con metadatos
         index_data = {
             'users': users,
             'period': f"{self.from_year}-{self.to_year}",
@@ -50,9 +91,15 @@ class GroupDataJSONGenerator:
             'consolidated_file': 'consolidated_data.json',
             'total_users': len(users),
             'file_size_mb': round(file_size_mb, 2),
+            'total_combinations_generated': total_combinations,
+            'total_files_generated': len(generated_files) + 1,  # +1 por consolidated
+            'files_generated': generated_files,
             'data_structure': {
-                'raw_data': 'Datos crudos por usuario para cada categoría',
-                'evolution_data': 'Datos de evolución temporal por año',
+                'consolidated_data': 'Datos consolidados para procesamiento dinÃ¡mico',
+                'shared_files': 'Datos por usuarios compartidos para cada combinaciÃ³n',
+                'scrobbles_files': 'Datos por scrobbles totales para cada combinaciÃ³n',
+                'evolution_files': 'Datos de evoluciÃ³n temporal para cada combinaciÃ³n',
+                'evolution_scatter_files': 'Datos scatter de evoluciÃ³n para cada combinaciÃ³n',
                 'categories': ['artists', 'albums', 'tracks', 'genres', 'labels', 'release_years']
             }
         }
@@ -61,17 +108,19 @@ class GroupDataJSONGenerator:
         with open(index_file, 'w', encoding='utf-8') as f:
             json.dump(index_data, f, indent=2, ensure_ascii=False)
 
-        print(f"      • Archivo consolidado generado: {consolidated_file}")
-        print(f"      • Tamaño del archivo: {file_size_mb:.2f} MB")
-        print(f"      • Usuarios incluidos: {len(users)}")
-        print(f"      • En lugar de {sum(1 for r in range(2, len(users) + 1) for _ in combinations(users, r))} archivos separados")
+        print(f"      â€¢ âœ… Archivo consolidado generado/verificado: {consolidated_file}")
+        print(f"      â€¢ âœ… TamaÃ±o del archivo: {file_size_mb:.2f} MB")
+        print(f"      â€¢ âœ… Combinaciones procesadas: {total_combinations}")
+        print(f"      â€¢ âœ… Archivos totales: {len(generated_files) + 2}")  # +2 por consolidated e index
+        print(f"      • 📄 Archivos omitidos (ya existían): {skipped_files}")
+        print(f"      â€¢ ðŸŽ‰ AHORA TODAS LAS PESTAÃ‘AS DEBERÃAN FUNCIONAR")
 
         return index_data
 
     def _generate_consolidated_user_data(self, users: List[str]) -> Dict:
-        """Genera datos consolidados con información por usuario para filtrado dinámico"""
+        """Genera datos consolidados con informaciÃ³n por usuario para filtrado dinÃ¡mico"""
 
-        print("        • Obteniendo datos crudos por usuario...")
+        print("        â€¢ Obteniendo datos crudos por usuario...")
 
         # Estructura consolidada
         consolidated = {
@@ -84,17 +133,17 @@ class GroupDataJSONGenerator:
 
         # Obtener datos crudos para cada usuario individual
         for user in users:
-            print(f"          • Procesando datos de {user}...")
+            print(f"          â€¢ Procesando datos de {user}...")
             user_data = self._get_user_raw_data([user])
             consolidated['raw_data'][user] = user_data
 
-        # Obtener datos de evolución para todos los usuarios
-        print("        • Procesando evolución temporal...")
+        # Obtener datos de evoluciÃ³n para todos los usuarios
+        print("        â€¢ Procesando evoluciÃ³n temporal...")
         all_users_evolution = self.database.get_evolution_data(
             users, self.from_year, self.to_year, self.mbid_only
         )
 
-        # Estructurar evolución por usuario
+        # Estructurar evoluciÃ³n por usuario
         for category in ['artists', 'albums', 'tracks', 'genres', 'labels', 'release_years']:
             consolidated['evolution'][category] = {}
             for item_name, year_data in all_users_evolution[category].items():
@@ -106,14 +155,14 @@ class GroupDataJSONGenerator:
                     }
                 consolidated['evolution'][category][item_name] = item_evolution
 
-        # Obtener datos scatter de evolución
-        print("        • Procesando evolución scatter...")
+        # Obtener datos scatter de evoluciÃ³n
+        print("        â€¢ Procesando evoluciÃ³n scatter...")
         scatter_data = self.database.get_evolution_scatter_data(
             users, self.from_year, self.to_year, self.mbid_only
         )
         consolidated['evolution_scatter'] = scatter_data
 
-        # Añadir metadatos
+        # AÃ±adir metadatos
         consolidated['metadata'] = {
             'generated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'years': list(range(self.from_year, self.to_year + 1)),
@@ -130,7 +179,7 @@ class GroupDataJSONGenerator:
             user_list, self.from_year, self.to_year, 100, self.mbid_only
         )
 
-        # Top álbumes
+        # Top Ã¡lbumes
         albums = self.database.get_top_albums_by_scrobbles_only(
             user_list, self.from_year, self.to_year, 100, self.mbid_only
         )
@@ -140,7 +189,7 @@ class GroupDataJSONGenerator:
             user_list, self.from_year, self.to_year, 100, self.mbid_only
         )
 
-        # Top géneros
+        # Top gÃ©neros
         genres = self.database.get_top_genres_by_scrobbles_only(
             user_list, self.from_year, self.to_year, 50, self.mbid_only
         )
@@ -150,7 +199,7 @@ class GroupDataJSONGenerator:
             user_list, self.from_year, self.to_year, 50, self.mbid_only
         )
 
-        # Top años de lanzamiento
+        # Top aÃ±os de lanzamiento
         release_years = self.database.get_top_individual_release_years_by_scrobbles_only(
             user_list, self.from_year, self.to_year, 50, self.mbid_only
         )
@@ -165,6 +214,7 @@ class GroupDataJSONGenerator:
         }
 
     def _generate_shared_charts_data(self, users: List[str]) -> Dict:
+        """Genera datos para grÃ¡ficos por usuarios compartidos"""
         # Top 15 artistas por usuarios compartidos
         top_artists = self.database.get_top_artists_by_shared_users(
             users, self.from_year, self.to_year, 15, self.mbid_only
@@ -239,6 +289,21 @@ class GroupDataJSONGenerator:
             'genres': self._prepare_line_chart_data('Top 15 GÃ©neros por AÃ±o', evolution_data['genres'], evolution_data['years']),
             'labels': self._prepare_line_chart_data('Top 15 Sellos por AÃ±o', evolution_data['labels'], evolution_data['years']),
             'release_years': self._prepare_line_chart_data('Top 15 AÃ±os de Lanzamiento por AÃ±o', evolution_data['release_years'], evolution_data['years'])
+        }
+
+    def _generate_evolution_scatter_data(self, users: List[str]) -> Dict:
+        """Genera datos para grÃ¡ficos scatter de evoluciÃ³n temporal"""
+        evolution_scatter_data = self.database.get_evolution_scatter_data(
+            users, self.from_year, self.to_year, self.mbid_only
+        )
+
+        return {
+            'artists': self._prepare_scatter_chart_data('Top 5 Artistas Anuales', evolution_scatter_data['artists'], evolution_scatter_data['years']),
+            'albums': self._prepare_scatter_chart_data('Top 5 Ãlbumes Anuales', evolution_scatter_data['albums'], evolution_scatter_data['years']),
+            'tracks': self._prepare_scatter_chart_data('Top 5 Canciones Anuales', evolution_scatter_data['tracks'], evolution_scatter_data['years']),
+            'genres': self._prepare_scatter_chart_data('Top 5 GÃ©neros Anuales', evolution_scatter_data['genres'], evolution_scatter_data['years']),
+            'labels': self._prepare_scatter_chart_data('Top 5 Sellos Anuales', evolution_scatter_data['labels'], evolution_scatter_data['years']),
+            'release_years': self._prepare_scatter_chart_data('Top 5 AÃ±os de Lanzamiento Anuales', evolution_scatter_data['release_years'], evolution_scatter_data['years'])
         }
 
     def _prepare_pie_chart_data(self, title: str, raw_data: List[Dict], chart_type: str) -> Dict:
@@ -336,23 +401,8 @@ class GroupDataJSONGenerator:
             'names': list(evolution_data.keys())
         }
 
-    def _generate_evolution_scatter_data(self, users: List[str]) -> Dict:
-        """Genera datos para gráficos scatter de evolución temporal"""
-        evolution_scatter_data = self.database.get_evolution_scatter_data(
-            users, self.from_year, self.to_year, self.mbid_only
-        )
-
-        return {
-            'artists': self._prepare_scatter_chart_data('Top 5 Artistas Anuales', evolution_scatter_data['artists'], evolution_scatter_data['years']),
-            'albums': self._prepare_scatter_chart_data('Top 5 Álbumes Anuales', evolution_scatter_data['albums'], evolution_scatter_data['years']),
-            'tracks': self._prepare_scatter_chart_data('Top 5 Canciones Anuales', evolution_scatter_data['tracks'], evolution_scatter_data['years']),
-            'genres': self._prepare_scatter_chart_data('Top 5 Géneros Anuales', evolution_scatter_data['genres'], evolution_scatter_data['years']),
-            'labels': self._prepare_scatter_chart_data('Top 5 Sellos Anuales', evolution_scatter_data['labels'], evolution_scatter_data['years']),
-            'release_years': self._prepare_scatter_chart_data('Top 5 Años de Lanzamiento Anuales', evolution_scatter_data['release_years'], evolution_scatter_data['years'])
-        }
-
     def _prepare_scatter_chart_data(self, title: str, scatter_data: Dict, years: List[int]) -> Dict:
-        """Prepara datos para gráficos scatter"""
+        """Prepara datos para grÃ¡ficos scatter"""
         if not scatter_data:
             return {
                 'title': title,

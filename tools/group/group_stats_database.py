@@ -1138,7 +1138,7 @@ class GroupStatsDatabase:
 
     def get_evolution_scatter_data(self, users: List[str], from_year: int, to_year: int,
                                 mbid_only: bool = False) -> Dict:
-        """Obtiene datos de evoluciÃ³n temporal para grÃ¡ficos scatter (top 5 por aÃ±o) FILTRADOS POR USUARIOS COMPARTIDOS"""
+        """Obtiene datos de evolución temporal para gráficos scatter (top 5 por año) FILTRADOS POR USUARIOS ESPECÍFICOS"""
         years = list(range(from_year, to_year + 1))
 
         evolution_scatter = {
@@ -1151,10 +1151,10 @@ class GroupStatsDatabase:
             'years': years
         }
 
-        # Para cada año, obtener el top 5 de ese año específico FILTRADO por usuarios compartidos (min 2 usuarios)
+        # Para cada año, obtener el top 5 de ese año específico que TODOS los usuarios seleccionados escuchen
         for year in years:
-            # Top 5 artistas del aÃ±o compartidos entre los usuarios
-            top_artists = self.get_top_artists_by_shared_users(users, year, year, 50, mbid_only)
+            # Top 5 artistas del año que TODOS los usuarios seleccionados escuchen
+            top_artists = self.get_top_artists_by_exact_users_scatter(users, year, year, mbid_only)
             evolution_scatter['artists'][year] = []
             for idx, item in enumerate(top_artists[:5]):  # Solo tomar top 5
                 evolution_scatter['artists'][year].append({
@@ -1164,8 +1164,8 @@ class GroupStatsDatabase:
                     'position': idx + 1
                 })
 
-            # Top 5 Ã¡lbumes del aÃ±o compartidos entre los usuarios
-            top_albums = self.get_top_albums_by_shared_users(users, year, year, 50, mbid_only)
+            # Top 5 álbumes del año que TODOS los usuarios seleccionados escuchen
+            top_albums = self.get_top_albums_by_exact_users_scatter(users, year, year, mbid_only)
             evolution_scatter['albums'][year] = []
             for idx, item in enumerate(top_albums[:5]):  # Solo tomar top 5
                 evolution_scatter['albums'][year].append({
@@ -1177,8 +1177,8 @@ class GroupStatsDatabase:
                     'album': item.get('album', '')
                 })
 
-            # Top 5 canciones del aÃ±o compartidas entre los usuarios
-            top_tracks = self.get_top_tracks_by_shared_users(users, year, year, 50, mbid_only)
+            # Top 5 canciones del año que TODOS los usuarios seleccionados escuchen
+            top_tracks = self.get_top_tracks_by_exact_users_scatter(users, year, year, mbid_only)
             evolution_scatter['tracks'][year] = []
             for idx, item in enumerate(top_tracks[:5]):  # Solo tomar top 5
                 evolution_scatter['tracks'][year].append({
@@ -1190,8 +1190,8 @@ class GroupStatsDatabase:
                     'track': item.get('track', '')
                 })
 
-            # Top 5 gÃ©neros del aÃ±o compartidos entre los usuarios
-            top_genres = self.get_top_genres_by_shared_users(users, year, year, 50, mbid_only)
+            # Top 5 géneros del año que TODOS los usuarios seleccionados escuchen
+            top_genres = self.get_top_genres_by_exact_users_scatter(users, year, year, mbid_only)
             evolution_scatter['genres'][year] = []
             for idx, item in enumerate(top_genres[:5]):  # Solo tomar top 5
                 evolution_scatter['genres'][year].append({
@@ -1201,8 +1201,8 @@ class GroupStatsDatabase:
                     'position': idx + 1
                 })
 
-            # Top 5 sellos del aÃ±o compartidos entre los usuarios
-            top_labels = self.get_top_labels_by_shared_users(users, year, year, 50, mbid_only)
+            # Top 5 sellos del año que TODOS los usuarios seleccionados escuchen
+            top_labels = self.get_top_labels_by_exact_users_scatter(users, year, year, mbid_only)
             evolution_scatter['labels'][year] = []
             for idx, item in enumerate(top_labels[:5]):  # Solo tomar top 5
                 evolution_scatter['labels'][year].append({
@@ -1212,8 +1212,8 @@ class GroupStatsDatabase:
                     'position': idx + 1
                 })
 
-            # Top 5 aÃ±os de lanzamiento del aÃ±o compartidos entre los usuarios
-            top_years = self.get_top_release_decades_by_shared_users(users, year, year, 50, mbid_only)
+            # Top 5 años de lanzamiento del año que TODOS los usuarios seleccionados escuchen
+            top_years = self.get_top_release_decades_by_exact_users_scatter(users, year, year, mbid_only)
             evolution_scatter['release_years'][year] = []
             for idx, item in enumerate(top_years[:5]):  # Solo tomar top 5
                 evolution_scatter['release_years'][year].append({
@@ -1224,6 +1224,283 @@ class GroupStatsDatabase:
                 })
 
         return evolution_scatter
+
+    def get_top_artists_by_exact_users_scatter(self, users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> List[Dict]:
+        """Top artistas que EXACTAMENTE todos los usuarios seleccionados escuchen (para scatter charts)"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT artist, user, COUNT(*) as plays
+            FROM scrobbles s
+            WHERE user IN ({','.join(['?'] * len(users))})
+              AND timestamp >= ? AND timestamp <= ?
+            {mbid_filter}
+            GROUP BY artist, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        # Procesar por artista con user_plays
+        artist_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            artist = row['artist']
+            user = row['user']
+            plays = row['plays']
+            artist_stats[artist]['users'].add(user)
+            artist_stats[artist]['total_scrobbles'] += plays
+            artist_stats[artist]['user_plays'][user] += plays
+
+        # Filtrar por nÃºmero EXACTO de usuarios (TODOS los usuarios seleccionados)
+        result = []
+        exact_users = len(users)
+
+        for artist, stats in artist_stats.items():
+            if len(stats['users']) == exact_users:  # EXACTAMENTE todos los usuarios seleccionados
+                result.append({
+                    'name': artist,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        # Ordenar por scrobbles totales (descendente)
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result
+
+    def get_top_albums_by_exact_users_scatter(self, users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> List[Dict]:
+        """Top álbumes que EXACTAMENTE todos los usuarios seleccionados escuchen (para scatter charts)"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT (artist || ' - ' || album) as album_name,
+                   artist,
+                   album,
+                   user,
+                   COUNT(*) as plays
+            FROM scrobbles s
+            WHERE user IN ({','.join(['?'] * len(users))})
+              AND timestamp >= ? AND timestamp <= ?
+              AND album IS NOT NULL AND album != ''
+            {mbid_filter}
+            GROUP BY artist, album, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        album_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'artist': '', 'album': ''})
+
+        for row in cursor.fetchall():
+            album_key = row['album_name']
+            user = row['user']
+            plays = row['plays']
+            album_stats[album_key]['users'].add(user)
+            album_stats[album_key]['total_scrobbles'] += plays
+            album_stats[album_key]['user_plays'][user] += plays
+            album_stats[album_key]['artist'] = row['artist']
+            album_stats[album_key]['album'] = row['album']
+
+        result = []
+        exact_users = len(users)
+
+        for album_name, stats in album_stats.items():
+            if len(stats['users']) == exact_users:  # EXACTAMENTE todos los usuarios seleccionados
+                result.append({
+                    'name': album_name,
+                    'artist': stats['artist'],
+                    'album': stats['album'],
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result
+
+    def get_top_tracks_by_exact_users_scatter(self, users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> List[Dict]:
+        """Top canciones que EXACTAMENTE todos los usuarios seleccionados escuchen (para scatter charts)"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT (artist || ' - ' || track) as track_name,
+                   artist,
+                   track,
+                   user,
+                   COUNT(*) as plays
+            FROM scrobbles s
+            WHERE user IN ({','.join(['?'] * len(users))})
+              AND timestamp >= ? AND timestamp <= ?
+            {mbid_filter}
+            GROUP BY artist, track, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        track_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'artist': '', 'track': ''})
+
+        for row in cursor.fetchall():
+            track_key = row['track_name']
+            user = row['user']
+            plays = row['plays']
+            track_stats[track_key]['users'].add(user)
+            track_stats[track_key]['total_scrobbles'] += plays
+            track_stats[track_key]['user_plays'][user] += plays
+            track_stats[track_key]['artist'] = row['artist']
+            track_stats[track_key]['track'] = row['track']
+
+        result = []
+        exact_users = len(users)
+
+        for track_name, stats in track_stats.items():
+            if len(stats['users']) == exact_users:  # EXACTAMENTE todos los usuarios seleccionados
+                result.append({
+                    'name': track_name,
+                    'artist': stats['artist'],
+                    'track': stats['track'],
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result
+
+    def get_top_genres_by_exact_users_scatter(self, users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> List[Dict]:
+        """Top géneros que EXACTAMENTE todos los usuarios seleccionados escuchen (para scatter charts)"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT ag.genres, user, COUNT(*) as plays
+            FROM scrobbles s
+            JOIN artist_genres ag ON s.artist = ag.artist
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+            {mbid_filter}
+            GROUP BY ag.genres, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        genre_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            try:
+                genres_list = json.loads(row['genres']) if row['genres'] else []
+                for genre in genres_list[:3]:  # Solo primeros 3 géneros por artista
+                    genre_stats[genre]['users'].add(row['user'])
+                    genre_stats[genre]['total_scrobbles'] += row['plays']
+                    genre_stats[genre]['user_plays'][row['user']] += row['plays']
+            except json.JSONDecodeError:
+                continue
+
+        result = []
+        exact_users = len(users)
+
+        for genre, stats in genre_stats.items():
+            if len(stats['users']) == exact_users:  # EXACTAMENTE todos los usuarios seleccionados
+                result.append({
+                    'name': genre,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result
+
+    def get_top_labels_by_exact_users_scatter(self, users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> List[Dict]:
+        """Top sellos que EXACTAMENTE todos los usuarios seleccionados escuchen (para scatter charts)"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT al.label, s.user, COUNT(*) as plays
+            FROM scrobbles s
+            JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+              AND al.label IS NOT NULL AND al.label != ''
+            {mbid_filter}
+            GROUP BY al.label, s.user
+        ''', users + [from_timestamp, to_timestamp])
+
+        label_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            label = row['label']
+            user = row['user']
+            plays = row['plays']
+            label_stats[label]['users'].add(user)
+            label_stats[label]['total_scrobbles'] += plays
+            label_stats[label]['user_plays'][user] += plays
+
+        result = []
+        exact_users = len(users)
+
+        for label, stats in label_stats.items():
+            if len(stats['users']) == exact_users:  # EXACTAMENTE todos los usuarios seleccionados
+                result.append({
+                    'name': label,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result
+
+    def get_top_release_decades_by_exact_users_scatter(self, users: List[str], from_year: int, to_year: int, mbid_only: bool = False) -> List[Dict]:
+        """Top décadas que EXACTAMENTE todos los usuarios seleccionados escuchen (para scatter charts)"""
+        cursor = self.conn.cursor()
+        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
+        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
+        mbid_filter = self._get_mbid_filter(mbid_only)
+
+        cursor.execute(f'''
+            SELECT ard.release_year, user, COUNT(*) as plays
+            FROM scrobbles s
+            JOIN album_release_dates ard ON s.artist = ard.artist AND s.album = ard.album
+            WHERE s.user IN ({','.join(['?'] * len(users))})
+              AND s.timestamp >= ? AND s.timestamp <= ?
+              AND ard.release_year IS NOT NULL
+            {mbid_filter}
+            GROUP BY ard.release_year, user
+        ''', users + [from_timestamp, to_timestamp])
+
+        decade_stats = defaultdict(lambda: {'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int)})
+
+        for row in cursor.fetchall():
+            decade = self._get_decade(row['release_year'])
+            decade_stats[decade]['users'].add(row['user'])
+            decade_stats[decade]['total_scrobbles'] += row['plays']
+            decade_stats[decade]['user_plays'][row['user']] += row['plays']
+
+        result = []
+        exact_users = len(users)
+
+        for decade, stats in decade_stats.items():
+            if len(stats['users']) == exact_users:  # EXACTAMENTE todos los usuarios seleccionados
+                result.append({
+                    'name': decade,
+                    'user_count': len(stats['users']),
+                    'total_scrobbles': stats['total_scrobbles'],
+                    'shared_users': list(stats['users']),
+                    'user_plays': dict(stats['user_plays'])
+                })
+
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result
 
     def _get_decade(self, year: int) -> str:
         """Convierte un aÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â±o a etiqueta de dÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©cada"""

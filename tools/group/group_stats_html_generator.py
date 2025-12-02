@@ -1134,10 +1134,10 @@ class GroupStatsHTMLGenerator:
     </div>
 
     <script>
-        const groupStats = {{stats_json}};
-        const colors = {{colors_json}};
-        const userIcons = {{user_icons_json}};
-        const periodFolder = "{{period_folder}}";
+        const groupStats = {stats_json};
+        const colors = {colors_json};
+        const userIcons = {user_icons_json};
+        const periodFolder = "{period_folder}";
 
         let currentView = 'data';
         let charts = {{}};
@@ -2400,7 +2400,6 @@ class GroupStatsHTMLGenerator:
             // Usar archivos JSON específicos para scatter charts (NUEVA LÓGICA CORREGIDA)
             console.log('Cargando datos scatter específicos para usuarios seleccionados...');
 
-            const userKey = getUserKey();
             const scatterData = await loadDynamicData('evolution_scatter', userKey);
 
             if (!scatterData) {{

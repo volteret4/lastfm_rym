@@ -277,9 +277,8 @@ def main():
         html_content = html_generator.generate_html(all_user_stats, users, args.years_back)
 
         # Paso 4: Agregar novedades
-        if discoveries_available:
-            print("✨ Integrando novedades...")
-            html_content = modify_html_for_discoveries(html_content, users, args.years_back)
+        from tools.users.user_stats_html_novelties import add_discoveries_to_html
+        html_content = add_discoveries_to_html(html_content)
 
         # Paso 5: Guardar
         os.makedirs(os.path.dirname(args.output), exist_ok=True)

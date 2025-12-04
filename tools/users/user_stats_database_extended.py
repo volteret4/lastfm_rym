@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 UserStatsDatabase - Versión extendida CORREGIDA con funciones faltantes para conteos únicos
-Añade: get_user_top_artists, get_user_top_albums, get_user_top_tracks
+AÑADE: Funciones completas de novedades que comparan períodos correctamente
 CORRIGE: Lógica de géneros (artistas: lastfm, álbumes: lastfm/musicbrainz/discogs)
 Hereda de la clase original para mantener TODA la funcionalidad
 """
@@ -17,7 +17,253 @@ from .user_stats_database import UserStatsDatabase
 
 
 class UserStatsDatabaseExtended(UserStatsDatabase):
-    """Versión extendida CORREGIDA con funciones adicionales para conteos únicos"""
+    """Versión extendida CORREGIDA con funciones adicionales para conteos únicos y novedades"""
+
+    def get_new_items_for_user_year(self, user: str, year: int, item_type: str, mbid_only: bool = False) -> List[Dict]:
+        """
+        NUEVA FUNCIÓN: Obtiene elementos NUEVOS para un usuario en un año específico
+
+        Lógica correcta:
+        1. Encuentra todos los elementos del año especificado para el usuario
+        2. Los compara con TODOS los scrobbles anteriores a ese año del mismo usuario
+        3. Devuelve solo los que NO existían antes (primera aparición)
+        4. Incluye scrobbles del período para ordenar por popularidad
+
+        Args:
+            user: Usuario
+            year: Año a analizar
+            item_type: 'artist', 'album', 'track', 'label', 'genre'
+            mbid_only: Solo scrobbles con MBID
+
+        Returns:
+            Lista de elementos nuevos con scrobbles del período
+        """
+        cursor = self.conn.cursor()
+
+        # Timestamps del año
+        year_start = int(datetime(year, 1, 1).timestamp())
+        year_end = int(datetime(year + 1, 1, 1).timestamp()) - 1
+
+        # Timestamp de inicio de todos los scrobbles (para comparar)
+        all_time_start = 0
+        before_year_end = year_start - 1
+
+        mbid_filter = self._get_mbid_filter(mbid_only, 's')
+        mbid_filter_prev = self._get_mbid_filter(mbid_only, 'sp')
+
+        new_items = []
+
+        try:
+            if item_type == 'artist':
+                # 1. Obtener todos los artistas del año actual
+                cursor.execute(f'''
+                    SELECT s.artist, COUNT(*) as period_plays
+                    FROM scrobbles s
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                    {mbid_filter}
+                    GROUP BY s.artist
+                    ORDER BY period_plays DESC
+                ''', (user, year_start, year_end))
+
+                year_artists = cursor.fetchall()
+
+                for artist_row in year_artists:
+                    artist_name = artist_row['artist']
+                    period_plays = artist_row['period_plays']
+
+                    # 2. Verificar si este artista existía antes del año
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as prev_count
+                        FROM scrobbles sp
+                        WHERE sp.user = ? AND sp.artist = ?
+                          AND sp.timestamp >= ? AND sp.timestamp <= ?
+                        {mbid_filter_prev}
+                    ''', (user, artist_name, all_time_start, before_year_end))
+
+                    prev_result = cursor.fetchone()
+                    prev_count = prev_result['prev_count'] if prev_result else 0
+
+                    # 3. Si no existía antes, es una novedad
+                    if prev_count == 0:
+                        new_items.append({
+                            'name': artist_name,
+                            'period_plays': period_plays,
+                            'first_year': year,
+                            'type': 'artist'
+                        })
+
+            elif item_type == 'album':
+                # Lógica similar para álbumes
+                cursor.execute(f'''
+                    SELECT s.artist, s.album, COUNT(*) as period_plays
+                    FROM scrobbles s
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY s.artist, s.album
+                    ORDER BY period_plays DESC
+                ''', (user, year_start, year_end))
+
+                year_albums = cursor.fetchall()
+
+                for album_row in year_albums:
+                    artist_name = album_row['artist']
+                    album_name = album_row['album']
+                    period_plays = album_row['period_plays']
+
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as prev_count
+                        FROM scrobbles sp
+                        WHERE sp.user = ? AND sp.artist = ? AND sp.album = ?
+                          AND sp.timestamp >= ? AND sp.timestamp <= ?
+                        {mbid_filter_prev}
+                    ''', (user, artist_name, album_name, all_time_start, before_year_end))
+
+                    prev_result = cursor.fetchone()
+                    prev_count = prev_result['prev_count'] if prev_result else 0
+
+                    if prev_count == 0:
+                        new_items.append({
+                            'name': f"{artist_name} - {album_name}",
+                            'period_plays': period_plays,
+                            'first_year': year,
+                            'type': 'album'
+                        })
+
+            elif item_type == 'track':
+                # Lógica similar para canciones
+                cursor.execute(f'''
+                    SELECT s.artist, s.track, COUNT(*) as period_plays
+                    FROM scrobbles s
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND s.track IS NOT NULL AND s.track != ''
+                    {mbid_filter}
+                    GROUP BY s.artist, s.track
+                    ORDER BY period_plays DESC
+                ''', (user, year_start, year_end))
+
+                year_tracks = cursor.fetchall()
+
+                for track_row in year_tracks:
+                    artist_name = track_row['artist']
+                    track_name = track_row['track']
+                    period_plays = track_row['period_plays']
+
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as prev_count
+                        FROM scrobbles sp
+                        WHERE sp.user = ? AND sp.artist = ? AND sp.track = ?
+                          AND sp.timestamp >= ? AND sp.timestamp <= ?
+                        {mbid_filter_prev}
+                    ''', (user, artist_name, track_name, all_time_start, before_year_end))
+
+                    prev_result = cursor.fetchone()
+                    prev_count = prev_result['prev_count'] if prev_result else 0
+
+                    if prev_count == 0:
+                        new_items.append({
+                            'name': f"{artist_name} - {track_name}",
+                            'period_plays': period_plays,
+                            'first_year': year,
+                            'type': 'track'
+                        })
+
+            elif item_type == 'label':
+                # Lógica para sellos
+                cursor.execute(f'''
+                    SELECT al.label, COUNT(*) as period_plays
+                    FROM scrobbles s
+                    LEFT JOIN album_labels al ON s.artist = al.artist AND s.album = al.album
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                      AND al.label IS NOT NULL AND al.label != ''
+                      AND s.album IS NOT NULL AND s.album != ''
+                    {mbid_filter}
+                    GROUP BY al.label
+                    ORDER BY period_plays DESC
+                ''', (user, year_start, year_end))
+
+                year_labels = cursor.fetchall()
+
+                for label_row in year_labels:
+                    label_name = label_row['label']
+                    period_plays = label_row['period_plays']
+
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as prev_count
+                        FROM scrobbles sp
+                        LEFT JOIN album_labels al ON sp.artist = al.artist AND sp.album = al.album
+                        WHERE sp.user = ? AND al.label = ?
+                          AND sp.timestamp >= ? AND sp.timestamp <= ?
+                          AND sp.album IS NOT NULL AND sp.album != ''
+                        {mbid_filter_prev}
+                    ''', (user, label_name, all_time_start, before_year_end))
+
+                    prev_result = cursor.fetchone()
+                    prev_count = prev_result['prev_count'] if prev_result else 0
+
+                    if prev_count == 0:
+                        new_items.append({
+                            'name': label_name,
+                            'period_plays': period_plays,
+                            'first_year': year,
+                            'type': 'label'
+                        })
+
+            elif item_type == 'genre':
+                # Lógica para géneros (usando Last.fm)
+                cursor.execute(f'''
+                    SELECT ag.genres, COUNT(*) as period_plays
+                    FROM scrobbles s
+                    JOIN artist_genres ag ON s.artist = ag.artist
+                    WHERE s.user = ? AND s.timestamp >= ? AND s.timestamp <= ?
+                    {mbid_filter}
+                    GROUP BY ag.genres
+                    ORDER BY period_plays DESC
+                ''', (user, year_start, year_end))
+
+                year_genre_data = cursor.fetchall()
+                genre_counts = defaultdict(int)
+
+                # Procesar géneros del año actual
+                for row in year_genre_data:
+                    genres_json = row['genres']
+                    period_plays = row['period_plays']
+                    try:
+                        genres_list = json.loads(genres_json) if genres_json else []
+                        for genre in genres_list[:3]:  # Solo primeros 3 géneros
+                            genre_counts[genre] += period_plays
+                    except (json.JSONDecodeError, TypeError):
+                        continue
+
+                # Para cada género, verificar si existía antes
+                for genre_name, period_plays in genre_counts.items():
+                    cursor.execute(f'''
+                        SELECT COUNT(*) as prev_count
+                        FROM scrobbles sp
+                        JOIN artist_genres ag ON sp.artist = ag.artist
+                        WHERE sp.user = ? AND ag.genres LIKE ?
+                          AND sp.timestamp >= ? AND sp.timestamp <= ?
+                        {mbid_filter_prev}
+                    ''', (user, f'%"{genre_name}"%', all_time_start, before_year_end))
+
+                    prev_result = cursor.fetchone()
+                    prev_count = prev_result['prev_count'] if prev_result else 0
+
+                    if prev_count == 0:
+                        new_items.append({
+                            'name': genre_name,
+                            'period_plays': period_plays,
+                            'first_year': year,
+                            'type': 'genre'
+                        })
+
+            # Ordenar por popularidad en el período y tomar top 10
+            new_items.sort(key=lambda x: x['period_plays'], reverse=True)
+            return new_items[:10]  # Top 10 novedades para este año
+
+        except sqlite3.OperationalError as e:
+            print(f"Error obteniendo novedades de {item_type} para {year}: {e}")
+            return []
 
     def get_user_top_artists(self, user: str, from_year: int, to_year: int,
                            limit: Optional[int] = 15, mbid_only: bool = False) -> List[Tuple[str, int]]:
@@ -384,7 +630,7 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
 
         else:
             # MusicBrainz y Discogs no tienen géneros de artistas, solo de álbumes
-            print(f"❌ Géneros de artistas no disponibles para {provider}")
+            print(f"⚠ Géneros de artistas no disponibles para {provider}")
             print(f"💡 {provider} solo tiene géneros de álbumes")
             return []
 
@@ -458,133 +704,6 @@ class UserStatsDatabaseExtended(UserStatsDatabase):
         else:
             print(f"Proveedor no válido: {provider}")
             return []
-
-    def get_user_discoveries_stats_by_year(self, user: str, from_year: int, to_year: int,
-                                         discovery_type: str = 'artists', mbid_only: bool = False) -> Dict[int, int]:
-        """
-        Obtiene estadísticas de novedades por año (solo conteos)
-
-        Returns:
-            Dict con año: número_de_novedades
-        """
-        discoveries = self.get_user_discoveries_by_year(user, from_year, to_year, discovery_type, mbid_only)
-
-        stats = {}
-        for year in range(from_year, to_year + 1):
-            stats[year] = len(discoveries.get(year, []))
-
-        return stats
-
-    def get_user_discoveries_by_year(self, user: str, from_year: int, to_year: int,
-                                   discovery_type: str = 'artists', mbid_only: bool = False) -> Dict[int, List[Dict]]:
-        """
-        Obtiene las novedades (primeras escuchas) del usuario por año
-
-        Args:
-            user: Usuario
-            from_year: Año inicial
-            to_year: Año final
-            discovery_type: 'artists', 'albums', 'tracks', 'labels'
-            mbid_only: Solo scrobbles con MBID
-
-        Returns:
-            Dict con año: [{'name': str, 'first_timestamp': int}]
-        """
-        cursor = self.conn.cursor()
-
-        from_timestamp = int(datetime(from_year, 1, 1).timestamp())
-        to_timestamp = int(datetime(to_year + 1, 1, 1).timestamp()) - 1
-
-        discoveries_by_year = {}
-
-        if discovery_type == 'artists':
-            # Obtener primeras escuchas de artistas dentro del periodo
-            cursor.execute('''
-                SELECT artist, first_timestamp
-                FROM user_first_artist_listen
-                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
-                ORDER BY first_timestamp ASC
-            ''', (user, from_timestamp, to_timestamp))
-
-            for row in cursor.fetchall():
-                # Convertir timestamp a año
-                first_date = datetime.fromtimestamp(row['first_timestamp'])
-                year = first_date.year
-
-                if year not in discoveries_by_year:
-                    discoveries_by_year[year] = []
-
-                discoveries_by_year[year].append({
-                    'name': row['artist'],
-                    'first_timestamp': row['first_timestamp'],
-                    'first_date': first_date.strftime('%Y-%m-%d')
-                })
-
-        elif discovery_type == 'albums':
-            cursor.execute('''
-                SELECT artist, album, first_timestamp
-                FROM user_first_album_listen
-                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
-                ORDER BY first_timestamp ASC
-            ''', (user, from_timestamp, to_timestamp))
-
-            for row in cursor.fetchall():
-                first_date = datetime.fromtimestamp(row['first_timestamp'])
-                year = first_date.year
-
-                if year not in discoveries_by_year:
-                    discoveries_by_year[year] = []
-
-                album_display = f"{row['artist']} - {row['album']}" if row['album'] else f"{row['artist']} - [Unknown Album]"
-                discoveries_by_year[year].append({
-                    'name': album_display,
-                    'first_timestamp': row['first_timestamp'],
-                    'first_date': first_date.strftime('%Y-%m-%d')
-                })
-
-        elif discovery_type == 'tracks':
-            cursor.execute('''
-                SELECT artist, track, first_timestamp
-                FROM user_first_track_listen
-                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
-                ORDER BY first_timestamp ASC
-            ''', (user, from_timestamp, to_timestamp))
-
-            for row in cursor.fetchall():
-                first_date = datetime.fromtimestamp(row['first_timestamp'])
-                year = first_date.year
-
-                if year not in discoveries_by_year:
-                    discoveries_by_year[year] = []
-
-                discoveries_by_year[year].append({
-                    'name': f"{row['artist']} - {row['track']}",
-                    'first_timestamp': row['first_timestamp'],
-                    'first_date': first_date.strftime('%Y-%m-%d')
-                })
-
-        elif discovery_type == 'labels':
-            cursor.execute('''
-                SELECT label, first_timestamp
-                FROM user_first_label_listen
-                WHERE user = ? AND first_timestamp >= ? AND first_timestamp <= ?
-                ORDER BY first_timestamp ASC
-            ''', (user, from_timestamp, to_timestamp))
-
-            for row in cursor.fetchall():
-                first_date = datetime.fromtimestamp(row['first_timestamp'])
-                year = first_date.year
-
-                if year not in discoveries_by_year:
-                    discoveries_by_year[year] = []
-
-                discoveries_by_year[year].append({
-                    'name': row['label'],
-                    'first_timestamp': row['first_timestamp'],
-                    'first_date': first_date.strftime('%Y-%m-%d')
-                })
-
-        return discoveries_by_year
 
     def get_top_albums_for_genre_by_provider(self, user: str, genre: str, from_year: int, to_year: int, provider: str, limit: int = 15, mbid_only: bool = False) -> List[Dict]:
         """

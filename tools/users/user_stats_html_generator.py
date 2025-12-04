@@ -10,7 +10,7 @@ FIXES:
 import json
 import os
 from typing import Dict, List
-
+from tools.users.user_stats_html_novelties import DiscoveriesHTMLModifier
 
 class UserStatsHTMLGenerator:
     """Clase para generar HTML con gráficos interactivos de estadísticas de usuarios - CORREGIDA"""
@@ -2707,6 +2707,7 @@ class UserStatsHTMLGenerator:
     </script>
 </body>
 </html>"""
+
 
     def _format_number(self, number: int) -> str:
         """Formatea nÃºmeros con separadores de miles"""

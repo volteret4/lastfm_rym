@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 DiscoveriesHTMLModifier - Versión CORREGIDA que integra correctamente el sistema de novedades
-Soluciona el problema de que no aparecen los gráficos
+SOLUCIONADO: Funciones JavaScript simplificadas que usan datos ya incluidos en el HTML
 """
 
 import re
@@ -35,56 +35,36 @@ class DiscoveriesHTMLModifier:
             return html_content  # Ya existe
 
         discoveries_content = '''
-            <!-- ✨ PESTAÑA DE NOVEDADES COMPLETAMENTE FUNCIONAL ✨ -->
             <div id="discoveriesTab" class="tab-content">
                 <div class="evolution-section">
                     <h3>✨ Descubrimientos Musicales</h3>
-                    <p style="text-align: center; color: #a6adc8; margin-bottom: 30px; font-style: italic;">
-                        Elementos que aparecen por primera vez en el período seleccionado comparado con todos los años anteriores
-                    </p>
 
-                    <!-- Gráfico de resumen de líneas -->
-                    <div class="discoveries-summary-chart" style="background: #1e1e2e; border-radius: 12px; padding: 20px; border: 2px solid #f38ba8; margin-bottom: 30px;">
-                        <h4 style="color: #f38ba8; font-size: 1.2em; margin-bottom: 15px; text-align: center;">📊 Resumen Anual de Novedades</h4>
-                        <div style="position: relative; height: 400px;">
-                            <canvas id="discoveriesSummaryChart"></canvas>
-                        </div>
-                    </div>
-
-                    <!-- Gráficos scatter individuales por tipo -->
-                    <div class="discoveries-grid" id="discoveriesGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 25px;">
-                        <div class="discoveries-chart" style="background: #1e1e2e; border-radius: 12px; padding: 20px; border: 2px solid #313244; margin-bottom: 20px;">
-                            <h4 style="color: #cba6f7; font-size: 1.1em; margin-bottom: 15px; text-align: center;">🎨 Top 5 Artistas Nuevos por Año</h4>
-                            <div style="position: relative; height: 400px;">
+                    <div class="discoveries-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px;">
+                        <div class="evolution-chart">
+                            <h4>Nuevos Artistas por Año</h4>
+                            <div class="line-chart-wrapper">
                                 <canvas id="discoveriesArtistsChart"></canvas>
                             </div>
                         </div>
 
-                        <div class="discoveries-chart" style="background: #1e1e2e; border-radius: 12px; padding: 20px; border: 2px solid #313244; margin-bottom: 20px;">
-                            <h4 style="color: #cba6f7; font-size: 1.1em; margin-bottom: 15px; text-align: center;">💿 Top 5 Álbumes Nuevos por Año</h4>
-                            <div style="position: relative; height: 400px;">
+                        <div class="evolution-chart">
+                            <h4>Nuevos Álbumes por Año</h4>
+                            <div class="line-chart-wrapper">
                                 <canvas id="discoveriesAlbumsChart"></canvas>
                             </div>
                         </div>
 
-                        <div class="discoveries-chart" style="background: #1e1e2e; border-radius: 12px; padding: 20px; border: 2px solid #313244; margin-bottom: 20px;">
-                            <h4 style="color: #cba6f7; font-size: 1.1em; margin-bottom: 15px; text-align: center;">🎵 Top 5 Canciones Nuevas por Año</h4>
-                            <div style="position: relative; height: 400px;">
+                        <div class="evolution-chart">
+                            <h4>Nuevas Canciones por Año</h4>
+                            <div class="line-chart-wrapper">
                                 <canvas id="discoveriesTracksChart"></canvas>
                             </div>
                         </div>
 
-                        <div class="discoveries-chart" style="background: #1e1e2e; border-radius: 12px; padding: 20px; border: 2px solid #313244; margin-bottom: 20px;">
-                            <h4 style="color: #cba6f7; font-size: 1.1em; margin-bottom: 15px; text-align: center;">🏷️ Top 5 Sellos Nuevos por Año</h4>
-                            <div style="position: relative; height: 400px;">
+                        <div class="evolution-chart">
+                            <h4>Nuevos Sellos por Año</h4>
+                            <div class="line-chart-wrapper">
                                 <canvas id="discoveriesLabelsChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="discoveries-chart" style="background: #1e1e2e; border-radius: 12px; padding: 20px; border: 2px solid #313244; margin-bottom: 20px;">
-                            <h4 style="color: #cba6f7; font-size: 1.1em; margin-bottom: 15px; text-align: center;">🎶 Top 5 Géneros Nuevos por Año</h4>
-                            <div style="position: relative; height: 400px;">
-                                <canvas id="discoveriesGenresChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -109,28 +89,58 @@ class DiscoveriesHTMLModifier:
 
     @staticmethod
     def add_discoveries_javascript_functions(html_content: str) -> str:
-        """Agrega las funciones JavaScript necesarias para las novedades"""
-        if 'renderDiscoveriesCharts' in html_content:
-            return html_content  # Ya existe
+        """Agrega las funciones JavaScript corregidas para las novedades"""
 
+        # PASO 1: Eliminar completamente la función loadDiscoveriesData existente si existe
+        old_function_patterns = [
+            r'async function loadDiscoveriesData\([^)]*\)[^}]*\{[^}]*(?:\{[^}]*\}[^}]*)*\}',
+            r'function loadDiscoveriesData\([^)]*\)[^}]*\{[^}]*(?:\{[^}]*\}[^}]*)*\}',
+            r'// .*Funciones para manejo de novedades[\s\S]*?function loadDiscoveriesData[\s\S]*?\}\s*\}',
+        ]
+
+        for pattern in old_function_patterns:
+            html_content = re.sub(pattern, '', html_content, flags=re.DOTALL)
+
+        # PASO 2: Limpiar funciones relacionadas duplicadas y código roto
+        cleanup_patterns = [
+            r'console\.log`[^`]*\);',  # Arreglar console.log con template literals rotos
+            r'throw new Error`[^`]*\);',  # Arreglar throw new Error con template literals rotos
+            r'loadingElement\.style\.display = \'block\';[\s\S]*?showDiscoveriesError\([^)]*\);\s*\}',
+            r'// âœ¨ Funciones para manejo de novedades[\s\S]*?const loadingElement = document\.getElementById\([^)]*\);[\s\S]*?\}\s*\}',
+            r'const loadingElement = document\.getElementById\([^)]*\);[\s\S]*?console\.error\([^)]*\);[\s\S]*?return;[\s\S]*?\}',
+            r'...`\);[\s\S]*?const loadingElement[\s\S]*?return;[\s\S]*?\}',
+        ]
+
+        for pattern in cleanup_patterns:
+            html_content = re.sub(pattern, '', html_content, flags=re.DOTALL)
+
+        # PASO 3: Insertar las funciones corregidas
         js_discoveries = '''
-        // ✨ FUNCIONES DE NOVEDADES - COMPLETAMENTE FUNCIONALES ✨
+        // ✨ FUNCIONES DE NOVEDADES - CORREGIDAS Y COMPLETAS ✨
+
+        function loadDiscoveriesData(username) {
+            console.log('Cargando datos de novedades para ' + username + '...');
+
+            try {
+                // CORREGIDO: Usar datos ya cargados en allStats en vez de hacer fetch
+                if (allStats && allStats[username] && allStats[username].discoveries) {
+                    console.log('Usando datos de novedades desde allStats');
+                    renderDiscoveriesCharts(allStats[username]);
+                    return;
+                }
+
+                // Fallback si no hay datos de novedades
+                console.warn('No se encontraron datos de novedades para', username);
+                showDiscoveriesError('No hay datos de novedades disponibles para este usuario');
+
+            } catch (error) {
+                console.error('Error cargando novedades:', error);
+                showDiscoveriesError(error.message);
+            }
+        }
 
         function renderDiscoveriesCharts(userStats) {
             console.log('✨ Renderizando gráficos de novedades...');
-
-            // Destruir charts existentes relacionados con novedades
-            const discoveriesChartIds = [
-                'discoveriesSummaryChart', 'discoveriesArtistsChart', 'discoveriesAlbumsChart',
-                'discoveriesTracksChart', 'discoveriesLabelsChart', 'discoveriesGenresChart'
-            ];
-
-            discoveriesChartIds.forEach(chartId => {
-                if (charts[chartId]) {
-                    charts[chartId].destroy();
-                    delete charts[chartId];
-                }
-            });
 
             if (!userStats || !userStats.discoveries) {
                 console.error('❌ No hay datos de novedades disponibles');
@@ -142,15 +152,20 @@ class DiscoveriesHTMLModifier:
             console.log('🔍 Datos de novedades encontrados:', Object.keys(discoveriesData));
 
             try {
-                // 1. Gráfico de resumen de líneas (todas las categorías juntas)
-                renderDiscoveriesSummaryChart(discoveriesData.summary);
+                const discoveryTypes = [
+                    {type: 'artists', canvasId: 'discoveriesArtistsChart', title: 'Top 10 Artistas Nuevos'},
+                    {type: 'albums', canvasId: 'discoveriesAlbumsChart', title: 'Top 10 Álbumes Nuevos'},
+                    {type: 'tracks', canvasId: 'discoveriesTracksChart', title: 'Top 10 Canciones Nuevas'},
+                    {type: 'labels', canvasId: 'discoveriesLabelsChart', title: 'Top 10 Sellos Nuevos'}
+                ];
 
-                // 2. Gráficos scatter individuales para cada tipo
-                renderDiscoveriesScatterChart('artists', discoveriesData.details.artists, '🎨 Artistas');
-                renderDiscoveriesScatterChart('albums', discoveriesData.details.albums, '💿 Álbumes');
-                renderDiscoveriesScatterChart('tracks', discoveriesData.details.tracks, '🎵 Canciones');
-                renderDiscoveriesScatterChart('labels', discoveriesData.details.labels, '🏷️ Sellos');
-                renderDiscoveriesScatterChart('genres', discoveriesData.details.genres, '🎶 Géneros');
+                discoveryTypes.forEach(function(config) {
+                    if (discoveriesData.details && discoveriesData.details[config.type]) {
+                        renderDiscoveryScatterChart(config.canvasId, discoveriesData.details[config.type], config.title);
+                    } else {
+                        showNoDataForDiscoveriesChart(config.canvasId);
+                    }
+                });
 
                 console.log('✅ Gráficos de novedades renderizados correctamente');
             } catch (error) {
@@ -159,256 +174,115 @@ class DiscoveriesHTMLModifier:
             }
         }
 
-        function renderDiscoveriesSummaryChart(summaryData) {
-            const canvas = document.getElementById('discoveriesSummaryChart');
-            if (!canvas) {
-                console.error('❌ Canvas de resumen no encontrado');
-                return;
-            }
-
-            if (!summaryData || Object.keys(summaryData).length === 0) {
-                console.log('⚠️ Sin datos de resumen');
-                return;
-            }
-
-            console.log('📊 Renderizando gráfico de resumen...', summaryData);
-
-            const datasets = [];
-            const discoveryTypes = ['artists', 'albums', 'tracks', 'labels', 'genres'];
-            const typeLabels = {
-                'artists': '🎨 Artistas',
-                'albums': '💿 Álbumes',
-                'tracks': '🎵 Canciones',
-                'labels': '🏷️ Sellos',
-                'genres': '🎶 Géneros'
-            };
-
-            discoveryTypes.forEach((type, index) => {
-                const typeData = summaryData[type];
-                if (typeData && typeData.yearly_counts) {
-                    const data = typeData.years.map(year => typeData.yearly_counts[year] || 0);
-
-                    datasets.push({
-                        label: typeLabels[type],
-                        data: data,
-                        borderColor: colors[index % colors.length],
-                        backgroundColor: colors[index % colors.length] + '20',
-                        tension: 0.4,
-                        fill: false,
-                        pointRadius: 4,
-                        pointHoverRadius: 8
-                    });
-                }
-            });
-
-            if (datasets.length === 0) {
-                console.log('⚠️ Sin datasets para gráfico de resumen');
-                showNoDataForDiscoveriesChart('discoveriesSummaryChart');
-                return;
-            }
-
-            const years = summaryData.artists?.years || summaryData[Object.keys(summaryData)[0]]?.years || [];
-
-            const config = {
-                type: 'line',
-                data: {
-                    labels: years,
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                color: '#cdd6f4',
-                                padding: 15,
-                                usePointStyle: true
-                            }
-                        },
-                        tooltip: {
-                            backgroundColor: '#1e1e2e',
-                            titleColor: '#cba6f7',
-                            bodyColor: '#cdd6f4',
-                            borderColor: '#cba6f7',
-                            borderWidth: 1,
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y + ' novedades';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Año',
-                                color: '#cdd6f4'
-                            },
-                            ticks: {
-                                color: '#a6adc8'
-                            },
-                            grid: {
-                                color: '#313244'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Número de Novedades',
-                                color: '#cdd6f4'
-                            },
-                            ticks: {
-                                color: '#a6adc8',
-                                precision: 0
-                            },
-                            grid: {
-                                color: '#313244'
-                            },
-                            beginAtZero: true
-                        }
-                    }
-                }
-            };
-
-            charts['discoveriesSummaryChart'] = new Chart(canvas, config);
-        }
-
-        function renderDiscoveriesScatterChart(type, typeData, label) {
-            const canvasId = `discoveries${type.charAt(0).toUpperCase() + type.slice(1)}Chart`;
+        function renderDiscoveryScatterChart(canvasId, typeData, title) {
             const canvas = document.getElementById(canvasId);
-
             if (!canvas) {
-                console.error(`❌ Canvas ${canvasId} no encontrado`);
+                console.error('❌ Canvas ' + canvasId + ' no encontrado');
                 return;
             }
 
-            if (!typeData || !typeData.top_by_year || Object.keys(typeData.top_by_year).length === 0) {
-                console.log(`⚠️ Sin datos para ${type}`);
+            if (!typeData || !typeData.top_by_year) {
+                console.log('⚠️ Sin datos para ' + canvasId);
                 showNoDataForDiscoveriesChart(canvasId);
                 return;
             }
 
-            console.log(`🔍 Renderizando scatter ${type}...`, typeData);
+            console.log('🔄 Renderizando scatter ' + canvasId + '...', typeData);
 
-            const datasets = [];
+            // Destruir chart existente si existe
+            if (charts && charts[canvasId]) {
+                charts[canvasId].destroy();
+                delete charts[canvasId];
+            }
+
             const years = typeData.years || [];
+            const datasets = [];
 
-            // Recopilar todos los elementos únicos y crear datasets
+            // Recopilar todos los elementos únicos de todos los años
             const allItems = new Set();
-            Object.values(typeData.top_by_year).forEach(yearItems => {
-                yearItems.forEach(item => allItems.add(item.name));
-            });
-
-            // Limitar a top 5 elementos con más scrobbles totales
-            const itemTotals = {};
-            allItems.forEach(item => {
-                itemTotals[item] = 0;
-                Object.values(typeData.top_by_year).forEach(yearItems => {
-                    const itemData = yearItems.find(i => i.name === item);
-                    if (itemData) itemTotals[item] += itemData.period_plays;
+            years.forEach(function(year) {
+                const yearItems = typeData.top_by_year[year] || [];
+                yearItems.forEach(function(item) {
+                    allItems.add(item.name);
                 });
             });
 
-            const topItems = Object.entries(itemTotals)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 5)
-                .map(([name, _]) => name);
+            // Calcular totales para obtener los top 10 globales
+            const itemTotals = {};
+            Array.from(allItems).forEach(function(item) {
+                itemTotals[item] = 0;
+                years.forEach(function(year) {
+                    const yearItems = typeData.top_by_year[year] || [];
+                    const itemData = yearItems.find(function(i) { return i.name === item; });
+                    if (itemData) {
+                        itemTotals[item] += itemData.period_plays;
+                    }
+                });
+            });
 
-            topItems.forEach((itemName, index) => {
+            // Obtener top 10 elementos por scrobbles totales
+            const topItems = Object.entries(itemTotals)
+                .sort(function(a, b) { return b[1] - a[1]; })
+                .slice(0, 10)
+                .map(function(entry) { return entry[0]; });
+
+            console.log('Top 10 elementos para ' + canvasId + ':', topItems);
+
+            // Crear datasets para cada elemento
+            topItems.forEach(function(itemName, index) {
                 const points = [];
 
-                years.forEach(year => {
+                years.forEach(function(year) {
                     const yearItems = typeData.top_by_year[year] || [];
-                    const itemData = yearItems.find(i => i.name === itemName);
+                    const itemData = yearItems.find(function(i) { return i.name === itemName; });
 
                     if (itemData && itemData.period_plays > 0) {
                         points.push({
                             x: year,
                             y: itemData.period_plays,
                             itemName: itemName,
-                            firstYear: itemData.first_year,
-                            itemType: itemData.type
+                            firstYear: itemData.first_year
                         });
                     }
                 });
 
                 if (points.length > 0) {
+                    const color = colors[index % colors.length];
                     datasets.push({
-                        label: itemName.length > 30 ? itemName.substring(0, 30) + '...' : itemName,
+                        label: itemName.length > 25 ? itemName.substring(0, 25) + '...' : itemName,
                         data: points,
-                        backgroundColor: colors[index % colors.length],
-                        borderColor: colors[index % colors.length],
+                        borderColor: color,
+                        backgroundColor: color,
                         pointRadius: 6,
                         pointHoverRadius: 10,
-                        showLine: false
+                        showLine: true,
+                        tension: 0.2
                     });
                 }
             });
 
             if (datasets.length === 0) {
-                console.log(`⚠️ Sin datasets para ${type}`);
+                console.log('⚠️ Sin datasets para ' + canvasId);
                 showNoDataForDiscoveriesChart(canvasId);
                 return;
             }
 
             const config = {
                 type: 'scatter',
-                data: { datasets },
+                data: { datasets: datasets },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            type: 'linear',
-                            position: 'bottom',
-                            title: {
-                                display: true,
-                                text: 'Año',
-                                color: '#a6adc8'
-                            },
-                            ticks: {
-                                color: '#a6adc8',
-                                stepSize: 1
-                            },
-                            grid: {
-                                color: '#313244'
-                            },
-                            min: Math.min(...years) - 0.5,
-                            max: Math.max(...years) + 0.5
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'Scrobbles',
-                                color: '#a6adc8'
-                            },
-                            ticks: {
-                                color: '#a6adc8'
-                            },
-                            grid: {
-                                color: '#313244'
-                            },
-                            beginAtZero: true
-                        }
-                    },
                     plugins: {
                         legend: {
-                            display: true,
                             position: 'bottom',
                             labels: {
                                 color: '#cdd6f4',
-                                padding: 12,
+                                padding: 10,
                                 usePointStyle: true,
-                                pointStyle: 'circle',
-                                font: {
-                                    size: 10
-                                },
+                                font: { size: 10 },
                                 boxHeight: 8,
-                                boxWidth: 8,
-                                maxWidth: 150
+                                boxWidth: 8
                             }
                         },
                         tooltip: {
@@ -419,48 +293,63 @@ class DiscoveriesHTMLModifier:
                             borderWidth: 1,
                             callbacks: {
                                 title: function(context) {
-                                    const point = context[0].raw;
-                                    return point.itemName;
+                                    return context[0].raw.itemName;
                                 },
                                 label: function(context) {
                                     const point = context.raw;
                                     return [
-                                        `Año: ${point.x}`,
-                                        `Scrobbles: ${point.y}`,
-                                        `Primera vez: ${point.firstYear}`
+                                        'Año: ' + point.x,
+                                        'Scrobbles: ' + point.y,
+                                        'Primera vez: ' + point.firstYear
                                     ];
                                 }
                             }
                         }
                     },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: 'Año', color: '#cdd6f4' },
+                            ticks: {
+                                color: '#a6adc8',
+                                stepSize: 1,
+                                callback: function(value) { return Math.round(value); }
+                            },
+                            grid: { color: '#313244' },
+                            min: Math.min.apply(Math, years) - 0.5,
+                            max: Math.max.apply(Math, years) + 0.5
+                        },
+                        y: {
+                            title: { display: true, text: 'Scrobbles', color: '#cdd6f4' },
+                            ticks: { color: '#a6adc8' },
+                            grid: { color: '#313244' },
+                            beginAtZero: true
+                        }
+                    },
                     interaction: {
                         mode: 'point'
-                    },
-                    onClick: function(event, elements) {
-                        if (elements.length > 0) {
-                            const element = elements[0];
-                            const point = this.data.datasets[element.datasetIndex].data[element.index];
-                            showDiscoveryPopup(point.itemName, point.x, point.y, point.firstYear, label);
-                        }
                     }
                 }
             };
 
+            if (!charts) {
+                charts = {};
+            }
             charts[canvasId] = new Chart(canvas, config);
+            console.log('✅ Gráfico scatter ' + canvasId + ' creado exitosamente');
         }
 
         function showDiscoveriesError(message) {
-            const gridElement = document.getElementById('discoveriesGrid');
+            const gridElement = document.querySelector('.discoveries-grid');
             if (gridElement) {
-                gridElement.innerHTML = `
-                    <div style="grid-column: 1/-1; text-align: center; padding: 40px;">
-                        <h4 style="color: #f38ba8; margin-bottom: 15px;">❌ Error en Novedades</h4>
-                        <p style="color: #cdd6f4; margin-bottom: 10px;">${message}</p>
-                        <p style="font-size: 0.8em; color: #6c7086;">
-                            Las novedades comparan el período seleccionado con años anteriores para encontrar elementos nuevos
-                        </p>
-                    </div>
-                `;
+                gridElement.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px;">' +
+                    '<h4 style="color: #f38ba8; margin-bottom: 15px;">⚠ Error en Novedades</h4>' +
+                    '<p style="color: #cdd6f4; margin-bottom: 10px;">' + message + '</p>' +
+                    '<p style="font-size: 0.8em; color: #6c7086;">' +
+                    'Las novedades comparan el período seleccionado con años anteriores' +
+                    '</p>' +
+                '</div>';
             }
         }
 
@@ -474,56 +363,33 @@ class DiscoveriesHTMLModifier:
                 }
             }
         }
-
-        function showDiscoveryPopup(itemName, year, scrobbles, firstYear, category) {
-            const popupTitle = `${category} - ${year}`;
-            const content = `
-                <div class="popup-item">
-                    <span class="name">Elemento: ${itemName}</span>
-                </div>
-                <div class="popup-item">
-                    <span class="name">Año: ${year}</span>
-                    <span class="count">${scrobbles} scrobbles</span>
-                </div>
-                <div class="popup-item">
-                    <span class="name">Primera aparición: ${firstYear}</span>
-                </div>
-                <div class="popup-item">
-                    <span class="name">Categoría: ${category}</span>
-                </div>
-            `;
-
-            const popupTitleElement = document.getElementById('popupTitle');
-            const popupContentElement = document.getElementById('popupContent');
-            const popupOverlayElement = document.getElementById('popupOverlay');
-            const popupElement = document.getElementById('popup');
-
-            if (popupTitleElement) popupTitleElement.textContent = popupTitle;
-            if (popupContentElement) popupContentElement.innerHTML = content;
-            if (popupOverlayElement) popupOverlayElement.style.display = 'block';
-            if (popupElement) popupElement.style.display = 'block';
-        }
         '''
 
         # Buscar donde insertar el JavaScript (antes del cierre del script principal)
         insert_patterns = [
-            r'(        // ✓ FIX: Función para grÃ¡ficos de lÃ­neas individuales)',
-            r'(        function _format_number\(number\) \{)',
             r'(    </script>\s*</body>\s*</html>)',
+            r'(</script>\s*</body>)',
+            r'(    </script>)',
             r'(</script>)'
         ]
 
+        inserted = False
         for pattern in insert_patterns:
             if re.search(pattern, html_content, re.DOTALL):
                 html_content = re.sub(pattern, js_discoveries + r'\n\1', html_content, count=1, flags=re.DOTALL)
+                inserted = True
                 break
+
+        if not inserted:
+            # Fallback: insertar antes del cierre de body
+            html_content = re.sub(r'(</body>)', '<script>' + js_discoveries + '</script>\n\\1', html_content)
 
         return html_content
 
     @staticmethod
     def add_discoveries_navigation_logic(html_content: str) -> str:
         """Agrega la lógica de navegación para la pestaña de novedades"""
-        if 'renderDiscoveriesCharts(allStats[currentUser]);' in html_content:
+        if 'loadDiscoveriesData(currentUser);' in html_content:
             return html_content  # Ya existe
 
         # Buscar el patrón de navegación de pestañas y agregar el caso de novedades
@@ -534,14 +400,14 @@ class DiscoveriesHTMLModifier:
 
         for pattern in navigation_patterns:
             if re.search(pattern, html_content):
-                replacement = r"\1 } else if (view === 'discoveries' || currentView === 'discoveries') { renderDiscoveriesCharts(userStats || allStats[currentUser]);"
+                replacement = r"\1 } else if (view === 'discoveries' || currentView === 'discoveries') { loadDiscoveriesData(currentUser);"
                 html_content = re.sub(pattern, replacement, html_content)
                 break
 
         # También buscar en la función selectUser
         select_user_pattern = r"(} else if \(currentView === 'evolution'\) \{\s*renderEvolutionCharts\(userStats\);)"
         if re.search(select_user_pattern, html_content):
-            replacement = r"\1 } else if (currentView === 'discoveries') { renderDiscoveriesCharts(userStats);"
+            replacement = r"\1 } else if (currentView === 'discoveries') { loadDiscoveriesData(username);"
             html_content = re.sub(select_user_pattern, replacement, html_content)
 
         return html_content

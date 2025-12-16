@@ -998,28 +998,15 @@ def generate_index_html(files):
                             </li>
                             <li>
                                 <strong>Estadísticas de Usuarios:</strong> Análisis
-                                individual con gráficos de coincidencias y evolución
+                                individual del usuario seleccionado
                             </li>
                             <li>
                                 <strong>Estadísticas Grupales:</strong> Análisis
-                                global del grupo con coincidencias y tendencias
+                                global del grupo, pudiendo seleccionar los usuarios que lo conforman
                             </li>
-                            <li>
-                                <strong>Coincidencias:</strong> Muestra solo
-                                artistas, canciones y álbumes escuchados por 2 o
-                                más usuarios
-                            </li>
-                            <li>
-                                <strong>Géneros:</strong> Detección automática
-                                de géneros musicales
-                            </li>
-                            <li>
-                                <strong>Sellos:</strong> Información sobre
-                                sellos discográficos (si está configurado)
-                            </li>
+
                         </ul>
                     </div>
-
                     <div class="info-box">
                         <h3>🛠️ Uso</h3>
                         <p><strong>Actualización de datos:</strong></p>
@@ -1033,23 +1020,23 @@ def generate_index_html(files):
                         <p><strong>Generación de estadísticas:</strong></p>
                         <ul>
                             <li>
-                                <code>python3 html_semanal.py</code> - Genera
+                                <code>python3 html_temporal.py weekly</code> - Genera
                                 estadísticas semanales
                             </li>
                             <li>
-                                <code>python3 html_mensual.py</code> -
+                                <code>python3 html_temporal.py monthly</code> -
                                 Genera estadísticas del mes actual
                             </li>
                             <li>
-                                <code>python3 html_mensual.py --months-ago 1</code>
+                                <code>python3 html_temporal.py monthly --months-ago 1</code>
                                 - Genera estadísticas del mes pasado
                             </li>
                             <li>
-                                <code>python3 html_anual.py</code> - Genera
+                                <code>python3 html_temporal.py yearly</code> - Genera
                                 estadísticas del año actual
                             </li>
                             <li>
-                                <code>python3 html_anual.py --years-ago 1</code>
+                                <code>python3 html_temporal.py yearly --years-ago 1</code>
                                 - Genera estadísticas del año pasado
                             </li>
                             <li>
@@ -1083,6 +1070,9 @@ def generate_index_html(files):
                                 <code>LASTFM_USERS=usuario1,usuario2,usuario3</code>
                             </li>
                             <li>
+                                <code>LASTFM_USERS_ICONS=😈,😎,😾</code>
+                            </li>
+                            <li>
                                 <code>DISCOGS_TOKEN=tu_token</code> (opcional)
                             </li>
                         </ul>
@@ -1097,6 +1087,7 @@ def generate_index_html(files):
                             para crear tu cuenta gratuita.
                         </p>
                     </div>
+
                 </div>
             </div>
         </div>

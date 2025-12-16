@@ -100,15 +100,8 @@ class PeriodCalculator:
         return int(start_date.timestamp()), int(end_date.timestamp()), period_label
 
 
-def rotate_weekly_files():
-    """Rota los archivos semanales: actual → pasada → hace-dos → hace-tres → eliminar"""
-    filenames = [
-        'esta-semana.html',
-        'semana-pasada.html',
-        'hace-dos-semanas.html',
-        'hace-tres-semanas.html'
-    ]
-
+def clear_weekly_files():
+    """Elimina todos los archivos existentes en docs/weekly"""
     docs_dir = 'docs'
     weekly_dir = os.path.join(docs_dir, 'weekly')
 
@@ -116,21 +109,64 @@ def rotate_weekly_files():
     if not os.path.exists(weekly_dir):
         os.makedirs(weekly_dir)
         print(f"📁 Creada carpeta: {weekly_dir}")
+        return
 
-    file_paths = [os.path.join(weekly_dir, f) for f in filenames]
+    print("🗑️ Limpiando archivos semanales en weekly/...")
 
-    print("🔄 Rotando archivos semanales en weekly/...")
+    # Eliminar todos los archivos .html en weekly/
+    for filename in os.listdir(weekly_dir):
+        if filename.endswith('.html'):
+            file_path = os.path.join(weekly_dir, filename)
+            os.remove(file_path)
+            print(f"   ❌ Eliminado: weekly/{filename}")
 
-    # Eliminar el más antiguo (hace-tres-semanas)
-    if os.path.exists(file_paths[3]):
-        os.remove(file_paths[3])
-        print(f"   ❌ Eliminado: weekly/{filenames[3]}")
 
-    # Rotar los demás hacia atrás
-    for i in range(2, -1, -1):  # [2, 1, 0]
-        if os.path.exists(file_paths[i]):
-            shutil.move(file_paths[i], file_paths[i + 1])
-            print(f"   📁 weekly/{filenames[i]} → weekly/{filenames[i + 1]}")
+def generate_all_weekly_stats(users: List[str]) -> None:
+    """Genera todas las estadísticas semanales (esta semana + 3 anteriores)"""
+    weekly_configs = [
+        (0, 'esta-semana.html', 'Esta semana'),
+        (1, 'semana-pasada.html', 'Semana pasada'),
+        (2, 'hace-dos-semanas.html', 'Hace dos semanas'),
+        (3, 'hace-tres-semanas.html', 'Hace tres semanas')
+    ]
+
+    docs_dir = 'docs'
+    weekly_dir = os.path.join(docs_dir, 'weekly')
+
+    # Asegurar que existe el directorio
+    if not os.path.exists(weekly_dir):
+        os.makedirs(weekly_dir)
+
+    print(f"\n📊 Generando 4 archivos semanales...")
+
+    for week_offset, filename, description in weekly_configs:
+        print(f"\n🔹 Generando {description}...")
+
+        stats, period_label, _, folder = generate_stats('weekly', users, week_offset=week_offset)
+
+        if not stats:
+            print(f"   ⚠️ No se pudieron generar estadísticas para {description}")
+            continue
+
+        # Crear HTML
+        html_content = HTMLGenerator.create_html(stats, users, 'semanal', folder)
+
+        # Guardar archivo
+        output_file = os.path.join(weekly_dir, filename)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        print(f"   ✅ Generado: weekly/{filename}")
+        print(f"   📅 {stats['period_label']} - {stats['total_scrobbles']:,} scrobbles")
+
+    # Generar copia en raíz de esta-semana.html
+    esta_semana_stats, _, _, _ = generate_stats('weekly', users, week_offset=0)
+    if esta_semana_stats:
+        root_html_content = HTMLGenerator.create_html(esta_semana_stats, users, 'semanal', "")
+        root_file = os.path.join(docs_dir, 'esta-semana.html')
+        with open(root_file, 'w', encoding='utf-8') as f:
+            f.write(root_html_content)
+        print(f"\n✅ Copia en raíz generada: esta-semana.html")
 
 
 def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, str, str, str]:
@@ -253,17 +289,20 @@ def main():
 
     print(f"✅ Base de datos encontrada: {db_path}")
 
-    # Rotar archivos semanales si es necesario
-    if args.period == 'weekly' and args.week_offset == 0:
-        rotate_weekly_files()
+    # Nuevo comportamiento para weekly: generar todos los archivos
+    if args.period == 'weekly':
+        clear_weekly_files()
+        generate_all_weekly_stats(users)
+        print("\n" + "=" * 60)
+        print("✅ PROCESO COMPLETADO - 4 ARCHIVOS SEMANALES GENERADOS")
+        print("=" * 60)
+        return
 
-    # Generar estadísticas
+    # Generar estadísticas para monthly/yearly (comportamiento original)
     print(f"\n📊 Generando estadísticas...")
 
     period_kwargs = {}
-    if args.period == 'weekly':
-        period_kwargs['week_offset'] = args.week_offset
-    elif args.period == 'monthly':
+    if args.period == 'monthly':
         period_kwargs['month'] = args.month
         period_kwargs['year'] = args.year
     elif args.period == 'yearly':
@@ -296,15 +335,6 @@ def main():
         f.write(html_content)
 
     print(f"✅ Archivo generado: {output_file}")
-
-    # Caso especial: si es esta-semana.html, también copiarlo a la raíz de docs/
-    if filename == 'esta-semana.html':
-        root_file = os.path.join(docs_dir, filename)
-        # Necesitamos generar una versión con rutas para la raíz (folder_level="")
-        root_html_content = HTMLGenerator.create_html(stats, users, args.period.replace('ly', 'al'), "")
-        with open(root_file, 'w', encoding='utf-8') as f:
-            f.write(root_html_content)
-        print(f"✅ Copia en raíz generada: {root_file}")
 
     print(f"📅 Período: {stats['period_label']}")
     print(f"📈 Total scrobbles: {stats['total_scrobbles']:,}")

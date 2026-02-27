@@ -1,0 +1,3209 @@
+<!doctype html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+        <title>Last.fm Stats</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@300;400;600&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            :root {
+                --bg: #0c0c0e;
+                --bg2: #131316;
+                --bg3: #1a1a1f;
+                --red: #c05050;
+                --red-dim: #6a2020;
+                --red-bg: #1a0a0a;
+                --gold: #c8a84b;
+                --gold-dim: #7a6125;
+                --teal: #4a9e8e;
+                --purple: #8a6eaf;
+                --blue: #4a70af;
+                --text: #e4ddd0;
+                --text-dim: #7a7570;
+                --border: #2a2a30;
+                --font-serif: "Playfair Display", Georgia, serif;
+                --font-mono: "JetBrains Mono", "Courier New", monospace;
+                --panel-w: 520px;
+            }
+            html {
+                scroll-behavior: smooth;
+            }
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font-family: var(--font-mono);
+                font-size: 13px;
+                font-weight: 300;
+                min-height: 100vh;
+                background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            }
+
+            /* HEADER */
+            header {
+                border-bottom: 1px solid var(--border);
+                padding: 24px 48px;
+                display: flex;
+                align-items: baseline;
+                gap: 20px;
+                background: linear-gradient(
+                    180deg,
+                    #161619 0%,
+                    transparent 100%
+                );
+            }
+            header h1 {
+                font-family: var(--font-serif);
+                font-size: 1.9rem;
+                font-weight: 400;
+                letter-spacing: -0.02em;
+            }
+            header h1 em {
+                color: var(--red);
+                font-style: italic;
+            }
+            .header-meta {
+                color: var(--text-dim);
+                font-size: 11px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+            .dot {
+                display: inline-block;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: var(--red);
+                margin-right: 8px;
+                vertical-align: middle;
+            }
+
+            /* LAYOUT */
+            main {
+                padding: 36px 48px;
+                max-width: 1700px;
+            }
+
+            /* TABS */
+            .tabs {
+                display: flex;
+                margin-bottom: 28px;
+                border-bottom: 1px solid var(--border);
+            }
+            .tab-btn {
+                background: transparent;
+                border: none;
+                border-bottom: 2px solid transparent;
+                color: var(--text-dim);
+                font-family: var(--font-mono);
+                font-size: 11px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                padding: 10px 22px;
+                cursor: pointer;
+                transition:
+                    color 0.2s,
+                    border-color 0.2s;
+                margin-bottom: -1px;
+            }
+            .tab-btn:hover {
+                color: var(--text);
+            }
+            .tab-btn.active {
+                color: var(--red);
+                border-bottom-color: var(--red);
+            }
+
+            /* FILTERS */
+            .filters {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 28px;
+                flex-wrap: wrap;
+                align-items: center;
+            }
+            .filter-label {
+                color: var(--text-dim);
+                font-size: 11px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+            select,
+            .filter-input {
+                background: var(--bg3);
+                border: 1px solid var(--border);
+                color: var(--text);
+                font-family: var(--font-mono);
+                font-size: 12px;
+                padding: 7px 12px;
+                border-radius: 2px;
+                cursor: pointer;
+                outline: none;
+                transition: border-color 0.2s;
+            }
+            .filter-input {
+                cursor: text;
+                width: 220px;
+            }
+            .filter-input::placeholder {
+                color: var(--text-dim);
+            }
+            select:hover,
+            .filter-input:hover {
+                border-color: var(--gold-dim);
+            }
+            select:focus,
+            .filter-input:focus {
+                border-color: var(--red);
+            }
+            .reset-btn {
+                background: transparent;
+                border: 1px solid var(--border);
+                color: var(--text-dim);
+                font-family: var(--font-mono);
+                font-size: 11px;
+                padding: 7px 12px;
+                border-radius: 2px;
+                cursor: pointer;
+                transition: color 0.2s;
+            }
+            .reset-btn:hover {
+                color: var(--text);
+                border-color: var(--text-dim);
+            }
+
+            /* KPI CARDS */
+            .kpi-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+                gap: 1px;
+                border: 1px solid var(--border);
+                margin-bottom: 36px;
+            }
+            .kpi-card {
+                background: var(--bg2);
+                padding: 22px 18px;
+                border-right: 1px solid var(--border);
+            }
+            .kpi-card:last-child {
+                border-right: none;
+            }
+            .kpi-value {
+                font-family: var(--font-serif);
+                font-size: 2rem;
+                font-weight: 700;
+                color: var(--red);
+                line-height: 1;
+                margin-bottom: 7px;
+            }
+            .kpi-label {
+                font-size: 10px;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+            }
+            .kpi-sub {
+                font-size: 11px;
+                color: var(--text-dim);
+                margin-top: 4px;
+            }
+
+            /* SECTION TITLE */
+            .section-title {
+                font-family: var(--font-serif);
+                font-size: 1.15rem;
+                font-weight: 400;
+                color: var(--text);
+                margin-bottom: 18px;
+                padding-bottom: 10px;
+                border-bottom: 1px solid var(--border);
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            .section-title .tag {
+                font-family: var(--font-mono);
+                font-size: 10px;
+                color: var(--red);
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                background: var(--red-bg);
+                border: 1px solid var(--red-dim);
+                padding: 2px 8px;
+                border-radius: 2px;
+            }
+
+            /* CHARTS */
+            .charts-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px;
+                margin-bottom: 36px;
+            }
+            .chart-card {
+                background: var(--bg2);
+                border: 1px solid var(--border);
+                padding: 24px 20px;
+            }
+            .chart-card.full {
+                grid-column: 1/-1;
+            }
+            .chart-card h3 {
+                font-family: var(--font-mono);
+                font-size: 10px;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                margin-bottom: 18px;
+            }
+
+            /* HEATMAP (overview) */
+            .heatmap-grid {
+                display: grid;
+                grid-template-columns: repeat(24, 1fr);
+                gap: 3px;
+                margin-bottom: 4px;
+            }
+            .heatmap-cell {
+                aspect-ratio: 1;
+                border-radius: 2px;
+                transition: opacity 0.15s;
+            }
+            .heatmap-cell:hover {
+                opacity: 0.65;
+            }
+            .heatmap-labels {
+                display: grid;
+                grid-template-columns: repeat(24, 1fr);
+                gap: 3px;
+            }
+            .heatmap-label {
+                font-size: 9px;
+                color: var(--text-dim);
+                text-align: center;
+            }
+
+            /* TABLE */
+            .table-wrap {
+                background: var(--bg2);
+                border: 1px solid var(--border);
+                overflow: auto;
+                margin-bottom: 36px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12px;
+            }
+            thead th {
+                background: var(--bg3);
+                color: var(--text-dim);
+                font-size: 10px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                padding: 11px 14px;
+                text-align: left;
+                border-bottom: 1px solid var(--border);
+                white-space: nowrap;
+                cursor: pointer;
+                user-select: none;
+            }
+            thead th:hover {
+                color: var(--red);
+            }
+            thead th.sorted {
+                color: var(--red);
+            }
+            tbody tr {
+                border-bottom: 1px solid #1e1e24;
+                transition: background 0.1s;
+            }
+            tbody tr.clickable {
+                cursor: pointer;
+            }
+            tbody tr.clickable:hover {
+                background: var(--bg3);
+            }
+            tbody tr.row-active {
+                background: #1e0e0e !important;
+            }
+            tbody td {
+                padding: 10px 14px;
+                color: var(--text);
+            }
+            .td-artist {
+                font-weight: 400;
+            }
+            .td-album {
+                color: var(--text-dim);
+                font-style: italic;
+            }
+            .td-genre {
+                color: var(--text-dim);
+            }
+            .td-date {
+                color: var(--text-dim);
+                font-size: 11px;
+            }
+            .td-num {
+                text-align: right;
+            }
+            .badge {
+                display: inline-block;
+                padding: 2px 7px;
+                border-radius: 2px;
+                font-size: 11px;
+            }
+            .badge-high {
+                background: #1e0808;
+                color: var(--red);
+                border: 1px solid var(--red-dim);
+            }
+            .badge-mid {
+                background: #1a1a0e;
+                color: var(--gold);
+                border: 1px solid var(--gold-dim);
+            }
+            .badge-low {
+                background: var(--bg3);
+                color: var(--text-dim);
+                border: 1px solid var(--border);
+            }
+
+            /* GENRE CARDS */
+            .genre-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 12px;
+                margin-bottom: 36px;
+            }
+            .genre-card {
+                background: var(--bg2);
+                border: 1px solid var(--border);
+                padding: 18px 16px;
+                cursor: pointer;
+                transition:
+                    border-color 0.2s,
+                    background 0.2s;
+                position: relative;
+                overflow: hidden;
+            }
+            .genre-card::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 3px;
+                height: 100%;
+                background: var(--card-color, var(--red));
+                opacity: 0.6;
+            }
+            .genre-card:hover {
+                border-color: var(--card-color, var(--red));
+                background: var(--bg3);
+            }
+            .genre-card.active {
+                border-color: var(--card-color, var(--red));
+                background: #160a0a;
+            }
+            .genre-name {
+                font-family: var(--font-serif);
+                font-size: 1rem;
+                margin-bottom: 6px;
+                padding-left: 10px;
+            }
+            .genre-meta {
+                font-size: 11px;
+                color: var(--text-dim);
+                padding-left: 10px;
+            }
+            .genre-bar {
+                margin-top: 10px;
+                padding-left: 10px;
+            }
+            .genre-bar-inner {
+                height: 3px;
+                border-radius: 2px;
+                background: var(--card-color, var(--red));
+                opacity: 0.5;
+                transition: width 0.4s;
+            }
+
+            /* ══════════════════════════════════════════════
+   HOURLY MATRIX TAB
+══════════════════════════════════════════════ */
+            .hm-controls {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+                align-items: center;
+            }
+            .hm-mode-btn {
+                background: var(--bg3);
+                border: 1px solid var(--border);
+                color: var(--text-dim);
+                font-family: var(--font-mono);
+                font-size: 11px;
+                letter-spacing: 0.08em;
+                padding: 7px 16px;
+                border-radius: 2px;
+                cursor: pointer;
+                transition:
+                    color 0.15s,
+                    border-color 0.15s;
+            }
+            .hm-mode-btn:hover {
+                color: var(--text);
+            }
+            .hm-mode-btn.active {
+                color: var(--red);
+                border-color: var(--red);
+                background: var(--red-bg);
+            }
+            .hm-norm-btn {
+                background: transparent;
+                border: 1px solid var(--border);
+                color: var(--text-dim);
+                font-family: var(--font-mono);
+                font-size: 10px;
+                letter-spacing: 0.08em;
+                padding: 6px 12px;
+                border-radius: 2px;
+                cursor: pointer;
+                transition: color 0.15s;
+            }
+            .hm-norm-btn:hover {
+                color: var(--text);
+            }
+            .hm-norm-btn.active {
+                color: var(--gold);
+                border-color: var(--gold-dim);
+            }
+
+            /* Matrix layout: sticky left label column + scrollable hour columns */
+            .matrix-outer {
+                background: var(--bg2);
+                border: 1px solid var(--border);
+                overflow: auto;
+                margin-bottom: 28px;
+                position: relative;
+            }
+            .matrix-inner {
+                display: grid;
+                min-width: max-content;
+            }
+            /* Row = entity label + 24 cells */
+            .matrix-row {
+                display: contents;
+            }
+            .matrix-hour-header {
+                display: contents;
+            }
+
+            /* Hour headers */
+            .mh-corner {
+                background: var(--bg3);
+                position: sticky;
+                left: 0;
+                z-index: 3;
+                border-right: 1px solid var(--border);
+                border-bottom: 1px solid var(--border);
+                padding: 0;
+            }
+            .mh-cell {
+                background: var(--bg3);
+                border-bottom: 1px solid var(--border);
+                padding: 7px 0;
+                text-align: center;
+                font-size: 9px;
+                color: var(--text-dim);
+                letter-spacing: 0.05em;
+                cursor: pointer;
+                transition:
+                    color 0.15s,
+                    background 0.15s;
+                user-select: none;
+                border-right: 1px solid #18181e;
+            }
+            .mh-cell:hover {
+                color: var(--gold);
+            }
+            .mh-cell.col-active {
+                color: var(--red);
+                background: #1a0808;
+            }
+
+            /* Entity label cells */
+            .ml-cell {
+                position: sticky;
+                left: 0;
+                z-index: 2;
+                background: var(--bg2);
+                border-right: 1px solid var(--border);
+                border-bottom: 1px solid #1a1a20;
+                padding: 0 12px;
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+                transition: background 0.15s;
+                white-space: nowrap;
+                min-width: 180px;
+                max-width: 240px;
+            }
+            .ml-cell:hover {
+                background: var(--bg3);
+            }
+            .ml-cell.row-active {
+                background: #1e0e0e;
+            }
+            .ml-name {
+                font-size: 11px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                flex: 1;
+            }
+            .ml-peak {
+                font-size: 9px;
+                color: var(--text-dim);
+                margin-left: 8px;
+                flex-shrink: 0;
+            }
+
+            /* Heatmap data cells */
+            .mc-cell {
+                border-bottom: 1px solid #14141a;
+                border-right: 1px solid #14141a;
+                cursor: pointer;
+                transition:
+                    opacity 0.1s,
+                    outline 0.1s;
+                position: relative;
+            }
+            .mc-cell:hover {
+                opacity: 0.7;
+                z-index: 1;
+            }
+            .mc-cell.col-active {
+                outline: 1px solid rgba(192, 80, 80, 0.5);
+            }
+            .mc-cell.row-col-active {
+                outline: 2px solid var(--red);
+            }
+
+            /* Hour detail panel (inline below matrix) */
+            .hour-detail {
+                background: var(--bg2);
+                border: 1px solid var(--border);
+                padding: 20px 24px;
+                margin-bottom: 28px;
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+                gap: 20px;
+            }
+            .hour-detail-section h4 {
+                font-size: 10px;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                margin-bottom: 10px;
+                padding-bottom: 6px;
+                border-bottom: 1px solid var(--border);
+            }
+            .hour-rank-list {
+                list-style: none;
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+            .hour-rank-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 3px 0;
+            }
+            .hour-rank-pos {
+                font-size: 10px;
+                color: var(--text-dim);
+                width: 14px;
+                text-align: right;
+                flex-shrink: 0;
+            }
+            .hour-rank-name {
+                font-size: 11px;
+                flex: 1;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .hour-rank-n {
+                font-size: 10px;
+                color: var(--text-dim);
+                flex-shrink: 0;
+            }
+
+            /* DETAIL PANEL */
+            .panel-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.55);
+                z-index: 100;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.25s;
+            }
+            .panel-overlay.open {
+                opacity: 1;
+                pointer-events: all;
+            }
+            .panel {
+                position: fixed;
+                top: 0;
+                right: 0;
+                height: 100%;
+                width: var(--panel-w);
+                max-width: 95vw;
+                background: var(--bg2);
+                border-left: 1px solid var(--border);
+                z-index: 101;
+                transform: translateX(100%);
+                transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+            }
+            .panel.open {
+                transform: translateX(0);
+            }
+            .panel-header {
+                padding: 20px 24px 16px;
+                border-bottom: 1px solid var(--border);
+                position: sticky;
+                top: 0;
+                background: var(--bg2);
+                z-index: 1;
+                flex-shrink: 0;
+            }
+            .panel-close {
+                position: absolute;
+                top: 18px;
+                right: 20px;
+                background: none;
+                border: none;
+                color: var(--text-dim);
+                font-size: 18px;
+                cursor: pointer;
+                padding: 4px;
+                transition: color 0.15s;
+            }
+            .panel-close:hover {
+                color: var(--text);
+            }
+            .panel-type {
+                font-size: 10px;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--red);
+                margin-bottom: 6px;
+            }
+            .panel-title {
+                font-family: var(--font-serif);
+                font-size: 1.4rem;
+                font-weight: 400;
+                line-height: 1.2;
+                padding-right: 32px;
+            }
+            .panel-subtitle {
+                font-size: 11px;
+                color: var(--text-dim);
+                margin-top: 5px;
+            }
+            .panel-body {
+                padding: 20px 24px;
+                flex: 1;
+            }
+            .panel-kpis {
+                display: grid;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 1px;
+                border: 1px solid var(--border);
+                margin-bottom: 24px;
+            }
+            .panel-kpi {
+                background: var(--bg3);
+                padding: 14px 12px;
+            }
+            .panel-kpi-val {
+                font-family: var(--font-serif);
+                font-size: 1.4rem;
+                color: var(--red);
+                line-height: 1;
+                margin-bottom: 4px;
+            }
+            .panel-kpi-lbl {
+                font-size: 9px;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+            }
+            .panel-section {
+                margin-bottom: 24px;
+            }
+            .panel-section-title {
+                font-size: 10px;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--text-dim);
+                margin-bottom: 12px;
+                padding-bottom: 8px;
+                border-bottom: 1px solid var(--border);
+            }
+            .top-list {
+                list-style: none;
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .top-item {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 5px 0;
+            }
+            .top-rank {
+                font-size: 10px;
+                color: var(--text-dim);
+                width: 18px;
+                text-align: right;
+                flex-shrink: 0;
+            }
+            .top-name {
+                flex: 1;
+                font-size: 12px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            .top-bar-wrap {
+                width: 80px;
+                height: 4px;
+                background: var(--bg3);
+                border-radius: 2px;
+                flex-shrink: 0;
+            }
+            .top-bar {
+                height: 100%;
+                border-radius: 2px;
+                background: var(--red);
+            }
+            .top-count {
+                font-size: 11px;
+                color: var(--text-dim);
+                width: 40px;
+                text-align: right;
+                flex-shrink: 0;
+            }
+            .panel-loading {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 200px;
+                gap: 12px;
+                color: var(--text-dim);
+            }
+            .panel-spinner {
+                width: 24px;
+                height: 24px;
+                border: 2px solid var(--border);
+                border-top-color: var(--red);
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+            }
+
+            /* LOADING */
+            .center-msg {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 60vh;
+                gap: 16px;
+                color: var(--text-dim);
+            }
+            .center-msg h2 {
+                font-family: var(--font-serif);
+                color: var(--text);
+                font-size: 1.4rem;
+            }
+            .center-msg pre {
+                background: var(--bg2);
+                border: 1px solid var(--border);
+                padding: 16px 24px;
+                font-size: 11px;
+                color: var(--red);
+                border-radius: 2px;
+                max-width: 540px;
+                text-align: left;
+                line-height: 1.8;
+            }
+            .spinner {
+                width: 32px;
+                height: 32px;
+                border: 2px solid var(--border);
+                border-top-color: var(--red);
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+            }
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+            .month-matrix-wrap {
+                margin-top: 2px;
+            }
+            .month-matrix-grid {
+                display: grid;
+                gap: 3px;
+                margin-bottom: 3px;
+            }
+            .mm-cell {
+                height: 18px;
+                border-radius: 2px;
+                cursor: default;
+                transition: opacity 0.12s;
+            }
+            .mm-cell.has-data {
+                cursor: pointer;
+            }
+            .mm-cell.has-data:hover {
+                opacity: 0.65;
+            }
+            .mm-cell.mm-pinned {
+                outline: 2px solid var(--gold);
+                outline-offset: -1px;
+            }
+            .mm-hover-box {
+                margin-top: 10px;
+                padding: 10px 12px;
+                background: var(--bg3);
+                border: 1px solid var(--border);
+                font-size: 11px;
+                min-height: 40px;
+            }
+            .custom-tooltip {
+                background: #1c1c22;
+                border: 1px solid var(--border);
+                padding: 10px 14px;
+                font-family: var(--font-mono);
+                font-size: 11px;
+            }
+            .ct-label {
+                color: var(--red);
+                margin-bottom: 4px;
+                font-weight: 600;
+            }
+            .ct-row {
+                color: var(--text-dim);
+            }
+
+            @media (max-width: 900px) {
+                header,
+                main {
+                    padding: 18px;
+                }
+                .charts-grid {
+                    grid-template-columns: 1fr;
+                }
+                :root {
+                    --panel-w: 100vw;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+        <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+        <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+        <script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
+        <script>
+            const { useState, useEffect, useMemo, useCallback, useRef } = React;
+            const {
+                BarChart,
+                Bar,
+                XAxis,
+                YAxis,
+                CartesianGrid,
+                Tooltip,
+                ResponsiveContainer,
+                Cell,
+            } = Recharts;
+
+            const C = {
+                red: "#c05050",
+                gold: "#c8a84b",
+                teal: "#4a9e8e",
+                purple: "#8a6eaf",
+                blue: "#4a70af",
+                dim: "#7a7570",
+                bg3: "#1a1a1f",
+                border: "#2a2a30",
+                text: "#e4ddd0",
+            };
+            const PALETTE = [
+                C.red,
+                C.teal,
+                C.gold,
+                C.purple,
+                C.blue,
+                "#9e7a4a",
+                "#4a9e6e",
+                "#af6e8a",
+                "#7a9e4a",
+                "#6eaf9e",
+            ];
+            const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
+            const fmtN = (n) => (n != null ? n.toLocaleString("es") : "—");
+            const fmtDate = (d) => (d ? d.slice(0, 10) : "—");
+
+            function scrobbleBadge(n) {
+                const cls =
+                    n >= 100
+                        ? "badge-high"
+                        : n >= 20
+                          ? "badge-mid"
+                          : "badge-low";
+                return React.createElement(
+                    "span",
+                    { className: `badge ${cls}` },
+                    fmtN(n),
+                );
+            }
+            function CT({ active, payload, label }) {
+                if (!active || !payload?.length) return null;
+                return React.createElement(
+                    "div",
+                    { className: "custom-tooltip" },
+                    React.createElement(
+                        "div",
+                        { className: "ct-label" },
+                        label,
+                    ),
+                    ...payload.map((p, i) =>
+                        React.createElement(
+                            "div",
+                            { className: "ct-row", key: i },
+                            `${p.name || "Scrobbles"}: ${fmtN(p.value)}`,
+                        ),
+                    ),
+                );
+            }
+            function HourHeatmap({ data }) {
+                if (!data?.length) return null;
+                const max = Math.max(...data.map((d) => d.scrobbles));
+                return React.createElement(
+                    "div",
+                    null,
+                    React.createElement(
+                        "div",
+                        { className: "heatmap-grid" },
+                        ...HOURS.map((h) => {
+                            const f = data.find((d) => d.hour === h);
+                            const v = f ? f.scrobbles : 0;
+                            return React.createElement("div", {
+                                key: h,
+                                className: "heatmap-cell",
+                                title: `${h}:00 — ${fmtN(v)} scrobbles`,
+                                style: {
+                                    background: `rgba(192,80,80,${max > 0 ? (0.08 + 0.88 * (v / max)).toFixed(2) : 0.08})`,
+                                },
+                            });
+                        }),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "heatmap-labels" },
+                        ...HOURS.map((h) =>
+                            React.createElement(
+                                "div",
+                                { key: h, className: "heatmap-label" },
+                                h % 6 === 0 ? `${h}h` : "",
+                            ),
+                        ),
+                    ),
+                );
+            }
+
+            /* ── LAZY LOADING ── */
+            let _detailCache = null,
+                _detailPromise = null;
+            function loadDetail() {
+                if (_detailCache) return Promise.resolve(_detailCache);
+                if (_detailPromise) return _detailPromise;
+                _detailPromise = fetch("lastfm_detail.json")
+                    .then((r) => {
+                        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                        return r.json();
+                    })
+                    .then((d) => {
+                        _detailCache = d;
+                        return d;
+                    });
+                return _detailPromise;
+            }
+
+            /* ══════════════════════════════════════════════
+   HOURLY MATRIX TAB
+══════════════════════════════════════════════ */
+            function HourlyMatrixTab({ data, onSelect, activeEntity }) {
+                const [mode, setMode] = useState("artists"); // artists | albums | genres
+                const [norm, setNorm] = useState("row"); // row | global
+                const [activeCol, setActiveCol] = useState(null); // selected hour column
+
+                const mx = data?.hourly_matrix?.[mode];
+                const rankings = data?.hourly_matrix?.hour_rankings?.[mode];
+
+                // Normalización
+                const normalized = useMemo(() => {
+                    if (!mx) return [];
+                    if (norm === "global") {
+                        const globalMax = Math.max(...mx.rows.flat());
+                        return mx.rows.map((row) =>
+                            row.map((v) => (globalMax > 0 ? v / globalMax : 0)),
+                        );
+                    }
+                    // por fila: cada artista normaliza contra su propio máximo
+                    return mx.rows.map((row) => {
+                        const rowMax = Math.max(...row);
+                        return row.map((v) => (rowMax > 0 ? v / rowMax : 0));
+                    });
+                }, [mx, norm]);
+
+                // Ordenar por hora pico
+                const orderedIdx = useMemo(() => {
+                    if (!mx) return [];
+                    return mx.peak_hours
+                        .map((h, i) => ({ i, h, total: mx.totals[i] }))
+                        .sort((a, b) => a.h - b.h || b.total - a.total)
+                        .map((x) => x.i);
+                }, [mx]);
+
+                const CELL_W = 28,
+                    CELL_H = 26,
+                    LABEL_W = 200;
+                const totalCols = 24,
+                    totalRows = orderedIdx.length;
+
+                if (!mx)
+                    return React.createElement(
+                        "div",
+                        { style: { color: "var(--text-dim)", padding: 32 } },
+                        "No hay datos de matriz horaria. Regenera el JSON.",
+                    );
+
+                // Tipo de entidad activa para resaltar fila
+                const activeRowIdx = useMemo(() => {
+                    if (!activeEntity || !mx) return -1;
+                    if (mode === "artists" && activeEntity.type === "artist")
+                        return mx.labels.indexOf(activeEntity.name);
+                    if (mode === "albums" && activeEntity.type === "album") {
+                        const key =
+                            activeEntity.artist + " — " + activeEntity.name;
+                        return mx.labels.indexOf(key);
+                    }
+                    if (mode === "genres" && activeEntity.type === "genre")
+                        return mx.labels.indexOf(activeEntity.name);
+                    return -1;
+                }, [activeEntity, mx, mode]);
+
+                const handleRowClick = useCallback(
+                    (idx) => {
+                        const label = mx.labels[idx];
+                        if (mode === "artists") {
+                            onSelect({ type: "artist", id: null, name: label });
+                        } else if (mode === "albums") {
+                            const [artist, ...rest] = label.split(" — ");
+                            onSelect({
+                                type: "album",
+                                id: null,
+                                name: rest.join(" — "),
+                                artist,
+                            });
+                        } else {
+                            onSelect({ type: "genre", name: label });
+                        }
+                    },
+                    [mx, mode, onSelect],
+                );
+
+                const handleColClick = useCallback((h) => {
+                    setActiveCol((prev) => (prev === h ? null : h));
+                }, []);
+
+                const modeLabels = {
+                    artists: "Artistas",
+                    albums: "Álbumes",
+                    genres: "Géneros",
+                };
+
+                // En modo géneros, el detalle por hora muestra artistas (más informativo que géneros)
+                const hourDetailRankings =
+                    mode === "genres"
+                        ? data?.hourly_matrix?.hour_rankings?.artists
+                        : rankings;
+                const hourDetailLabel =
+                    mode === "genres" ? "Artistas" : modeLabels[mode];
+
+                return React.createElement(
+                    "div",
+                    null,
+                    // Controls
+                    React.createElement(
+                        "div",
+                        { className: "hm-controls" },
+                        React.createElement(
+                            "span",
+                            { className: "filter-label" },
+                            "Ver por:",
+                        ),
+                        ...Object.entries(modeLabels).map(([k, v]) =>
+                            React.createElement(
+                                "button",
+                                {
+                                    key: k,
+                                    className: `hm-mode-btn${mode === k ? " active" : ""}`,
+                                    onClick: () => {
+                                        setMode(k);
+                                        setActiveCol(null);
+                                    },
+                                },
+                                v,
+                            ),
+                        ),
+                        React.createElement("div", {
+                            style: {
+                                marginLeft: 16,
+                                borderLeft: "1px solid var(--border)",
+                                paddingLeft: 16,
+                                display: "flex",
+                                gap: 8,
+                                alignItems: "center",
+                            },
+                        }),
+                        React.createElement(
+                            "span",
+                            { className: "filter-label" },
+                            "Normalizar:",
+                        ),
+                        React.createElement(
+                            "button",
+                            {
+                                className: `hm-norm-btn${norm === "row" ? " active" : ""}`,
+                                onClick: () => setNorm("row"),
+                            },
+                            "por fila",
+                        ),
+                        React.createElement(
+                            "button",
+                            {
+                                className: `hm-norm-btn${norm === "global" ? " active" : ""}`,
+                                onClick: () => setNorm("global"),
+                            },
+                            "global",
+                        ),
+                        React.createElement(
+                            "span",
+                            {
+                                style: {
+                                    marginLeft: "auto",
+                                    color: "var(--text-dim)",
+                                    fontSize: 10,
+                                    letterSpacing: ".05em",
+                                },
+                            },
+                            "Clic columna → ranking de esa hora  ·  Clic fila → detalle",
+                        ),
+                    ),
+
+                    // Leyenda de color
+                    React.createElement(
+                        "div",
+                        {
+                            style: {
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                marginBottom: 16,
+                                fontSize: 10,
+                                color: "var(--text-dim)",
+                            },
+                        },
+                        React.createElement("span", null, "Menos"),
+                        ...Array.from({ length: 8 }, (_, i) =>
+                            React.createElement("div", {
+                                key: i,
+                                style: {
+                                    width: 16,
+                                    height: 10,
+                                    borderRadius: 2,
+                                    background: `rgba(192,80,80,${0.05 + 0.95 * (i / 7)})`,
+                                },
+                            }),
+                        ),
+                        React.createElement("span", null, "Más"),
+                        React.createElement(
+                            "span",
+                            { style: { marginLeft: 24 } },
+                            norm === "row"
+                                ? "Intensidad relativa por fila (cada entidad vs su propia hora pico)"
+                                : "Intensidad global (relativa al máximo de todas las entidades)",
+                        ),
+                    ),
+
+                    // Matrix
+                    React.createElement(
+                        "div",
+                        { className: "matrix-outer" },
+                        React.createElement(
+                            "div",
+                            {
+                                className: "matrix-inner",
+                                style: {
+                                    display: "grid",
+                                    gridTemplateColumns: `${LABEL_W}px repeat(24,${CELL_W}px)`,
+                                    gridTemplateRows: `32px repeat(${totalRows},${CELL_H}px)`,
+                                },
+                            },
+                            // Corner cell
+                            React.createElement("div", {
+                                className: "mh-corner",
+                                style: {
+                                    gridColumn: 1,
+                                    gridRow: 1,
+                                    width: LABEL_W,
+                                    height: 32,
+                                },
+                            }),
+                            // Hour headers
+                            ...HOURS.map((h) =>
+                                React.createElement(
+                                    "div",
+                                    {
+                                        key: `hdr-${h}`,
+                                        className: `mh-cell${activeCol === h ? " col-active" : ""}`,
+                                        style: {
+                                            gridColumn: h + 2,
+                                            gridRow: 1,
+                                            width: CELL_W,
+                                            height: 32,
+                                        },
+                                        onClick: () => handleColClick(h),
+                                        title: `Hora ${h}:00 — clic para ver ranking`,
+                                    },
+                                    `${h}h`,
+                                ),
+                            ),
+
+                            // Rows
+                            ...orderedIdx
+                                .map((dataIdx, rowPos) => {
+                                    const label = mx.labels[dataIdx];
+                                    const peak = mx.peak_hours[dataIdx];
+                                    const total = mx.totals[dataIdx];
+                                    const isActiveRow =
+                                        dataIdx === activeRowIdx;
+                                    const row = normalized[dataIdx];
+
+                                    return [
+                                        // Label cell
+                                        React.createElement(
+                                            "div",
+                                            {
+                                                key: `lbl-${dataIdx}`,
+                                                className: `ml-cell${isActiveRow ? " row-active" : ""}`,
+                                                style: {
+                                                    gridColumn: 1,
+                                                    gridRow: rowPos + 2,
+                                                    height: CELL_H,
+                                                },
+                                                onClick: () =>
+                                                    handleRowClick(dataIdx),
+                                                title: `${label} — ${fmtN(total)} scrobbles · hora pico: ${peak}:00`,
+                                            },
+                                            React.createElement(
+                                                "span",
+                                                { className: "ml-name" },
+                                                label,
+                                            ),
+                                            React.createElement(
+                                                "span",
+                                                { className: "ml-peak" },
+                                                `${peak}h`,
+                                            ),
+                                        ),
+                                        // 24 data cells
+                                        ...HOURS.map((h) => {
+                                            const alpha = (
+                                                0.05 +
+                                                0.9 * row[h]
+                                            ).toFixed(3);
+                                            const raw = mx.rows[dataIdx][h];
+                                            const isColActive = activeCol === h;
+                                            const isBothActive =
+                                                isActiveRow && isColActive;
+                                            return React.createElement("div", {
+                                                key: `c-${dataIdx}-${h}`,
+                                                className: `mc-cell${isColActive ? " col-active" : ""}${isBothActive ? " row-col-active" : ""}`,
+                                                style: {
+                                                    gridColumn: h + 2,
+                                                    gridRow: rowPos + 2,
+                                                    width: CELL_W,
+                                                    height: CELL_H,
+                                                    background: `rgba(192,80,80,${alpha})`,
+                                                },
+                                                title: `${label} · ${h}:00 → ${fmtN(raw)} scrobbles`,
+                                                onClick: () => {
+                                                    handleColClick(h);
+                                                    handleRowClick(dataIdx);
+                                                },
+                                            });
+                                        }),
+                                    ];
+                                })
+                                .flat(),
+                        ),
+                    ),
+
+                    // Hour detail panel (shown when a column is selected)
+                    activeCol !== null &&
+                        hourDetailRankings?.[activeCol] &&
+                        React.createElement(
+                            React.Fragment,
+                            null,
+                            React.createElement(
+                                "div",
+                                { className: "section-title" },
+                                `${activeCol}:00 — ${activeCol + 1}:00`,
+                                React.createElement(
+                                    "span",
+                                    { className: "tag" },
+                                    `${fmtN(hourDetailRankings[activeCol].reduce((a, r) => a + (r.n || 0), 0))} scrobbles`,
+                                ),
+                            ),
+                            React.createElement(
+                                "div",
+                                { className: "hour-detail" },
+                                React.createElement(
+                                    "div",
+                                    null,
+                                    React.createElement(
+                                        "h4",
+                                        { className: "hour-detail-section" },
+                                        hourDetailLabel,
+                                    ),
+                                    React.createElement(
+                                        "ul",
+                                        { className: "hour-rank-list" },
+                                        ...(
+                                            hourDetailRankings[activeCol] || []
+                                        ).map((r, i) =>
+                                            React.createElement(
+                                                "li",
+                                                {
+                                                    key: i,
+                                                    className: "hour-rank-item",
+                                                },
+                                                React.createElement(
+                                                    "span",
+                                                    {
+                                                        className:
+                                                            "hour-rank-pos",
+                                                    },
+                                                    `${i + 1}.`,
+                                                ),
+                                                React.createElement(
+                                                    "span",
+                                                    {
+                                                        className:
+                                                            "hour-rank-name",
+                                                        title: r.name,
+                                                    },
+                                                    r.name,
+                                                ),
+                                                React.createElement(
+                                                    "span",
+                                                    {
+                                                        className:
+                                                            "hour-rank-n",
+                                                    },
+                                                    fmtN(r.n),
+                                                ),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                );
+            }
+
+            /* ── MONTH MATRIX (año × mes) ── */
+            function MonthMatrix({
+                monthData,
+                monthlyDetail,
+                detailLabel,
+                detailKey,
+            }) {
+                const [hovered, setHovered] = useState(null);
+                const [selected, setSelected] = useState(null);
+
+                const map = {};
+                (monthData || []).forEach(({ month, scrobbles }) => {
+                    const [y, m] = month.split("-");
+                    if (!map[y]) map[y] = {};
+                    map[y][parseInt(m, 10)] = scrobbles;
+                });
+                const years = Object.keys(map).sort();
+                const maxVal = Math.max(
+                    ...(monthData || []).map((d) => d.scrobbles),
+                    1,
+                );
+                const MN = [
+                    "En",
+                    "Fe",
+                    "Ma",
+                    "Ab",
+                    "My",
+                    "Jn",
+                    "Jl",
+                    "Ag",
+                    "Se",
+                    "Oc",
+                    "No",
+                    "Di",
+                ];
+                const COLS = "36px repeat(12, 1fr)";
+
+                // Lo que se muestra: hover gana sobre la selección pinada
+                const active = hovered || selected;
+
+                const buildInfo = (mKey, val) => ({
+                    month: mKey,
+                    scrobbles: val,
+                    items: (monthlyDetail || {})[mKey] || [],
+                });
+
+                return React.createElement(
+                    "div",
+                    { className: "month-matrix-wrap" },
+                    // Header mes
+                    React.createElement(
+                        "div",
+                        {
+                            className: "month-matrix-grid",
+                            style: { gridTemplateColumns: COLS },
+                        },
+                        React.createElement("span"),
+                        ...MN.map((m, i) =>
+                            React.createElement(
+                                "div",
+                                {
+                                    key: i,
+                                    style: {
+                                        fontSize: 9,
+                                        color: "var(--text-dim)",
+                                        textAlign: "center",
+                                        lineHeight: "18px",
+                                    },
+                                },
+                                m,
+                            ),
+                        ),
+                    ),
+                    // Filas por año
+                    ...years.map((y) =>
+                        React.createElement(
+                            "div",
+                            {
+                                key: y,
+                                className: "month-matrix-grid",
+                                style: { gridTemplateColumns: COLS },
+                            },
+                            React.createElement(
+                                "span",
+                                {
+                                    style: {
+                                        fontSize: 9,
+                                        color: "var(--text-dim)",
+                                        textAlign: "right",
+                                        paddingRight: 6,
+                                        lineHeight: "18px",
+                                    },
+                                },
+                                y,
+                            ),
+                            ...[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(
+                                (m) => {
+                                    const val = map[y]?.[m] || 0;
+                                    const mKey = `${y}-${String(m).padStart(2, "0")}`;
+                                    const isPinned = selected?.month === mKey;
+                                    const alpha =
+                                        val > 0
+                                            ? (
+                                                  0.1 +
+                                                  0.85 * (val / maxVal)
+                                              ).toFixed(3)
+                                            : "0.05";
+                                    return React.createElement("div", {
+                                        key: m,
+                                        className: `mm-cell${val > 0 ? " has-data" : ""}${isPinned ? " mm-pinned" : ""}`,
+                                        style: {
+                                            background: `rgba(192,80,80,${alpha})`,
+                                        },
+                                        onMouseEnter: () =>
+                                            val > 0 &&
+                                            setHovered(buildInfo(mKey, val)),
+                                        onMouseLeave: () => setHovered(null),
+                                        onClick: () => {
+                                            if (val === 0) return;
+                                            const info = buildInfo(mKey, val);
+                                            setSelected((prev) =>
+                                                prev?.month === mKey
+                                                    ? null
+                                                    : info,
+                                            );
+                                        },
+                                        title:
+                                            val > 0
+                                                ? `${mKey}: ${fmtN(val)}`
+                                                : "",
+                                    });
+                                },
+                            ),
+                        ),
+                    ),
+                    // Info box — hover o pinado
+                    React.createElement(
+                        "div",
+                        { className: "mm-hover-box" },
+                        active
+                            ? React.createElement(
+                                  React.Fragment,
+                                  null,
+                                  React.createElement(
+                                      "div",
+                                      {
+                                          style: {
+                                              display: "flex",
+                                              justifyContent: "space-between",
+                                              alignItems: "baseline",
+                                              marginBottom: 3,
+                                          },
+                                      },
+                                      React.createElement(
+                                          "span",
+                                          {
+                                              style: {
+                                                  color: "var(--red)",
+                                                  fontWeight: 600,
+                                              },
+                                          },
+                                          active.month,
+                                      ),
+                                      selected &&
+                                          !hovered &&
+                                          React.createElement(
+                                              "span",
+                                              {
+                                                  style: {
+                                                      fontSize: 9,
+                                                      color: "var(--text-dim)",
+                                                      letterSpacing: ".08em",
+                                                  },
+                                              },
+                                              "PINADO · clic para soltar",
+                                          ),
+                                  ),
+                                  React.createElement(
+                                      "div",
+                                      { style: { color: "var(--text-dim)" } },
+                                      `${fmtN(active.scrobbles)} scrobbles`,
+                                  ),
+                                  active.items.length > 0 &&
+                                      React.createElement(
+                                          "div",
+                                          {
+                                              style: {
+                                                  marginTop: 8,
+                                                  paddingTop: 6,
+                                                  borderTop:
+                                                      "1px solid var(--border)",
+                                              },
+                                          },
+                                          React.createElement(
+                                              "div",
+                                              {
+                                                  style: {
+                                                      fontSize: 9,
+                                                      letterSpacing: ".1em",
+                                                      color: "var(--text-dim)",
+                                                      marginBottom: 5,
+                                                      textTransform:
+                                                          "uppercase",
+                                                  },
+                                              },
+                                              detailLabel || "Top",
+                                          ),
+                                          ...active.items.map((item, i) => {
+                                              const name =
+                                                  item[detailKey] ||
+                                                  item.a ||
+                                                  item.t ||
+                                                  item.al ||
+                                                  "";
+                                              return React.createElement(
+                                                  "div",
+                                                  {
+                                                      key: i,
+                                                      style: {
+                                                          color:
+                                                              i === 0
+                                                                  ? "var(--gold)"
+                                                                  : "var(--text-dim)",
+                                                          padding: "1px 0",
+                                                      },
+                                                  },
+                                                  `${i + 1}. ${name} — ${fmtN(item.n)}`,
+                                              );
+                                          }),
+                                      ),
+                              )
+                            : React.createElement(
+                                  "span",
+                                  {
+                                      style: {
+                                          color: "var(--text-dim)",
+                                          fontSize: 10,
+                                      },
+                                  },
+                                  "Pasa el ratón o haz clic en un mes para ver detalle",
+                              ),
+                    ),
+                );
+            }
+
+            /* ── HOURLY BAR (distribución horaria) ── */
+            function HourlyBar({ hourly }) {
+                const [hovered, setHovered] = useState(null);
+                if (!hourly || hourly.every((v) => v === 0)) return null;
+                const maxH = Math.max(...hourly, 1);
+                const BAR_H = 36;
+                return React.createElement(
+                    "div",
+                    { style: { marginTop: 4 } },
+                    // Barras
+                    React.createElement(
+                        "div",
+                        {
+                            style: {
+                                display: "flex",
+                                gap: 2,
+                                alignItems: "flex-end",
+                                height: BAR_H,
+                            },
+                        },
+                        hourly.map((v, h) =>
+                            React.createElement("div", {
+                                key: h,
+                                style: {
+                                    flex: 1,
+                                    height: `${Math.max(2, Math.round((v / maxH) * BAR_H))}px`,
+                                    background:
+                                        hovered === h
+                                            ? "var(--gold)"
+                                            : `rgba(192,80,80,${(0.15 + 0.8 * (v / maxH)).toFixed(3)})`,
+                                    borderRadius: "2px 2px 0 0",
+                                    cursor: "default",
+                                    transition: "background .1s",
+                                },
+                                onMouseEnter: () => setHovered(h),
+                                onMouseLeave: () => setHovered(null),
+                                title: `${h}:00 — ${fmtN(v)}`,
+                            }),
+                        ),
+                    ),
+                    // Etiquetas de horas
+                    React.createElement(
+                        "div",
+                        { style: { display: "flex", marginTop: 2 } },
+                        [0, 6, 12, 18, 23].map((h) =>
+                            React.createElement(
+                                "div",
+                                {
+                                    key: h,
+                                    style: {
+                                        position: "relative",
+                                        left: `${(h / 23) * 100}%`,
+                                        fontSize: 9,
+                                        color: "var(--text-dim)",
+                                        transform: "translateX(-50%)",
+                                        whiteSpace: "nowrap",
+                                    },
+                                },
+                                `${h}h`,
+                            ),
+                        ),
+                    ),
+                    // Tooltip de hora activa
+                    hovered !== null &&
+                        React.createElement(
+                            "div",
+                            {
+                                style: {
+                                    marginTop: 6,
+                                    fontSize: 11,
+                                    color: "var(--text-dim)",
+                                },
+                            },
+                            React.createElement(
+                                "span",
+                                { style: { color: "var(--gold)" } },
+                                `${hovered}:00`,
+                            ),
+                            ` — ${fmtN(hourly[hovered])} scrobbles`,
+                        ),
+                );
+            }
+
+            /* ── PANEL DE DETALLE ── */
+            function DetailPanel({
+                entity,
+                onClose,
+                statsArtists,
+                statsAlbums,
+            }) {
+                const [detail, setDetail] = useState(null);
+                const [loading, setLoading] = useState(false);
+                const [error, setError] = useState(null);
+
+                useEffect(() => {
+                    const h = (e) => {
+                        if (e.key === "Escape") onClose();
+                    };
+                    document.addEventListener("keydown", h);
+                    return () => document.removeEventListener("keydown", h);
+                }, [onClose]);
+                useEffect(() => {
+                    document.body.style.overflow = entity ? "hidden" : "";
+                    return () => {
+                        document.body.style.overflow = "";
+                    };
+                }, [entity]);
+
+                useEffect(() => {
+                    if (!entity) return;
+                    setDetail(null);
+                    setError(null);
+                    setLoading(true);
+                    loadDetail()
+                        .then((d) => {
+                            let raw = null;
+                            if (entity.type === "artist") {
+                                if (entity.id != null) {
+                                    raw = d.artists?.[String(entity.id)];
+                                } else {
+                                    // Buscar id por nombre en statsArtists
+                                    const found = (statsArtists || []).find(
+                                        (a) => a.artist === entity.name,
+                                    );
+                                    if (found)
+                                        raw =
+                                            d.artists?.[
+                                                String(found.artist_id)
+                                            ];
+                                }
+                            }
+                            if (entity.type === "album") {
+                                if (entity.id != null) {
+                                    raw = d.albums?.[String(entity.id)];
+                                } else {
+                                    const found = (statsAlbums || []).find(
+                                        (a) =>
+                                            a.album === entity.name &&
+                                            a.artist === entity.artist,
+                                    );
+                                    if (found)
+                                        raw =
+                                            d.albums?.[String(found.album_id)];
+                                }
+                            }
+                            if (entity.type === "genre")
+                                raw = d.genres?.[entity.name];
+                            setDetail(raw || {});
+                        })
+                        .catch((e) => setError(e.message))
+                        .finally(() => setLoading(false));
+                }, [entity?.type, entity?.id, entity?.name]);
+
+                return React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement("div", {
+                        className: `panel-overlay${entity ? " open" : ""}`,
+                        onClick: onClose,
+                    }),
+                    React.createElement(
+                        "div",
+                        { className: `panel${entity ? " open" : ""}` },
+                        entity &&
+                            React.createElement(PanelContent, {
+                                entity,
+                                detail,
+                                loading,
+                                error,
+                                onClose,
+                            }),
+                    ),
+                );
+            }
+
+            function PanelContent({ entity, detail, loading, error, onClose }) {
+                const monthData = (detail?.monthly || []).map((x) => ({
+                    month: x.m || x.month,
+                    scrobbles: x.n || x.scrobbles,
+                }));
+                const trackData = (detail?.top_tracks || []).map((x) => ({
+                    name: x.t || x.track,
+                    n: x.n || x.scrobbles,
+                }));
+                const albumData = (detail?.top_albums || []).map((x) => ({
+                    name: x.a || x.album,
+                    n: x.n || x.scrobbles,
+                }));
+                const artistData = (detail?.top_artists || []).map((x) => ({
+                    name: x.a || x.artist,
+                    n: x.n || x.scrobbles,
+                }));
+                const total = monthData.reduce((a, m) => a + m.scrobbles, 0);
+                const typeLabel = {
+                    artist: "Artista",
+                    album: "Álbum",
+                    genre: "Género",
+                }[entity.type];
+                const subtitle =
+                    entity.type === "artist"
+                        ? entity.genres
+                        : entity.type === "album"
+                          ? entity.artist
+                          : `${entity.artistCount || ""} artistas`;
+
+                const monthlyArtists = detail?.monthly_artists || {};
+                const monthlyAlbums = detail?.monthly_albums || {};
+                const monthlyTracks = detail?.monthly_tracks || {};
+                const hourlyData = detail?.hourly || [];
+
+                // Config según tipo de entidad
+                const matrixCfg =
+                    entity.type === "genre"
+                        ? {
+                              monthlyDetail: monthlyArtists,
+                              detailLabel: "Artistas",
+                              detailKey: "a",
+                          }
+                        : entity.type === "artist"
+                          ? {
+                                monthlyDetail: monthlyAlbums,
+                                detailLabel: "Álbumes",
+                                detailKey: "al",
+                            }
+                          : {
+                                monthlyDetail: monthlyTracks,
+                                detailLabel: "Pistas",
+                                detailKey: "t",
+                            };
+
+                return React.createElement(
+                    React.Fragment,
+                    null,
+                    React.createElement(
+                        "div",
+                        { className: "panel-header" },
+                        React.createElement(
+                            "button",
+                            { className: "panel-close", onClick: onClose },
+                            "×",
+                        ),
+                        React.createElement(
+                            "div",
+                            { className: "panel-type" },
+                            typeLabel,
+                        ),
+                        React.createElement(
+                            "div",
+                            { className: "panel-title" },
+                            entity.name,
+                        ),
+                        subtitle &&
+                            React.createElement(
+                                "div",
+                                { className: "panel-subtitle" },
+                                subtitle,
+                            ),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "panel-body" },
+                        loading
+                            ? React.createElement(
+                                  "div",
+                                  { className: "panel-loading" },
+                                  React.createElement("div", {
+                                      className: "panel-spinner",
+                                  }),
+                                  "Cargando…",
+                              )
+                            : error
+                              ? React.createElement(
+                                    "div",
+                                    {
+                                        style: {
+                                            color: "var(--red)",
+                                            fontSize: 12,
+                                        },
+                                    },
+                                    `Error: ${error}`,
+                                )
+                              : React.createElement(
+                                    React.Fragment,
+                                    null,
+                                    React.createElement(
+                                        "div",
+                                        { className: "panel-kpis" },
+                                        React.createElement(
+                                            "div",
+                                            { className: "panel-kpi" },
+                                            React.createElement(
+                                                "div",
+                                                { className: "panel-kpi-val" },
+                                                fmtN(total),
+                                            ),
+                                            React.createElement(
+                                                "div",
+                                                { className: "panel-kpi-lbl" },
+                                                "Scrobbles",
+                                            ),
+                                        ),
+                                        React.createElement(
+                                            "div",
+                                            { className: "panel-kpi" },
+                                            React.createElement(
+                                                "div",
+                                                { className: "panel-kpi-val" },
+                                                monthData.length
+                                                    ? monthData[0].month.slice(
+                                                          0,
+                                                          7,
+                                                      )
+                                                    : "—",
+                                            ),
+                                            React.createElement(
+                                                "div",
+                                                { className: "panel-kpi-lbl" },
+                                                "Primer mes",
+                                            ),
+                                        ),
+                                        React.createElement(
+                                            "div",
+                                            { className: "panel-kpi" },
+                                            React.createElement(
+                                                "div",
+                                                { className: "panel-kpi-val" },
+                                                monthData.length
+                                                    ? monthData[
+                                                          monthData.length - 1
+                                                      ].month.slice(0, 7)
+                                                    : "—",
+                                            ),
+                                            React.createElement(
+                                                "div",
+                                                { className: "panel-kpi-lbl" },
+                                                "Último mes",
+                                            ),
+                                        ),
+                                    ),
+                                    monthData.length > 0 &&
+                                        React.createElement(
+                                            "div",
+                                            { className: "panel-section" },
+                                            React.createElement(
+                                                "div",
+                                                {
+                                                    className:
+                                                        "panel-section-title",
+                                                },
+                                                "Evolución mensual",
+                                            ),
+                                            React.createElement(MonthMatrix, {
+                                                monthData,
+                                                ...matrixCfg,
+                                            }),
+                                        ),
+                                    hourlyData.length > 0 &&
+                                        React.createElement(
+                                            "div",
+                                            { className: "panel-section" },
+                                            React.createElement(
+                                                "div",
+                                                {
+                                                    className:
+                                                        "panel-section-title",
+                                                },
+                                                "Distribución horaria",
+                                            ),
+                                            React.createElement(HourlyBar, {
+                                                hourly: hourlyData,
+                                            }),
+                                        ),
+                                    trackData.length > 0 &&
+                                        React.createElement(
+                                            "div",
+                                            { className: "panel-section" },
+                                            React.createElement(
+                                                "div",
+                                                {
+                                                    className:
+                                                        "panel-section-title",
+                                                },
+                                                "Top pistas",
+                                            ),
+                                            React.createElement(TopList, {
+                                                items: trackData,
+                                            }),
+                                        ),
+                                    albumData.length > 0 &&
+                                        React.createElement(
+                                            "div",
+                                            { className: "panel-section" },
+                                            React.createElement(
+                                                "div",
+                                                {
+                                                    className:
+                                                        "panel-section-title",
+                                                },
+                                                "Top álbumes",
+                                            ),
+                                            React.createElement(TopList, {
+                                                items: albumData,
+                                                color: C.gold,
+                                            }),
+                                        ),
+                                    artistData.length > 0 &&
+                                        React.createElement(
+                                            "div",
+                                            { className: "panel-section" },
+                                            React.createElement(
+                                                "div",
+                                                {
+                                                    className:
+                                                        "panel-section-title",
+                                                },
+                                                "Top artistas",
+                                            ),
+                                            React.createElement(TopList, {
+                                                items: artistData,
+                                            }),
+                                        ),
+                                ),
+                    ),
+                );
+            }
+
+            function TopList({ items, color = C.red }) {
+                const max = items[0]?.n || 1;
+                return React.createElement(
+                    "ul",
+                    { className: "top-list" },
+                    items.map((it, i) =>
+                        React.createElement(
+                            "li",
+                            { key: i, className: "top-item" },
+                            React.createElement(
+                                "span",
+                                { className: "top-rank" },
+                                `${i + 1}.`,
+                            ),
+                            React.createElement(
+                                "span",
+                                { className: "top-name", title: it.name },
+                                it.name,
+                            ),
+                            React.createElement(
+                                "div",
+                                { className: "top-bar-wrap" },
+                                React.createElement("div", {
+                                    className: "top-bar",
+                                    style: {
+                                        width: `${Math.round((it.n / max) * 100)}%`,
+                                        background: color,
+                                    },
+                                }),
+                            ),
+                            React.createElement(
+                                "span",
+                                { className: "top-count" },
+                                fmtN(it.n),
+                            ),
+                        ),
+                    ),
+                );
+            }
+
+            /* ── OVERVIEW TAB ── */
+            function OverviewTab({ data }) {
+                const {
+                    artists,
+                    monthly,
+                    hourly,
+                    weekday,
+                    genres,
+                    total_scrobbles,
+                    first_scrobble,
+                    last_scrobble,
+                } = data;
+                const firstD = first_scrobble ? new Date(first_scrobble) : null;
+                const lastD = last_scrobble ? new Date(last_scrobble) : null;
+                const activeYears =
+                    firstD && lastD
+                        ? ((lastD - firstD) / 864e5 / 365.25).toFixed(1)
+                        : null;
+                const avgMonth = monthly?.length
+                    ? Math.round(
+                          monthly.reduce((a, m) => a + m.scrobbles, 0) /
+                              monthly.length,
+                      )
+                    : null;
+                const peakHour = hourly?.length
+                    ? hourly.reduce((a, b) =>
+                          a.scrobbles > b.scrobbles ? a : b,
+                      )
+                    : null;
+                const ms = (monthly || []).slice(-48);
+
+                return React.createElement(
+                    "div",
+                    null,
+                    React.createElement(
+                        "div",
+                        { className: "kpi-grid" },
+                        kpiCard(fmtN(total_scrobbles), "Scrobbles totales"),
+                        kpiCard(fmtN(artists?.length), "Artistas"),
+                        kpiCard(
+                            activeYears ? `${activeYears}a` : "—",
+                            "Años de historial",
+                            `${fmtDate(first_scrobble)} → ${fmtDate(last_scrobble)}`,
+                        ),
+                        kpiCard(fmtN(avgMonth), "Scrobbles / mes"),
+                        kpiCard(
+                            peakHour ? `${peakHour.hour}:00` : "—",
+                            "Hora pico",
+                        ),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "charts-grid" },
+                        React.createElement(
+                            "div",
+                            { className: "chart-card full" },
+                            React.createElement(
+                                "h3",
+                                null,
+                                "Evolución mensual",
+                            ),
+                            React.createElement(
+                                ResponsiveContainer,
+                                { width: "100%", height: 185 },
+                                React.createElement(
+                                    BarChart,
+                                    {
+                                        data: ms,
+                                        margin: {
+                                            top: 4,
+                                            right: 8,
+                                            left: -22,
+                                            bottom: 0,
+                                        },
+                                    },
+                                    React.createElement(CartesianGrid, {
+                                        strokeDasharray: "3 3",
+                                        stroke: C.border,
+                                        vertical: false,
+                                    }),
+                                    React.createElement(XAxis, {
+                                        dataKey: "month",
+                                        tick: { fill: C.dim, fontSize: 10 },
+                                        tickLine: false,
+                                        axisLine: false,
+                                        interval: Math.max(
+                                            0,
+                                            Math.floor(ms.length / 8) - 1,
+                                        ),
+                                    }),
+                                    React.createElement(YAxis, {
+                                        tick: { fill: C.dim, fontSize: 10 },
+                                        tickLine: false,
+                                        axisLine: false,
+                                    }),
+                                    React.createElement(Tooltip, {
+                                        content: React.createElement(CT),
+                                        cursor: {
+                                            fill: "rgba(255,255,255,0.03)",
+                                        },
+                                    }),
+                                    React.createElement(Bar, {
+                                        dataKey: "scrobbles",
+                                        fill: C.red,
+                                        radius: [2, 2, 0, 0],
+                                        maxBarSize: 12,
+                                    }),
+                                ),
+                            ),
+                        ),
+                        React.createElement(
+                            "div",
+                            { className: "chart-card" },
+                            React.createElement(
+                                "h3",
+                                null,
+                                "Distribución horaria",
+                            ),
+                            React.createElement(HourHeatmap, { data: hourly }),
+                            React.createElement(
+                                "div",
+                                { style: { marginTop: 14 } },
+                                React.createElement(
+                                    ResponsiveContainer,
+                                    { width: "100%", height: 95 },
+                                    React.createElement(
+                                        BarChart,
+                                        {
+                                            data: HOURS.map((h) => {
+                                                const f = (hourly || []).find(
+                                                    (d) => d.hour === h,
+                                                );
+                                                return {
+                                                    hour: `${h}h`,
+                                                    scrobbles: f
+                                                        ? f.scrobbles
+                                                        : 0,
+                                                };
+                                            }),
+                                            margin: {
+                                                top: 2,
+                                                right: 0,
+                                                left: -26,
+                                                bottom: 0,
+                                            },
+                                        },
+                                        React.createElement(XAxis, {
+                                            dataKey: "hour",
+                                            tick: { fill: C.dim, fontSize: 9 },
+                                            tickLine: false,
+                                            axisLine: false,
+                                            interval: 5,
+                                        }),
+                                        React.createElement(YAxis, {
+                                            tick: { fill: C.dim, fontSize: 9 },
+                                            tickLine: false,
+                                            axisLine: false,
+                                        }),
+                                        React.createElement(Tooltip, {
+                                            content: React.createElement(CT),
+                                        }),
+                                        React.createElement(Bar, {
+                                            dataKey: "scrobbles",
+                                            fill: C.red,
+                                            radius: [2, 2, 0, 0],
+                                            maxBarSize: 14,
+                                        }),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        React.createElement(
+                            "div",
+                            { className: "chart-card" },
+                            React.createElement(
+                                "h3",
+                                null,
+                                "Por día de la semana",
+                            ),
+                            React.createElement(
+                                ResponsiveContainer,
+                                { width: "100%", height: 205 },
+                                React.createElement(
+                                    BarChart,
+                                    {
+                                        data: weekday || [],
+                                        margin: {
+                                            top: 4,
+                                            right: 8,
+                                            left: -24,
+                                            bottom: 0,
+                                        },
+                                    },
+                                    React.createElement(CartesianGrid, {
+                                        strokeDasharray: "3 3",
+                                        stroke: C.border,
+                                        vertical: false,
+                                    }),
+                                    React.createElement(XAxis, {
+                                        dataKey: "day",
+                                        tick: { fill: C.dim, fontSize: 11 },
+                                        tickLine: false,
+                                        axisLine: false,
+                                    }),
+                                    React.createElement(YAxis, {
+                                        tick: { fill: C.dim, fontSize: 10 },
+                                        tickLine: false,
+                                        axisLine: false,
+                                    }),
+                                    React.createElement(Tooltip, {
+                                        content: React.createElement(CT),
+                                    }),
+                                    React.createElement(Bar, {
+                                        dataKey: "scrobbles",
+                                        fill: C.teal,
+                                        radius: [2, 2, 0, 0],
+                                    }),
+                                ),
+                            ),
+                        ),
+                    ),
+                );
+            }
+
+            /* ── ARTISTS TAB ── */
+            function ArtistsTab({ artists: all, onSelect, activeId }) {
+                const [genre, setGenre] = useState("");
+                const [search, setSearch] = useState("");
+                const [sortKey, setSortKey] = useState("total_scrobbles");
+                const [sortAsc, setSortAsc] = useState(false);
+                const genreList = useMemo(
+                    () =>
+                        [
+                            ...new Set(
+                                (all || []).flatMap((a) =>
+                                    a.genres
+                                        ? a.genres
+                                              .split(",")
+                                              .map((g) => g.trim())
+                                        : [],
+                                ),
+                            ),
+                        ]
+                            .filter(Boolean)
+                            .sort(),
+                    [all],
+                );
+                const filtered = useMemo(
+                    () =>
+                        (all || []).filter(
+                            (a) =>
+                                (!genre ||
+                                    (a.genres &&
+                                        a.genres
+                                            .split(",")
+                                            .map((g) => g.trim())
+                                            .includes(genre))) &&
+                                (!search ||
+                                    a.artist
+                                        .toLowerCase()
+                                        .includes(search.toLowerCase())),
+                        ),
+                    [all, genre, search],
+                );
+                const sorted = useMemo(
+                    () =>
+                        [...filtered].sort((a, b) => {
+                            const va =
+                                a[sortKey] ??
+                                (typeof a[sortKey] === "number"
+                                    ? -Infinity
+                                    : "");
+                            const vb =
+                                b[sortKey] ??
+                                (typeof b[sortKey] === "number"
+                                    ? -Infinity
+                                    : "");
+                            return sortAsc
+                                ? va > vb
+                                    ? 1
+                                    : -1
+                                : va < vb
+                                  ? 1
+                                  : -1;
+                        }),
+                    [filtered, sortKey, sortAsc],
+                );
+                const th = (key, label) => ({
+                    className: sortKey === key ? "sorted" : "",
+                    onClick: () => {
+                        if (sortKey === key) setSortAsc(!sortAsc);
+                        else {
+                            setSortKey(key);
+                            setSortAsc(false);
+                        }
+                    },
+                    children:
+                        label +
+                        (sortKey === key ? (sortAsc ? " ↑" : " ↓") : ""),
+                });
+                return React.createElement(
+                    "div",
+                    null,
+                    React.createElement(
+                        "div",
+                        { className: "filters" },
+                        React.createElement(
+                            "span",
+                            { className: "filter-label" },
+                            "Filtrar:",
+                        ),
+                        React.createElement("input", {
+                            type: "text",
+                            className: "filter-input",
+                            placeholder: "Buscar artista…",
+                            value: search,
+                            onChange: (e) => setSearch(e.target.value),
+                        }),
+                        React.createElement(
+                            "select",
+                            {
+                                value: genre,
+                                onChange: (e) => setGenre(e.target.value),
+                            },
+                            React.createElement(
+                                "option",
+                                { value: "" },
+                                "Todos los géneros",
+                            ),
+                            ...genreList.map((g) =>
+                                React.createElement(
+                                    "option",
+                                    { key: g, value: g },
+                                    g,
+                                ),
+                            ),
+                        ),
+                        (genre || search) &&
+                            React.createElement(
+                                "button",
+                                {
+                                    className: "reset-btn",
+                                    onClick: () => {
+                                        setGenre("");
+                                        setSearch("");
+                                    },
+                                },
+                                "✕ limpiar",
+                            ),
+                        React.createElement(
+                            "span",
+                            {
+                                style: {
+                                    marginLeft: "auto",
+                                    color: "var(--text-dim)",
+                                    fontSize: 11,
+                                },
+                            },
+                            "Clic en fila → detalle",
+                        ),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "section-title" },
+                        "Artistas",
+                        React.createElement(
+                            "span",
+                            { className: "tag" },
+                            `${sorted.length.toLocaleString("es")} artistas`,
+                        ),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "table-wrap" },
+                        React.createElement(
+                            "table",
+                            null,
+                            React.createElement(
+                                "thead",
+                                null,
+                                React.createElement(
+                                    "tr",
+                                    null,
+                                    React.createElement(
+                                        "th",
+                                        th("artist", "Artista"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("genres", "Géneros"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("total_scrobbles", "Scrobbles"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("first_scrobble", "Primera escucha"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("last_scrobble", "Última escucha"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th(
+                                            "active_days_span",
+                                            "Días escuchado",
+                                        ),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th(
+                                            "avg_days_between",
+                                            "Media scrobbles/día",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            React.createElement(
+                                "tbody",
+                                null,
+                                ...sorted.map((a, i) =>
+                                    React.createElement(
+                                        "tr",
+                                        {
+                                            key: i,
+                                            className: `clickable${activeId === a.artist_id ? " row-active" : ""}`,
+                                            onClick: () =>
+                                                onSelect({
+                                                    type: "artist",
+                                                    id: a.artist_id,
+                                                    name: a.artist,
+                                                    genres: a.genres
+                                                        ? a.genres
+                                                              .split(",")
+                                                              .map((g) =>
+                                                                  g.trim(),
+                                                              )
+                                                              .slice(0, 3)
+                                                              .join(", ")
+                                                        : "",
+                                                }),
+                                        },
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-artist" },
+                                            a.artist,
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-genre" },
+                                            a.genres
+                                                ? a.genres
+                                                      .split(",")
+                                                      .map((g) => g.trim())
+                                                      .slice(0, 3)
+                                                      .join(", ")
+                                                : "—",
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-num" },
+                                            scrobbleBadge(a.total_scrobbles),
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-date" },
+                                            fmtDate(a.first_scrobble),
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-date" },
+                                            fmtDate(a.last_scrobble),
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            {
+                                                className: "td-num",
+                                                style: {
+                                                    color: "var(--text-dim)",
+                                                },
+                                            },
+                                            a.active_days_span != null
+                                                ? `${fmtN(a.active_days_span)}d`
+                                                : "—",
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            {
+                                                className: "td-num",
+                                                style: {
+                                                    color: "var(--text-dim)",
+                                                },
+                                            },
+                                            a.avg_days_between != null
+                                                ? `${a.avg_days_between}`
+                                                : "—",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                );
+            }
+
+            /* ── ALBUMS TAB ── */
+            function AlbumsTab({ albums: all, onSelect, activeId }) {
+                const [search, setSearch] = useState("");
+                const [sortKey, setSortKey] = useState("total_scrobbles");
+                const [sortAsc, setSortAsc] = useState(false);
+                const filtered = useMemo(
+                    () =>
+                        (all || []).filter(
+                            (a) =>
+                                !search ||
+                                a.album
+                                    .toLowerCase()
+                                    .includes(search.toLowerCase()) ||
+                                a.artist
+                                    .toLowerCase()
+                                    .includes(search.toLowerCase()),
+                        ),
+                    [all, search],
+                );
+                const sorted = useMemo(
+                    () =>
+                        [...filtered].sort((a, b) => {
+                            const va = a[sortKey] ?? "";
+                            const vb = b[sortKey] ?? "";
+                            return sortAsc
+                                ? va > vb
+                                    ? 1
+                                    : -1
+                                : va < vb
+                                  ? 1
+                                  : -1;
+                        }),
+                    [filtered, sortKey, sortAsc],
+                );
+                const th = (key, label) => ({
+                    className: sortKey === key ? "sorted" : "",
+                    onClick: () => {
+                        if (sortKey === key) setSortAsc(!sortAsc);
+                        else {
+                            setSortKey(key);
+                            setSortAsc(false);
+                        }
+                    },
+                    children:
+                        label +
+                        (sortKey === key ? (sortAsc ? " ↑" : " ↓") : ""),
+                });
+                return React.createElement(
+                    "div",
+                    null,
+                    React.createElement(
+                        "div",
+                        { className: "filters" },
+                        React.createElement(
+                            "span",
+                            { className: "filter-label" },
+                            "Buscar:",
+                        ),
+                        React.createElement("input", {
+                            type: "text",
+                            className: "filter-input",
+                            placeholder: "Artista o álbum…",
+                            value: search,
+                            onChange: (e) => setSearch(e.target.value),
+                        }),
+                        search &&
+                            React.createElement(
+                                "button",
+                                {
+                                    className: "reset-btn",
+                                    onClick: () => setSearch(""),
+                                },
+                                "✕ limpiar",
+                            ),
+                        React.createElement(
+                            "span",
+                            {
+                                style: {
+                                    marginLeft: "auto",
+                                    color: "var(--text-dim)",
+                                    fontSize: 11,
+                                },
+                            },
+                            "Clic en fila → detalle",
+                        ),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "section-title" },
+                        "Álbumes",
+                        React.createElement(
+                            "span",
+                            { className: "tag" },
+                            `${sorted.length.toLocaleString("es")} álbumes`,
+                        ),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "table-wrap" },
+                        React.createElement(
+                            "table",
+                            null,
+                            React.createElement(
+                                "thead",
+                                null,
+                                React.createElement(
+                                    "tr",
+                                    null,
+                                    React.createElement(
+                                        "th",
+                                        th("artist", "Artista"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("album", "Álbum"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("genres", "Géneros"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("total_scrobbles", "Scrobbles"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("first_scrobble", "Primera escucha"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("last_scrobble", "Última escucha"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("active_days_span", "Rango días"),
+                                    ),
+                                    React.createElement(
+                                        "th",
+                                        th("days_listened", "Días escuchados"),
+                                    ),
+                                ),
+                            ),
+                            React.createElement(
+                                "tbody",
+                                null,
+                                ...sorted.map((a, i) =>
+                                    React.createElement(
+                                        "tr",
+                                        {
+                                            key: i,
+                                            className: `clickable${activeId === a.album_id ? " row-active" : ""}`,
+                                            onClick: () =>
+                                                onSelect({
+                                                    type: "album",
+                                                    id: a.album_id,
+                                                    name: a.album,
+                                                    artist: a.artist,
+                                                }),
+                                        },
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-artist" },
+                                            a.artist,
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-album" },
+                                            a.album,
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-genre" },
+                                            a.genres
+                                                ? a.genres
+                                                      .split(",")
+                                                      .map((g) => g.trim())
+                                                      .slice(0, 2)
+                                                      .join(", ")
+                                                : "—",
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-num" },
+                                            scrobbleBadge(a.total_scrobbles),
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-date" },
+                                            fmtDate(a.first_scrobble),
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            { className: "td-date" },
+                                            fmtDate(a.last_scrobble),
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            {
+                                                className: "td-num",
+                                                style: {
+                                                    color: "var(--text-dim)",
+                                                },
+                                            },
+                                            a.active_days_span != null
+                                                ? `${fmtN(a.active_days_span)}d`
+                                                : "—",
+                                        ),
+                                        React.createElement(
+                                            "td",
+                                            {
+                                                className: "td-num",
+                                                style: {
+                                                    color: "var(--text-dim)",
+                                                },
+                                            },
+                                            a.days_listened != null
+                                                ? `${fmtN(a.days_listened)}d`
+                                                : "—",
+                                        ),
+                                    ),
+                                ),
+                            ),
+                        ),
+                    ),
+                );
+            }
+
+            /* ── GENRES TAB ── */
+            function GenresTab({ genres: all, onSelect, activeName }) {
+                const [search, setSearch] = useState("");
+                const filtered = useMemo(
+                    () =>
+                        (all || []).filter(
+                            (g) =>
+                                !search ||
+                                g.genre
+                                    .toLowerCase()
+                                    .includes(search.toLowerCase()),
+                        ),
+                    [all, search],
+                );
+                const maxS = filtered[0]?.scrobbles || 1;
+                return React.createElement(
+                    "div",
+                    null,
+                    React.createElement(
+                        "div",
+                        { className: "filters" },
+                        React.createElement(
+                            "span",
+                            { className: "filter-label" },
+                            "Buscar:",
+                        ),
+                        React.createElement("input", {
+                            type: "text",
+                            className: "filter-input",
+                            placeholder: "Filtrar géneros…",
+                            value: search,
+                            onChange: (e) => setSearch(e.target.value),
+                        }),
+                        search &&
+                            React.createElement(
+                                "button",
+                                {
+                                    className: "reset-btn",
+                                    onClick: () => setSearch(""),
+                                },
+                                "✕ limpiar",
+                            ),
+                        React.createElement(
+                            "span",
+                            {
+                                style: {
+                                    marginLeft: "auto",
+                                    color: "var(--text-dim)",
+                                    fontSize: 11,
+                                },
+                            },
+                            "Clic → detalle",
+                        ),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "section-title" },
+                        "Géneros",
+                        React.createElement(
+                            "span",
+                            { className: "tag" },
+                            `${filtered.length} géneros`,
+                        ),
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "genre-grid" },
+                        ...filtered.map((g, i) => {
+                            const color = PALETTE[i % PALETTE.length];
+                            return React.createElement(
+                                "div",
+                                {
+                                    key: i,
+                                    className: `genre-card${activeName === g.genre ? " active" : ""}`,
+                                    style: { "--card-color": color },
+                                    onClick: () =>
+                                        onSelect({
+                                            type: "genre",
+                                            name: g.genre,
+                                            artistCount: g.artists,
+                                        }),
+                                },
+                                React.createElement(
+                                    "div",
+                                    { className: "genre-name" },
+                                    g.genre,
+                                ),
+                                React.createElement(
+                                    "div",
+                                    { className: "genre-meta" },
+                                    `${fmtN(g.scrobbles)} scrobbles · ${fmtN(g.artists)} artistas`,
+                                ),
+                                React.createElement(
+                                    "div",
+                                    { className: "genre-bar" },
+                                    React.createElement("div", {
+                                        className: "genre-bar-inner",
+                                        style: {
+                                            width: `${Math.round((g.scrobbles / maxS) * 100)}%`,
+                                            background: color,
+                                        },
+                                    }),
+                                ),
+                            );
+                        }),
+                    ),
+                );
+            }
+
+            /* ── APP ROOT ── */
+            function App() {
+                const [data, setData] = useState(null);
+                const [error, setError] = useState(null);
+                const [tab, setTab] = useState("overview");
+                const [selected, setSelected] = useState(null);
+
+                useEffect(() => {
+                    fetch("lastfm_stats.json")
+                        .then((r) => {
+                            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                            return r.json();
+                        })
+                        .then(setData)
+                        .catch((e) => setError(e.message));
+                }, []);
+
+                const handleSelect = useCallback((entity) => {
+                    setSelected((prev) =>
+                        prev &&
+                        prev.type === entity.type &&
+                        (prev.id === entity.id || prev.name === entity.name)
+                            ? null
+                            : entity,
+                    );
+                }, []);
+                const handleClose = useCallback(() => setSelected(null), []);
+                const prefetchDetail = useCallback(() => {
+                    loadDetail();
+                }, []);
+
+                if (error)
+                    return React.createElement(
+                        "div",
+                        { className: "center-msg" },
+                        React.createElement(
+                            "h2",
+                            null,
+                            "No se pudo cargar lastfm_stats.json",
+                        ),
+                        React.createElement(
+                            "pre",
+                            null,
+                            `Ejecuta primero:\n\n  pip install requests python-dotenv\n  python extraer_lastfm.py\n\nError: ${error}`,
+                        ),
+                    );
+                if (!data)
+                    return React.createElement(
+                        "div",
+                        { className: "center-msg" },
+                        React.createElement("div", { className: "spinner" }),
+                        React.createElement("span", null, "Cargando datos…"),
+                    );
+
+                const genAt = data.generated_at
+                    ? new Date(data.generated_at).toLocaleDateString("es", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                      })
+                    : null;
+
+                const tabs = [
+                    { id: "overview", label: "Resumen" },
+                    { id: "artists", label: "Artistas" },
+                    { id: "albums", label: "Álbumes" },
+                    { id: "genres", label: "Géneros" },
+                    { id: "hourly", label: "Por Horas" },
+                ];
+                const activeArtistId =
+                    selected?.type === "artist" ? selected.id : null;
+                const activeAlbumId =
+                    selected?.type === "album" ? selected.id : null;
+                const activeGenre =
+                    selected?.type === "genre" ? selected.name : null;
+
+                return React.createElement(
+                    "div",
+                    null,
+                    React.createElement(
+                        "header",
+                        null,
+                        React.createElement(
+                            "h1",
+                            null,
+                            React.createElement("em", null, "Last.fm"),
+                            " Stats",
+                        ),
+                        data.username &&
+                            React.createElement(
+                                "span",
+                                { className: "header-meta" },
+                                React.createElement("span", {
+                                    className: "dot",
+                                }),
+                                data.username,
+                            ),
+                        genAt &&
+                            React.createElement(
+                                "span",
+                                { className: "header-meta" },
+                                `actualizado ${genAt}`,
+                            ),
+                    ),
+                    React.createElement(
+                        "main",
+                        null,
+                        React.createElement(
+                            "div",
+                            { className: "tabs" },
+                            ...tabs.map((t) =>
+                                React.createElement(
+                                    "button",
+                                    {
+                                        key: t.id,
+                                        className: `tab-btn${tab === t.id ? " active" : ""}`,
+                                        onClick: () => setTab(t.id),
+                                        onMouseEnter:
+                                            t.id !== "overview"
+                                                ? prefetchDetail
+                                                : undefined,
+                                    },
+                                    t.label,
+                                ),
+                            ),
+                        ),
+                        tab === "overview" &&
+                            React.createElement(OverviewTab, { data }),
+                        tab === "artists" &&
+                            React.createElement(ArtistsTab, {
+                                artists: data.artists,
+                                onSelect: handleSelect,
+                                activeId: activeArtistId,
+                            }),
+                        tab === "albums" &&
+                            React.createElement(AlbumsTab, {
+                                albums: data.albums,
+                                onSelect: handleSelect,
+                                activeId: activeAlbumId,
+                            }),
+                        tab === "genres" &&
+                            React.createElement(GenresTab, {
+                                genres: data.genres,
+                                onSelect: handleSelect,
+                                activeName: activeGenre,
+                            }),
+                        tab === "hourly" &&
+                            React.createElement(HourlyMatrixTab, {
+                                data,
+                                onSelect: handleSelect,
+                                activeEntity: selected,
+                            }),
+                    ),
+                    React.createElement(DetailPanel, {
+                        entity: selected,
+                        onClose: handleClose,
+                        statsArtists: data?.artists,
+                        statsAlbums: data?.albums,
+                    }),
+                );
+            }
+
+            function kpiCard(value, label, sub) {
+                return React.createElement(
+                    "div",
+                    { className: "kpi-card", key: label },
+                    React.createElement(
+                        "div",
+                        { className: "kpi-value" },
+                        value ?? "—",
+                    ),
+                    React.createElement(
+                        "div",
+                        { className: "kpi-label" },
+                        label,
+                    ),
+                    sub &&
+                        React.createElement(
+                            "div",
+                            { className: "kpi-sub" },
+                            sub,
+                        ),
+                );
+            }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                ReactDOM.createRoot(document.getElementById("root")).render(
+                    React.createElement(App),
+                );
+            });
+        </script>
+    </body>
+</html>

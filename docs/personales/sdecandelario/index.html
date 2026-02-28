@@ -3,13 +3,6 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-        <!-- Umami Analytics -->
-        <script
-            defer
-            src="https://cloud.umami.is/script.js"
-            data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"
-        ></script>
-
         <title>Last.fm Stats</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -2207,7 +2200,7 @@
                           a.scrobbles > b.scrobbles ? a : b,
                       )
                     : null;
-                const ms = monthly || [];
+                const ms = (monthly || []).slice(-48);
 
                 return React.createElement(
                     "div",
@@ -2240,78 +2233,51 @@
                                 "Evolución mensual",
                             ),
                             React.createElement(
-                                "div",
-                                {
-                                    style: {
-                                        overflowX: "auto",
-                                        overflowY: "hidden",
-                                    },
-                                },
+                                ResponsiveContainer,
+                                { width: "100%", height: 185 },
                                 React.createElement(
-                                    "div",
+                                    BarChart,
                                     {
-                                        style: {
-                                            minWidth:
-                                                Math.max(700, ms.length * 18) +
-                                                "px",
+                                        data: ms,
+                                        margin: {
+                                            top: 4,
+                                            right: 8,
+                                            left: -22,
+                                            bottom: 0,
                                         },
                                     },
-                                    React.createElement(
-                                        ResponsiveContainer,
-                                        { width: "100%", height: 185 },
-                                        React.createElement(
-                                            BarChart,
-                                            {
-                                                data: ms,
-                                                margin: {
-                                                    top: 4,
-                                                    right: 8,
-                                                    left: -22,
-                                                    bottom: 0,
-                                                },
-                                            },
-                                            React.createElement(CartesianGrid, {
-                                                strokeDasharray: "3 3",
-                                                stroke: C.border,
-                                                vertical: false,
-                                            }),
-                                            React.createElement(XAxis, {
-                                                dataKey: "month",
-                                                tick: {
-                                                    fill: C.dim,
-                                                    fontSize: 10,
-                                                },
-                                                tickLine: false,
-                                                axisLine: false,
-                                                interval: Math.max(
-                                                    0,
-                                                    Math.floor(ms.length / 12) -
-                                                        1,
-                                                ),
-                                            }),
-                                            React.createElement(YAxis, {
-                                                tick: {
-                                                    fill: C.dim,
-                                                    fontSize: 10,
-                                                },
-                                                tickLine: false,
-                                                axisLine: false,
-                                            }),
-                                            React.createElement(Tooltip, {
-                                                content:
-                                                    React.createElement(CT),
-                                                cursor: {
-                                                    fill: "rgba(255,255,255,0.03)",
-                                                },
-                                            }),
-                                            React.createElement(Bar, {
-                                                dataKey: "scrobbles",
-                                                fill: C.red,
-                                                radius: [2, 2, 0, 0],
-                                                maxBarSize: 12,
-                                            }),
+                                    React.createElement(CartesianGrid, {
+                                        strokeDasharray: "3 3",
+                                        stroke: C.border,
+                                        vertical: false,
+                                    }),
+                                    React.createElement(XAxis, {
+                                        dataKey: "month",
+                                        tick: { fill: C.dim, fontSize: 10 },
+                                        tickLine: false,
+                                        axisLine: false,
+                                        interval: Math.max(
+                                            0,
+                                            Math.floor(ms.length / 8) - 1,
                                         ),
-                                    ),
+                                    }),
+                                    React.createElement(YAxis, {
+                                        tick: { fill: C.dim, fontSize: 10 },
+                                        tickLine: false,
+                                        axisLine: false,
+                                    }),
+                                    React.createElement(Tooltip, {
+                                        content: React.createElement(CT),
+                                        cursor: {
+                                            fill: "rgba(255,255,255,0.03)",
+                                        },
+                                    }),
+                                    React.createElement(Bar, {
+                                        dataKey: "scrobbles",
+                                        fill: C.red,
+                                        radius: [2, 2, 0, 0],
+                                        maxBarSize: 12,
+                                    }),
                                 ),
                             ),
                         ),
@@ -2435,7 +2401,6 @@
                 const [search, setSearch] = useState("");
                 const [sortKey, setSortKey] = useState("total_scrobbles");
                 const [sortAsc, setSortAsc] = useState(false);
-                const [visibleCount, setVisibleCount] = useState(25);
                 const genreList = useMemo(
                     () =>
                         [
@@ -2493,14 +2458,6 @@
                         }),
                     [filtered, sortKey, sortAsc],
                 );
-                // Reset visible count when filters or sort change
-                const prevFilterKey = React.useRef(null);
-                const filterKey = `${genre}|${search}|${sortKey}|${sortAsc}`;
-                if (prevFilterKey.current !== filterKey) {
-                    prevFilterKey.current = filterKey;
-                    if (visibleCount !== 25) setVisibleCount(25);
-                }
-                const visible = sorted.slice(0, visibleCount);
                 const th = (key, label) => ({
                     className: sortKey === key ? "sorted" : "",
                     onClick: () => {
@@ -2636,7 +2593,7 @@
                             React.createElement(
                                 "tbody",
                                 null,
-                                ...visible.map((a, i) =>
+                                ...sorted.map((a, i) =>
                                     React.createElement(
                                         "tr",
                                         {
@@ -2718,36 +2675,14 @@
                             ),
                         ),
                     ),
-                    visibleCount < sorted.length &&
-                        React.createElement(
-                            "div",
-                            {
-                                style: {
-                                    textAlign: "center",
-                                    marginBottom: 28,
-                                },
-                            },
-                            React.createElement(
-                                "button",
-                                {
-                                    className: "reset-btn",
-                                    style: {
-                                        padding: "10px 32px",
-                                        fontSize: 12,
-                                    },
-                                    onClick: () =>
-                                        setVisibleCount((v) => v + 25),
-                                },
-                                `Cargar 25 más (${visibleCount} / ${sorted.length} artistas)`,
-                            ),
-                        ),
                 );
             }
+
+            /* ── ALBUMS TAB ── */
             function AlbumsTab({ albums: all, onSelect, activeId }) {
                 const [search, setSearch] = useState("");
                 const [sortKey, setSortKey] = useState("total_scrobbles");
                 const [sortAsc, setSortAsc] = useState(false);
-                const [visibleCount, setVisibleCount] = useState(25);
                 const filtered = useMemo(
                     () =>
                         (all || []).filter(
@@ -2777,14 +2712,6 @@
                         }),
                     [filtered, sortKey, sortAsc],
                 );
-                // Reset visible count when filters or sort change
-                const prevFilterKeyA = React.useRef(null);
-                const filterKeyA = `${search}|${sortKey}|${sortAsc}`;
-                if (prevFilterKeyA.current !== filterKeyA) {
-                    prevFilterKeyA.current = filterKeyA;
-                    if (visibleCount !== 25) setVisibleCount(25);
-                }
-                const visible = sorted.slice(0, visibleCount);
                 const th = (key, label) => ({
                     className: sortKey === key ? "sorted" : "",
                     onClick: () => {
@@ -2896,7 +2823,7 @@
                             React.createElement(
                                 "tbody",
                                 null,
-                                ...visible.map((a, i) =>
+                                ...sorted.map((a, i) =>
                                     React.createElement(
                                         "tr",
                                         {
@@ -2975,31 +2902,10 @@
                             ),
                         ),
                     ),
-                    visibleCount < sorted.length &&
-                        React.createElement(
-                            "div",
-                            {
-                                style: {
-                                    textAlign: "center",
-                                    marginBottom: 28,
-                                },
-                            },
-                            React.createElement(
-                                "button",
-                                {
-                                    className: "reset-btn",
-                                    style: {
-                                        padding: "10px 32px",
-                                        fontSize: 12,
-                                    },
-                                    onClick: () =>
-                                        setVisibleCount((v) => v + 25),
-                                },
-                                `Cargar 25 más (${visibleCount} / ${sorted.length} álbumes)`,
-                            ),
-                        ),
                 );
             }
+
+            /* ── GENRES TAB ── */
             function GenresTab({ genres: all, onSelect, activeName }) {
                 const [search, setSearch] = useState("");
                 const filtered = useMemo(

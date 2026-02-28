@@ -750,12 +750,53 @@ def main():
                         help=f"Carpeta de salida (default: {OUTPUT_DIR})")
     parser.add_argument("--users", nargs="*",
                         help="Usuarios a procesar (default: todos)")
+    parser.add_argument("--index-only", action="store_true",
+                        help="Solo regenera el index.html leyendo los JSONs ya existentes en --out")
     parser.add_argument("--html",  default=HTML_TEMPLATE,
                         help=f"HTML template (default: {HTML_TEMPLATE})")
     args = parser.parse_args()
 
     print("🎵 Generador de estadísticas — lastfm_rym.db")
     print("=" * 52)
+
+    output_dir = Path(args.out)
+
+    # ── Modo solo índice ──────────────────────────────────────────────────
+    if args.index_only:
+        print(f"\n📄 Modo --index-only: leyendo JSONs existentes en {output_dir} ...")
+        if not output_dir.exists():
+            print(f"❌  La carpeta de salida no existe: {output_dir}")
+            return
+        users_meta = []
+        for entry in sorted(output_dir.iterdir()):
+            if not entry.is_dir():
+                continue
+            stats_file = entry / "lastfm_stats.json"
+            if not stats_file.exists():
+                continue
+            try:
+                with open(stats_file, encoding="utf-8") as f:
+                    data = json.load(f)
+                top_artist = data["artists"][0]["artist"] if data.get("artists") else None
+                users_meta.append({
+                    "username":   data.get("username", entry.name),
+                    "total":      data.get("total_scrobbles", 0),
+                    "first":      data.get("first_scrobble"),
+                    "last":       data.get("last_scrobble"),
+                    "top_artist": top_artist,
+                })
+                print(f"   ✓ {entry.name}")
+            except Exception as e:
+                print(f"   ⚠️  No se pudo leer {stats_file}: {e}")
+        if not users_meta:
+            print("❌  No se encontró ningún lastfm_stats.json en la carpeta de salida.")
+            return
+        users_meta.sort(key=lambda u: u["username"].lower())
+        print(f"\n{'─'*52}")
+        print("📄 Generando index.html...")
+        generate_index_html(users_meta, output_dir)
+        print(f"\n✅  ¡Listo! {output_dir}/index.html actualizado con {len(users_meta)} usuarios.")
+        return
 
     # ── Verificaciones ────────────────────────────────────────────────────
     db_path = Path(args.db)
@@ -769,7 +810,6 @@ def main():
         print(f"    Asegúrate de que '{html_path.name}' esté en el mismo directorio.")
         return
 
-    output_dir = Path(args.out)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # ── Abrir BD ──────────────────────────────────────────────────────────
@@ -858,6 +898,33 @@ def main():
         })
 
     conn.close()
+
+    # ── Incorporar usuarios existentes no procesados en este lanzamiento ──
+    processed_users = {m["username"] for m in users_meta}
+    if output_dir.exists():
+        for entry in sorted(output_dir.iterdir()):
+            if not entry.is_dir() or entry.name in processed_users:
+                continue
+            stats_file = entry / "lastfm_stats.json"
+            if not stats_file.exists():
+                continue
+            try:
+                with open(stats_file, encoding="utf-8") as f:
+                    data = json.load(f)
+                top_artist = data["artists"][0]["artist"] if data.get("artists") else None
+                users_meta.append({
+                    "username":   data.get("username", entry.name),
+                    "total":      data.get("total_scrobbles", 0),
+                    "first":      data.get("first_scrobble"),
+                    "last":       data.get("last_scrobble"),
+                    "top_artist": top_artist,
+                })
+                print(f"   ↺ Usuario existente incorporado al índice: {entry.name}")
+            except Exception as e:
+                print(f"   ⚠️  No se pudo leer {stats_file}: {e}")
+
+    # Ordenar todos los usuarios alfabéticamente en el índice
+    users_meta.sort(key=lambda u: u["username"].lower())
 
     # ── Generar index ─────────────────────────────────────────────────────
     if users_meta:

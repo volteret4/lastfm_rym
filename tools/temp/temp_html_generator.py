@@ -87,7 +87,7 @@ class HTMLGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Stats - {stats.get('period_label', 'Estadísticas')}</title>
-    <link rel="icon" type="image/png" href="images/music.png">
+    <link rel="icon" type="image/png" href="/images/favicon.png">
     <!-- Umami Analytics -->
     <script defer src="{umami_script_url}" data-website-id="{umami_website_id}"></script>
 

@@ -59,7 +59,7 @@ class GroupStatsHTMLGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Grupo - Estadísticas Grupales</title>
-    <link rel="icon" type="image/png" href="images/music.png">
+    <link rel="icon" type="image/png" href="/images/favicon.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Umami Analytics -->
     <script defer src="{umami_script_url}" data-website-id="{umami_website_id}"></script>

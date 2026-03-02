@@ -44,7 +44,7 @@ class UserStatsHTMLGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Last.fm Usuarios - Estadísticas Individuales</title>
-    <link rel="icon" type="image/png" href="images/music.png">
+    <link rel="icon" type="image/png" href="/images/favicon.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {{

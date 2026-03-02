@@ -744,8 +744,8 @@ def main():
     parser = argparse.ArgumentParser(
         description="Genera estadísticas HTML/JSON desde lastfm_rym.db"
     )
-    parser.add_argument("--db",    default="lastfm_rym.db",
-                        help="Ruta a la base de datos SQLite (default: lastfm_rym.db)")
+    parser.add_argument("--db",    default="db/lastfm_rym.db",
+                        help="Ruta a la base de datos SQLite (default: db/lastfm_rym.db)")
     parser.add_argument("--out",   default=OUTPUT_DIR,
                         help=f"Carpeta de salida (default: {OUTPUT_DIR})")
     parser.add_argument("--users", nargs="*",
@@ -756,7 +756,7 @@ def main():
                         help=f"HTML template (default: {HTML_TEMPLATE})")
     args = parser.parse_args()
 
-    print("🎵 Generador de estadísticas — lastfm_rym.db")
+    print(f"🎵 Generador de estadísticas — {args.db or 'lastfm_rym.db'}")
     print("=" * 52)
 
     output_dir = Path(args.out)

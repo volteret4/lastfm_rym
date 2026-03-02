@@ -692,7 +692,7 @@ def generate_index_html(files):
                     gap: 0.3rem;
                 }
                 .nav-tabs li {
-                    flex: 1 1 10%;
+                    flex: 1 1 20%;
                 }
 
                 .tab-link {
@@ -805,6 +805,9 @@ def generate_index_html(files):
                     <a href="#grupo" class="tab-link" data-tab="grupo"
                         >Grupo</a
                     >
+                </li>
+                <li>
+                    <a href="/personales/index.html" class="tab-link">Individuales</a>
                 </li>
                 <li>
                     <a href="#about" class="tab-link" data-tab="about">Acerca de</a>
@@ -1225,6 +1228,9 @@ def generate_index_html(files):
 
             tabLinks.forEach((link) => {
                 link.addEventListener("click", (e) => {
+                    // SI NO TIENE data-tab, es un enlace externo, dejamos que funcione normal
+                    if (!link.getAttribute("data-tab")) return;
+
                     e.preventDefault();
 
                     // Remover active de todos

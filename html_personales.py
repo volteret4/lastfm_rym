@@ -768,6 +768,8 @@ def main():
             print(f"❌  La carpeta de salida no existe: {output_dir}")
             return
         users_meta = []
+        filter_users = set(args.users) if args.users else set()
+        seen_usernames: set[str] = set()
         for entry in sorted(output_dir.iterdir()):
             if not entry.is_dir():
                 continue
@@ -777,9 +779,22 @@ def main():
             try:
                 with open(stats_file, encoding="utf-8") as f:
                     data = json.load(f)
+                username = data.get("username", entry.name)
+                # ✅ Fix 1: el directorio debe coincidir con el username del JSON
+                if username != entry.name:
+                    print(f"   ⚠️  Omitiendo {entry.name}: username='{username}' no coincide")
+                    continue
+                # ✅ Fix 2: respetar --users también en modo --index-only
+                if filter_users and username not in filter_users:
+                    continue
+                # ✅ Fix 3: evitar duplicados
+                if username in seen_usernames:
+                    print(f"   ⚠️  Duplicado omitido: {username}")
+                    continue
+                seen_usernames.add(username)
                 top_artist = data["artists"][0]["artist"] if data.get("artists") else None
                 users_meta.append({
-                    "username":   data.get("username", entry.name),
+                    "username":   username,
                     "total":      data.get("total_scrobbles", 0),
                     "first":      data.get("first_scrobble"),
                     "last":       data.get("last_scrobble"),
@@ -911,9 +926,12 @@ def main():
             try:
                 with open(stats_file, encoding="utf-8") as f:
                     data = json.load(f)
+                username = data.get("username", entry.name)
+                if username != entry.name:          # ← línea añadida
+                    continue
                 top_artist = data["artists"][0]["artist"] if data.get("artists") else None
                 users_meta.append({
-                    "username":   data.get("username", entry.name),
+                    "username":   username,
                     "total":      data.get("total_scrobbles", 0),
                     "first":      data.get("first_scrobble"),
                     "last":       data.get("last_scrobble"),

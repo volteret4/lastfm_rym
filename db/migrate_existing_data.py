@@ -1,406 +1,331 @@
 #!/usr/bin/env python3
 """
-Script de Migración - Retroalimentación de MBIDs
-Actualiza scrobbles existentes con MBIDs cuando están disponibles en los datos enriquecidos
+cleanup_after_migration.py
+===========================
+Elimina las tablas legacy redundantes que ya están consolidadas en
+artists / albums / tracks, y hace VACUUM para recuperar el espacio.
+
+TABLAS QUE SE ELIMINAN (datos ya migrados a las canónicas):
+  - artist_details          → artists
+  - album_details           → albums
+  - track_details           → tracks
+  - album_labels            → albums.label
+  - album_release_dates     → albums.release_year / original_release_date
+
+TABLAS QUE SE CONSERVAN:
+  - scrobbles               (con artist_id / album_id / track_id)
+  - artists / albums / tracks
+  - artist_genres           (legacy ligera, útil para compatibilidad rápida)
+  - artist_genres_detailed
+  - album_genres
+  - user_first_*_listen
+  - cache_responses / api_cache
+  - group_stats
+  - listenbrainz_*
+  - import_errors
+
+ÍNDICES DUPLICADOS:
+  Se eliminan los índices redundantes que apuntan a las columnas de texto
+  (artist, album, track) en scrobbles ahora que tenemos los IDs.
+  Se conservan idx_scrobbles_user_timestamp y los de FK.
+
+Hace backup automático antes de modificar nada.
 """
 
 import sqlite3
+import os
 import sys
-from typing import Dict, Tuple
-
-class MigrationHelper:
-    def __init__(self, db_path='lastfm_cache.db'):
-        self.db_path = db_path
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
-
-    def check_migration_status(self) -> Dict:
-        """Verifica el estado actual de la migración"""
-        cursor = self.conn.cursor()
-
-        # Total de scrobbles
-        cursor.execute('SELECT COUNT(*) as total FROM scrobbles')
-        total_scrobbles = cursor.fetchone()['total']
-
-        # Verificar si existen las columnas MBIDs
-        cursor.execute("PRAGMA table_info(scrobbles)")
-        columns = [row[1] for row in cursor.fetchall()]
-
-        has_artist_mbid = 'artist_mbid' in columns
-        has_album_mbid = 'album_mbid' in columns
-        has_track_mbid = 'track_mbid' in columns
-
-        # Scrobbles con MBIDs ya asignados (solo si las columnas existen)
-        scrobbles_with_artist_mbid = 0
-        scrobbles_with_album_mbid = 0
-        scrobbles_with_track_mbid = 0
-
-        if has_artist_mbid:
-            cursor.execute('SELECT COUNT(*) as with_mbid FROM scrobbles WHERE artist_mbid IS NOT NULL')
-            scrobbles_with_artist_mbid = cursor.fetchone()['with_mbid']
-
-        if has_album_mbid:
-            cursor.execute('SELECT COUNT(*) as with_mbid FROM scrobbles WHERE album_mbid IS NOT NULL')
-            scrobbles_with_album_mbid = cursor.fetchone()['with_mbid']
-
-        if has_track_mbid:
-            cursor.execute('SELECT COUNT(*) as with_mbid FROM scrobbles WHERE track_mbid IS NOT NULL')
-            scrobbles_with_track_mbid = cursor.fetchone()['with_mbid']
-
-        # Datos disponibles para retroalimentar (verificar si las tablas existen)
-        artist_mbids_available = 0
-        album_mbids_available = 0
-        track_mbids_available = 0
-
-        # Verificar si existen las tablas de detalles
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='artist_details'")
-        has_artist_details = cursor.fetchone() is not None
-
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='album_details'")
-        has_album_details = cursor.fetchone() is not None
-
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='track_details'")
-        has_track_details = cursor.fetchone() is not None
-
-        if has_artist_details:
-            cursor.execute('SELECT COUNT(*) as available FROM artist_details WHERE mbid IS NOT NULL')
-            artist_mbids_available = cursor.fetchone()['available']
-
-        if has_album_details:
-            cursor.execute('SELECT COUNT(*) as available FROM album_details WHERE mbid IS NOT NULL')
-            album_mbids_available = cursor.fetchone()['available']
-
-        if has_track_details:
-            cursor.execute('SELECT COUNT(*) as available FROM track_details WHERE mbid IS NOT NULL')
-            track_mbids_available = cursor.fetchone()['available']
-
-        return {
-            'total_scrobbles': total_scrobbles,
-            'has_mbid_columns': {
-                'artist': has_artist_mbid,
-                'album': has_album_mbid,
-                'track': has_track_mbid
-            },
-            'has_detail_tables': {
-                'artist': has_artist_details,
-                'album': has_album_details,
-                'track': has_track_details
-            },
-            'current_mbids': {
-                'artist': scrobbles_with_artist_mbid,
-                'album': scrobbles_with_album_mbid,
-                'track': scrobbles_with_track_mbid
-            },
-            'available_mbids': {
-                'artist': artist_mbids_available,
-                'album': album_mbids_available,
-                'track': track_mbids_available
-            }
-        }
-
-    def add_missing_columns(self):
-        """Añade las columnas de MBIDs si no existen"""
-        cursor = self.conn.cursor()
-
-        columns_to_add = [
-            ('artist_mbid', 'TEXT'),
-            ('album_mbid', 'TEXT'),
-            ('track_mbid', 'TEXT')
-        ]
-
-        for column_name, column_type in columns_to_add:
-            try:
-                cursor.execute(f'ALTER TABLE scrobbles ADD COLUMN {column_name} {column_type}')
-                print(f"   ✅ Columna {column_name} añadida")
-            except sqlite3.OperationalError as e:
-                if "duplicate column name" in str(e):
-                    print(f"   ℹ️ Columna {column_name} ya existe")
-                else:
-                    print(f"   ⚠️ Error añadiendo {column_name}: {e}")
-
-        self.conn.commit()
-
-    def backfill_artist_mbids(self) -> int:
-        """Retroalimenta MBIDs de artistas desde artist_details"""
-        cursor = self.conn.cursor()
-
-        # Verificar si la columna artist_mbid existe
-        cursor.execute("PRAGMA table_info(scrobbles)")
-        columns = [row[1] for row in cursor.fetchall()]
-
-        if 'artist_mbid' not in columns:
-            print(f"   ⚠️ Columna artist_mbid no existe aún. Se omite este paso.")
-            return 0
-
-        # Verificar si la tabla artist_details existe
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='artist_details'")
-        if not cursor.fetchone():
-            print(f"   ⚠️ Tabla artist_details no existe aún. Se omite este paso.")
-            return 0
-
-        # Encontrar scrobbles sin artist_mbid que tienen datos disponibles
-        cursor.execute('''
-            UPDATE scrobbles
-            SET artist_mbid = (
-                SELECT ad.mbid
-                FROM artist_details ad
-                WHERE ad.artist = scrobbles.artist
-                AND ad.mbid IS NOT NULL
-            )
-            WHERE artist_mbid IS NULL
-            AND artist IN (
-                SELECT artist FROM artist_details WHERE mbid IS NOT NULL
-            )
-        ''')
-
-        updated_rows = cursor.rowcount
-        self.conn.commit()
-        return updated_rows
-
-    def backfill_album_mbids(self) -> int:
-        """Retroalimenta MBIDs de álbumes desde album_details"""
-        cursor = self.conn.cursor()
-
-        # Verificar si la columna album_mbid existe
-        cursor.execute("PRAGMA table_info(scrobbles)")
-        columns = [row[1] for row in cursor.fetchall()]
-
-        if 'album_mbid' not in columns:
-            print(f"   ⚠️ Columna album_mbid no existe aún. Se omite este paso.")
-            return 0
-
-        # Verificar si la tabla album_details existe
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='album_details'")
-        if not cursor.fetchone():
-            print(f"   ⚠️ Tabla album_details no existe aún. Se omite este paso.")
-            return 0
-
-        cursor.execute('''
-            UPDATE scrobbles
-            SET album_mbid = (
-                SELECT ald.mbid
-                FROM album_details ald
-                WHERE ald.artist = scrobbles.artist
-                AND ald.album = scrobbles.album
-                AND ald.mbid IS NOT NULL
-            )
-            WHERE album_mbid IS NULL
-            AND album IS NOT NULL
-            AND album != ''
-            AND (artist, album) IN (
-                SELECT artist, album FROM album_details WHERE mbid IS NOT NULL
-            )
-        ''')
-
-        updated_rows = cursor.rowcount
-        self.conn.commit()
-        return updated_rows
-
-    def backfill_track_mbids(self) -> int:
-        """Retroalimenta MBIDs de tracks desde track_details"""
-        cursor = self.conn.cursor()
-
-        # Verificar si la columna track_mbid existe
-        cursor.execute("PRAGMA table_info(scrobbles)")
-        columns = [row[1] for row in cursor.fetchall()]
-
-        if 'track_mbid' not in columns:
-            print(f"   ⚠️ Columna track_mbid no existe aún. Se omite este paso.")
-            return 0
-
-        # Verificar si la tabla track_details existe
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='track_details'")
-        if not cursor.fetchone():
-            print(f"   ⚠️ Tabla track_details no existe aún. Se omite este paso.")
-            return 0
-
-        cursor.execute('''
-            UPDATE scrobbles
-            SET track_mbid = (
-                SELECT td.mbid
-                FROM track_details td
-                WHERE td.artist = scrobbles.artist
-                AND td.track = scrobbles.track
-                AND td.mbid IS NOT NULL
-            )
-            WHERE track_mbid IS NULL
-            AND (artist, track) IN (
-                SELECT artist, track FROM track_details WHERE mbid IS NOT NULL
-            )
-        ''')
-
-        updated_rows = cursor.rowcount
-        self.conn.commit()
-        return updated_rows
-
-    def create_missing_indexes(self):
-        """Crea índices que pueden estar faltando"""
-        cursor = self.conn.cursor()
-
-        # Verificar qué columnas existen
-        cursor.execute("PRAGMA table_info(scrobbles)")
-        scrobbles_columns = [row[1] for row in cursor.fetchall()]
-
-        # Verificar qué tablas existen
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-        existing_tables = {row[0] for row in cursor.fetchall()}
-
-        indexes_to_create = []
-
-        # Índices para scrobbles solo si las columnas existen
-        if 'artist_mbid' in scrobbles_columns:
-            indexes_to_create.append(('idx_scrobbles_artist_mbid', 'scrobbles', 'artist_mbid'))
-        if 'album_mbid' in scrobbles_columns:
-            indexes_to_create.append(('idx_scrobbles_album_mbid', 'scrobbles', 'album_mbid'))
-        if 'track_mbid' in scrobbles_columns:
-            indexes_to_create.append(('idx_scrobbles_track_mbid', 'scrobbles', 'track_mbid'))
-
-        # Índices para tablas de detalles solo si existen
-        if 'artist_details' in existing_tables:
-            indexes_to_create.append(('idx_artist_details_mbid', 'artist_details', 'mbid'))
-        if 'album_details' in existing_tables:
-            indexes_to_create.append(('idx_album_details_mbid', 'album_details', 'mbid'))
-        if 'track_details' in existing_tables:
-            indexes_to_create.append(('idx_track_details_mbid', 'track_details', 'mbid'))
-
-        if not indexes_to_create:
-            print(f"   ℹ️ No hay índices nuevos por crear en la estructura actual")
-            return
-
-        for index_name, table_name, column_name in indexes_to_create:
-            try:
-                cursor.execute(f'CREATE INDEX IF NOT EXISTS {index_name} ON {table_name}({column_name})')
-                print(f"   ✅ Índice {index_name} creado/verificado")
-            except sqlite3.OperationalError as e:
-                print(f"   ⚠️ Error con índice {index_name}: {e}")
-
-        self.conn.commit()
-
-    def run_migration(self):
-        """Ejecuta el proceso completo de migración"""
-        print("🔄 INICIANDO MIGRACIÓN DE DATOS EXISTENTES")
-        print("=" * 60)
-
-        # Verificar estado inicial
-        status_before = self.check_migration_status()
-        print(f"\n📊 ESTADO INICIAL:")
-        print(f"   • Total de scrobbles: {status_before['total_scrobbles']:,}")
-
-        print(f"\n🏗️ ESTRUCTURA ACTUAL:")
-        print(f"   • Columna artist_mbid: {'✅ Existe' if status_before['has_mbid_columns']['artist'] else '❌ No existe'}")
-        print(f"   • Columna album_mbid: {'✅ Existe' if status_before['has_mbid_columns']['album'] else '❌ No existe'}")
-        print(f"   • Columna track_mbid: {'✅ Existe' if status_before['has_mbid_columns']['track'] else '❌ No existe'}")
-
-        print(f"\n📚 TABLAS DE DETALLES:")
-        print(f"   • Tabla artist_details: {'✅ Existe' if status_before['has_detail_tables']['artist'] else '❌ No existe'}")
-        print(f"   • Tabla album_details: {'✅ Existe' if status_before['has_detail_tables']['album'] else '❌ No existe'}")
-        print(f"   • Tabla track_details: {'✅ Existe' if status_before['has_detail_tables']['track'] else '❌ No existe'}")
-
-        if any(status_before['has_mbid_columns'].values()):
-            print(f"\n📋 MBIDs ACTUALES:")
-            if status_before['has_mbid_columns']['artist']:
-                print(f"   • Con artist_mbid: {status_before['current_mbids']['artist']:,}")
-            if status_before['has_mbid_columns']['album']:
-                print(f"   • Con album_mbid: {status_before['current_mbids']['album']:,}")
-            if status_before['has_mbid_columns']['track']:
-                print(f"   • Con track_mbid: {status_before['current_mbids']['track']:,}")
-
-        if any(status_before['has_detail_tables'].values()):
-            print(f"\n💾 MBIDs DISPONIBLES PARA RETROALIMENTAR:")
-            if status_before['has_detail_tables']['artist']:
-                print(f"   • Artistas: {status_before['available_mbids']['artist']:,}")
-            if status_before['has_detail_tables']['album']:
-                print(f"   • Álbumes: {status_before['available_mbids']['album']:,}")
-            if status_before['has_detail_tables']['track']:
-                print(f"   • Tracks: {status_before['available_mbids']['track']:,}")
-
-        if status_before['total_scrobbles'] == 0:
-            print(f"\n⚠️ No hay scrobbles en la base de datos")
-            return
-
-        # Paso 1: Añadir columnas faltantes
-        print(f"\n🔧 PASO 1: Verificando estructura de tabla...")
-        self.add_missing_columns()
-
-        # Paso 2: Crear índices
-        print(f"\n🗂️ PASO 2: Creando/verificando índices...")
-        self.create_missing_indexes()
-
-        # Paso 3: Retroalimentar MBIDs
-        print(f"\n🔄 PASO 3: Retroalimentando MBIDs...")
-
-        print(f"   Actualizando artist_mbid...")
-        artist_updates = self.backfill_artist_mbids()
-        print(f"   ✅ {artist_updates:,} scrobbles actualizados con artist_mbid")
-
-        print(f"   Actualizando album_mbid...")
-        album_updates = self.backfill_album_mbids()
-        print(f"   ✅ {album_updates:,} scrobbles actualizados con album_mbid")
-
-        print(f"   Actualizando track_mbid...")
-        track_updates = self.backfill_track_mbids()
-        print(f"   ✅ {track_updates:,} scrobbles actualizados con track_mbid")
-
-        # Verificar estado final
-        status_after = self.check_migration_status()
-
-        print(f"\n📈 RESULTADOS DE LA MIGRACIÓN:")
-
-        if any(status_before['has_mbid_columns'].values()):
-            if status_before['has_mbid_columns']['artist']:
-                print(f"   • Artist MBIDs: {status_before['current_mbids']['artist']:,} → {status_after['current_mbids']['artist']:,} (+{status_after['current_mbids']['artist'] - status_before['current_mbids']['artist']:,})")
-            if status_before['has_mbid_columns']['album']:
-                print(f"   • Album MBIDs: {status_before['current_mbids']['album']:,} → {status_after['current_mbids']['album']:,} (+{status_after['current_mbids']['album'] - status_before['current_mbids']['album']:,})")
-            if status_before['has_mbid_columns']['track']:
-                print(f"   • Track MBIDs: {status_before['current_mbids']['track']:,} → {status_after['current_mbids']['track']:,} (+{status_after['current_mbids']['track'] - status_before['current_mbids']['track']:,})")
-
-        total_updates = artist_updates + album_updates + track_updates
-        print(f"\n🎉 MIGRACIÓN COMPLETADA")
-        print(f"   • Total de actualizaciones: {total_updates:,}")
-
-        if status_after['has_mbid_columns']['artist'] and status_after['total_scrobbles'] > 0:
-            print(f"   • Porcentaje de scrobbles con artist_mbid: {(status_after['current_mbids']['artist'] / status_after['total_scrobbles'] * 100):.1f}%")
-
-        if total_updates > 0:
-            print(f"\n💡 PRÓXIMO PASO RECOMENDADO:")
-            print(f"   • Ejecutar: python update_database_optimized.py --enrich")
-            print(f"   • Esto completará el enriquecimiento de entidades restantes")
+import shutil
+import time
+from datetime import datetime
+
+
+DEFAULT_DB = 'db/lastfm_cache.db'
+
+LEGACY_TABLES_TO_DROP = [
+    'artist_details',
+    'album_details',
+    'track_details',
+    'album_labels',
+    'album_release_dates',
+]
+
+# Índices sobre columnas de texto que ya no son la vía principal de query
+REDUNDANT_INDEXES_TO_DROP = [
+    'idx_scrobbles_artist_album',
+    'idx_scrobbles_user_artist',
+    'idx_scrobbles_artist_timestamp',
+    'idx_scrobbles_user_track',
+    'idx_scrobbles_user_artist_timestamp',
+    'idx_scrobbles_album_artist',
+    'idx_scrobbles_track_artist',
+    'idx_scrobbles_timestamp_user',
+    'idx_scrobbles_artist_user',
+    # MBIDs de texto en scrobbles (ahora en artists/albums/tracks)
+    'idx_scrobbles_artist_mbid',
+    'idx_scrobbles_user_artist_mbid',
+    'idx_scrobbles_album_mbid',
+    'idx_scrobbles_track_mbid',
+]
+
+
+def backup_db(db_path: str) -> str:
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_path = f"{db_path}.pre_cleanup_{ts}"
+    print(f"💾 Backup: {backup_path}")
+    shutil.copy2(db_path, backup_path)
+    size_mb = os.path.getsize(backup_path) / 1024 / 1024
+    print(f"   ✅ {size_mb:.1f} MB guardados")
+    return backup_path
+
+
+def get_conn(db_path: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(db_path)
+    conn.execute('PRAGMA journal_mode=DELETE')   # WAL no es compatible con VACUUM
+    conn.execute('PRAGMA foreign_keys=OFF')
+    return conn
+
+
+def verify_migration_complete(conn: sqlite3.Connection) -> bool:
+    """Comprueba que la migración se ejecutó antes de limpiar."""
+    cur = conn.cursor()
+    for table in ('artists', 'albums', 'tracks'):
+        row = cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        ).fetchone()
+        if not row:
+            print(f"❌ Tabla canónica '{table}' no encontrada.")
+            print("   Ejecuta primero migrate_to_normalized_schema.py")
+            return False
+
+    # Verificar que las FKs están pobladas en scrobbles
+    total   = cur.execute("SELECT COUNT(*) FROM scrobbles").fetchone()[0]
+    with_id = cur.execute("SELECT COUNT(*) FROM scrobbles WHERE artist_id IS NOT NULL").fetchone()[0]
+    if total > 0 and with_id / total < 0.8:
+        print(f"⚠️  Solo el {with_id/total*100:.1f}% de scrobbles tiene artist_id.")
+        print("   ¿Seguro que la migración terminó correctamente?")
+        answer = input("   Continuar igualmente? (y/N): ").strip().lower()
+        if answer != 'y':
+            return False
+
+    return True
+
+
+def show_size_report(conn: sqlite3.Connection, label: str):
+    """Muestra tamaño aproximado por tabla."""
+    cur = conn.cursor()
+    print(f"\n📊 {label}")
+    rows = cur.execute("""
+        SELECT name, SUM(payload) AS bytes
+        FROM (
+            SELECT name, payload FROM dbstat
+        )
+        GROUP BY name
+        ORDER BY bytes DESC
+        LIMIT 20
+    """).fetchall()
+    for name, size in rows:
+        print(f"   {name:<40} {size/1024/1024:>7.2f} MB")
+
+
+def drop_legacy_tables(conn: sqlite3.Connection):
+    print("\n🗑️  Eliminando tablas legacy redundantes...")
+    cur = conn.cursor()
+    existing = {r[0] for r in cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+
+    for table in LEGACY_TABLES_TO_DROP:
+        if table in existing:
+            cur.execute(f"DROP TABLE {table}")
+            print(f"   ✅ DROP TABLE {table}")
         else:
-            if not any(status_before['has_mbid_columns'].values()) and not any(status_before['has_detail_tables'].values()):
-                print(f"\n💡 PRÓXIMO PASO RECOMENDADO:")
-                print(f"   • Tu base de datos usa la estructura original")
-                print(f"   • Ejecutar: python update_database_optimized.py --all")
-                print(f"   • Esto creará la nueva estructura y descargará con MBIDs")
-            else:
-                print(f"\n⚠️ NOTA:")
-                print(f"   • No se encontraron MBIDs para retroalimentar")
-                print(f"   • Las columnas/tablas están creadas pero vacías")
-                print(f"   • Ejecutar: python update_database_optimized.py --enrich")
+            print(f"   ⏭️  {table} no existe")
 
-    def close(self):
-        self.conn.close()
+    conn.commit()
+
+
+def drop_redundant_indexes(conn: sqlite3.Connection):
+    print("\n🗑️  Eliminando índices redundantes...")
+    cur = conn.cursor()
+    existing = {r[0] for r in cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='index'"
+    ).fetchall()}
+
+    for idx in REDUNDANT_INDEXES_TO_DROP:
+        if idx in existing:
+            cur.execute(f"DROP INDEX {idx}")
+            print(f"   ✅ DROP INDEX {idx}")
+        else:
+            print(f"   ⏭️  {idx} no existe")
+
+    conn.commit()
+
+
+def drop_mbid_text_columns_scrobbles(conn: sqlite3.Connection):
+    """
+    Elimina las columnas artist_mbid/album_mbid/track_mbid de scrobbles
+    (ya están en artists/albums/tracks).
+    SQLite no soporta DROP COLUMN hasta la versión 3.35 — usamos recreación.
+    """
+    cur = conn.cursor()
+
+    # Verificar versión de SQLite
+    version = cur.execute("SELECT sqlite_version()").fetchone()[0]
+    major, minor, *_ = (int(x) for x in version.split('.'))
+
+    if major > 3 or (major == 3 and minor >= 35):
+        print(f"\n🗑️  Eliminando columnas *_mbid de scrobbles (SQLite {version})...")
+        for col in ('artist_mbid', 'album_mbid', 'track_mbid'):
+            try:
+                cur.execute(f"ALTER TABLE scrobbles DROP COLUMN {col}")
+                print(f"   ✅ DROP COLUMN scrobbles.{col}")
+            except Exception as e:
+                print(f"   ⏭️  {col}: {e}")
+        conn.commit()
+    else:
+        print(f"\n⚠️  SQLite {version} < 3.35 — no soporta DROP COLUMN.")
+        print("   Las columnas *_mbid en scrobbles se conservan (impacto mínimo).")
+
+
+def remove_text_columns_via_recreate(conn: sqlite3.Connection):
+    """
+    Elimina las columnas de texto 'artist', 'track', 'album' de scrobbles
+    ahora que los IDs son la fuente de verdad.
+
+    ⚠️  OPERACIÓN PESADA: recrea la tabla completa.
+    Se omite por defecto; activar con --drop-text-cols.
+    """
+    print("\n⚙️  Recreando tabla scrobbles sin columnas de texto...")
+
+    cur = conn.cursor()
+    total = cur.execute("SELECT COUNT(*) FROM scrobbles").fetchone()[0]
+    print(f"   {total:,} filas a mover...")
+
+    cur.executescript("""
+        CREATE TABLE scrobbles_new (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user       TEXT    NOT NULL,
+            timestamp  INTEGER NOT NULL,
+            artist_id  INTEGER NOT NULL REFERENCES artists(artist_id),
+            album_id   INTEGER REFERENCES albums(album_id),
+            track_id   INTEGER REFERENCES tracks(track_id),
+            UNIQUE(user, timestamp, artist_id)
+        );
+
+        INSERT INTO scrobbles_new (id, user, timestamp, artist_id, album_id, track_id)
+        SELECT id, user, timestamp, artist_id, album_id, track_id
+        FROM scrobbles
+        WHERE artist_id IS NOT NULL;
+
+        DROP TABLE scrobbles;
+        ALTER TABLE scrobbles_new RENAME TO scrobbles;
+
+        CREATE INDEX IF NOT EXISTS idx_scrobbles_user_ts    ON scrobbles(user, timestamp);
+        CREATE INDEX IF NOT EXISTS idx_scrobbles_artist_id  ON scrobbles(artist_id);
+        CREATE INDEX IF NOT EXISTS idx_scrobbles_album_id   ON scrobbles(album_id);
+        CREATE INDEX IF NOT EXISTS idx_scrobbles_track_id   ON scrobbles(track_id);
+        CREATE INDEX IF NOT EXISTS idx_scrobbles_user_art   ON scrobbles(user, artist_id);
+        CREATE INDEX IF NOT EXISTS idx_scrobbles_user_alb   ON scrobbles(user, album_id);
+    """)
+    conn.commit()
+    print("   ✅ Tabla scrobbles recreada sin columnas de texto")
+
+
+def vacuum_db(db_path: str):
+    """VACUUM necesita conexión sin WAL activo."""
+    print("\n🗜️  Ejecutando VACUUM (esto puede tardar varios minutos)...")
+    size_before = os.path.getsize(db_path) / 1024 / 1024
+    start = time.time()
+
+    # VACUUM requiere conexión limpia
+    conn = sqlite3.connect(db_path)
+    conn.execute("VACUUM")
+    conn.close()
+
+    elapsed = time.time() - start
+    size_after = os.path.getsize(db_path) / 1024 / 1024
+    saved = size_before - size_after
+
+    print(f"   ✅ VACUUM completado en {elapsed:.1f}s")
+    print(f"   📦 {size_before:.1f} MB  →  {size_after:.1f} MB  (−{saved:.1f} MB)")
 
 
 def main():
-    if len(sys.argv) > 1:
-        db_path = sys.argv[1]
-    else:
-        db_path = 'lastfm_cache.db'
+    import argparse
+    parser = argparse.ArgumentParser(description='Limpieza post-migración y reducción de tamaño')
+    parser.add_argument('--db',             default=DEFAULT_DB, help=f'Ruta DB (default: {DEFAULT_DB})')
+    parser.add_argument('--no-backup',      action='store_true', help='Saltar backup')
+    parser.add_argument('--drop-text-cols', action='store_true',
+                        help='⚠️  Eliminar columnas artist/track/album de scrobbles (máximo ahorro, operación pesada)')
+    parser.add_argument('--dry-run',        action='store_true', help='Solo mostrar qué se haría')
+    args = parser.parse_args()
 
-    try:
-        migrator = MigrationHelper(db_path)
-        migrator.run_migration()
-    except sqlite3.Error as e:
-        print(f"❌ Error de base de datos: {e}")
+    db_path = args.db
+    if not os.path.exists(db_path):
+        print(f"❌ No encontrada: {db_path}")
         sys.exit(1)
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
+
+    size_initial = os.path.getsize(db_path) / 1024 / 1024
+    print("=" * 60)
+    print("🧹 CLEANUP POST-MIGRACIÓN")
+    print("=" * 60)
+    print(f"🗄️  {db_path}  ({size_initial:.1f} MB)")
+
+    if args.dry_run:
+        print("\n[DRY RUN — no se modifica nada]")
+        print("Se eliminarían:")
+        for t in LEGACY_TABLES_TO_DROP:
+            print(f"  TABLE  {t}")
+        for i in REDUNDANT_INDEXES_TO_DROP:
+            print(f"  INDEX  {i}")
+        if args.drop_text_cols:
+            print("  COLUMNS scrobbles.(artist, track, album)  [recreación completa]")
+        return
+
+    conn = get_conn(db_path)
+
+    if not verify_migration_complete(conn):
+        conn.close()
         sys.exit(1)
-    finally:
-        if 'migrator' in locals():
-            migrator.close()
+
+    if not args.no_backup:
+        conn.close()
+        backup_db(db_path)
+        conn = get_conn(db_path)
+
+    show_size_report(conn, "Tamaño por tabla ANTES")
+
+    drop_legacy_tables(conn)
+    drop_redundant_indexes(conn)
+    drop_mbid_text_columns_scrobbles(conn)
+
+    if args.drop_text_cols:
+        print("\n⚠️  --drop-text-cols activado: eliminando columnas de texto de scrobbles")
+        print("   Esto elimina artist/track/album como strings — asegúrate de que")
+        print("   todos tus scripts usan los IDs o hacen JOIN.")
+        answer = input("   Confirmar? (y/N): ").strip().lower()
+        if answer == 'y':
+            remove_text_columns_via_recreate(conn)
+        else:
+            print("   Omitido.")
+
+    show_size_report(conn, "Tamaño por tabla DESPUÉS (antes de VACUUM)")
+    conn.close()
+
+    vacuum_db(db_path)
+
+    size_final = os.path.getsize(db_path) / 1024 / 1024
+    print(f"\n✨ LIMPIEZA COMPLETADA")
+    print(f"   {size_initial:.1f} MB  →  {size_final:.1f} MB  (−{size_initial - size_final:.1f} MB)")
+
+    if not args.drop_text_cols:
+        print("""
+💡 Para máximo ahorro ejecuta también con --drop-text-cols:
+   Elimina las columnas artist/track/album (texto) de la tabla scrobbles,
+   que es la más grande. Solo hazlo cuando todos tus scripts usen los IDs.
+   Ahorro estimado adicional: 150-250 MB según tu volumen de scrobbles.
+""")
 
 
 if __name__ == '__main__':

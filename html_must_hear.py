@@ -10,6 +10,14 @@ from html import unescape
 from pathlib import Path
 from datetime import datetime
 
+# Optional clients — imported lazily so the script works without them
+def _try_import(mod):
+    try:
+        import importlib
+        return importlib.import_module(mod)
+    except ImportError:
+        return None
+
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 DEFAULT_SERIES = "https://musicbrainz.org/series/4bc2a338-e1d8-4546-8a61-640da8aaf888"
 UA = "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
@@ -114,66 +122,222 @@ def fetch_series(series_url: str, cache_file: Path) -> list[dict]:
     print(f"✅ {len(all_items)} álbumes scrapeados → {cache_file}")
     return all_items
 
-def fetch_descriptions(cache_file: Path) -> dict:
-    """Scrape 1001albumsgenerator.com/albums for Spotify IDs and descriptions.
-    Returns dict keyed by normalized 'artist|||title'.
-    Cached to avoid repeated scrapes."""
-    desc_cache = cache_file.parent / "descriptions_cache.json"
+def fetch_descriptions_1001(cache_file: Path) -> dict:
+    """Scrape 1001albumsgenerator.com for Spotify IDs + descriptions.
+    Returns dict keyed by _norm(artist)+'|||'+_norm(title)."""
+    desc_cache = cache_file.parent / "descriptions_1001_cache.json"
     if desc_cache.exists():
-        print(f"📦 Descripciones en caché: {desc_cache}")
+        print(f"  📦 1001gen caché: {desc_cache}")
         return json.loads(desc_cache.read_text())
 
-    print("🌐 Scrapeando 1001albumsgenerator.com/albums...")
-    html = curl_get(GEN_INDEX)
+    print("  🌐 Scrapeando 1001albumsgenerator.com/albums...")
+    html = curl_get("https://1001albumsgenerator.com/albums")
     if not html:
-        print("  ⚠ No se pudo obtener la página de descripciones")
+        print("  ⚠ No se pudo obtener la página")
         return {}
 
-    # Parse rows: /albums/<spotify_id>  →  title, artist, spotify_id
-    # Each row also has a detail page we can scrape for description
     rows = re.findall(
         r'href="/albums/([A-Za-z0-9]{22})"[^>]*>\s*([^<]+)</a>.*?'
         r'href="/artists/[^"]*"[^>]*>\s*([^<]+)</a>',
         html, re.DOTALL
     )
-
     data = {}
     for spotify_id, title, artist in rows:
         key = _norm(artist.strip()) + "|||" + _norm(title.strip())
-        data[key] = {
-            "spotify_id": spotify_id,
-            "title":      title.strip(),
-            "artist":     artist.strip(),
-            "desc":       "",
-        }
+        data[key] = {"spotify_id": spotify_id, "title": title.strip(),
+                     "artist": artist.strip(), "desc": ""}
 
-    print(f"  ✅ {len(data)} álbumes con ID de Spotify")
+    print(f"  ✅ {len(data)} álbumes con Spotify ID")
 
-    # Scrape detail pages for descriptions (batch, with delay)
     items = list(data.items())
     for i, (key, info) in enumerate(items):
-        sid = info["spotify_id"]
-        url = f"https://1001albumsgenerator.com/albums/{sid}"
         if i % 50 == 0:
-            print(f"  📄 Descripciones {i}/{len(items)}...")
-        dhtml = curl_get(url)
-        # Look for description block: <p class="...description..."> or <div class="album-description">
-        m = re.search(r'<(?:p|div)[^>]*class="[^"]*(?:description|about)[^"]*"[^>]*>(.*?)</(?:p|div)>', dhtml, re.DOTALL | re.IGNORECASE)
-        if not m:
-            # fallback: first long <p> in main content
-            paras = re.findall(r'<p[^>]*>((?:[^<]|<(?!/?p))*)</p>', dhtml, re.DOTALL)
-            for p in paras:
+            print(f"  📄 Desc {i}/{len(items)}...")
+        dhtml = curl_get(f"https://1001albumsgenerator.com/albums/{info['spotify_id']}")
+        m = re.search(r'<(?:p|div)[^>]*class="[^"]*(?:description|about)[^"]*"[^>]*>(.*?)</(?:p|div)>',
+                      dhtml, re.DOTALL | re.IGNORECASE)
+        if m:
+            info["desc"] = re.sub(r'<[^>]+>', '', m.group(1)).strip()[:800]
+        else:
+            for p in re.findall(r'<p[^>]*>((?:[^<]|<(?!/?p))*)</p>', dhtml, re.DOTALL):
                 clean = re.sub(r'<[^>]+>', '', p).strip()
                 if len(clean) > 120:
                     info["desc"] = clean[:800]
                     break
-        else:
-            info["desc"] = re.sub(r'<[^>]+>', '', m.group(1)).strip()[:800]
         time.sleep(0.3)
 
     desc_cache.write_text(json.dumps(data, ensure_ascii=False, indent=2))
-    print(f"  💾 Guardado en {desc_cache}")
+    print(f"  💾 {desc_cache}")
     return data
+
+
+def fetch_album_info_spotify(albums: list, cache_file: Path,
+                              client_id: str, client_secret: str) -> dict:
+    """Fetch Spotify IDs + album descriptions via spotipy.
+    Returns dict keyed by _norm(artist)+'|||'+_norm(title)."""
+    sp_cache = cache_file.parent / "descriptions_spotify_cache.json"
+    if sp_cache.exists():
+        cached = json.loads(sp_cache.read_text())
+        # Only skip if all albums are already there
+        missing = [a for a in albums
+                   if (_norm(a["artist"]) + "|||" + _norm(a["title"])) not in cached]
+        if not missing:
+            print(f"  📦 Spotify caché completo: {sp_cache}")
+            return cached
+        print(f"  📦 Spotify caché parcial: {len(cached)} entradas, {len(missing)} nuevas")
+    else:
+        cached = {}
+        missing = albums
+
+    spotipy = _try_import("spotipy")
+    if not spotipy:
+        print("  ⚠ spotipy no disponible. Instala con: pip install spotipy --break-system-packages")
+        return cached
+
+    from spotipy.oauth2 import SpotifyClientCredentials
+    sp = spotipy.Spotify(auth_manager=SpotifyClientCredentials(
+        client_id=client_id, client_secret=client_secret))
+
+    print(f"  🎵 Buscando {len(missing)} álbumes en Spotify...")
+    for i, album in enumerate(missing):
+        if i % 20 == 0:
+            print(f"    {i}/{len(missing)}...")
+        key = _norm(album["artist"]) + "|||" + _norm(album["title"])
+        try:
+            q = f"album:{album['title']} artist:{album['artist']}"
+            results = sp.search(q=q, type="album", limit=1)
+            items = results.get("albums", {}).get("items", [])
+            if items:
+                item = items[0]
+                cached[key] = {
+                    "spotify_id": item["id"],
+                    "title":      item["name"],
+                    "artist":     ", ".join(a["name"] for a in item["artists"]),
+                    "desc":       "",   # Spotify API doesn't have album descriptions
+                    "spotify_url": item["external_urls"].get("spotify", ""),
+                }
+            else:
+                cached[key] = {"spotify_id": "", "title": album["title"],
+                                "artist": album["artist"], "desc": "", "spotify_url": ""}
+        except Exception as e:
+            print(f"    ⚠ {album['artist']} – {album['title']}: {e}")
+            cached[key] = {"spotify_id": "", "title": album["title"],
+                           "artist": album["artist"], "desc": "", "spotify_url": ""}
+        time.sleep(0.1)
+
+    sp_cache.write_text(json.dumps(cached, ensure_ascii=False, indent=2))
+    print(f"  💾 {sp_cache}")
+    return cached
+
+
+def fetch_album_info_lastfm(albums: list, cache_file: Path,
+                             api_key: str, api_secret: str) -> dict:
+    """Fetch album wiki/bio via pylast (Last.fm).
+    Returns dict keyed by _norm(artist)+'|||'+_norm(title).
+    Merges with existing data (keeps spotify_id if already present)."""
+    lfm_cache = cache_file.parent / "descriptions_lastfm_cache.json"
+    if lfm_cache.exists():
+        cached = json.loads(lfm_cache.read_text())
+        missing = [a for a in albums
+                   if (_norm(a["artist"]) + "|||" + _norm(a["title"])) not in cached]
+        if not missing:
+            print(f"  📦 Last.fm caché completo: {lfm_cache}")
+            return cached
+        print(f"  📦 Last.fm caché parcial: {len(cached)}, {len(missing)} nuevos")
+    else:
+        cached = {}
+        missing = albums
+
+    pylast = _try_import("pylast")
+    if not pylast:
+        print("  ⚠ pylast no disponible. Instala con: pip install pylast --break-system-packages")
+        return cached
+
+    network = pylast.LastFMNetwork(api_key=api_key, api_secret=api_secret)
+    print(f"  🎙 Obteniendo info Last.fm de {len(missing)} álbumes...")
+
+    for i, album in enumerate(missing):
+        if i % 50 == 0:
+            print(f"    {i}/{len(missing)}...")
+        key = _norm(album["artist"]) + "|||" + _norm(album["title"])
+        entry = cached.get(key, {"spotify_id": "", "title": album["title"],
+                                  "artist": album["artist"], "desc": ""})
+        try:
+            lfm_album = network.get_album(album["artist"], album["title"])
+            wiki = lfm_album.get_wiki_summary() or ""
+            # strip Last.fm "Read more" anchor
+            wiki = re.sub(r'<a href="[^"]*last\.fm[^"]*"[^>]*>[^<]*</a>', '', wiki)
+            wiki = re.sub(r'<[^>]+>', '', wiki).strip()
+            entry["desc"] = wiki[:800] if wiki else entry.get("desc", "")
+        except Exception:
+            # Try artist bio as fallback
+            try:
+                artist = network.get_artist(album["artist"])
+                bio = artist.get_bio_summary() or ""
+                bio = re.sub(r'<a href="[^"]*last\.fm[^"]*"[^>]*>[^<]*</a>', '', bio)
+                bio = re.sub(r'<[^>]+>', '', bio).strip()
+                entry["desc"] = bio[:800] if bio else entry.get("desc", "")
+            except Exception:
+                pass
+        cached[key] = entry
+        time.sleep(0.25)
+
+    lfm_cache.write_text(json.dumps(cached, ensure_ascii=False, indent=2))
+    print(f"  💾 {lfm_cache}")
+    return cached
+
+
+def fetch_album_info(albums: list, cache_file: Path, args) -> dict:
+    """Dispatcher: choose info source based on CLI args.
+    Priority: --1001-albums > --spotify-* > --lastfm-*
+    Multiple sources are merged (1001gen wins for desc if available)."""
+    desc_db = {}
+
+    use_1001  = getattr(args, "gen_1001", False)
+    sp_id     = getattr(args, "spotify_client_id",     None)
+    sp_secret = getattr(args, "spotify_client_secret", None)
+    lfm_key   = getattr(args, "lastfm_api_key",        None)
+    lfm_secret= getattr(args, "lastfm_api_secret",     None)
+
+    if not any([use_1001, sp_id, lfm_key]):
+        print("ℹ️  Sin fuente de descripciones (usa --1001-albums, --spotify-client-id/secret o --lastfm-api-key/secret)")
+        return {}
+
+    # Layer sources from lowest to highest priority
+    if lfm_key and lfm_secret:
+        print("\n📡 Fuente: Last.fm")
+        lfm_data = fetch_album_info_lastfm(albums, cache_file, lfm_key, lfm_secret)
+        desc_db.update(lfm_data)
+
+    if sp_id and sp_secret:
+        print("\n📡 Fuente: Spotify")
+        sp_data = fetch_album_info_spotify(albums, cache_file, sp_id, sp_secret)
+        # Merge: keep existing desc if spotify has none
+        for k, v in sp_data.items():
+            if k in desc_db:
+                desc_db[k]["spotify_id"]  = v.get("spotify_id", "")
+                desc_db[k]["spotify_url"] = v.get("spotify_url", "")
+                if v.get("desc"):
+                    desc_db[k]["desc"] = v["desc"]
+            else:
+                desc_db[k] = v
+
+    if use_1001:
+        print("\n📡 Fuente: 1001albumsgenerator.com")
+        data_1001 = fetch_descriptions_1001(cache_file)
+        # 1001gen wins: overwrite desc + spotify_id
+        for k, v in data_1001.items():
+            if k in desc_db:
+                desc_db[k]["spotify_id"] = v.get("spotify_id", desc_db[k].get("spotify_id",""))
+                if v.get("desc"):
+                    desc_db[k]["desc"] = v["desc"]
+            else:
+                desc_db[k] = v
+
+    found = sum(1 for v in desc_db.values() if v.get("desc"))
+    print(f"\n  📖 {found}/{len(desc_db)} álbumes con descripción")
+    return desc_db
+
 
 # ── DATABASE ──────────────────────────────────────────────────────────────────
 
@@ -229,15 +393,16 @@ def album_to_json(album: dict, heard: bool, desc_db: dict = None) -> dict:
     key = _norm(album.get("artist","")) + "|||" + _norm(album.get("title",""))
     info = (desc_db or {}).get(key, {})
     return {
-        "n":         album["number"],
-        "title":     album["title"],
-        "artist":    album["artist"],
-        "year":      album["year"],
-        "mbid":      album["mbid"],
-        "heard":     heard,
-        "cover":     f"{CAA}/{album['mbid']}/front-250",
+        "n":          album["number"],
+        "title":      album["title"],
+        "artist":     album["artist"],
+        "year":       album["year"],
+        "mbid":       album["mbid"],
+        "heard":      heard,
+        "cover":      f"{CAA}/{album['mbid']}/front-250",
         "spotify_id": info.get("spotify_id", ""),
-        "desc":      info.get("desc", ""),
+        "spotify_url":info.get("spotify_url", ""),
+        "desc":       info.get("desc", ""),
     }
 
 def render_user_html(user: str, albums_data: list[dict], series_name: str) -> str:
@@ -690,9 +855,9 @@ function openPanel(a, cardEl) {{
 
   // Links
   const mbUrl      = `https://musicbrainz.org/release-group/${{a.mbid}}`;
-  const spotifyUrl = a.spotify_id
-    ? `https://open.spotify.com/album/${{a.spotify_id}}`
-    : `https://open.spotify.com/search/${{encodeURIComponent(a.artist + ' ' + a.title)}}`;
+  const spotifyUrl = a.spotify_url
+    || (a.spotify_id ? `https://open.spotify.com/album/${{a.spotify_id}}`
+    : `https://open.spotify.com/search/${{encodeURIComponent(a.artist + ' ' + a.title)}}`);
   const gen1001Url = a.spotify_id
     ? `https://1001albumsgenerator.com/albums/${{a.spotify_id}}`
     : '';
@@ -879,7 +1044,7 @@ setTimeout(() => {{
 """
 
 
-def render_index_html(users_data: list[dict], series_name: str, generated: str) -> str:
+def render_collection_index_html(users_data: list[dict], series_name: str, generated: str) -> str:
     cards_html = ""
     for u in users_data:
         pct  = u["pct"]
@@ -1057,7 +1222,7 @@ def render_index_html(users_data: list[dict], series_name: str, generated: str) 
 </head>
 <body>
 <header>
-  <div class="site-label">Must Hear Tracker</div>
+  <div class="site-label"><a href="../index.html" style="color:var(--muted);text-decoration:none;letter-spacing:.2em">← All Collections</a></div>
   <h1>{series_name}</h1>
   <div class="header-meta">
     <span>{len(users_data)}</span> users &nbsp;·&nbsp;
@@ -1076,23 +1241,224 @@ def render_index_html(users_data: list[dict], series_name: str, generated: str) 
 </html>
 """
 
+
+def render_root_index_html(collections: list[dict], generated: str) -> str:
+    """Top-level index listing all music collections."""
+    cards_html = ""
+    for c in collections:
+        avg_pct  = c["avg_pct"]
+        users_n  = c["users"]
+        total    = c["total"]
+        cards_html += f"""
+      <a class="col-card" href="{c['slug']}/index.html">
+        <div class="col-name">{c['name']}</div>
+        <div class="col-meta">{users_n} users &middot; {total} albums</div>
+        <div class="col-bar-wrap">
+          <div class="col-bar" style="width:{avg_pct:.1f}%"></div>
+        </div>
+        <div class="col-pct">{avg_pct:.1f}% avg completion</div>
+      </a>"""
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Must Hear — Collections</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {{
+    --bg:#0a0a0a; --surface:#111; --border:#1e1e1e;
+    --accent:#e8ff47; --muted:#555; --text:#e0e0e0;
+  }}
+  *, *::before, *::after {{ box-sizing:border-box; margin:0; padding:0; }}
+  body {{
+    background:var(--bg); color:var(--text);
+    font-family:'DM Sans',sans-serif; min-height:100vh;
+  }}
+  body::before {{
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.4;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  }}
+  header {{
+    position:relative; z-index:1;
+    padding:60px 60px 40px;
+    border-bottom:1px solid var(--border);
+  }}
+  .site-label {{
+    font-family:'DM Mono',monospace; font-size:.7rem;
+    letter-spacing:.2em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:12px;
+  }}
+  h1 {{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(2.4rem,6vw,5rem);
+    letter-spacing:.04em; line-height:.95; color:var(--accent);
+  }}
+  .header-meta {{
+    font-family:'DM Mono',monospace; font-size:.72rem;
+    color:var(--muted); margin-top:16px;
+  }}
+  main {{ position:relative; z-index:1; padding:40px 60px 80px; }}
+  .section-label {{
+    font-family:'DM Mono',monospace; font-size:.65rem;
+    letter-spacing:.2em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:20px;
+  }}
+  .collections-grid {{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:16px;
+  }}
+  .col-card {{
+    display:block; text-decoration:none;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:6px; padding:26px 22px 20px;
+    transition:border-color .15s, transform .15s;
+    position:relative; overflow:hidden;
+  }}
+  .col-card::after {{
+    content:''; position:absolute; top:0; left:0; right:0;
+    height:3px; background:var(--accent);
+    transform:scaleX(0); transform-origin:left;
+    transition:transform .25s ease;
+  }}
+  .col-card:hover {{ border-color:#333; transform:translateY(-2px); }}
+  .col-card:hover::after {{ transform:scaleX(1); }}
+  .col-name {{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:1.6rem; letter-spacing:.05em;
+    color:var(--text); margin-bottom:8px; line-height:1.1;
+  }}
+  .col-meta {{
+    font-family:'DM Mono',monospace; font-size:.65rem;
+    color:var(--muted); margin-bottom:14px;
+  }}
+  .col-bar-wrap {{
+    height:3px; background:var(--border);
+    border-radius:2px; overflow:hidden; margin-bottom:6px;
+  }}
+  .col-bar {{
+    height:100%; background:var(--accent);
+    border-radius:2px; transition:width .8s ease;
+  }}
+  .col-pct {{
+    font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted);
+  }}
+  footer {{
+    position:relative; z-index:1;
+    padding:24px 60px; border-top:1px solid var(--border);
+    font-family:'DM Mono',monospace; font-size:.65rem; color:var(--muted);
+  }}
+  @media (max-width:700px) {{
+    header,main,footer {{ padding-left:20px; padding-right:20px; }}
+    header {{ padding-top:36px; }}
+  }}
+</style>
+</head>
+<body>
+<header>
+  <div class="site-label">Must Hear Tracker</div>
+  <h1>Collections</h1>
+  <div class="header-meta">
+    {len(collections)} collection{'s' if len(collections) != 1 else ''} &nbsp;&middot;&nbsp;
+    Generated {generated}
+  </div>
+</header>
+<main>
+  <div class="section-label">All Lists</div>
+  <div class="collections-grid">{cards_html}
+  </div>
+</main>
+<footer>Generated {generated}</footer>
+</body>
+</html>
+"""
+
+
+def update_root_index(root_dir: Path, collection_name: str, slug: str,
+                      users_index: list[dict], generated: str) -> None:
+    """Read existing root index data (if any), upsert this collection, rewrite."""
+    meta_file = root_dir / ".collections_meta.json"
+
+    # Load existing metadata
+    if meta_file.exists():
+        collections = json.loads(meta_file.read_text())
+    else:
+        collections = []
+
+    # Compute avg completion for this collection
+    avg_pct = (sum(u["pct"] for u in users_index) / len(users_index)) if users_index else 0
+    total   = users_index[0]["total"] if users_index else 0
+
+    entry = {
+        "slug":    slug,
+        "name":    collection_name,
+        "users":   len(users_index),
+        "total":   total,
+        "avg_pct": round(avg_pct, 1),
+        "updated": generated,
+    }
+
+    # Upsert by slug
+    existing = [c for c in collections if c["slug"] != slug]
+    existing.append(entry)
+    existing.sort(key=lambda c: c["name"])
+
+    meta_file.write_text(json.dumps(existing, ensure_ascii=False, indent=2))
+
+    # Render and write root index
+    html = render_root_index_html(existing, generated)
+    (root_dir / "index.html").write_text(html, encoding="utf-8")
+    print(f"📋 root index → {root_dir / 'index.html'} ({len(existing)} collections)")
+
+
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="1001 Albums Must Hear — HTML Generator")
     parser.add_argument("--db",     required=True, help="Ruta a lastfm_cache.db")
-    parser.add_argument("--out",    default="docs/must_hear", help="Directorio de salida")
+    parser.add_argument("--out",    default="docs/must_hear",
+                        help="Directorio raíz de salida (contiene el index superior)")
     parser.add_argument("--series", default=DEFAULT_SERIES, help="URL de la serie en MusicBrainz")
-    parser.add_argument("--name",   default="1001 Albums You Must Hear Before You Die", help="Nombre de la serie")
-    parser.add_argument("--cache",  default="series_cache.json", help="Caché local del scraping")
-    parser.add_argument("--users",      nargs="*", help="Usuarios específicos (por defecto todos)")
-    parser.add_argument("--from-cache",  action="store_true", help="No re-scrapear series, solo actualizar HTMLs con la DB")
+    parser.add_argument("--name",   default="1001 Albums You Must Hear Before You Die",
+                        help="Nombre de la serie (usado en títulos y en el index superior)")
+    parser.add_argument("--slug",   default=None,
+                        help="Nombre del subdirectorio para esta colección (auto si no se indica)")
+    parser.add_argument("--cache",  default=None,
+                        help="Caché local del scraping (por defecto <out>/<slug>/series_cache.json)")
+    parser.add_argument("--users",       nargs="*", help="Usuarios específicos (por defecto todos)")
+    parser.add_argument("--from-cache",  action="store_true",
+                        help="No re-scrapear series, solo actualizar HTMLs con la DB")
+    # ── Fuentes de descripción (opcionales, combinables) ──
+    parser.add_argument("--1001-albums", dest="gen_1001", action="store_true",
+                        help="Scrape 1001albumsgenerator.com para descripciones y Spotify IDs")
+    parser.add_argument("--spotify-client-id",     dest="spotify_client_id",     default=None,
+                        help="Spotify API client_id (para buscar álbumes)")
+    parser.add_argument("--spotify-client-secret", dest="spotify_client_secret", default=None,
+                        help="Spotify API client_secret")
+    parser.add_argument("--lastfm-api-key",        dest="lastfm_api_key",        default=None,
+                        help="Last.fm API key (para wiki de álbumes/artistas)")
+    parser.add_argument("--lastfm-api-secret",     dest="lastfm_api_secret",     default=None,
+                        help="Last.fm API secret")
     args = parser.parse_args()
 
-    out_dir = Path(args.out)
+    root_dir = Path(args.out)
+    root_dir.mkdir(parents=True, exist_ok=True)
+
+    # Slug: directorio de esta colección dentro del root
+    if args.slug:
+        slug = args.slug
+    else:
+        # Auto-slug from series name: lowercase, spaces→underscores, strip non-alnum
+        slug = re.sub(r"[^a-z0-9]+", "_", args.name.lower()).strip("_")
+        slug = re.sub(r"_+", "_", slug)
+
+    out_dir = root_dir / slug
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    cache_path = Path(args.cache)
+    cache_path = Path(args.cache) if args.cache else out_dir / "series_cache.json"
 
     # 1. Obtener lista de álbumes
     if args.from_cache:
@@ -1105,8 +1471,8 @@ def main():
         albums = fetch_series(args.series, cache_path)
         print(f"\n🎵 {len(albums)} álbumes en la serie")
 
-    # 1b. Descripciones de 1001albumsgenerator.com
-    desc_db = fetch_descriptions(cache_path)
+    # 1b. Descripciones / info de álbumes
+    desc_db = fetch_album_info(albums, cache_path, args)
 
     # 2. Obtener usuarios
     users = args.users or get_users(args.db)
@@ -1142,13 +1508,16 @@ def main():
             "pct":   pct,
         })
 
-    # 4. Index
+    # 4. Collection index (usuarios de esta colección)
     users_index.sort(key=lambda u: u["pct"], reverse=True)
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
-    index_html = render_index_html(users_index, args.name, generated)
+    index_html = render_collection_index_html(users_index, args.name, generated)
     (out_dir / "index.html").write_text(index_html, encoding="utf-8")
-    print(f"\n📋 index.html → {out_dir / 'index.html'}")
-    print(f"\n🎉 Listo! Abre: {out_dir / 'index.html'}")
+    print(f"\n📋 collection index → {out_dir / 'index.html'}")
+
+    # 5. Root index (agrupa todas las colecciones)
+    update_root_index(root_dir, args.name, slug, users_index, generated)
+    print(f"\n🎉 Listo! Abre: {root_dir / 'index.html'}")
 
 if __name__ == "__main__":
     main()

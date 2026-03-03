@@ -54,7 +54,7 @@ def parse_page(html: str) -> list[dict]:
         })
     return items
 
-def fetch_page_with_retry(url: str, retries: int = 10, delay: float = 10.0) -> str:
+def fetch_page_with_retry(url: str, retries: int = 3, delay: float = 3.0) -> str:
     for attempt in range(retries):
         html = curl_get(url)
         rows = re.findall(r'<tr class="(?:odd|even)">', html)
@@ -132,11 +132,29 @@ def get_user_albums(db_path: str, user: str) -> set[tuple]:
     return {(_norm(r[0]), _norm(r[1])) for r in rows}
 
 def check_heard(user_albums: set, album: dict) -> bool:
-    """Match by normalized (title, artist). Artist match is fuzzy (substring)."""
+    """Match by normalized (title, artist).
+    Title: canonical title must be contained in the scrobble title OR vice-versa
+           (handles remasters, editions, bonus discs, e.g.
+            'boston' matches 'boston2000remaster', 'bostondeluxeedition', etc.)
+    Artist: fuzzy substring match in either direction.
+    """
     a_n = _norm(album["artist"])
     t_n = _norm(album["title"])
+    if not t_n:
+        return False
     for ua, ut in user_albums:
-        if t_n == ut and (not a_n or a_n in ua or ua in a_n):
+        if not ut:
+            continue
+        # Title match: exact, canonical-in-scrobble, or scrobble-in-canonical (min 80% length)
+        title_match = (
+            t_n == ut or
+            t_n in ut or
+            (ut in t_n and len(ut) >= len(t_n) * 0.8)
+        )
+        if not title_match:
+            continue
+        # Artist match: substring in either direction
+        if not a_n or a_n in ua or ua in a_n:
             return True
     return False
 

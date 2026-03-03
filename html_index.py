@@ -810,6 +810,9 @@ def generate_index_html(files):
                     <a href="/personales/index.html" class="tab-link">Individuales</a>
                 </li>
                 <li>
+                    <a href="/must_hear/index.html" class="tab-link">Must Hear</a>
+                </li>
+                <li>
                     <a href="#about" class="tab-link" data-tab="about">Acerca de</a>
                 </li>
             </ul>

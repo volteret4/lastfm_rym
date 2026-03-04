@@ -1567,7 +1567,7 @@ header{
   position:fixed;top:0;left:0;right:var(--panel);height:var(--header-h);z-index:100;
   background:rgba(10,10,10,.97);backdrop-filter:blur(12px);
   border-bottom:1px solid var(--border);border-right:1px solid var(--border);
-  padding:0 18px;display:flex;align-items:center;gap:12px;overflow:hidden;
+  padding:0 18px;display:flex;align-items:center;gap:12px;
 }
 .back-link{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--muted);text-decoration:none}
 .back-link:hover{color:var(--text)}
@@ -2029,10 +2029,6 @@ setTimeout(()=>{{
     <button class="dec-btn" id="dec-btn" onclick="toggleDecDD()">
       Decade: {label} &#x25BE;
     </button>
-    <div class="dec-dropdown" id="dec-dd">
-      <div class="dec-dh">Jump to decade</div>
-      {decade_nav}
-    </div>
   </div>
   <div class="controls">
     <button class="filter-btn active" id="btn-all"     onclick="setFilter('all')">All</button>
@@ -2043,19 +2039,11 @@ setTimeout(()=>{{
       <button class="genre-btn" id="genre-btn" onclick="toggleGenreDD()">
         Genre <span class="badge" id="genre-badge" style="display:none">0</span> v
       </button>
-      <div class="genre-dropdown" id="genre-dd">
-        <div class="genre-dh">Filter by genre <span class="genre-clear" onclick="clearGenres()">clear</span></div>
-        <div id="genre-list"></div>
-      </div>
     </div>
     <div class="user-wrap">
       <button class="user-btn" id="user-btn" onclick="toggleUserDD()">
         <span class="u-name" id="user-btn-label">All users</span> &#x25BE;
       </button>
-      <div class="user-dropdown" id="user-dd">
-        <div class="user-dh">View as user</div>
-        <div id="user-list"></div>
-      </div>
     </div>
     <div class="rating-wrap" id="rating-btns"></div>
   </div>
@@ -2080,6 +2068,19 @@ setTimeout(()=>{{
     <div class="panel-empty"><div class="panel-empty-icon">◉</div>Click an album</div>
   </div>
 </aside>
+<!-- Dropdowns rendered at body level so position:fixed is never clipped by header overflow -->
+<div class="dec-dropdown" id="dec-dd">
+  <div class="dec-dh">Jump to decade</div>
+  {decade_nav}
+</div>
+<div class="genre-dropdown" id="genre-dd">
+  <div class="genre-dh">Filter by genre <span class="genre-clear" onclick="clearGenres()">clear</span></div>
+  <div id="genre-list"></div>
+</div>
+<div class="user-dropdown" id="user-dd">
+  <div class="user-dh">View as user</div>
+  <div id="user-list"></div>
+</div>
 <script>{js}</script>
 </body>
 </html>"""
@@ -2383,13 +2384,22 @@ def run_scaruffi(args, root_dir: Path) -> None:
     # Update root index
     meta_file = root_dir / ".collections_meta.json"
     collections = json.loads(meta_file.read_text()) if meta_file.exists() else []
-    total_albums = sum(len(v) for v in decades_data.values())
+    all_albums   = [a for v in decades_data.values() for a in v]
+    total_albums = len(all_albums)
+    if users and total_albums:
+        user_pcts = []
+        for u in users:
+            heard = sum(1 for a in all_albums if u in (a.get("heard_by") or []))
+            user_pcts.append(heard / total_albums * 100)
+        avg_pct_scaruffi = round(sum(user_pcts) / len(user_pcts), 1)
+    else:
+        avg_pct_scaruffi = 0
     entry = {
         "slug":    "scaruffi",
         "name":    "Scaruffi's Best Rock (by Decade)",
         "users":   len(users),
         "total":   total_albums,
-        "avg_pct": 0,
+        "avg_pct": avg_pct_scaruffi,
         "updated": generated,
         "url":     "scaruffi/index.html",
     }

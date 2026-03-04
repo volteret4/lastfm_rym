@@ -372,6 +372,72 @@ def fetch_youtube_ids(albums: list, cache_file: Path, force: bool = False) -> di
 
 
 
+# ── RATEYOURMUSIC FETCH ──────────────────────────────────────────────────────
+
+RYM_URL_RE = re.compile(r'https://rateyourmusic\.com/release/[a-z]+/[^/]+/[^/]+/?')
+
+def fetch_rym_urls(albums: list, cache_file: Path,
+                   searxng: str = "http://localhost:8485",
+                   key_field: str = "mbid") -> dict:
+    """Search RateYourMusic URLs via local SearXNG instance.
+    key_field: 'mbid' for 1001/RS collections, 'normkey' for Scaruffi.
+    Returns dict keyed by key_field value → rym URL string ('' if not found)."""
+    rym_cache_path = cache_file.parent / "rym_cache.json"
+    if rym_cache_path.exists():
+        cached = json.loads(rym_cache_path.read_text())
+        missing = []
+        for a in albums:
+            k = a[key_field] if key_field == "mbid" else (_norm(a["artist"]) + "|||" + _norm(a["title"]))
+            if k and k not in cached:
+                missing.append(a)
+        if not missing:
+            found = sum(1 for v in cached.values() if v)
+            print(f"  📦 RYM caché completo: {found}/{len(cached)} con URL")
+            return cached
+        print(f"  📦 RYM caché parcial: {len(cached)} OK, {len(missing)} pendientes")
+    else:
+        cached = {}
+        missing = albums
+
+    print(f"  🔍 Buscando {len(missing)} álbumes en RateYourMusic via SearXNG ({searxng})...")
+    errors = 0
+    for i, album in enumerate(missing):
+        if i % 25 == 0:
+            print(f"    {i}/{len(missing)}...")
+        k = album[key_field] if key_field == "mbid" else (_norm(album["artist"]) + "|||" + _norm(album["title"]))
+        if not k:
+            continue
+
+        q   = urllib.parse.quote_plus(f"{album['artist']} - {album['title']} site:rateyourmusic.com")
+        url = f"{searxng}/search?q={q}&format=json&categories=general"
+        try:
+            req  = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read())
+            results = data.get("results", [])
+            rym_url = ""
+            for result in results:
+                href = result.get("url", "")
+                if RYM_URL_RE.match(href):
+                    rym_url = href.rstrip("/")
+                    break
+            cached[k] = rym_url
+        except Exception as e:
+            errors += 1
+            cached[k] = ""
+            if errors <= 3:
+                print(f"    ⚠ Error SearXNG ({album['artist']} — {album['title']}): {e}")
+
+        time.sleep(0.4)
+
+    rym_cache_path.write_text(json.dumps(cached, ensure_ascii=False, indent=2))
+    found = sum(1 for v in cached.values() if v)
+    print(f"  💾 {rym_cache_path} ({found}/{len(cached)} encontrados, {errors} errores)")
+    if errors > 3:
+        print(f"  ⚠ {errors} errores totales — ¿está SearXNG corriendo en {searxng}?")
+    return cached
+
+
 # ── MUSICBRAINZ GENRE FETCH ──────────────────────────────────────────────────
 
 # Genres too generic / meta to be useful for filtering
@@ -441,7 +507,8 @@ def fetch_genres_musicbrainz(albums: list, cache_file: Path) -> dict:
 COVER_PLACEHOLDER = "data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22250%22%20height=%22250%22%20viewBox=%220%200%20250%20250%22%3E%3Crect%20width=%22250%22%20height=%22250%22%20fill=%22%23111%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%2260%22%20fill=%22none%22%20stroke=%22%23333%22%20stroke-width=%222%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%228%22%20fill=%22%23333%22/%3E%3C/svg%3E"
 
 def album_to_json(album: dict, heard: bool, desc_db: dict = None,
-                   yt_cache: dict = None, genre_cache: dict = None) -> dict:
+                   yt_cache: dict = None, genre_cache: dict = None,
+                   rym_cache: dict = None) -> dict:
     key  = _norm(album.get("artist","")) + "|||" + _norm(album.get("title",""))
     info = (desc_db or {}).get(key, {})
     return {
@@ -457,6 +524,7 @@ def album_to_json(album: dict, heard: bool, desc_db: dict = None,
         "desc":       info.get("desc", ""),
         "yt_id":      (yt_cache or {}).get(album["mbid"], ""),
         "genres":     (genre_cache or {}).get(album["mbid"], []),
+        "rym":        (rym_cache or {}).get(album["mbid"], ""),
     }
 
 def render_user_html(user: str, albums_data: list[dict], series_name: str,
@@ -762,7 +830,8 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     border: 1px solid var(--border); color: var(--muted);
     text-decoration: none; transition: all .15s;
   }}
-  .panel-link:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .panel-link.rym{border-color:#f4b400;color:#f4b400}
+  .panel-link.rym:hover{background:rgba(244,180,0,.08)}
 
   .panel-yt-wrap {{
     margin-top: 14px; border-radius: 4px; overflow: hidden;
@@ -1010,6 +1079,7 @@ function openPanel(a, cardEl) {{
     <div class="panel-links">
       <a class="panel-link" href="${{mbUrl}}" target="_blank">MusicBrainz</a>
       ${{gen1001Url ? `<a class="panel-link" href="${{gen1001Url}}" target="_blank" style="border-color:#7b61ff;color:#7b61ff">1001gen</a>` : ''}}
+      ${{a.rym ? `<a class="panel-link rym" href="${{a.rym}}" target="_blank">RYM</a>` : ''}}
     </div>
     <div class="panel-divider"></div>
     <div class="panel-section-label">About</div>
@@ -1546,6 +1616,7 @@ def render_scaruffi_decade_html(decade: str, albums: list, users_heard: dict,
             "desc":       a.get("desc", ""),
             "yt_id":      a.get("yt_id", ""),
             "heard_by":   heard_by,
+            "rym":        a.get("rym", ""),
         })
 
     albums_json   = json.dumps(albums_js, ensure_ascii=False)
@@ -1694,6 +1765,8 @@ header{
 .panel-link.sp:hover{background:rgba(29,185,84,.08)}
 .panel-link.bc{border-color:#1da0c3;color:#1da0c3}
 .panel-link.sc{border-color:#f50;color:#f50}
+.panel-link.rym{border-color:#f4b400;color:#f4b400}
+.panel-link.rym:hover{background:rgba(244,180,0,.08)}
 .panel-yt-wrap{margin-top:11px;border-radius:4px;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
 .panel-yt-wrap iframe{display:block;width:100%;height:145px;border:none}
 .panel-yt-placeholder{height:60px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted)}
@@ -1919,6 +1992,7 @@ function openPanel(a, cardEl) {{
   if (a.spotify)    links.push('<a class="panel-link sp" href="'+a.spotify+'" target="_blank">Spotify</a>');
   if (a.bandcamp)   links.push('<a class="panel-link bc" href="'+a.bandcamp+'" target="_blank">Bandcamp</a>');
   if (a.soundcloud) links.push('<a class="panel-link sc" href="'+a.soundcloud+'" target="_blank">SoundCloud</a>');
+  if (a.rym)        links.push('<a class="panel-link rym" href="'+a.rym+'" target="_blank">RYM</a>');
   if (a.mbid)       links.push('<a class="panel-link" href="https://musicbrainz.org/release-group/'+a.mbid+'" target="_blank">MusicBrainz</a>');
 
   let ytBlock = '';
@@ -2376,6 +2450,36 @@ def run_scaruffi(args, root_dir: Path) -> None:
         print("No decade data to index")
         return
 
+    # ── RateYourMusic URLs (--rateyourmusic) ──
+    do_rym    = getattr(args, "rateyourmusic", False)
+    searxng   = getattr(args, "searxng", "http://localhost:8485")
+    rym_cache_path = out_dir / "rym_cache.json"
+    if rym_cache_path.exists():
+        rym_cache = json.loads(rym_cache_path.read_text())
+        print(f"  📦 RYM caché cargado: {sum(1 for v in rym_cache.values() if v)}/{len(rym_cache)} con URL")
+    else:
+        rym_cache = {}
+    if do_rym and not index_only:
+        all_for_rym = [a for v in decades_data.values() for a in v]
+        # Use a dummy cache_file path so fetch_rym_urls writes to out_dir/rym_cache.json
+        class _FakePath:
+            parent = out_dir
+        rym_cache = fetch_rym_urls(all_for_rym, _FakePath(), searxng=searxng, key_field="normkey")
+    # Inject rym URLs into album dicts
+    if rym_cache:
+        for decade, albums in decades_data.items():
+            for a in albums:
+                k = _norm(a["artist"]) + "|||" + _norm(a["title"])
+                a["rym"] = rym_cache.get(k, "")
+    # Re-render all decade HTMLs with rym data
+    if do_rym or rym_cache:
+        for decade, albums in decades_data.items():
+            html = render_scaruffi_decade_html(
+                decade, albums, users_heard, "Scaruffi", list(SCARUFFI_DECADES)
+            )
+            (out_dir / f"decade_{decade}s.html").write_text(html, encoding="utf-8")
+        print("  ✅ HTMLs re-renderizados con RYM")
+
     (out_dir / "index.html").write_text(
         render_scaruffi_index_html(decades_data, users, generated), encoding="utf-8"
     )
@@ -2633,6 +2737,12 @@ def render_root_index_html(collections: list[dict], generated: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Must Hear — Collections</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Umami Analytics -->
+<script>
+    defer
+    src="https://cloud.umami.is/script.js"
+    data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {{
@@ -2808,6 +2918,10 @@ def main():
                         help="Last.fm API secret")
     parser.add_argument("--youtube",      action="store_true",
                         help="Pre-fetch YouTube video IDs for all albums (saved in youtube_cache.json)")
+    parser.add_argument("--rateyourmusic", dest="rateyourmusic", action="store_true",
+                        help="Pre-fetch RateYourMusic URLs via SearXNG (saved in rym_cache.json)")
+    parser.add_argument("--searxng",      dest="searxng", default="http://localhost:8485",
+                        help="URL base de la instancia SearXNG con JSON habilitado (default: http://localhost:8485)")
     parser.add_argument("--genres",       action="store_true",
                         help="Pre-fetch géneros desde MusicBrainz (guardado en genres_mb_cache.json)")
     parser.add_argument("--audit",        action="store_true",
@@ -2899,6 +3013,17 @@ def main():
         print("\n🎸 MusicBrainz géneros pre-fetch")
         genre_cache = fetch_genres_musicbrainz(albums, cache_path)
 
+    # 1e. RateYourMusic URLs — always load existing cache; only re-fetch if --rateyourmusic passed
+    rym_cache_path = cache_path.parent / "rym_cache.json"
+    if rym_cache_path.exists():
+        rym_cache = json.loads(rym_cache_path.read_text())
+        print(f"  📦 RYM caché cargado: {sum(1 for v in rym_cache.values() if v)}/{len(rym_cache)} con URL")
+    else:
+        rym_cache = {}
+    if args.rateyourmusic and not args.index_only:
+        print("\n🎵 RateYourMusic pre-fetch")
+        rym_cache = fetch_rym_urls(albums, cache_path, searxng=args.searxng, key_field="mbid")
+
     # 1d. Audit mode: show gaps in cache and exit
     if args.audit:
         print("\n🔍 AUDIT — álbumes con datos incompletos:")
@@ -2936,7 +3061,7 @@ def main():
         albums_data = []
         for album in albums:
             heard = check_heard(user_albums, album)
-            albums_data.append(album_to_json(album, heard, desc_db, yt_cache, genre_cache))
+            albums_data.append(album_to_json(album, heard, desc_db, yt_cache, genre_cache, rym_cache))
 
         heard_count = sum(1 for a in albums_data if a["heard"])
         pct = round(heard_count / len(albums_data) * 100, 1) if albums_data else 0

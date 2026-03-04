@@ -673,6 +673,12 @@ def generate_index_html(users_meta: list[dict], output_dir: Path):
     <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
     <title>Last.fm Stats — Usuarios</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <!-- Umami Analytics -->
+    <script>
+        defer
+        src="https://cloud.umami.is/script.js"
+        data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@300;400;600&display=swap" rel="stylesheet"/>
     <style>
         *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}

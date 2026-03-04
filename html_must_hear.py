@@ -830,8 +830,8 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     border: 1px solid var(--border); color: var(--muted);
     text-decoration: none; transition: all .15s;
   }}
-  .panel-link.rym{border-color:#f4b400;color:#f4b400}
-  .panel-link.rym:hover{background:rgba(244,180,0,.08)}
+  .panel-link.rym{border-color:#5baadb;color:#5baadb}
+  .panel-link.rym:hover{background:rgba(48,81,159,.08)}
 
   .panel-yt-wrap {{
     margin-top: 14px; border-radius: 4px; overflow: hidden;
@@ -1765,8 +1765,8 @@ header{
 .panel-link.sp:hover{background:rgba(29,185,84,.08)}
 .panel-link.bc{border-color:#1da0c3;color:#1da0c3}
 .panel-link.sc{border-color:#f50;color:#f50}
-.panel-link.rym{border-color:#f4b400;color:#f4b400}
-.panel-link.rym:hover{background:rgba(244,180,0,.08)}
+.panel-link.rym{border-color:#5baadb;color:#5baadb}
+.panel-link.rym:hover{background:rgba(48,81,159,.08)}
 .panel-yt-wrap{margin-top:11px;border-radius:4px;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
 .panel-yt-wrap iframe{display:block;width:100%;height:145px;border:none}
 .panel-yt-placeholder{height:60px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted)}

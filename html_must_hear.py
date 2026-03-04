@@ -540,6 +540,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{user} — {series_name}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" type="image/png" href="/images/discount.png" />
 <!-- Umami Analytics -->
 <script>
     defer
@@ -2098,6 +2099,7 @@ setTimeout(()=>{{
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Scaruffi {label}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" type="image/png" href="/images/discount.png" />
 <!-- Umami Analytics -->
 <script>
     defer
@@ -2195,6 +2197,7 @@ def render_scaruffi_index_html(decades_data: dict, users: list, generated: str) 
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Scaruffi Decades</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" type="image/png" href="/images/discount.png" />
 <!-- Umami Analytics -->
 <script>
     defer
@@ -2560,6 +2563,7 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{series_name} — Must Hear</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" type="image/png" href="/images/discount.png" />
 <!-- Umami Analytics -->
 <script>
     defer
@@ -2761,6 +2765,7 @@ def render_root_index_html(collections: list[dict], generated: str) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Must Hear — Collections</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" type="image/png" href="/images/discount.png" />
 <!-- Umami Analytics -->
 <script>
     defer

@@ -1126,11 +1126,11 @@ fetch('{data_file}')
 
 # ── SCARUFFI DECADES ──────────────────────────────────────────────────────────
 
-SCARUFFI_DECADES = ["60", "70", "80", "90", "00", "10"]
+SCARUFFI_DECADES = ["60", "70", "80", "90", "00", "10", "20"]
 SCARUFFI_BASE    = "https://scaruffiplaylists.netlify.app"
 SCARUFFI_DECADE_LABELS = {
     "60": "1960s", "70": "1970s", "80": "1980s",
-    "90": "1990s", "00": "2000s", "10": "2010s",
+    "90": "1990s", "00": "2000s", "10": "2010s", "20": "2020s",
 }
 
 
@@ -1518,7 +1518,7 @@ def render_scaruffi_decade_html(decade: str, albums: list, users_heard: dict,
     for d in SCARUFFI_DECADES:
         lbl    = SCARUFFI_DECADE_LABELS.get(d, d + "s")
         active = "active" if d == decade else ""
-        decade_nav += f'<a class="dec-link {active}" href="decade_{d}s.html">{lbl}</a>'
+        decade_nav += f'<a class="dec-item {active}" href="decade_{d}s.html">{lbl}</a>'
 
     all_genres: dict = {}
     for a in albums:
@@ -1572,14 +1572,22 @@ header{
 .back-link{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--muted);text-decoration:none}
 .back-link:hover{color:var(--text)}
 .header-title{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:.08em;color:var(--accent);white-space:nowrap}
-.dec-nav{display:flex;gap:4px;margin-left:8px}
-.dec-link{
-  font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.06em;
-  padding:4px 8px;border-radius:3px;border:1px solid var(--border);
-  color:var(--muted);text-decoration:none;transition:all .15s;
+.dec-wrap{position:relative}
+.dec-btn{
+  font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;
+  padding:4px 9px;border-radius:3px;border:1px solid var(--accent);background:rgba(232,255,71,.06);
+  color:var(--accent);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;white-space:nowrap;
 }
-.dec-link:hover{border-color:var(--muted);color:var(--text)}
-.dec-link.active{border-color:var(--accent);color:var(--accent);background:rgba(232,255,71,.06)}
+.dec-btn:hover{background:rgba(232,255,71,.12)}
+.dec-dropdown{
+  display:none;position:fixed;background:#161616;border:1px solid var(--border);border-radius:4px;
+  z-index:9999;min-width:160px;padding:4px 0;box-shadow:0 8px 32px rgba(0,0,0,.6);
+}
+.dec-dropdown.open{display:block}
+.dec-dh{padding:5px 10px 4px;font-family:'DM Mono',monospace;font-size:.56rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);margin-bottom:3px}
+.dec-item{display:block;padding:6px 14px;font-family:'DM Mono',monospace;font-size:.68rem;color:var(--text);text-decoration:none;transition:background .1s}
+.dec-item:hover{background:var(--surface)}
+.dec-item.active{color:var(--accent)}
 .controls{display:flex;align-items:center;gap:7px;margin-left:auto;flex-shrink:0}
 .filter-btn{
   font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;
@@ -1604,9 +1612,9 @@ header{
 .genre-btn:hover,.genre-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(232,255,71,.06)}
 .genre-btn .badge{background:var(--accent);color:#000;border-radius:10px;padding:1px 5px;font-size:.52rem;font-weight:700}
 .genre-dropdown{
-  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  display:none;position:fixed;top:calc(100% + 6px);right:0;
   background:#161616;border:1px solid var(--border);border-radius:4px;
-  z-index:500;min-width:200px;max-height:320px;overflow-y:auto;padding:4px 0;
+  z-index:9999;min-width:200px;max-height:320px;overflow-y:auto;padding:4px 0;
   box-shadow:0 8px 32px rgba(0,0,0,.6);
 }
 .genre-dropdown.open{display:block}
@@ -1695,7 +1703,7 @@ header{
   header{right:0}
   #main{margin-right:0}
   #panel{top:auto;bottom:0;height:55vh;border-left:none;border-top:1px solid var(--border)}
-  .dec-nav{display:none}
+  .dec-wrap{display:none}
 }
 .user-wrap{position:relative}
 .user-btn{font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;padding:4px 9px;border-radius:3px;border:1px solid var(--accent);background:rgba(232,255,71,.06);color:var(--accent);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;white-space:nowrap}
@@ -1783,7 +1791,20 @@ function clearGenres() {{
 document.addEventListener('click', e => {{
   if (!e.target.closest('.genre-wrap')) document.getElementById('genre-dd').classList.remove('open');
   if (!e.target.closest('.user-wrap'))  document.getElementById('user-dd').classList.remove('open');
+  if (!e.target.closest('.dec-wrap'))   document.getElementById('dec-dd').classList.remove('open');
 }});
+
+function toggleDecDD() {{
+  const dd  = document.getElementById('dec-dd');
+  const btn = document.getElementById('dec-btn');
+  const open = !dd.classList.contains('open');
+  dd.classList.toggle('open', open);
+  if (open) {{
+    const r = btn.getBoundingClientRect();
+    dd.style.top  = (r.bottom + 4) + 'px';
+    dd.style.left = r.left + 'px';
+  }}
+}}
 
 function buildRatingBtns() {{
   const ratings = [...new Set(ALBUMS.map(a=>a.rating))].sort((a,b)=>b-a);
@@ -2004,7 +2025,15 @@ setTimeout(()=>{{
 <header>
   <a href="index.html" class="back-link">←</a>
   <span class="header-title">Scaruffi {label}</span>
-  <nav class="dec-nav">{decade_nav}</nav>
+  <div class="dec-wrap">
+    <button class="dec-btn" id="dec-btn" onclick="toggleDecDD()">
+      Decade: {label} &#x25BE;
+    </button>
+    <div class="dec-dropdown" id="dec-dd">
+      <div class="dec-dh">Jump to decade</div>
+      {decade_nav}
+    </div>
+  </div>
   <div class="controls">
     <button class="filter-btn active" id="btn-all"     onclick="setFilter('all')">All</button>
     <button class="filter-btn"        id="btn-heard"   onclick="setFilter('heard')">Heard</button>
@@ -2750,9 +2779,8 @@ def main():
     parser.add_argument("--out",    default="docs/must_hear",
                         help="Directorio raíz de salida (contiene el index superior)")
     parser.add_argument("--series", default=DEFAULT_SERIES, help="URL de la serie en MusicBrainz")
-    parser.add_argument("--name",   default=None,
-                        help="Nombre de la serie (usado en títulos y en el index superior). "
-                             "Si se omite, se lee del .collections_meta.json existente.")
+    parser.add_argument("--name",   default="1001 Albums You Must Hear Before You Die",
+                        help="Nombre de la serie (usado en títulos y en el index superior)")
     parser.add_argument("--slug",   default=None,
                         help="Nombre del subdirectorio para esta colección (auto si no se indica)")
     parser.add_argument("--cache",  default=None,
@@ -2799,29 +2827,10 @@ def main():
     # Slug: directorio de esta colección dentro del root
     if args.slug:
         slug = args.slug
-    elif args.name:
+    else:
         # Auto-slug from series name: lowercase, spaces→underscores, strip non-alnum
         slug = re.sub(r"[^a-z0-9]+", "_", args.name.lower()).strip("_")
         slug = re.sub(r"_+", "_", slug)
-    else:
-        print("Error: debes indicar --slug o --name para identificar la coleccion.")
-        return
-
-    # Resolve collection name: read from existing meta if not passed explicitly.
-    # This prevents --index-only from overwriting the stored name with the CLI default.
-    if not args.name:
-        meta_file = root_dir / ".collections_meta.json"
-        if meta_file.exists():
-            meta_collections = json.loads(meta_file.read_text())
-            for c in meta_collections:
-                if c["slug"] == slug and c.get("name"):
-                    args.name = c["name"]
-                    print(f"Nombre leido del meta: {args.name!r}")
-                    break
-        if not args.name:
-            print(f"Error: no se encontro nombre para el slug {slug!r} en el meta. "
-                  f"Pasa --name explicitamente la primera vez.")
-            return
 
     out_dir = root_dir / slug
     out_dir.mkdir(parents=True, exist_ok=True)

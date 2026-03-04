@@ -2750,8 +2750,9 @@ def main():
     parser.add_argument("--out",    default="docs/must_hear",
                         help="Directorio raíz de salida (contiene el index superior)")
     parser.add_argument("--series", default=DEFAULT_SERIES, help="URL de la serie en MusicBrainz")
-    parser.add_argument("--name",   default="1001 Albums You Must Hear Before You Die",
-                        help="Nombre de la serie (usado en títulos y en el index superior)")
+    parser.add_argument("--name",   default=None,
+                        help="Nombre de la serie (usado en títulos y en el index superior). "
+                             "Si se omite, se lee del .collections_meta.json existente.")
     parser.add_argument("--slug",   default=None,
                         help="Nombre del subdirectorio para esta colección (auto si no se indica)")
     parser.add_argument("--cache",  default=None,
@@ -2798,10 +2799,29 @@ def main():
     # Slug: directorio de esta colección dentro del root
     if args.slug:
         slug = args.slug
-    else:
+    elif args.name:
         # Auto-slug from series name: lowercase, spaces→underscores, strip non-alnum
         slug = re.sub(r"[^a-z0-9]+", "_", args.name.lower()).strip("_")
         slug = re.sub(r"_+", "_", slug)
+    else:
+        print("Error: debes indicar --slug o --name para identificar la coleccion.")
+        return
+
+    # Resolve collection name: read from existing meta if not passed explicitly.
+    # This prevents --index-only from overwriting the stored name with the CLI default.
+    if not args.name:
+        meta_file = root_dir / ".collections_meta.json"
+        if meta_file.exists():
+            meta_collections = json.loads(meta_file.read_text())
+            for c in meta_collections:
+                if c["slug"] == slug and c.get("name"):
+                    args.name = c["name"]
+                    print(f"Nombre leido del meta: {args.name!r}")
+                    break
+        if not args.name:
+            print(f"Error: no se encontro nombre para el slug {slug!r} en el meta. "
+                  f"Pasa --name explicitamente la primera vez.")
+            return
 
     out_dir = root_dir / slug
     out_dir.mkdir(parents=True, exist_ok=True)

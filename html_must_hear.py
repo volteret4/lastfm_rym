@@ -540,6 +540,12 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{user} — {series_name}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Umami Analytics -->
+<script>
+    defer
+    src="https://cloud.umami.is/script.js"
+    data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {{
@@ -830,8 +836,8 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     border: 1px solid var(--border); color: var(--muted);
     text-decoration: none; transition: all .15s;
   }}
-  .panel-link.rym{border-color:#5baadb;color:#5baadb}
-  .panel-link.rym:hover{background:rgba(48,81,159,.08)}
+  .panel-link.rym{{border-color:#5baadb;color:#5baadb}}
+  .panel-link.rym:hover{{background:rgba(48,81,159,.08)}}
 
   .panel-yt-wrap {{
     margin-top: 14px; border-radius: 4px; overflow: hidden;
@@ -2092,6 +2098,12 @@ setTimeout(()=>{{
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Scaruffi {label}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Umami Analytics -->
+<script>
+    defer
+    src="https://cloud.umami.is/script.js"
+    data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>{css}</style>
 </head>
@@ -2183,6 +2195,12 @@ def render_scaruffi_index_html(decades_data: dict, users: list, generated: str) 
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Scaruffi Decades</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Umami Analytics -->
+<script>
+    defer
+    src="https://cloud.umami.is/script.js"
+    data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root{{--bg:#0a0a0a;--surface:#111;--border:#1e1e1e;--accent:#e8ff47;--text:#e0e0e0;--muted:#555}}
@@ -2542,6 +2560,12 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{series_name} — Must Hear</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<!-- Umami Analytics -->
+<script>
+    defer
+    src="https://cloud.umami.is/script.js"
+    data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {{

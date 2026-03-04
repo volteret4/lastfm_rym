@@ -172,20 +172,81 @@ def fetch_descriptions_1001(cache_file: Path) -> dict:
 
 
 
+def _migrate_desc_entry(entry: dict) -> dict:
+    """Migrate old single 'desc' field → 'desc_lfm_album'. Non-destructive."""
+    if "desc" in entry and "desc_lfm_album" not in entry:
+        entry["desc_lfm_album"] = entry.pop("desc")
+    for k in ("desc_lfm_album", "desc_lfm_artist", "desc_mb_album", "desc_mb_artist"):
+        entry.setdefault(k, "")
+    return entry
+
+
+def _clean_lfm_text(text: str) -> str:
+    text = re.sub(r'<a href="[^"]*last\.fm[^"]*"[^>]*>[^<]*</a>', '', text)
+    return re.sub(r'<[^>]+>', '', text).strip()
+
+
+def _fetch_mb_annotation(mbid: str, entity: str = "release-group") -> str:
+    """Fetch MusicBrainz annotation for a release-group or artist MBID."""
+    if not mbid:
+        return ""
+    try:
+        url = f"https://musicbrainz.org/ws/2/{entity}/{mbid}?inc=annotation&fmt=json"
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "MustHearAlbums/1.0 (https://github.com/musthear)",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read())
+        ann = data.get("annotation") or {}
+        text = ann.get("text", "") if isinstance(ann, dict) else str(ann)
+        return text.strip()[:800] if text and len(text.strip()) > 20 else ""
+    except Exception:
+        pass
+    return ""
+
+
+def _fetch_mb_artist_mbid(artist_name: str) -> str:
+    """Search MusicBrainz for an artist MBID by name."""
+    try:
+        q = urllib.parse.quote(f'artist:"{artist_name}"')
+        url = f"https://musicbrainz.org/ws/2/artist?query={q}&limit=1&fmt=json"
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "MustHearAlbums/1.0 (https://github.com/musthear)",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read())
+        artists = data.get("artists", [])
+        return artists[0].get("id", "") if artists else ""
+    except Exception:
+        pass
+    return ""
+
+
 def fetch_album_info_lastfm(albums: list, cache_file: Path,
-                             api_key: str, api_secret: str) -> dict:
-    """Fetch album wiki/bio via pylast (Last.fm).
-    Returns dict keyed by _norm(artist)+'|||'+_norm(title).
-    Merges with existing data (keeps spotify_id if already present)."""
+                             api_key: str, api_secret: str,
+                             fetch_mb: bool = True) -> dict:
+    """Fetch album/artist info from Last.fm and MusicBrainz annotations.
+    Cache fields: desc_lfm_album, desc_lfm_artist, desc_mb_album, desc_mb_artist.
+    Migrates legacy 'desc' → 'desc_lfm_album' automatically."""
     lfm_cache = cache_file.parent / "descriptions_lastfm_cache.json"
     if lfm_cache.exists():
-        cached = json.loads(lfm_cache.read_text())
+        raw = json.loads(lfm_cache.read_text())
+        cached = {k: _migrate_desc_entry(v) for k, v in raw.items()}
         missing = [a for a in albums
                    if (_norm(a["artist"]) + "|||" + _norm(a["title"])) not in cached]
+        # Also re-enrich entries missing MB fields if fetch_mb enabled
+        if fetch_mb:
+            missing += [a for a in albums
+                        if (_norm(a["artist"]) + "|||" + _norm(a["title"])) in cached
+                        and not cached[_norm(a["artist"]) + "|||" + _norm(a["title"])].get("desc_mb_album")
+                        and not cached[_norm(a["artist"]) + "|||" + _norm(a["title"])].get("desc_mb_artist")]
+            missing = list({id(a): a for a in missing}.values())  # deduplicate
         if not missing:
             print(f"  📦 Last.fm caché completo: {lfm_cache}")
             return cached
-        print(f"  📦 Last.fm caché parcial: {len(cached)}, {len(missing)} nuevos")
+        print(f"  📦 Last.fm caché parcial/incompleto: {len(cached)} entradas, {len(missing)} a enriquecer")
     else:
         cached = {}
         missing = albums
@@ -196,48 +257,66 @@ def fetch_album_info_lastfm(albums: list, cache_file: Path,
         return cached
 
     network = pylast.LastFMNetwork(api_key=api_key, api_secret=api_secret)
-    print(f"  🎙 Obteniendo info Last.fm de {len(missing)} álbumes...")
+    print(f"  🎙 Obteniendo info Last.fm + MusicBrainz de {len(missing)} álbumes...")
 
     for i, album in enumerate(missing):
-        if i % 50 == 0:
+        if i % 25 == 0:
             print(f"    {i}/{len(missing)}...")
         key = _norm(album["artist"]) + "|||" + _norm(album["title"])
-        entry = cached.get(key, {"spotify_id": "", "title": album["title"],
-                                  "artist": album["artist"], "desc": ""})
-        try:
-            lfm_album = network.get_album(album["artist"], album["title"])
-            wiki = lfm_album.get_wiki_summary() or ""
-            # strip Last.fm "Read more" anchor
-            wiki = re.sub(r'<a href="[^"]*last\.fm[^"]*"[^>]*>[^<]*</a>', '', wiki)
-            wiki = re.sub(r'<[^>]+>', '', wiki).strip()
-            entry["desc"] = wiki[:800] if wiki else entry.get("desc", "")
-        except Exception:
-            # Try artist bio as fallback
+        entry = _migrate_desc_entry(cached.get(key, {
+            "spotify_id": "", "title": album["title"], "artist": album["artist"],
+        }))
+
+        # ── Last.fm album wiki ──
+        if not entry["desc_lfm_album"]:
             try:
-                artist = network.get_artist(album["artist"])
-                bio = artist.get_bio_summary() or ""
-                bio = re.sub(r'<a href="[^"]*last\.fm[^"]*"[^>]*>[^<]*</a>', '', bio)
-                bio = re.sub(r'<[^>]+>', '', bio).strip()
-                entry["desc"] = bio[:800] if bio else entry.get("desc", "")
+                lfm_album = network.get_album(album["artist"], album["title"])
+                wiki = _clean_lfm_text(lfm_album.get_wiki_summary() or "")
+                entry["desc_lfm_album"] = wiki[:800] if len(wiki) > 40 else ""
             except Exception:
                 pass
+            time.sleep(0.25)
+
+        # ── Last.fm artist bio ──
+        if not entry["desc_lfm_artist"]:
+            try:
+                lfm_artist = network.get_artist(album["artist"])
+                bio = _clean_lfm_text(lfm_artist.get_bio_summary() or "")
+                entry["desc_lfm_artist"] = bio[:800] if len(bio) > 40 else ""
+            except Exception:
+                pass
+            time.sleep(0.25)
+
+        # ── MusicBrainz annotations ──
+        if fetch_mb:
+            album_mbid = album.get("mbid", "")
+
+            if album_mbid and not entry["desc_mb_album"]:
+                entry["desc_mb_album"] = _fetch_mb_annotation(album_mbid, "release-group")
+                time.sleep(1.1)
+
+            if not entry["desc_mb_artist"]:
+                artist_mbid = _fetch_mb_artist_mbid(album["artist"])
+                if artist_mbid:
+                    entry["desc_mb_artist"] = _fetch_mb_annotation(artist_mbid, "artist")
+                time.sleep(1.1)
+
         cached[key] = entry
-        time.sleep(0.25)
 
     lfm_cache.write_text(json.dumps(cached, ensure_ascii=False, indent=2))
     print(f"  💾 {lfm_cache}")
     return cached
 
-
 def fetch_album_info(albums: list, cache_file: Path, args) -> dict:
     """Dispatcher: choose info source based on CLI args.
-    Priority: --1001-albums > --spotify-* > --lastfm-*
-    Multiple sources are merged (1001gen wins for desc if available)."""
+    Priority: --1001-albums > --lastfm-*
+    Multiple sources are merged (1001gen wins for desc_lfm_album if available)."""
     desc_db = {}
 
-    use_1001  = getattr(args, "gen_1001", False)
-    lfm_key   = getattr(args, "lastfm_api_key",        None)
-    lfm_secret= getattr(args, "lastfm_api_secret",     None)
+    use_1001   = getattr(args, "gen_1001", False)
+    lfm_key    = getattr(args, "lastfm_api_key",    None)
+    lfm_secret = getattr(args, "lastfm_api_secret", None)
+    fetch_mb   = getattr(args, "genres", False) or True  # always fetch MB annotations if available
 
     if not any([use_1001, lfm_key]):
         print("ℹ️  Sin fuente de descripciones (usa --1001-albums o --lastfm-api-key/secret)")
@@ -245,24 +324,28 @@ def fetch_album_info(albums: list, cache_file: Path, args) -> dict:
 
     # Layer sources from lowest to highest priority
     if lfm_key and lfm_secret:
-        print("\n📡 Fuente: Last.fm")
-        lfm_data = fetch_album_info_lastfm(albums, cache_file, lfm_key, lfm_secret)
+        print("\n📡 Fuente: Last.fm + MusicBrainz")
+        lfm_data = fetch_album_info_lastfm(albums, cache_file, lfm_key, lfm_secret, fetch_mb=fetch_mb)
         desc_db.update(lfm_data)
 
     if use_1001:
         print("\n📡 Fuente: 1001albumsgenerator.com")
         data_1001 = fetch_descriptions_1001(cache_file)
-        # 1001gen wins: overwrite desc + spotify_id
+        # 1001gen wins: overwrite desc_lfm_album + spotify_id
         for k, v in data_1001.items():
-            if k in desc_db:
-                desc_db[k]["spotify_id"] = v.get("spotify_id", desc_db[k].get("spotify_id",""))
-                if v.get("desc"):
-                    desc_db[k]["desc"] = v["desc"]
-            else:
-                desc_db[k] = v
+            entry = _migrate_desc_entry(desc_db.get(k, {}))
+            entry["spotify_id"] = v.get("spotify_id", entry.get("spotify_id", ""))
+            # 1001gen legacy field "desc" maps to desc_lfm_album
+            gen_desc = v.get("desc", "") or v.get("desc_lfm_album", "")
+            if gen_desc:
+                entry["desc_lfm_album"] = gen_desc
+            desc_db[k] = entry
 
-    found = sum(1 for v in desc_db.values() if v.get("desc"))
-    print(f"\n  📖 {found}/{len(desc_db)} álbumes con descripción")
+    total_with_any = sum(
+        1 for v in desc_db.values()
+        if any(v.get(f) for f in ("desc_lfm_album","desc_lfm_artist","desc_mb_album","desc_mb_artist"))
+    )
+    print(f"\n  📖 {total_with_any}/{len(desc_db)} álbumes con alguna descripción")
     return desc_db
 
 
@@ -510,21 +593,25 @@ def album_to_json(album: dict, heard: bool, desc_db: dict = None,
                    yt_cache: dict = None, genre_cache: dict = None,
                    rym_cache: dict = None) -> dict:
     key  = _norm(album.get("artist","")) + "|||" + _norm(album.get("title",""))
-    info = (desc_db or {}).get(key, {})
+    raw  = (desc_db or {}).get(key, {})
+    info = _migrate_desc_entry(dict(raw))  # ensure new fields present
     return {
-        "n":          album["number"],
-        "title":      album["title"],
-        "artist":     album["artist"],
-        "year":       album["year"],
-        "mbid":       album["mbid"],
-        "heard":      heard,
-        "cover":      f"{CAA}/{album['mbid']}/front-250",
-        "spotify_id": info.get("spotify_id", ""),
-        "spotify_url":info.get("spotify_url", ""),
-        "desc":       info.get("desc", ""),
-        "yt_id":      (yt_cache or {}).get(album["mbid"], ""),
-        "genres":     (genre_cache or {}).get(album["mbid"], []),
-        "rym":        (rym_cache or {}).get(album["mbid"], ""),
+        "n":              album["number"],
+        "title":          album["title"],
+        "artist":         album["artist"],
+        "year":           album["year"],
+        "mbid":           album["mbid"],
+        "heard":          heard,
+        "cover":          f"{CAA}/{album['mbid']}/front-250",
+        "spotify_id":     info.get("spotify_id", ""),
+        "spotify_url":    info.get("spotify_url", ""),
+        "desc_lfm_album": info.get("desc_lfm_album", ""),
+        "desc_lfm_artist":info.get("desc_lfm_artist", ""),
+        "desc_mb_album":  info.get("desc_mb_album", ""),
+        "desc_mb_artist": info.get("desc_mb_artist", ""),
+        "yt_id":          (yt_cache or {}).get(album["mbid"], ""),
+        "genres":         (genre_cache or {}).get(album["mbid"], []),
+        "rym":            (rym_cache or {}).get(album["mbid"], ""),
     }
 
 def render_user_html(user: str, albums_data: list[dict], series_name: str,
@@ -584,6 +671,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     border-right: 1px solid var(--border);
     padding: 0 20px;
     display: flex; align-items: center; gap: 16px;
+    overflow: hidden;
   }}
   .header-title {{
     font-family: 'Bebas Neue', sans-serif;
@@ -647,9 +735,9 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     padding: 1px 6px; font-size: .58rem; font-weight: 700;
   }}
   .genre-dropdown {{
-    display: none; position: fixed;
+    display: none; position: absolute; top: calc(100% + 6px); right: 0;
     background: #161616; border: 1px solid var(--border); border-radius: 4px;
-    z-index: 9999; min-width: 220px; max-height: 360px;
+    z-index: 500; min-width: 220px; max-height: 360px;
     overflow-y: auto; padding: 6px 0;
     scrollbar-width: thin; scrollbar-color: var(--border) transparent;
     box-shadow: 0 8px 32px rgba(0,0,0,.6);
@@ -827,6 +915,21 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   .panel-bio::-webkit-scrollbar {{ width: 3px; }}
   .panel-bio::-webkit-scrollbar-thumb {{ background: var(--border); }}
   .panel-bio-loading {{ font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); font-style: italic; }}
+  .desc-block {{ margin-bottom: 10px; }}
+  .desc-source-label {{
+    font-family: 'DM Mono', monospace; font-size: .52rem;
+    letter-spacing: .14em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 3px;
+    display: flex; align-items: center; gap: 5px;
+  }}
+  .desc-source-label::before {{
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: currentColor; flex-shrink: 0;
+  }}
+  .desc-source-label.lfm {{ color: #d51007; }}
+  .desc-source-label.mb  {{ color: #ba478f; }}
+  .desc-source-label.artist {{ color: #6a9fb5; }}
+  .desc-source-text {{ font-size: .75rem; color: #aaa; line-height: 1.6; }}
 
   .panel-links {{ display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }}
   .panel-link {{
@@ -975,14 +1078,8 @@ function buildGenreList() {{
 function toggleGenreDropdown() {{
   const dd = document.getElementById('genre-dropdown');
   const btn = document.getElementById('genre-btn');
-  const open = !dd.classList.contains('open');
-  dd.classList.toggle('open', open);
-  btn.classList.toggle('active', open || selectedGenres.size > 0);
-  if (open) {{
-    const r = btn.getBoundingClientRect();
-    dd.style.top  = (r.bottom + 4) + 'px';
-    dd.style.left = Math.max(4, r.right - 220) + 'px';
-  }}
+  dd.classList.toggle('open');
+  btn.classList.toggle('active', dd.classList.contains('open') || selectedGenres.size > 0);
 }}
 
 function toggleGenre(genre, checked) {{
@@ -1082,6 +1179,22 @@ function openPanel(a, cardEl) {{
          No video cached — <a href="${{ytSearchUrl}}" target="_blank" style="color:var(--accent);text-decoration:none">Search YouTube ↗</a>
        </div>`;
 
+  // ── Build "About" section with all available desc sources ──
+  const descSources = [
+    {{ key: 'desc_lfm_album',  cls: 'lfm',    label: '💿 Album · Last.fm'    }},
+    {{ key: 'desc_lfm_artist', cls: 'artist',  label: '🎙 Artist · Last.fm'   }},
+    {{ key: 'desc_mb_album',   cls: 'mb',      label: '💿 Album · MusicBrainz'}},
+    {{ key: 'desc_mb_artist',  cls: 'mb artist',label: '🎙 Artist · MusicBrainz'}},
+  ];
+  const descBlocks = descSources
+    .filter(s => a[s.key] && a[s.key].length > 40)
+    .map(s => `<div class="desc-block">
+      <div class="desc-source-label ${{s.cls}}">${{s.label}}</div>
+      <div class="desc-source-text">${{a[s.key]}}</div>
+    </div>`).join('');
+  const aboutHtml = descBlocks || '<span class="panel-bio-loading" id="p-bio-loading">Loading…</span>';
+  const needsFetch = !descBlocks;
+
   body.innerHTML = `
     <div class="panel-num">#${{a.n}}</div>
     <div class="panel-title">${{a.title}}</div>
@@ -1095,43 +1208,39 @@ function openPanel(a, cardEl) {{
     </div>
     <div class="panel-divider"></div>
     <div class="panel-section-label">About</div>
-    <div class="panel-bio" id="p-bio">
-      ${{a.desc && a.desc.length > 40
-        ? a.desc
-        : '<span class="panel-bio-loading">Loading…</span>'}}
-    </div>
+    <div class="panel-bio" id="p-bio">${{aboutHtml}}</div>
     <div class="panel-divider"></div>
     <div class="panel-section-label">Listen on YouTube</div>
     <div class="panel-yt-wrap">${{ytBlock}}</div>
   `;
 
-  if (!a.desc || a.desc.length <= 40) fetchBio(a.artist, a.title, a.mbid);
+  if (needsFetch) fetchBio(a.artist, a.title, a.mbid);
 }}
 
-// ── BIO FETCH ──
+// ── BIO FETCH (live fallback when no cached desc available) ──
 async function fetchBio(artist, title, mbid) {{
   const bioEl = document.getElementById('p-bio');
   if (!bioEl) return;
+  const LFM_KEY = 'c9b21e5a749e4f279b6cdce9d5b3a7b3';
+  const clean = t => t.replace(/<a href="[^"]*last\\.fm[^"]*"[^>]*>[^<]*<\\/a>/g,'')
+                       .replace(/<[^>]+>/g,'').replace(/\\s{{2,}}/g,' ').trim().slice(0,800);
+  const blocks = [];
   try {{
-    const lfmUrl = `https://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist=${{encodeURIComponent(artist)}}&album=${{encodeURIComponent(title)}}&format=json&api_key=c9b21e5a749e4f279b6cdce9d5b3a7b3`;
-    const d = await fetch(lfmUrl).then(r => r.json());
-    const wiki = d?.album?.wiki?.summary || d?.album?.wiki?.content || '';
-    if (wiki && wiki.length > 40) {{
-      bioEl.textContent = wiki.replace(/<[^>]+>/g,'').replace(/ {{2,}}/g,' ').trim().slice(0,800);
-      return;
+    const d = await fetch(`https://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist=${{encodeURIComponent(artist)}}&album=${{encodeURIComponent(title)}}&format=json&api_key=${{LFM_KEY}}`).then(r=>r.json());
+    const wiki = clean(d?.album?.wiki?.summary || d?.album?.wiki?.content || '');
+    if (wiki.length > 40) blocks.push(`<div class="desc-block"><div class="desc-source-label lfm">💿 Album · Last.fm</div><div class="desc-source-text">${{wiki}}</div></div>`);
+    const d2 = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${{encodeURIComponent(artist)}}&format=json&api_key=${{LFM_KEY}}`).then(r=>r.json());
+    const bio = clean(d2?.artist?.bio?.summary || '');
+    if (bio.length > 40) blocks.push(`<div class="desc-block"><div class="desc-source-label artist">🎙 Artist · Last.fm</div><div class="desc-source-text">${{bio}}</div></div>`);
+  }} catch(e) {{}}
+  try {{
+    if (mbid) {{
+      const mb = await fetch(`https://musicbrainz.org/ws/2/release-group/${{mbid}}?inc=annotation&fmt=json`).then(r=>r.json());
+      const ann = mb?.annotation?.text || '';
+      if (ann.length > 20) blocks.push(`<div class="desc-block"><div class="desc-source-label mb">💿 Album · MusicBrainz</div><div class="desc-source-text">${{ann.slice(0,800)}}</div></div>`);
     }}
-    const d2 = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${{encodeURIComponent(artist)}}&format=json&api_key=c9b21e5a749e4f279b6cdce9d5b3a7b3`).then(r=>r.json());
-    const bio = d2?.artist?.bio?.summary || '';
-    if (bio && bio.length > 40) {{
-      bioEl.textContent = bio.replace(/<[^>]+>/g,'').replace(/ {{2,}}/g,' ').trim().slice(0,800);
-      return;
-    }}
-    const d3 = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${{encodeURIComponent(artist + ' (album)')}}`).then(r=>r.json());
-    const extract = d3?.extract || '';
-    bioEl.textContent = extract.length > 40 ? extract.slice(0,800) : 'No info available.';
-  }} catch(e) {{
-    if (bioEl) bioEl.textContent = 'Could not load info.';
-  }}
+  }} catch(e) {{}}
+  if (bioEl) bioEl.innerHTML = blocks.length ? blocks.join('') : 'No info available.';
 }}
 
 // ── FILTERS ──
@@ -1493,9 +1602,13 @@ def _parse_scaruffi_markdown(md: str) -> list:
 def scaruffi_enrich_albums(albums: list, cache_dir: Path,
                             lfm_key: str = "", lfm_secret: str = "",
                             fetch_genres: bool = False) -> list:
-    """Enrich Scaruffi albums with Last.fm desc + MusicBrainz genres."""
+    """Enrich Scaruffi albums with Last.fm desc + MusicBrainz genres and annotations.
+    Cache fields: desc_lfm_album, desc_lfm_artist, desc_mb_album, desc_mb_artist, mbid, genres.
+    Migrates legacy 'desc' → 'desc_lfm_album' automatically."""
     enrich_cache = cache_dir / "scaruffi_enrich_cache.json"
-    cached = json.loads(enrich_cache.read_text()) if enrich_cache.exists() else {}
+    raw_cached   = json.loads(enrich_cache.read_text()) if enrich_cache.exists() else {}
+    # Migrate legacy entries
+    cached = {k: _migrate_desc_entry(v) for k, v in raw_cached.items()}
 
     pylast  = None
     network = None
@@ -1507,23 +1620,35 @@ def scaruffi_enrich_albums(albums: list, cache_dir: Path,
     changed = False
     for album in albums:
         key   = _norm(album["artist"]) + "|||" + _norm(album["title"])
-        entry = cached.get(key, {})
+        entry = _migrate_desc_entry(cached.get(key, {}))
 
-        if network and not entry.get("desc"):
+        # ── Last.fm album wiki ──
+        if network and not entry["desc_lfm_album"]:
             try:
                 lfm_al = network.get_album(album["artist"], album["title"])
-                wiki   = lfm_al.get_wiki_summary() or ""
-                wiki   = re.sub(r'<a href="[^"]*last\.fm[^"]*"[^>]*>[^<]*</a>', '', wiki)
-                wiki   = re.sub(r'<[^>]+>', '', wiki).strip()
+                wiki   = _clean_lfm_text(lfm_al.get_wiki_summary() or "")
                 if wiki and len(wiki) > 40:
-                    entry["desc"] = wiki[:800]
+                    entry["desc_lfm_album"] = wiki[:800]
                     changed = True
             except Exception:
                 pass
             time.sleep(0.25)
 
+        # ── Last.fm artist bio ──
+        if network and not entry["desc_lfm_artist"]:
+            try:
+                lfm_ar = network.get_artist(album["artist"])
+                bio    = _clean_lfm_text(lfm_ar.get_bio_summary() or "")
+                if bio and len(bio) > 40:
+                    entry["desc_lfm_artist"] = bio[:800]
+                    changed = True
+            except Exception:
+                pass
+            time.sleep(0.25)
+
+        # ── MusicBrainz: find MBID for release-group ──
         if fetch_genres and not entry.get("mbid") and not entry.get("mbid_tried"):
-            q = urllib.parse.quote(f'releasegroup:"{album["title"]}" AND artist:"{album["artist"]}"')
+            q = urllib.parse.quote(f'releasegroup:"{album["title"]}" AND artist:"{album["artist"]}"'  )
             try:
                 req = urllib.request.Request(
                     f"https://musicbrainz.org/ws/2/release-group?query={q}&limit=1&fmt=json",
@@ -1540,6 +1665,7 @@ def scaruffi_enrich_albums(albums: list, cache_dir: Path,
             entry["mbid_tried"] = True
             time.sleep(1.1)
 
+        # ── MusicBrainz genres ──
         if fetch_genres and entry.get("mbid") and not entry.get("genres"):
             try:
                 req = urllib.request.Request(
@@ -1560,18 +1686,38 @@ def scaruffi_enrich_albums(albums: list, cache_dir: Path,
                 pass
             time.sleep(1.1)
 
+        # ── MusicBrainz album annotation ──
+        if entry.get("mbid") and not entry["desc_mb_album"]:
+            ann = _fetch_mb_annotation(entry["mbid"], "release-group")
+            if ann:
+                entry["desc_mb_album"] = ann
+                changed = True
+            time.sleep(1.1)
+
+        # ── MusicBrainz artist annotation ──
+        if not entry["desc_mb_artist"]:
+            artist_mbid = _fetch_mb_artist_mbid(album["artist"])
+            if artist_mbid:
+                ann = _fetch_mb_annotation(artist_mbid, "artist")
+                if ann:
+                    entry["desc_mb_artist"] = ann
+                    changed = True
+            time.sleep(1.1)
+
         if entry:
-            cached[key]     = entry
-            album["desc"]   = entry.get("desc", "")
-            album["mbid"]   = entry.get("mbid", "")
-            album["genres"] = entry.get("genres", [])
+            cached[key]             = entry
+            album["desc_lfm_album"] = entry.get("desc_lfm_album", "")
+            album["desc_lfm_artist"]= entry.get("desc_lfm_artist", "")
+            album["desc_mb_album"]  = entry.get("desc_mb_album", "")
+            album["desc_mb_artist"] = entry.get("desc_mb_artist", "")
+            album["mbid"]           = entry.get("mbid", "")
+            album["genres"]         = entry.get("genres", [])
 
     if changed:
         enrich_cache.write_text(json.dumps(cached, ensure_ascii=False, indent=2))
         print(f"  💾 enrich cache -> {enrich_cache}")
 
     return albums
-
 
 def scaruffi_check_heard(user_albums: set, album: dict) -> bool:
     a_n = _norm(album["artist"])
@@ -1612,23 +1758,26 @@ def render_scaruffi_decade_html(decade: str, albums: list, users_heard: dict,
     for a in albums:
         heard_by = [u for u in users if scaruffi_check_heard(users_heard[u], a)]
         albums_js.append({
-            "rank":       a["rank"],
-            "artist":     a["artist"],
-            "title":      a["title"],
-            "year":       a.get("year"),
-            "cover":      a.get("cover", ""),
-            "rating":     a.get("rating", 0),
-            "youtube":    a.get("youtube", ""),
-            "spotify":    a.get("spotify", ""),
-            "bandcamp":   a.get("bandcamp", ""),
-            "soundcloud": a.get("soundcloud", ""),
-            "note":       a.get("note", ""),
-            "mbid":       a.get("mbid", ""),
-            "genres":     a.get("genres", []),
-            "desc":       a.get("desc", ""),
-            "yt_id":      a.get("yt_id", ""),
-            "heard_by":   heard_by,
-            "rym":        a.get("rym", ""),
+            "rank":           a["rank"],
+            "artist":         a["artist"],
+            "title":          a["title"],
+            "year":           a.get("year"),
+            "cover":          a.get("cover", ""),
+            "rating":         a.get("rating", 0),
+            "youtube":        a.get("youtube", ""),
+            "spotify":        a.get("spotify", ""),
+            "bandcamp":       a.get("bandcamp", ""),
+            "soundcloud":     a.get("soundcloud", ""),
+            "note":           a.get("note", ""),
+            "mbid":           a.get("mbid", ""),
+            "genres":         a.get("genres", []),
+            "desc_lfm_album": a.get("desc_lfm_album", "") or a.get("desc", ""),  # migrate
+            "desc_lfm_artist":a.get("desc_lfm_artist", ""),
+            "desc_mb_album":  a.get("desc_mb_album", ""),
+            "desc_mb_artist": a.get("desc_mb_artist", ""),
+            "yt_id":          a.get("yt_id", ""),
+            "heard_by":       heard_by,
+            "rym":            a.get("rym", ""),
         })
 
     albums_json   = json.dumps(albums_js, ensure_ascii=False)
@@ -1767,6 +1916,11 @@ header{
 .panel-bio{font-size:.72rem;color:#aaa;line-height:1.6;max-height:120px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
 .panel-bio::-webkit-scrollbar{width:3px}
 .panel-bio::-webkit-scrollbar-thumb{background:var(--border)}
+.desc-block{margin-bottom:9px}
+.desc-source-label{font-family:'DM Mono',monospace;font-size:.5rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;display:flex;align-items:center;gap:4px}
+.desc-source-label::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.desc-source-label.lfm{color:#d51007}.desc-source-label.mb{color:#ba478f}.desc-source-label.artist{color:#6a9fb5}
+.desc-source-text{font-size:.7rem;color:#aaa;line-height:1.55}
 .panel-note{font-family:'DM Mono',monospace;font-size:.62rem;color:#666;font-style:italic;line-height:1.5;margin-top:6px}
 .panel-links{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
 .panel-link{font-family:'DM Mono',monospace;font-size:.58rem;letter-spacing:.07em;text-transform:uppercase;padding:3px 8px;border-radius:3px;border:1px solid var(--border);color:var(--muted);text-decoration:none;transition:all .15s}
@@ -2020,8 +2174,17 @@ function openPanel(a, cardEl) {{
 
   const genreTags = (a.genres||[]).map(g=>'<span class="panel-genre-tag">'+g+'</span>').join('');
   const heardLine = a.heard_by.length>0 ? '<div class="panel-heard-by">Heard by <b>'+a.heard_by.join(', ')+'</b></div>' : '';
-  const bioHtml   = (a.desc&&a.desc.length>40) ? a.desc : '<span style="color:var(--muted);font-style:italic">Loading\u2026</span>';
   const noteHtml  = a.note ? '<div class="panel-note">'+a.note+'</div>' : '';
+  const descSrcs  = [
+    {{key:'desc_lfm_album',  cls:'lfm',    lbl:'💿 Album \u00b7 Last.fm'}},
+    {{key:'desc_lfm_artist', cls:'artist',  lbl:'🎙 Artist \u00b7 Last.fm'}},
+    {{key:'desc_mb_album',   cls:'mb',      lbl:'💿 Album \u00b7 MusicBrainz'}},
+    {{key:'desc_mb_artist',  cls:'mb artist',lbl:'🎙 Artist \u00b7 MusicBrainz'}},
+  ];
+  const descBlocks = descSrcs.filter(s=>a[s.key]&&a[s.key].length>40)
+    .map(s=>'<div class="desc-block"><div class="desc-source-label '+s.cls+'">'+s.lbl+'</div><div class="desc-source-text">'+a[s.key]+'</div></div>').join('');
+  const bioHtml = descBlocks || '<span style="color:var(--muted);font-style:italic">Loading\u2026</span>';
+  const needsFetch = !descBlocks;
 
   document.getElementById('panel-body').innerHTML =
     '<div class="panel-title">'+a.title+'</div>'
@@ -2038,24 +2201,31 @@ function openPanel(a, cardEl) {{
     +'<div class="panel-bio" id="p-bio">'+bioHtml+'</div>'
     +noteHtml;
 
-  if (!a.desc||a.desc.length<=40) fetchBio(a.artist, a.title);
+  if (needsFetch) fetchBio(a.artist, a.title, a.mbid);
 }}
 
-async function fetchBio(artist, title) {{
+async function fetchBio(artist, title, mbid) {{
   const bioEl = document.getElementById('p-bio');
   if (!bioEl) return;
   const KEY = 'c9b21e5a749e4f279b6cdce9d5b3a7b3';
+  const clean = t => t.replace(/<a href="[^"]*last\\.fm[^"]*"[^>]*>[^<]*<\\/a>/g,'').replace(/<[^>]+>/g,'').replace(/ {{2,}}/g,' ').trim().slice(0,800);
+  const blocks = [];
   try {{
-    const d = await fetch('https://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist='+encodeURIComponent(artist)+'&album='+encodeURIComponent(title)+'&format=json&api_key='+KEY).then(r=>r.json());
-    const wiki = d?.album?.wiki?.summary||d?.album?.wiki?.content||'';
-    if (wiki&&wiki.length>40) {{ bioEl.textContent=wiki.replace(/<[^>]+>/g,'').replace(/ {{2,}}/g,' ').trim().slice(0,800); return; }}
+    const d  = await fetch('https://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist='+encodeURIComponent(artist)+'&album='+encodeURIComponent(title)+'&format=json&api_key='+KEY).then(r=>r.json());
+    const wiki = clean(d?.album?.wiki?.summary||d?.album?.wiki?.content||'');
+    if (wiki.length>40) blocks.push('<div class="desc-block"><div class="desc-source-label lfm">💿 Album \u00b7 Last.fm</div><div class="desc-source-text">'+wiki+'</div></div>');
     const d2 = await fetch('https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist='+encodeURIComponent(artist)+'&format=json&api_key='+KEY).then(r=>r.json());
-    const bio = d2?.artist?.bio?.summary||'';
-    if (bio&&bio.length>40) {{ bioEl.textContent=bio.replace(/<[^>]+>/g,'').replace(/ {{2,}}/g,' ').trim().slice(0,800); return; }}
-    const d3 = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(artist+' (album)')).then(r=>r.json());
-    const ex = d3?.extract||'';
-    bioEl.textContent = ex.length>40 ? ex.slice(0,800) : 'No info available.';
-  }} catch(e) {{ if(bioEl) bioEl.textContent='Could not load info.'; }}
+    const bio = clean(d2?.artist?.bio?.summary||'');
+    if (bio.length>40) blocks.push('<div class="desc-block"><div class="desc-source-label artist">🎙 Artist \u00b7 Last.fm</div><div class="desc-source-text">'+bio+'</div></div>');
+  }} catch(e) {{}}
+  try {{
+    if (mbid) {{
+      const mb  = await fetch('https://musicbrainz.org/ws/2/release-group/'+mbid+'?inc=annotation&fmt=json').then(r=>r.json());
+      const ann = (mb?.annotation?.text||'').trim();
+      if (ann.length>20) blocks.push('<div class="desc-block"><div class="desc-source-label mb">💿 Album \u00b7 MusicBrainz</div><div class="desc-source-text">'+ann.slice(0,800)+'</div></div>');
+    }}
+  }} catch(e) {{}}
+  if (bioEl) bioEl.innerHTML = blocks.length ? blocks.join('') : 'No info available.';
 }}
 
 function setFilter(f) {{
@@ -3012,15 +3182,21 @@ def main():
 
     # 1b. Descripciones / info de álbumes (skip if --index-only)
     if args.index_only:
-        # Load whichever description cache exists
+        # Load whichever description cache exists (migrate legacy 'desc' field)
         desc_db = {}
         for fname in ("descriptions_lastfm_cache.json", "descriptions_1001_cache.json"):
             p = cache_path.parent / fname
             if p.exists():
                 data = json.loads(p.read_text())
                 for k, v in data.items():
-                    if k not in desc_db or (v.get("desc") and not desc_db[k].get("desc")):
+                    v = _migrate_desc_entry(v)
+                    if k not in desc_db:
                         desc_db[k] = v
+                    else:
+                        # Merge: keep non-empty fields from each source
+                        for field in ("desc_lfm_album","desc_lfm_artist","desc_mb_album","desc_mb_artist","spotify_id"):
+                            if v.get(field) and not desc_db[k].get(field):
+                                desc_db[k][field] = v[field]
                 print(f"  📦 Desc cargado desde {fname}: {len(data)} entradas")
     else:
         desc_db = fetch_album_info(albums, cache_path, args)

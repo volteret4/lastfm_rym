@@ -5,7 +5,7 @@ Scrapes MusicBrainz series, crosses with last.fm scrobbles DB,
 generates per-user HTML grids + index.html
 """
 
-import subprocess, json, re, time, argparse, sqlite3, urllib.parse, urllib.request, urllib.error
+import subprocess, os, json, re, time, argparse, sqlite3, urllib.parse, urllib.request, urllib.error
 from html import unescape
 from pathlib import Path
 from datetime import datetime
@@ -313,9 +313,12 @@ def fetch_album_info(albums: list, cache_file: Path, args) -> dict:
     Multiple sources are merged (1001gen wins for desc_lfm_album if available)."""
     desc_db = {}
 
+    lastfm_api_key_gopass = subprocess.check_output(["gopass", "show", "-o", "lastfm/api_key"]).decode().strip()
+    lastfm_api_secret_gopass = subprocess.check_output(["gopass", "show", "-o", "lastfm/secret"]).decode().strip()
+
     use_1001   = getattr(args, "gen_1001", False)
-    lfm_key    = getattr(args, "lastfm_api_key",    None)
-    lfm_secret = getattr(args, "lastfm_api_secret", None)
+    lfm_key    = getattr(args, "lastfm_api_key",    lastfm_api_key_gopass)
+    lfm_secret = getattr(args, "lastfm_api_secret", lastfm_api_secret_gopass)
     fetch_mb   = getattr(args, "genres", False) or True  # always fetch MB annotations if available
 
     if not any([use_1001, lfm_key]):
@@ -354,6 +357,40 @@ def fetch_album_info(albums: list, cache_file: Path, args) -> dict:
 def _norm(s: str) -> str:
     return re.sub(r"[^\w]", "", (s or "").lower())
 
+
+# ── Schema detection helpers ───────────────────────────────────────────────────
+
+def _user_table_name(username: str) -> str:
+    """Nombre de la tabla scrobbles per-user (schema normalizado nuevo)."""
+    safe = re.sub(r'[^a-z0-9]', '_', username.lower()).strip('_')
+    return f"scrobbles_{safe}"
+
+
+def _scrobbles_schema(conn: sqlite3.Connection) -> str:
+    """Detecta el esquema del DB de scrobbles.
+    'new': tablas scrobbles_<user> + artists/albums (lastfm_cache_rym_new_normalized.db)
+    'old': tabla scrobbles con columnas user/artist/album TEXT (rym_lastfm.db)
+    """
+    tables = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+    return "new" if "scrobbles" not in tables and "artists" in tables else "old"
+
+
+def _scrobbles_get_users(conn: sqlite3.Connection) -> list[str]:
+    """Lee lista de usuarios, compatible con schema old y new."""
+    tables = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+    if "users" in tables:
+        return [r[0] for r in conn.execute(
+            "SELECT username FROM users ORDER BY username"
+        ).fetchall()]
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT user FROM scrobbles ORDER BY user"
+    ).fetchall()]
+
+
 def get_users(db_path: str) -> list[str]:
     """
     Lee usuarios desde must_hear.db (tabla users) o desde rym_lastfm.db (tabla scrobbles).
@@ -369,12 +406,28 @@ def get_users(db_path: str) -> list[str]:
 
 
 def get_user_albums_from_scrobbles(scrobbles_db: str, user: str) -> set[tuple]:
-    """Lee scrobbles de rym_lastfm.db. Devuelve set de (norm_artist, norm_album)."""
+    """Lee scrobbles de la DB. Devuelve set de (norm_artist, norm_album).
+    Compatible con schema old (rym_lastfm.db) y new (lastfm_cache_rym_new_normalized.db)."""
     with sqlite3.connect(scrobbles_db) as c:
-        rows = c.execute(
-            "SELECT artist, album FROM scrobbles WHERE user=? AND album IS NOT NULL AND album != ''",
-            (user,)
-        ).fetchall()
+        if _scrobbles_schema(c) == "new":
+            tbl = _user_table_name(user)
+            exists = c.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (tbl,)
+            ).fetchone()
+            if not exists:
+                return set()
+            rows = c.execute(f"""
+                SELECT ar.name, al.name
+                FROM {tbl} sc
+                JOIN artists ar ON ar.id = sc.artist_id
+                JOIN albums  al ON al.id = sc.album_id
+                WHERE sc.album_id IS NOT NULL
+            """).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT artist, album FROM scrobbles WHERE user=? AND album IS NOT NULL AND album != ''",
+                (user,)
+            ).fetchall()
     return {(_norm(r[0]), _norm(r[1])) for r in rows}
 
 
@@ -1282,8 +1335,7 @@ function openPanel(a, cardEl) {{
       <div class="desc-source-label ${{s.cls}}">${{s.label}}</div>
       <div class="desc-source-text">${{a[s.key]}}</div>
     </div>`).join('');
-  const aboutHtml = descBlocks || '<span class="panel-bio-loading" id="p-bio-loading">Loading…</span>';
-  const needsFetch = !descBlocks;
+  const aboutHtml = descBlocks || '<span style="color:var(--muted);font-size:.8rem">No info available.</span>';
 
   body.innerHTML = `
     <div class="panel-num">#${{a.n}}</div>
@@ -1303,34 +1355,6 @@ function openPanel(a, cardEl) {{
     <div class="panel-section-label">Listen on YouTube</div>
     <div class="panel-yt-wrap">${{ytBlock}}</div>
   `;
-
-  if (needsFetch) fetchBio(a.artist, a.title, a.mbid);
-}}
-
-// ── BIO FETCH (live fallback when no cached desc available) ──
-async function fetchBio(artist, title, mbid) {{
-  const bioEl = document.getElementById('p-bio');
-  if (!bioEl) return;
-  const LFM_KEY = 'c9b21e5a749e4f279b6cdce9d5b3a7b3';
-  const clean = t => t.replace(/<a href="[^"]*last\\.fm[^"]*"[^>]*>[^<]*<\\/a>/g,'')
-                       .replace(/<[^>]+>/g,'').replace(/\\s{{2,}}/g,' ').trim().slice(0,800);
-  const blocks = [];
-  try {{
-    const d = await fetch(`https://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist=${{encodeURIComponent(artist)}}&album=${{encodeURIComponent(title)}}&format=json&api_key=${{LFM_KEY}}`).then(r=>r.json());
-    const wiki = clean(d?.album?.wiki?.summary || d?.album?.wiki?.content || '');
-    if (wiki.length > 40) blocks.push(`<div class="desc-block"><div class="desc-source-label lfm">💿 Album · Last.fm</div><div class="desc-source-text">${{wiki}}</div></div>`);
-    const d2 = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${{encodeURIComponent(artist)}}&format=json&api_key=${{LFM_KEY}}`).then(r=>r.json());
-    const bio = clean(d2?.artist?.bio?.summary || '');
-    if (bio.length > 40) blocks.push(`<div class="desc-block"><div class="desc-source-label artist">🎙 Artist · Last.fm</div><div class="desc-source-text">${{bio}}</div></div>`);
-  }} catch(e) {{}}
-  try {{
-    if (mbid) {{
-      const mb = await fetch(`https://musicbrainz.org/ws/2/release-group/${{mbid}}?inc=annotation&fmt=json`).then(r=>r.json());
-      const ann = mb?.annotation?.text || '';
-      if (ann.length > 20) blocks.push(`<div class="desc-block"><div class="desc-source-label mb">💿 Album · MusicBrainz</div><div class="desc-source-text">${{ann.slice(0,800)}}</div></div>`);
-    }}
-  }} catch(e) {{}}
-  if (bioEl) bioEl.innerHTML = blocks.length ? blocks.join('') : 'No info available.';
 }}
 
 // ── FILTERS ──
@@ -2623,9 +2647,7 @@ def run_scaruffi(args, root_dir: Path) -> None:
     elif _scr_path:
         import sqlite3 as _sq
         with _sq.connect(_scr_path) as _c:
-            users = args.users or [r[0] for r in _c.execute(
-                "SELECT DISTINCT user FROM scrobbles ORDER BY user"
-            ).fetchall()]
+            users = args.users or _scrobbles_get_users(_c)
     else:
         users = args.users or []
     print(f"Scaruffi: {len(users)} users: {', '.join(users)}")
@@ -3256,13 +3278,29 @@ def mh_get_users(mh_conn: sqlite3.Connection) -> list[str]:
 def mh_get_user_albums(scrobbles_conn: sqlite3.Connection, user: str) -> set[tuple]:
     """
     Devuelve set de (norm_artist, norm_album) escuchados por user.
-    Lee de rym_lastfm.db (tabla scrobbles), igual que antes.
+    Compatible con schema old (tabla scrobbles con user TEXT) y
+    new (tablas scrobbles_<user> con FKs a artists/albums).
     """
-    rows = scrobbles_conn.execute(
-        "SELECT artist, album FROM scrobbles "
-        "WHERE user=? AND album IS NOT NULL AND album != ''",
-        (user,)
-    ).fetchall()
+    if _scrobbles_schema(scrobbles_conn) == "new":
+        tbl = _user_table_name(user)
+        exists = scrobbles_conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (tbl,)
+        ).fetchone()
+        if not exists:
+            return set()
+        rows = scrobbles_conn.execute(f"""
+            SELECT ar.name, al.name
+            FROM {tbl} sc
+            JOIN artists ar ON ar.id = sc.artist_id
+            JOIN albums  al ON al.id = sc.album_id
+            WHERE sc.album_id IS NOT NULL
+        """).fetchall()
+    else:
+        rows = scrobbles_conn.execute(
+            "SELECT artist, album FROM scrobbles "
+            "WHERE user=? AND album IS NOT NULL AND album != ''",
+            (user,)
+        ).fetchall()
     return {(_norm(r[0]), _norm(r[1])) for r in rows}
 
 
@@ -3301,15 +3339,15 @@ def mh_load_collection(mh_conn: sqlite3.Connection,
     rows = mh_conn.execute("""
         SELECT
             al.id,
-            ar.name           AS artist,
-            al.name           AS title,
+            ar.name                AS artist,
+            al.name                AS title,
             al.year,
             al.release_group_mbid  AS mbid,
             ca.rank,
-            al.desc_lfm_album,
-            al.desc_lfm_artist,
-            al.desc_mb_album,
-            al.desc_mb_artist,
+            am.desc_lfm_album,
+            am.desc_lfm_artist,
+            am.desc_mb_album,
+            am.desc_mb_artist,
             al.yt_id,
             al.rateyourmusic_url   AS rym,
             al.spotify_id,
@@ -3318,15 +3356,16 @@ def mh_load_collection(mh_conn: sqlite3.Connection,
             al.scaruffi_rating,
             al.scaruffi_note,
             al.wikipedia_url,
-            al.wikipedia_content,
+            am.wikipedia_content,
             al.aoty_user_score,
             al.aoty_critic_score,
             al.metacritic_score,
             al.label
         FROM collection_albums ca
-        JOIN collections c  ON c.id  = ca.collection_id
-        JOIN albums al      ON al.id = ca.album_id
-        JOIN artists ar     ON ar.id = al.artist_id
+        JOIN collections c        ON c.id  = ca.collection_id
+        JOIN albums al            ON al.id = ca.album_id
+        JOIN artists ar           ON ar.id = al.artist_id
+        LEFT JOIN album_metadata am ON am.album_id = al.id
         WHERE c.slug = ?
         ORDER BY ca.rank ASC NULLS LAST, al.year ASC
     """, (collection_slug,)).fetchall()
@@ -3365,7 +3404,7 @@ def mh_album_to_json(album: dict, heard: bool) -> dict:
     compatibilidad con los templates HTML existentes.
     """
     mbid = album.get("mbid", "")
-    cover = album.get("cover_url") or (f"{CAA}/{mbid}/front-250" if mbid else "")
+    cover = album.get("cover_url") or (f"{CAA}/{mbid}/front-500" if mbid else "")
     return {
         "n":               album.get("number", 0),
         "title":           album.get("title", ""),
@@ -3393,27 +3432,189 @@ def mh_album_to_json(album: dict, heard: bool) -> dict:
     }
 
 
+_ALBUM_METADATA_FIELDS = frozenset({
+    "desc_lfm_album", "desc_lfm_artist",
+    "desc_mb_album",  "desc_mb_artist",
+    "wikipedia_content",
+    "producers", "engineers", "credits",
+})
+
+
+def mh_fetch_covers(mh_conn: sqlite3.Connection, albums: list,
+                     lfm_key: str = "", discogs_token: str = "") -> None:
+    """
+    Busca portadas de mayor calidad para los álbumes de una colección.
+
+    Estrategia por prioridad:
+      1. front-250 en cover_url existente → reemplaza por front-500 (sin red)
+      2. CAA: sigue redirect para obtener URL real de alta resolución (necesita mbid)
+      3. Last.fm album.getInfo: extralarge/mega (~300-500 px)
+      4. Discogs search: cover_image (suele ser 600 px+, requiere token)
+
+    Guarda el resultado en albums.cover_url y actualiza album en memoria.
+    """
+    CAA_PREFIX = "https://coverartarchive.org/release-group"
+    PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f"  # imagen vacía Last.fm
+    ts = int(time.time())
+
+    upgraded = fetched = already_ok = 0
+    total = len(albums)
+
+    for i, album in enumerate(albums, 1):
+        album_id  = album["id"]
+        mbid      = album.get("mbid", "")
+        title     = album.get("title", "")
+        artist    = album.get("artist", "")
+        current   = album.get("cover_url") or ""
+
+        print(f"  [{i}/{total}] {artist} — {title}", end="  ")
+
+        # ── Upgrade rápido front-250 → front-500 ──────────────────────────────
+        if "front-250" in current:
+            new_url = current.replace("front-250", "front-500")
+            mh_conn.execute(
+                "UPDATE albums SET cover_url=?, last_updated=? WHERE id=?",
+                (new_url, ts, album_id)
+            )
+            album["cover_url"] = new_url
+            upgraded += 1
+            print("⬆ 250→500")
+            continue
+
+        # Si ya tiene portada de fuente externa (no CAA vacía), saltamos
+        if current and CAA_PREFIX not in current:
+            already_ok += 1
+            print("✓")
+            continue
+
+        new_cover = ""
+
+        # ── Estrategia 1: CAA redirect (res completa, verifica existencia) ────
+        if mbid:
+            try:
+                req = urllib.request.Request(
+                    f"{CAA_PREFIX}/{mbid}/front",
+                    headers={"User-Agent": UA}
+                )
+                with urllib.request.urlopen(req, timeout=12) as r:
+                    new_cover = r.url   # URL real tras el redirect
+            except Exception:
+                pass
+            time.sleep(0.3)
+
+        # ── Estrategia 2: Last.fm album.getInfo ──────────────────────────────
+        if not new_cover and lfm_key:
+            try:
+                params = urllib.parse.urlencode({
+                    "method": "album.getinfo",
+                    "artist": artist, "album": title,
+                    "api_key": lfm_key, "format": "json",
+                    "autocorrect": 1,
+                })
+                req = urllib.request.Request(
+                    f"https://ws.audioscrobbler.com/2.0/?{params}",
+                    headers={"User-Agent": UA}
+                )
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    data = json.loads(r.read())
+                images = data.get("album", {}).get("image", [])
+                # reversed: empieza por mega/extralarge (los mayores)
+                for img in reversed(images):
+                    src = img.get("#text", "")
+                    if src and PLACEHOLDER not in src:
+                        new_cover = src
+                        break
+            except Exception:
+                pass
+            time.sleep(0.25)
+
+        # ── Estrategia 3: Discogs search ──────────────────────────────────────
+        if not new_cover and discogs_token:
+            try:
+                q = urllib.parse.urlencode({
+                    "q": f"{artist} {title}",
+                    "type": "release", "per_page": "1",
+                })
+                req = urllib.request.Request(
+                    f"https://api.discogs.com/database/search?{q}",
+                    headers={
+                        "User-Agent":    UA,
+                        "Authorization": f"Discogs token={discogs_token}",
+                    }
+                )
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    data = json.loads(r.read())
+                results = data.get("results", [])
+                if results:
+                    img = results[0].get("cover_image") or results[0].get("thumb", "")
+                    if img:
+                        new_cover = img
+            except Exception:
+                pass
+            time.sleep(0.5)
+
+        if new_cover:
+            mh_conn.execute(
+                "UPDATE albums SET cover_url=?, last_updated=? WHERE id=?",
+                (new_cover, ts, album_id)
+            )
+            album["cover_url"] = new_cover
+            fetched += 1
+            print("🖼")
+        else:
+            print("✗ sin portada")
+
+    mh_conn.commit()
+    print(f"\n  portadas: {upgraded} actualizadas 250→500 · "
+          f"{fetched} nuevas · {already_ok} ya correctas")
+
+
 def mh_save_fetched_data(mh_conn: sqlite3.Connection, album_id: int, fields: dict):
     """
-    Persiste datos recién obtenidos (desc, yt_id, rym_url...) en must_hear.db.
+    Persiste datos recién obtenidos en must_hear.db.
+    - Campos de texto largo → album_metadata
+    - Resto (urls, ids, scores…) → albums
     Solo rellena campos vacíos (COALESCE). No sobreescribe.
     """
     valid = {k: v for k, v in fields.items() if v not in (None, "", [], {})}
     if not valid:
         return
     ts = int(time.time())
-    set_parts, params = [], []
-    for col, val in valid.items():
-        if isinstance(val, list):
-            val = json.dumps(val, ensure_ascii=False)
-        set_parts.append(f"{col} = COALESCE({col}, ?)")
-        params.append(val)
-    set_parts.append("last_updated = ?")
-    params.extend([ts, album_id])
-    mh_conn.execute(
-        f"UPDATE albums SET {', '.join(set_parts)} WHERE id=?",
-        params
-    )
+
+    meta_fields  = {k: v for k, v in valid.items() if k in _ALBUM_METADATA_FIELDS}
+    album_fields = {k: v for k, v in valid.items() if k not in _ALBUM_METADATA_FIELDS}
+
+    if album_fields:
+        set_parts, params = [], []
+        for col, val in album_fields.items():
+            if isinstance(val, list):
+                val = json.dumps(val, ensure_ascii=False)
+            set_parts.append(f"{col} = COALESCE({col}, ?)")
+            params.append(val)
+        set_parts.append("last_updated = ?")
+        params.extend([ts, album_id])
+        mh_conn.execute(
+            f"UPDATE albums SET {', '.join(set_parts)} WHERE id=?",
+            params
+        )
+
+    if meta_fields:
+        # Garantizar que existe la fila en album_metadata
+        mh_conn.execute(
+            "INSERT OR IGNORE INTO album_metadata (album_id) VALUES (?)",
+            (album_id,)
+        )
+        set_parts, params = [], []
+        for col, val in meta_fields.items():
+            if isinstance(val, list):
+                val = json.dumps(val, ensure_ascii=False)
+            set_parts.append(f"{col} = COALESCE({col}, ?)")
+            params.append(val)
+        params.append(album_id)
+        mh_conn.execute(
+            f"UPDATE album_metadata SET {', '.join(set_parts)} WHERE album_id=?",
+            params
+        )
 
 
 def mh_save_genres(mh_conn: sqlite3.Connection, album_id: int,
@@ -3651,6 +3852,14 @@ def main():
                                          {"rateyourmusic_url": rym_url})
             mh_conn.commit()
 
+        if getattr(args, "caratulas", False) and not args.index_only:
+            print("\n🖼  Portadas HD (CAA → Last.fm → Discogs)")
+            mh_fetch_covers(
+                mh_conn, albums,
+                lfm_key=getattr(args, "lastfm_api_key", "") or "",
+                discogs_token=getattr(args, "discogs_token", "") or "",
+            )
+
         if args.lastfm_api_key and not args.index_only:
             print("\n📖 Last.fm / MusicBrainz descripciones pre-fetch")
             desc_input = [{"artist": a["artist"], "title": a["title"],
@@ -3692,10 +3901,7 @@ def main():
     if mh_conn:
         users = args.users or mh_get_users(mh_conn)
     elif scrobbles_conn:
-        rows = scrobbles_conn.execute(
-            "SELECT DISTINCT user FROM scrobbles ORDER BY user"
-        ).fetchall()
-        users = args.users or [r[0] for r in rows]
+        users = args.users or _scrobbles_get_users(scrobbles_conn)
     else:
         users = args.users or []
     print(f"👥 {len(users)} usuarios: {', '.join(users)}")

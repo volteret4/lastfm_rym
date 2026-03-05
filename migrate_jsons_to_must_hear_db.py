@@ -3318,11 +3318,7 @@ def mh_load_collection(mh_conn: sqlite3.Connection,
             al.scaruffi_rating,
             al.scaruffi_note,
             al.wikipedia_url,
-            al.wikipedia_content,
-            al.aoty_user_score,
-            al.aoty_critic_score,
-            al.metacritic_score,
-            al.label
+            al.wikipedia_content
         FROM collection_albums ca
         JOIN collections c  ON c.id  = ca.collection_id
         JOIN albums al      ON al.id = ca.album_id
@@ -3336,7 +3332,6 @@ def mh_load_collection(mh_conn: sqlite3.Connection,
         "desc_lfm_album","desc_lfm_artist","desc_mb_album","desc_mb_artist",
         "yt_id","rym","spotify_id","spotify_url","cover_url",
         "scaruffi_rating","scaruffi_note","wikipedia_url","wikipedia_content",
-        "aoty_user_score","aoty_critic_score","metacritic_score","label",
     ]
 
     albums = []
@@ -3383,13 +3378,9 @@ def mh_album_to_json(album: dict, heard: bool) -> dict:
         "yt_id":           album.get("yt_id", ""),
         "genres":          album.get("genres", []),
         "rym":             album.get("rym", ""),
-        "scaruffi_rating":   album.get("scaruffi_rating"),
-        "scaruffi_note":     album.get("scaruffi_note", ""),
-        "wikipedia_url":     album.get("wikipedia_url", ""),
-        "aoty_user_score":   album.get("aoty_user_score"),
-        "aoty_critic_score": album.get("aoty_critic_score"),
-        "metacritic_score":  album.get("metacritic_score"),
-        "label":             album.get("label", ""),
+        "scaruffi_rating": album.get("scaruffi_rating"),
+        "scaruffi_note":   album.get("scaruffi_note", ""),
+        "wikipedia_url":   album.get("wikipedia_url", ""),
     }
 
 

@@ -121,7 +121,7 @@ def clear_weekly_files():
             print(f"   ❌ Eliminado: weekly/{filename}")
 
 
-def generate_all_weekly_stats(users: List[str]) -> None:
+def generate_all_weekly_stats(users: List[str], db_path: str = 'db/lastfm_cache.db') -> None:
     """Genera todas las estadísticas semanales (esta semana + 3 anteriores)"""
     weekly_configs = [
         (0, 'esta-semana.html', 'Esta semana'),
@@ -142,7 +142,7 @@ def generate_all_weekly_stats(users: List[str]) -> None:
     for week_offset, filename, description in weekly_configs:
         print(f"\n🔹 Generando {description}...")
 
-        stats, period_label, _, folder = generate_stats('weekly', users, week_offset=week_offset)
+        stats, period_label, _, folder = generate_stats('weekly', users, db_path, week_offset=week_offset)
 
         if not stats:
             print(f"   ⚠️ No se pudieron generar estadísticas para {description}")
@@ -160,7 +160,7 @@ def generate_all_weekly_stats(users: List[str]) -> None:
         print(f"   📅 {stats['period_label']} - {stats['total_scrobbles']:,} scrobbles")
 
     # Generar copia en raíz de esta-semana.html
-    esta_semana_stats, _, _, _ = generate_stats('weekly', users, week_offset=0)
+    esta_semana_stats, _, _, _ = generate_stats('weekly', users, db_path, week_offset=0)
     if esta_semana_stats:
         root_html_content = HTMLGenerator.create_html(esta_semana_stats, users, 'semanal', "")
         root_file = os.path.join(docs_dir, 'esta-semana.html')
@@ -169,7 +169,7 @@ def generate_all_weekly_stats(users: List[str]) -> None:
         print(f"\n✅ Copia en raíz generada: esta-semana.html")
 
 
-def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, str, str, str]:
+def generate_stats(period_type: str, users: List[str], db_path: str = 'db/lastfm_cache.db', **kwargs) -> Tuple[Dict, str, str, str]:
     """
     Genera estadísticas para el período especificado
 
@@ -212,7 +212,7 @@ def generate_stats(period_type: str, users: List[str], **kwargs) -> Tuple[Dict, 
     print(f"   Hasta: {datetime.fromtimestamp(to_timestamp).strftime('%Y-%m-%d %H:%M')}")
 
     # Conectar a base de datos y analizar
-    db = Database()
+    db = Database(db_path)
     analyzer = StatsAnalyzer(db)
 
     # Incluir novedades para todos los períodos (no solo semanales)
@@ -256,6 +256,8 @@ def main():
     # Argumentos para anuales
     parser.add_argument('--years-ago', type=int, default=0,
                         help='Años hacia atrás (0=este año, 1=año pasado, etc.)')
+    parser.add_argument('--db', type=str, default=None,
+                        help='Ruta a la base de datos SQLite (default: db/lastfm_cache.db)')
 
     args = parser.parse_args()
 
@@ -282,7 +284,7 @@ def main():
     print(f"👥 Usuarios: {', '.join(users)}")
 
     # Verificar base de datos
-    db_path = 'db/lastfm_cache.db'
+    db_path = args.db or 'db/lastfm_cache.db'
     if not os.path.exists(db_path):
         print(f"❌ Error: Base de datos no encontrada en {db_path}")
         sys.exit(1)
@@ -292,7 +294,7 @@ def main():
     # Nuevo comportamiento para weekly: generar todos los archivos
     if args.period == 'weekly':
         clear_weekly_files()
-        generate_all_weekly_stats(users)
+        generate_all_weekly_stats(users, db_path)
         print("\n" + "=" * 60)
         print("✅ PROCESO COMPLETADO - 4 ARCHIVOS SEMANALES GENERADOS")
         print("=" * 60)
@@ -308,7 +310,7 @@ def main():
     elif args.period == 'yearly':
         period_kwargs['year'] = args.year
 
-    stats, period_label, filename, folder = generate_stats(args.period, users, **period_kwargs)
+    stats, period_label, filename, folder = generate_stats(args.period, users, db_path, **period_kwargs)
 
     if not stats:
         print("❌ No se pudieron generar estadísticas")

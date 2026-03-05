@@ -2,20 +2,56 @@
 """
 UserStatsDatabase - Versión optimizada con soporte MBID y mejor rendimiento
 CORREGIDA para géneros por proveedor
+
+Soporta dual-schema: legacy (lastfm_cache.db) y normalizado (lastfm_cache_rym_new_normalized.db).
+Cuando se detecta el schema normalizado, todas las queries se delegan a NormalizedDB.
 """
 
+import os
+import sys
 import sqlite3
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Optional
 from collections import defaultdict
 
+# Soporte para el schema normalizado
+try:
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _ROOT = os.path.join(_HERE, '..', '..')
+    if _ROOT not in sys.path:
+        sys.path.insert(0, _ROOT)
+    from db.db_reader import NormalizedDB, is_normalized_db
+    _HAS_NORMALIZED = True
+except ImportError:
+    _HAS_NORMALIZED = False
 
 
 class UserStatsDatabase:
-    """Versión optimizada con soporte para filtros MBID y mejor rendimiento"""
+    """
+    Versión optimizada con soporte para filtros MBID y mejor rendimiento.
+
+    Cuando se conecta a un DB con schema normalizado (lastfm_cache_rym_new_normalized.db),
+    __new__ retorna directamente una instancia de NormalizedDB que implementa
+    la misma interfaz pública con queries adaptadas al nuevo schema.
+    """
+
+    def __new__(cls, db_path='db/lastfm_cache.db'):
+        if _HAS_NORMALIZED:
+            try:
+                _probe = sqlite3.connect(db_path)
+                _norm = is_normalized_db(_probe)
+                _probe.close()
+                if _norm:
+                    return NormalizedDB(db_path)
+            except Exception:
+                pass
+        return super().__new__(cls)
 
     def __init__(self, db_path='db/lastfm_cache.db'):
+        # Si __new__ retornó un NormalizedDB, no inicializar la clase legacy
+        if _HAS_NORMALIZED and isinstance(self, NormalizedDB):
+            return
         self.db_path = db_path
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row

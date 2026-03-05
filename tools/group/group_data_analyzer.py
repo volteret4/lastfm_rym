@@ -20,6 +20,8 @@ class GroupDataAnalyzer:
         self.current_year = datetime.now().year
         self.from_year = self.current_year - years_back
         self.to_year = self.current_year
+        # Detectar si es schema normalizado (NormalizedDB)
+        self._is_normalized = hasattr(database, 'get_multi_user_entity_data')
 
     def analyze_data_by_user_levels(self, users: List[str]) -> Dict:
         """Analiza datos para diferentes niveles de coincidencia de usuarios"""
@@ -101,11 +103,44 @@ class GroupDataAnalyzer:
             }
         }
 
+    def _build_entity_stats_from_rows(self, rows, entity_type: str, exact_users: int, limit: int) -> List[Dict]:
+        """Construye estadísticas de entidades a partir de filas (entity, user, plays, extra)."""
+        stats = defaultdict(lambda: {
+            'users': set(), 'total_scrobbles': 0, 'user_plays': defaultdict(int), 'extra': {}
+        })
+        for r in rows:
+            e = r['entity']
+            stats[e]['users'].add(r['user'])
+            stats[e]['total_scrobbles'] += r['plays']
+            stats[e]['user_plays'][r['user']] += r['plays']
+            if r.get('extra'):
+                stats[e]['extra'].update(r['extra'])
+        result = []
+        for name, s in stats.items():
+            if len(s['users']) == exact_users:
+                item = {
+                    'name': name,
+                    'user_count': len(s['users']),
+                    'total_scrobbles': s['total_scrobbles'],
+                    'shared_users': list(s['users']),
+                    'user_plays': dict(s['user_plays']),
+                }
+                item.update(s['extra'])
+                result.append(item)
+        result.sort(key=lambda x: x['total_scrobbles'], reverse=True)
+        return result[:limit]
+
     def _get_top_artists_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
         """Obtiene artistas compartidos por EXACTAMENTE el número especificado de usuarios"""
-        cursor = self.database.conn.cursor()
         from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+
+        if self._is_normalized:
+            rows = self.database.get_multi_user_entity_data(
+                users, from_timestamp, to_timestamp, 'artist')
+            return self._build_entity_stats_from_rows(rows, 'artist', exact_users, limit)
+
+        cursor = self.database.conn.cursor()
         mbid_filter = self.database._get_mbid_filter(self.mbid_only)
 
         cursor.execute(f'''
@@ -146,9 +181,15 @@ class GroupDataAnalyzer:
 
     def _get_top_albums_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
         """Obtiene álbumes compartidos por EXACTAMENTE el número especificado de usuarios"""
-        cursor = self.database.conn.cursor()
         from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+
+        if self._is_normalized:
+            rows = self.database.get_multi_user_entity_data(
+                users, from_timestamp, to_timestamp, 'album')
+            return self._build_entity_stats_from_rows(rows, 'album', exact_users, limit)
+
+        cursor = self.database.conn.cursor()
         mbid_filter = self.database._get_mbid_filter(self.mbid_only)
 
         cursor.execute(f'''
@@ -195,9 +236,15 @@ class GroupDataAnalyzer:
 
     def _get_top_tracks_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
         """Obtiene canciones compartidas por EXACTAMENTE el número especificado de usuarios"""
-        cursor = self.database.conn.cursor()
         from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+
+        if self._is_normalized:
+            rows = self.database.get_multi_user_entity_data(
+                users, from_timestamp, to_timestamp, 'track')
+            return self._build_entity_stats_from_rows(rows, 'track', exact_users, limit)
+
+        cursor = self.database.conn.cursor()
         mbid_filter = self.database._get_mbid_filter(self.mbid_only)
 
         cursor.execute(f'''
@@ -243,9 +290,15 @@ class GroupDataAnalyzer:
 
     def _get_top_genres_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
         """Obtiene géneros compartidos por EXACTAMENTE el número especificado de usuarios"""
-        cursor = self.database.conn.cursor()
         from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+
+        if self._is_normalized:
+            rows = self.database.get_multi_user_entity_data(
+                users, from_timestamp, to_timestamp, 'genre')
+            return self._build_entity_stats_from_rows(rows, 'genre', exact_users, limit)
+
+        cursor = self.database.conn.cursor()
         mbid_filter = self.database._get_mbid_filter(self.mbid_only)
 
         cursor.execute(f'''
@@ -286,9 +339,15 @@ class GroupDataAnalyzer:
 
     def _get_top_labels_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
         """Obtiene sellos compartidos por EXACTAMENTE el número especificado de usuarios"""
-        cursor = self.database.conn.cursor()
         from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+
+        if self._is_normalized:
+            rows = self.database.get_multi_user_entity_data(
+                users, from_timestamp, to_timestamp, 'label')
+            return self._build_entity_stats_from_rows(rows, 'label', exact_users, limit)
+
+        cursor = self.database.conn.cursor()
         mbid_filter = self.database._get_mbid_filter(self.mbid_only)
 
         cursor.execute(f'''
@@ -328,9 +387,15 @@ class GroupDataAnalyzer:
 
     def _get_top_release_decades_by_exact_users(self, users: List[str], exact_users: int, limit: int = 25) -> List[Dict]:
         """Obtiene décadas compartidas por EXACTAMENTE el número especificado de usuarios"""
-        cursor = self.database.conn.cursor()
         from_timestamp = int(datetime(self.from_year, 1, 1).timestamp())
         to_timestamp = int(datetime(self.to_year + 1, 1, 1).timestamp()) - 1
+
+        if self._is_normalized:
+            rows = self.database.get_multi_user_entity_data(
+                users, from_timestamp, to_timestamp, 'decade')
+            return self._build_entity_stats_from_rows(rows, 'decade', exact_users, limit)
+
+        cursor = self.database.conn.cursor()
         mbid_filter = self.database._get_mbid_filter(self.mbid_only)
 
         cursor.execute(f'''

@@ -3,11 +3,23 @@
 GroupStatsDatabase - Base de datos para estadÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­sticas grupales
 """
 
+import os
+import sys
 import sqlite3
 import json
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 from collections import defaultdict
+
+try:
+    _HERE = os.path.dirname(os.path.abspath(__file__))
+    _ROOT = os.path.join(_HERE, '..', '..')
+    if _ROOT not in sys.path:
+        sys.path.insert(0, _ROOT)
+    from db.db_reader import NormalizedDB, is_normalized_db
+    _HAS_NORMALIZED = True
+except ImportError:
+    _HAS_NORMALIZED = False
 
 
 class GroupStatsDatabase:
@@ -15,6 +27,24 @@ class GroupStatsDatabase:
 
     def __init__(self, db_path='db/lastfm_cache.db'):
         self.db_path = db_path
+        self._normalized: Optional['NormalizedDB'] = None
+
+        if _HAS_NORMALIZED:
+            _probe = sqlite3.connect(db_path)
+            if is_normalized_db(_probe):
+                _probe.close()
+                self._normalized = NormalizedDB(db_path)
+                self.conn = self._normalized.conn
+                # Delegate all callable NormalizedDB methods as instance attributes
+                # so get_evolution_data (which stays here) automatically uses them
+                for _m in dir(self._normalized):
+                    if not _m.startswith('__'):
+                        _attr = getattr(self._normalized, _m, None)
+                        if callable(_attr):
+                            setattr(self, _m, _attr)
+                return
+            _probe.close()
+
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
         self._create_group_stats_table()
@@ -1513,5 +1543,8 @@ class GroupStatsDatabase:
             return f"{decade_start}s"
 
     def close(self):
-        """Cerrar conexiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n a la base de datos"""
-        self.conn.close()
+        """Cerrar conexión a la base de datos"""
+        if self._normalized:
+            self._normalized.close()
+        elif self.conn:
+            self.conn.close()

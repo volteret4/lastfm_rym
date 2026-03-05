@@ -75,6 +75,8 @@ def main():
                        help='No regenerar archivos JSON (usar existentes)')
     parser.add_argument('--debug-scatter', action='store_true',
                        help='Mostrar información de debug para scatter charts')
+    parser.add_argument('--db', type=str, default=None,
+                       help='Ruta a la base de datos SQLite (default: db/lastfm_cache.db)')
     args = parser.parse_args()
 
     # Auto-generar nombre de archivo si no se especifica
@@ -111,7 +113,7 @@ def main():
         period_folder = f"{from_year}-{current_year}"
 
         # Inicializar componentes
-        database = GroupStatsDatabase()
+        database = GroupStatsDatabase(args.db or 'db/lastfm_cache.db')
         analyzer = GroupStatsAnalyzer(database, years_back=args.years_back, mbid_only=args.mbid_only)
         html_generator = GroupStatsHTMLGenerator()
 

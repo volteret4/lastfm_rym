@@ -26,8 +26,19 @@ import os
 import re
 import shutil
 import argparse
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
+# Soporte para el schema normalizado
+try:
+    _ROOT = os.path.dirname(os.path.abspath(__file__))
+    if _ROOT not in sys.path:
+        sys.path.insert(0, _ROOT)
+    from db.db_reader import NormalizedDB, is_normalized_db
+    _HAS_NORMALIZED = True
+except ImportError:
+    _HAS_NORMALIZED = False
 
 # ─────────────────────────────────────────────
 #  CONFIGURACIÓN

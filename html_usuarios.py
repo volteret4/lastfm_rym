@@ -187,6 +187,12 @@ def main():
         action='store_true',
         help='Usar JSONs existentes en vez de regenerar (mÃ¡s rÃ¡pido)'
     )
+    parser.add_argument(
+        '--db',
+        type=str,
+        default=None,
+        help='Ruta a la base de datos SQLite (default: db/lastfm_cache.db)'
+    )
 
     args = parser.parse_args()
 
@@ -241,7 +247,7 @@ def main():
 
         else:
             # Generar anÃ¡lisis normal
-            database = UserStatsDatabaseExtended()
+            database = UserStatsDatabaseExtended(args.db or 'db/lastfm_cache.db')
             analyzer = UserStatsAnalyzer(database, years_back=args.years_back)
 
             print(f"ðŸ“Š Analizando usuarios...")

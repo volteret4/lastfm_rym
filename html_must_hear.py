@@ -112,11 +112,12 @@ def fetch_series(series_url: str, cache_file: Path) -> list[dict]:
 
     # Verificar completitud
     nums = {a["number"] for a in all_items}
-    missing = sorted(set(range(1, 1002)) - nums)
+    expected = set(range(1, max(nums) + 1)) if nums else set()
+    missing = sorted(expected - nums)
     if missing:
-        print(f"⚠ Aún faltan {len(missing)} álbumes: {missing[:10]}...")
+        print(f"⚠ Huecos en numeración: {missing[:10]}{'...' if len(missing)>10 else ''}")
     else:
-        print(f"✅ Lista completa!")
+        print(f"✅ Lista completa ({len(all_items)} álbumes)")
 
     cache_file.write_text(json.dumps(all_items, ensure_ascii=False, indent=2))
     print(f"✅ {len(all_items)} álbumes scrapeados → {cache_file}")
@@ -313,12 +314,14 @@ def fetch_album_info(albums: list, cache_file: Path, args) -> dict:
     Multiple sources are merged (1001gen wins for desc_lfm_album if available)."""
     desc_db = {}
 
-    lastfm_api_key_gopass = subprocess.check_output(["gopass", "show", "-o", "lastfm/api_key"]).decode().strip()
-    lastfm_api_secret_gopass = subprocess.check_output(["gopass", "show", "-o", "lastfm/secret"]).decode().strip()
+    lastfm_api_key_sops = subprocess.check_output([
+        "sops", "-d", "--extract", '["LASTFM_API_KEY"]', ".encrypted.env"
+    ]).decode().strip()
+    lastfm_api_secret_sops = subprocess.check_output(["sops", "-d", "--extract", '["LASTFM_API_SECRET"]', ".encrypted.env"]).decode().strip()
 
     use_1001   = getattr(args, "gen_1001", False)
-    lfm_key    = getattr(args, "lastfm_api_key",    lastfm_api_key_gopass)
-    lfm_secret = getattr(args, "lastfm_api_secret", lastfm_api_secret_gopass)
+    lfm_key    = getattr(args, "lastfm_api_key",    lastfm_api_key_sops)
+    lfm_secret = getattr(args, "lastfm_api_secret", lastfm_api_secret_sops)
     fetch_mb   = getattr(args, "genres", False) or True  # always fetch MB annotations if available
 
     if not any([use_1001, lfm_key]):
@@ -540,6 +543,17 @@ def check_heard(user_albums: set, album: dict) -> bool:
 
 # ── YOUTUBE PRE-FETCH ────────────────────────────────────────────────────────
 
+def _yt_search(query: str) -> str:
+    """Return first YouTube video ID for query using yt-dlp (no API key needed)."""
+    r = subprocess.run(
+        ["yt-dlp", "--no-playlist", "--get-id", "--quiet",
+         f"ytsearch1:{query}"],
+        capture_output=True, text=True, timeout=30
+    )
+    vid = r.stdout.strip()
+    return vid if len(vid) == 11 else ""
+
+
 def fetch_youtube_ids(albums: list, cache_file: Path, force: bool = False) -> dict:
     """Pre-fetch YouTube video IDs for all albums.
     Returns dict keyed by mbid → video_id (str, may be "").
@@ -558,42 +572,20 @@ def fetch_youtube_ids(albums: list, cache_file: Path, force: bool = False) -> di
         cached = {}
         missing = albums
 
-    print(f"  🎬 Buscando {len(missing)} vídeos en YouTube...")
-    bot_wall_hits = 0
+    print(f"  🎬 Buscando {len(missing)} vídeos en YouTube (yt-dlp)...")
     for i, album in enumerate(missing):
         if i % 25 == 0:
-            print(f"    {i}/{len(missing)}... (bot-walls: {bot_wall_hits})")
-        q    = urllib.parse.quote_plus(f"{album['artist']} {album['title']} full album")
-        html = curl_get(f"https://www.youtube.com/results?search_query={q}")
-
-        # Detect bot/consent wall — YT returns short page or consent redirect
-        if not html or len(html) < 5000 or 'consent.youtube.com' in html or '"videoId"' not in html:
-            # Don't cache this failure — we'll retry next time
-            bot_wall_hits += 1
-            time.sleep(2.0)
-            continue
-
-        # Extract video IDs from initial page JSON
-        ids  = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html)
-        seen = set(); unique = []
-        for v in ids:
-            if v not in seen:
-                seen.add(v); unique.append(v)
-
-        if unique:
-            cached[album["mbid"]] = unique[0]
-        # If no IDs found but page seems valid, cache empty to avoid re-scraping
-        else:
-            cached[album["mbid"]] = ""
-
-        time.sleep(0.8)   # be polite to YouTube
+            print(f"    {i}/{len(missing)}...")
+        q   = f"{album['artist']} {album['title']} full album"
+        vid = _yt_search(q)
+        cached[album["mbid"]] = vid
+        if i % 25 != 0 and not vid:
+            pass  # silent miss
+        time.sleep(0.5)
 
     yt_cache.write_text(json.dumps(cached, ensure_ascii=False, indent=2))
     found = sum(1 for v in cached.values() if v)
-    print(f"  💾 {yt_cache} ({found}/{len(cached)} encontrados, {bot_wall_hits} bloqueados sin cachear)")
-    if bot_wall_hits > 0:
-        print(f"  ⚠ YouTube bloqueó {bot_wall_hits} peticiones (bot-wall/consent). "
-              f"Vuelve a ejecutar con --youtube para reintentar.")
+    print(f"  💾 {yt_cache} ({found}/{len(cached)} encontrados)")
     return cached
 
 
@@ -3081,8 +3073,10 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
 """
 
 
-def render_root_index_html(collections: list[dict], generated: str) -> str:
-    """Top-level index listing all music collections."""
+def render_root_index_html(collections: list[dict], generated: str,
+                            title: str = "Collections",
+                            back_link: str = "") -> str:
+    """Top-level index listing all music collections (reused for collection-group index too)."""
     cards_html = ""
     for c in collections:
         avg_pct  = c["avg_pct"]
@@ -3098,12 +3092,20 @@ def render_root_index_html(collections: list[dict], generated: str) -> str:
         <div class="col-pct">{avg_pct:.1f}% avg completion</div>
       </a>"""
 
+    site_label = (
+        f'<div class="site-label"><a href="{back_link}" '
+        f'style="color:var(--muted);text-decoration:none;letter-spacing:.2em">'
+        f'&larr; All Collections</a></div>'
+        if back_link else
+        '<div class="site-label">Must Hear Tracker</div>'
+    )
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Must Hear — Collections</title>
+<title>Must Hear — {title}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="icon" type="image/png" href="/images/discount.png" />
 <!-- Umami Analytics -->
@@ -3205,8 +3207,8 @@ def render_root_index_html(collections: list[dict], generated: str) -> str:
 </head>
 <body>
 <header>
-  <div class="site-label">Must Hear Tracker</div>
-  <h1>Collections</h1>
+  {site_label}
+  <h1>{title}</h1>
   <div class="header-meta">
     {len(collections)} collection{'s' if len(collections) != 1 else ''} &nbsp;&middot;&nbsp;
     Generated {generated}
@@ -3224,7 +3226,8 @@ def render_root_index_html(collections: list[dict], generated: str) -> str:
 
 
 def update_root_index(root_dir: Path, collection_name: str, slug: str,
-                      users_index: list[dict], generated: str) -> None:
+                      users_index: list[dict], generated: str,
+                      url: str = "") -> None:
     """Read existing root index data (if any), upsert this collection, rewrite."""
     meta_file = root_dir / ".collections_meta.json"
 
@@ -3246,6 +3249,8 @@ def update_root_index(root_dir: Path, collection_name: str, slug: str,
         "avg_pct": round(avg_pct, 1),
         "updated": generated,
     }
+    if url:
+        entry["url"] = url
 
     # Upsert by slug
     existing = [c for c in collections if c["slug"] != slug]
@@ -3258,6 +3263,59 @@ def update_root_index(root_dir: Path, collection_name: str, slug: str,
     html = render_root_index_html(existing, generated)
     (root_dir / "index.html").write_text(html, encoding="utf-8")
     print(f"📋 root index → {root_dir / 'index.html'} ({len(existing)} collections)")
+
+
+def update_collection_group_index(root_dir: Path, collection_name: str,
+                                   collection_slug: str, series_name: str,
+                                   series_slug: str, users_index: list[dict],
+                                   generated: str) -> None:
+    """Upsert a series into a collection-group index (e.g. pitchfork/index.html),
+    then update the root index with the group as a single entry."""
+    coll_dir  = root_dir / collection_slug
+    coll_dir.mkdir(parents=True, exist_ok=True)
+    meta_file = coll_dir / ".series_meta.json"
+
+    series = json.loads(meta_file.read_text()) if meta_file.exists() else []
+
+    avg_pct = (sum(u["pct"] for u in users_index) / len(users_index)) if users_index else 0
+    total   = users_index[0]["total"] if users_index else 0
+
+    entry = {
+        "slug":    series_slug,
+        "name":    series_name,
+        "users":   len(users_index),
+        "total":   total,
+        "avg_pct": round(avg_pct, 1),
+        "updated": generated,
+    }
+    existing_series = [s for s in series if s["slug"] != series_slug]
+    existing_series.append(entry)
+    existing_series.sort(key=lambda s: s["name"])
+    meta_file.write_text(json.dumps(existing_series, ensure_ascii=False, indent=2))
+
+    # Render collection-group index (reuse root index template with back-link)
+    html = render_root_index_html(
+        existing_series, generated,
+        title=collection_name,
+        back_link="../index.html",
+    )
+    (coll_dir / "index.html").write_text(html, encoding="utf-8")
+    print(f"📋 group index → {coll_dir / 'index.html'} ({len(existing_series)} series)")
+
+    # Update root index: represent the whole group as one entry
+    group_avg   = round(sum(s["avg_pct"] for s in existing_series) / len(existing_series), 1)
+    group_total = sum(s["total"] for s in existing_series)
+    group_users = len(users_index)
+    root_proxy  = [{"user": "_group", "pct": group_avg, "total": group_total, "heard": 0}
+                   for _ in range(group_users)]
+    update_root_index(
+        root_dir,
+        collection_name=collection_name,
+        slug=collection_slug,
+        users_index=root_proxy,
+        generated=generated,
+        url=f"{collection_slug}/index.html",
+    )
 
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
@@ -3636,6 +3694,219 @@ def mh_save_genres(mh_conn: sqlite3.Connection, album_id: int,
         )
 
 
+# ── GLOBAL DB OPERATIONS (no specific collection target) ─────────────────────
+
+def _is_global_mode(args) -> bool:
+    """True when no specific collection target was given → operate on whole DB."""
+    return not (
+        getattr(args, "slug", None) or
+        getattr(args, "scaruffi_decades", False) or
+        getattr(args, "scaruffi_decade", None) or
+        getattr(args, "aoty_decades", False) or
+        getattr(args, "aoty_decade_list", None) or
+        getattr(args, "collection", None) or
+        args.series != DEFAULT_SERIES or
+        args.name != "1001 Albums You Must Hear Before You Die"
+    )
+
+
+def mh_global_fetch_covers(mh_conn: sqlite3.Connection,
+                            lfm_key: str = "", discogs_token: str = "") -> None:
+    """Fetch HD covers for ALL albums in must_hear.db that are missing one."""
+    PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f"
+    rows = mh_conn.execute("""
+        SELECT al.id, ar.name, al.name, al.release_group_mbid, al.cover_url
+        FROM albums al JOIN artists ar ON ar.id = al.artist_id
+        WHERE al.cover_url IS NULL OR al.cover_url = ''
+           OR al.cover_url LIKE '%front-250%'
+           OR instr(al.cover_url, ?) > 0
+        ORDER BY ar.name, al.name
+    """, (PLACEHOLDER,)).fetchall()
+    if not rows:
+        print("✅ Todos los álbumes ya tienen portada en DB")
+        return
+    albums = [
+        {"id": r[0], "artist": r[1], "title": r[2], "mbid": r[3] or "", "cover_url": r[4] or ""}
+        for r in rows
+    ]
+    print(f"🖼  {len(albums)} álbumes sin portada completa en toda la DB")
+    mh_fetch_covers(mh_conn, albums, lfm_key=lfm_key, discogs_token=discogs_token)
+
+
+def mh_global_fetch_youtube(mh_conn: sqlite3.Connection) -> None:
+    """Fetch YouTube IDs for ALL albums in must_hear.db that are missing one."""
+    rows = mh_conn.execute("""
+        SELECT al.id, ar.name, al.name
+        FROM albums al JOIN artists ar ON ar.id = al.artist_id
+        WHERE al.yt_id IS NULL OR al.yt_id = ''
+        ORDER BY ar.name, al.name
+    """).fetchall()
+    if not rows:
+        print("✅ Todos los álbumes ya tienen YouTube ID en DB")
+        return
+    print(f"🎬 {len(rows)} álbumes sin YouTube en toda la DB (yt-dlp)...")
+    ts    = int(time.time())
+    found = 0
+    for i, (alb_id, artist, title) in enumerate(rows):
+        if i % 25 == 0:
+            print(f"  {i}/{len(rows)}...")
+        yt_id = _yt_search(f"{artist} {title} full album")
+        if yt_id:
+            mh_conn.execute(
+                "UPDATE albums SET yt_id=?, last_updated=? WHERE id=?", (yt_id, ts, alb_id)
+            )
+            found += 1
+        time.sleep(0.5)
+    mh_conn.commit()
+    print(f"✅ {found}/{len(rows)} YouTube IDs nuevos guardados en DB")
+
+
+def _discover_group_slugs(root_dir: Path) -> dict:
+    """Scan root_dir for .series_meta.json files to map series_slug → group_slug."""
+    groups = {}
+    for meta_file in root_dir.glob("*/.series_meta.json"):
+        group_slug = meta_file.parent.name
+        for s in json.loads(meta_file.read_text()):
+            groups[s["slug"]] = group_slug
+    return groups
+
+
+def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
+                           slug: str, name: str, out_dir: Path,
+                           users: list, generated: str,
+                           collection_slug: str = None,
+                           collection_name: str = None) -> None:
+    """Regenerate HTML pages for one MusicBrainz-series collection using DB data."""
+    albums = mh_load_collection(mh_conn, slug)
+    if not albums:
+        print(f"  ⚠ '{slug}' vacía, saltando")
+        return
+    print(f"  📦 {len(albums)} álbumes")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    data_dir = out_dir / "data"
+    data_dir.mkdir(exist_ok=True)
+
+    users_index = []
+    for user in users:
+        user_scrobbles = mh_get_user_albums(scrobbles_conn, user) if scrobbles_conn else set()
+        albums_data    = []
+        heard_ids      = []
+        for album in albums:
+            heard = check_heard(user_scrobbles, album)
+            jdata = mh_album_to_json(album, heard)
+            if heard:
+                heard_ids.append((album["id"], 0))
+            albums_data.append(jdata)
+
+        heard_count = sum(1 for a in albums_data if a["heard"])
+        pct         = round(heard_count / len(albums_data) * 100, 1) if albums_data else 0
+        safe_user   = re.sub(r"[^a-z0-9]", "_", user.lower())
+        json_fname  = f"{safe_user}.json"
+        fname       = f"user_{safe_user}.html"
+
+        (data_dir / json_fname).write_text(
+            json.dumps(albums_data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
+        )
+        (out_dir / fname).write_text(
+            render_user_html(user, albums_data, name, data_file=f"data/{json_fname}"),
+            encoding="utf-8"
+        )
+        if heard_ids:
+            mh_populate_user_heard(mh_conn, scrobbles_conn, user, heard_ids)
+        users_index.append({
+            "user": user, "file": fname,
+            "heard": heard_count, "total": len(albums_data), "pct": pct,
+        })
+        print(f"   {user}: {heard_count}/{len(albums_data)} ({pct}%)")
+
+    users_index.sort(key=lambda u: u["pct"], reverse=True)
+    (out_dir / "index.html").write_text(
+        render_collection_index_html(users_index, name, generated), encoding="utf-8"
+    )
+    print(f"  📋 {out_dir / 'index.html'}")
+
+    if collection_slug:
+        update_collection_group_index(
+            root_dir, collection_name, collection_slug,
+            name, slug, users_index, generated,
+        )
+    else:
+        update_root_index(root_dir, name, slug, users_index, generated)
+
+
+def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn) -> None:
+    """Regenerate HTML pages for ALL known collections (scaruffi, aoty, MB series)."""
+    generated = datetime.now().strftime("%Y-%m-%d %H:%M")
+    users = getattr(args, "users", None) or (mh_get_users(mh_conn) if mh_conn else [])
+    if not users:
+        print("❌ No hay usuarios en la DB")
+        return
+    print(f"👥 {len(users)} usuarios: {', '.join(users)}")
+
+    # ── Scaruffi ──────────────────────────────────────────────────────────────
+    if (root_dir / "scaruffi").exists():
+        print("\n── Scaruffi ──────────────────────────────────────────────────")
+        orig_sca = getattr(args, "scaruffi_decades", False)
+        orig_idx = args.index_only
+        args.scaruffi_decades = True
+        args.index_only       = True
+        if mh_conn:
+            args._sca_mh_conn = mh_conn
+        run_scaruffi(args, root_dir)
+        args.scaruffi_decades = orig_sca
+        args.index_only       = orig_idx
+
+    # ── AOTY ──────────────────────────────────────────────────────────────────
+    if (root_dir / "aoty").exists():
+        print("\n── AOTY ──────────────────────────────────────────────────────")
+        try:
+            from tools.must_hear.aoty_must_hear import run_aoty
+            args.aoty_decades  = None   # None = all available from cache/DB
+            args.force_scrape  = False
+            args.scrobbles_db  = getattr(args, "scrobbles_db", None) or getattr(args, "db", None)
+            if mh_conn:
+                args._aoty_mh_conn = mh_conn
+            run_aoty(args, root_dir)
+            args.aoty_decades = False
+        except Exception as e:
+            print(f"  ⚠ AOTY error: {e}")
+
+    # ── MusicBrainz series (from must_hear.db) ────────────────────────────────
+    if not mh_conn:
+        print("⚠ Sin --must-hear-db: no se pueden regenerar colecciones MB")
+        return
+
+    group_map   = _discover_group_slugs(root_dir)
+    group_names = {}
+    root_meta   = root_dir / ".collections_meta.json"
+    if root_meta.exists():
+        for c in json.loads(root_meta.read_text()):
+            group_names[c["slug"]] = c["name"]
+
+    skip = {"scaruffi"}
+    rows = mh_conn.execute("SELECT slug, name FROM collections ORDER BY name").fetchall()
+    mb_rows = [(s, n) for s, n in rows
+               if s not in skip and not s.startswith("aoty")]
+
+    for slug, name in mb_rows:
+        print(f"\n── {name} ({slug}) ──────────────────────────────────────────")
+        g_slug = group_map.get(slug)
+        if g_slug:
+            out_dir = root_dir / g_slug / slug
+            g_name  = group_names.get(g_slug, g_slug.replace("_", " ").title())
+        else:
+            out_dir = root_dir / slug
+            g_slug  = None
+            g_name  = None
+        _regen_one_collection(
+            mh_conn, scrobbles_conn, root_dir,
+            slug, name, out_dir, users, generated,
+            collection_slug=g_slug, collection_name=g_name,
+        )
+
+    print(f"\n✅ Global index-only done → {root_dir / 'index.html'}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="1001 Albums Must Hear — HTML Generator")
     parser.add_argument("--must-hear-db", dest="must_hear_db", default=None,
@@ -3651,6 +3922,9 @@ def main():
     parser.add_argument("--series", default=DEFAULT_SERIES, help="URL de la serie en MusicBrainz")
     parser.add_argument("--name",   default="1001 Albums You Must Hear Before You Die",
                         help="Nombre de la serie (usado en títulos y en el index superior)")
+    parser.add_argument("--collection", default=None,
+                        help="Nombre del grupo/colección que agrupa varias series "
+                             "(ej: 'pitchfork'). Crea docs/must_hear/<collection>/<serie>/")
     parser.add_argument("--slug",   default=None,
                         help="Nombre del subdirectorio para esta colección (auto si no se indica)")
     parser.add_argument("--cache",  default=None,
@@ -3688,6 +3962,12 @@ def main():
                         help="Token Discogs para carátulas HD (opcional, mejora resultados)")
     parser.add_argument("--scaruffi-debug",   dest="scaruffi_debug",   action="store_true",
                         help="Guardar HTML/Markdown crudo de Scaruffi para depurar el parser")
+    parser.add_argument("--aoty-decades", dest="aoty_decades", action="store_true",
+                        help="Scrapear décadas de AOTY (albumoftheyear.org/must-hear/YYYYs/)")
+    parser.add_argument("--aoty-decade", dest="aoty_decade_list", nargs="+", metavar="DECADE",
+                        help="Décadas AOTY específicas a (re)scrapear: 1950s 1960s ... 2020s")
+    parser.add_argument("--aoty-force", dest="aoty_force_scrape", action="store_true",
+                        help="Re-scrapear AOTY aunque haya caché")
     args = parser.parse_args()
 
     root_dir = Path(args.out)
@@ -3720,11 +4000,46 @@ def main():
         scrobbles_conn.execute("PRAGMA query_only=ON")
         print(f"🗄  scrobbles.db: {p}")
 
+    # ── Global mode: no specific collection target ────────────────────────────
+    if mh_conn and _is_global_mode(args):
+        if args.index_only:
+            global_index_only(args, root_dir, mh_conn, scrobbles_conn)
+            if mh_conn: mh_conn.close()
+            if scrobbles_conn: scrobbles_conn.close()
+            return
+        do_covers  = getattr(args, "caratulas", False)
+        do_youtube = getattr(args, "youtube",   False)
+        if do_covers or do_youtube:
+            if do_covers:
+                mh_global_fetch_covers(
+                    mh_conn,
+                    lfm_key=getattr(args, "lastfm_api_key", "") or "",
+                    discogs_token=getattr(args, "discogs_token", "") or "",
+                )
+            if do_youtube:
+                mh_global_fetch_youtube(mh_conn)
+            if mh_conn: mh_conn.close()
+            if scrobbles_conn: scrobbles_conn.close()
+            return
+
     # Scaruffi mode: fully separate flow
     if getattr(args, "scaruffi_decades", False):
         if mh_conn:
             args._sca_mh_conn = mh_conn
         run_scaruffi(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
+    # AOTY mode: fully separate flow
+    if getattr(args, "aoty_decades", False) or getattr(args, "aoty_decade_list", None):
+        from tools.must_hear.aoty_must_hear import run_aoty
+        args.scrobbles_db   = scrobbles_db_path
+        args.aoty_decades   = getattr(args, "aoty_decade_list", None)
+        args.force_scrape   = getattr(args, "aoty_force_scrape", False)
+        if mh_conn:
+            args._aoty_mh_conn = mh_conn
+        run_aoty(args, root_dir)
         if mh_conn: mh_conn.close()
         if scrobbles_conn: scrobbles_conn.close()
         return
@@ -3736,7 +4051,15 @@ def main():
         slug = re.sub(r"[^a-z0-9]+", "_", args.name.lower()).strip("_")
         slug = re.sub(r"_+", "_", slug)
 
-    out_dir = root_dir / slug
+    # --collection groups multiple series under a common subdirectory
+    collection_name = getattr(args, "collection", None)
+    if collection_name:
+        collection_slug = re.sub(r"[^a-z0-9]+", "_", collection_name.lower()).strip("_")
+        collection_slug = re.sub(r"_+", "_", collection_slug)
+        out_dir = root_dir / collection_slug / slug
+    else:
+        collection_slug = None
+        out_dir = root_dir / slug
     out_dir.mkdir(parents=True, exist_ok=True)
 
     cache_path = Path(args.cache) if args.cache else out_dir / "series_cache.json"
@@ -3745,18 +4068,26 @@ def main():
         args.from_cache = True
 
     # ── 1. Lista de álbumes ──────────────────────────────────────────────────
+    albums_from_db = False
     if mh_conn:
         # Modo must_hear.db: cargar directamente de la BD
         albums = mh_load_collection(mh_conn, slug)
-        if not albums:
-            print(f"⚠ No hay álbumes para la colección '{slug}' en must_hear.db")
-            print(f"  Colecciones disponibles:")
-            for row in mh_conn.execute("SELECT slug, name, total_albums FROM collections").fetchall():
-                print(f"    {row[0]:<30} {row[2]} álbumes  ({row[1]})")
-            if mh_conn: mh_conn.close()
-            if scrobbles_conn: scrobbles_conn.close()
-            return
-        print(f"\n📦 {len(albums)} álbumes desde must_hear.db (colección '{slug}')")
+        if albums:
+            albums_from_db = True
+            print(f"\n📦 {len(albums)} álbumes desde must_hear.db (colección '{slug}')")
+        else:
+            print(f"ℹ  Colección '{slug}' no encontrada en must_hear.db, scrapeando desde MusicBrainz...")
+            if args.from_cache:
+                if not cache_path.exists():
+                    print(f"❌ --from-cache / --index-only: no existe {cache_path}")
+                    if mh_conn: mh_conn.close()
+                    if scrobbles_conn: scrobbles_conn.close()
+                    return
+                albums = json.loads(cache_path.read_text())
+                print(f"\n📦 caché: {len(albums)} álbumes desde {cache_path}")
+            else:
+                albums = fetch_series(args.series, cache_path)
+                print(f"\n🎵 {len(albums)} álbumes en la serie")
     elif args.from_cache:
         if not cache_path.exists():
             print(f"❌ --from-cache / --index-only: no existe {cache_path}")
@@ -3769,7 +4100,7 @@ def main():
 
     # ── 1b. Descripciones e info enriquecida (solo si NO usamos must_hear.db) ─
     # Con must_hear.db ya vienen incluidas en mh_load_collection()
-    if not mh_conn:
+    if not albums_from_db:
         if args.index_only:
             desc_db = {}
             for fname in ("descriptions_lastfm_cache.json", "descriptions_1001_cache.json"):
@@ -3924,7 +4255,7 @@ def main():
         heard_ids   = []
 
         for album in albums:
-            if mh_conn:
+            if albums_from_db:
                 heard = check_heard(user_scrobbles, album)
                 jdata = mh_album_to_json(album, heard)
                 if heard:
@@ -3975,8 +4306,15 @@ def main():
     print(f"\n📋 collection index → {out_dir / 'index.html'}")
 
     # ── 5. Root index ─────────────────────────────────────────────────────────
-    update_root_index(root_dir, args.name, slug, users_index, generated)
-    print(f"\n🎉 Listo! Abre: {root_dir / 'index.html'}")
+    if collection_slug:
+        update_collection_group_index(
+            root_dir, collection_name, collection_slug,
+            args.name, slug, users_index, generated,
+        )
+        print(f"\n🎉 Listo! Abre: {root_dir / collection_slug / 'index.html'}")
+    else:
+        update_root_index(root_dir, args.name, slug, users_index, generated)
+        print(f"\n🎉 Listo! Abre: {root_dir / 'index.html'}")
 
     if mh_conn: mh_conn.close()
     if scrobbles_conn: scrobbles_conn.close()

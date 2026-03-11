@@ -958,55 +958,85 @@ def mh_sync_aoty_collection(mh_conn: sqlite3.Connection,
                               decade: str,
                               scraped_albums: list[dict]) -> list[dict]:
     """Upsert scraped AOTY albums into must_hear.db.
-    Creates the collection aoty_{decade} if not present.
-    For existing albums, preserves enriched fields (cover_url, yt_id, descs).
+    Uses SELECT-first pattern throughout — no UNIQUE constraints exist on
+    slug/name/artist_id+name, so INSERT OR IGNORE would silently do nothing.
     Returns album list with 'id' field set to DB row id."""
-    ts  = int(time.time())
+    ts   = int(time.time())
     slug = f"aoty_{decade}"
     url  = f"{AOTY_BASE}/{decade}/"
 
-    # Ensure collection row
-    mh_conn.execute(
-        "INSERT OR IGNORE INTO collections (name, slug, source_url, last_updated) VALUES (?,?,?,?)",
-        (f"AOTY Must Hear {decade}", slug, url, ts)
-    )
-    coll_id = mh_conn.execute(
+    # ── 1. Collection row ─────────────────────────────────────────────────────
+    coll_row = mh_conn.execute(
         "SELECT id FROM collections WHERE slug=?", (slug,)
-    ).fetchone()[0]
+    ).fetchone()
+    if coll_row:
+        coll_id = coll_row[0]
+        mh_conn.execute(
+            "UPDATE collections SET name=?, source_url=?, source_type=?, "
+            "last_updated=? WHERE id=?",
+            (f"AOTY Must Hear {decade}", url, "aoty", ts, coll_id)
+        )
+        print(f"  📋 Colección existente '{slug}' (id={coll_id})")
+    else:
+        mh_conn.execute(
+            "INSERT INTO collections "
+            "(name, slug, source_url, source_type, last_updated, added_timestamp) "
+            "VALUES (?,?,?,?,?,?)",
+            (f"AOTY Must Hear {decade}", slug, url, "aoty", ts, ts)
+        )
+        coll_id = mh_conn.execute(
+            "SELECT id FROM collections WHERE slug=?", (slug,)
+        ).fetchone()[0]
+        print(f"  📋 Colección nueva '{slug}' creada (id={coll_id})")
+    mh_conn.commit()
 
+    # ── 2. Albums ─────────────────────────────────────────────────────────────
     result = []
     for album in scraped_albums:
         artist_name = album["artist"]
         title       = album["title"]
 
-        # Upsert artist
-        mh_conn.execute(
-            "INSERT OR IGNORE INTO artists (name, added_timestamp) VALUES (?,?)",
-            (artist_name, ts)
-        )
-        artist_id = mh_conn.execute(
+        # Artist: SELECT by name (indexed), insert only if missing
+        artist_row = mh_conn.execute(
             "SELECT id FROM artists WHERE name=?", (artist_name,)
-        ).fetchone()[0]
+        ).fetchone()
+        if artist_row:
+            artist_id = artist_row[0]
+        else:
+            mh_conn.execute(
+                "INSERT INTO artists (name, added_timestamp) VALUES (?,?)",
+                (artist_name, ts)
+            )
+            artist_id = mh_conn.execute(
+                "SELECT id FROM artists WHERE name=?", (artist_name,)
+            ).fetchone()[0]
 
-        # Upsert album — only set aoty fields on insert; preserve on update
-        mh_conn.execute("""
-            INSERT OR IGNORE INTO albums
-              (artist_id, name, year, aoty_url, aoty_critic_score, aoty_user_score,
-               cover_url, added_timestamp)
-            VALUES (?,?,?,?,?,?,?,?)
-        """, (artist_id, title, album.get("year"),
-              album.get("aoty_url", ""),
-              album.get("aoty_critic_score"),
-              album.get("aoty_user_score"),
-              album.get("cover_url", ""),
-              ts))
-
-        album_id = mh_conn.execute(
+        # Album: SELECT by (artist_id, name), insert only if missing
+        album_row = mh_conn.execute(
             "SELECT id FROM albums WHERE artist_id=? AND name=?",
             (artist_id, title)
-        ).fetchone()[0]
+        ).fetchone()
+        if album_row:
+            album_id = album_row[0]
+        else:
+            mh_conn.execute(
+                "INSERT INTO albums "
+                "(artist_id, name, year, aoty_url, aoty_critic_score, "
+                "aoty_user_score, cover_url, added_timestamp) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (artist_id, title, album.get("year"),
+                 album.get("aoty_url", ""),
+                 album.get("aoty_critic_score"),
+                 album.get("aoty_user_score"),
+                 album.get("cover_url", ""),
+                 ts)
+            )
+            album_id = mh_conn.execute(
+                "SELECT id FROM albums WHERE artist_id=? AND name=?",
+                (artist_id, title)
+            ).fetchone()[0]
 
-        # Update aoty-specific scores/url if still empty (COALESCE pattern)
+        # Update aoty-specific scores/url only if still empty
         mh_conn.execute("""
             UPDATE albums SET
               aoty_url          = COALESCE(aoty_url,          ?),
@@ -1021,16 +1051,22 @@ def mh_sync_aoty_collection(mh_conn: sqlite3.Connection,
               album.get("cover_url", ""),
               ts, album_id))
 
-        # Upsert collection_albums
-        mh_conn.execute(
-            "INSERT OR IGNORE INTO collection_albums (collection_id, album_id, rank) VALUES (?,?,?)",
-            (coll_id, album_id, album.get("number", 0))
-        )
+        # collection_albums: SELECT by (collection_id, album_id) — no UNIQUE constraint
+        ca_row = mh_conn.execute(
+            "SELECT id FROM collection_albums "
+            "WHERE collection_id=? AND album_id=?",
+            (coll_id, album_id)
+        ).fetchone()
+        if not ca_row:
+            mh_conn.execute(
+                "INSERT INTO collection_albums (collection_id, album_id, rank) "
+                "VALUES (?,?,?)",
+                (coll_id, album_id, album.get("number", 0))
+            )
 
         # Build merged dict: DB values win over scraped for enriched fields
         merged = dict(album)
         merged["id"] = album_id
-        # Load existing enriched values from DB
         row = mh_conn.execute(
             "SELECT cover_url, yt_id, rateyourmusic_url FROM albums WHERE id=?",
             (album_id,)
@@ -1041,13 +1077,13 @@ def mh_sync_aoty_collection(mh_conn: sqlite3.Connection,
             if row[2]: merged["rym"]       = row[2]
         result.append(merged)
 
-    # Update collection total
+    # ── 3. Update total ───────────────────────────────────────────────────────
     mh_conn.execute(
         "UPDATE collections SET total_albums=?, last_updated=? WHERE id=?",
         (len(result), ts, coll_id)
     )
     mh_conn.commit()
-    print(f"  💾 DB: colección '{slug}' → {len(result)} álbumes")
+    print(f"  💾 DB: '{slug}' → {len(result)} álbumes guardados")
     return result
 
 
@@ -1110,7 +1146,7 @@ def mh_aoty_fetch_covers(mh_conn: sqlite3.Connection, albums: list[dict],
 
         # Last.fm extralarge/mega
         try:
-            api_key = lfm_key
+            api_key = lfm_key or "c9b21e5a749e4f279b6cdce9d5b3a7b3"
             params  = urllib.parse.urlencode({
                 "method": "album.getinfo",
                 "artist": artist, "album": title,
@@ -1229,7 +1265,7 @@ def aoty_fetch_covers(albums: list[dict], cache_dir: Path,
 
         # ── Strategy 1: Last.fm album.getInfo (extralarge ~300px, sometimes mega ~500px) ──
         try:
-            api_key = lfm_key
+            api_key = lfm_key or "c9b21e5a749e4f279b6cdce9d5b3a7b3"
             params  = urllib.parse.urlencode({
                 "method": "album.getinfo",
                 "artist": artist, "album": title,

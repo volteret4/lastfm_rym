@@ -27,6 +27,36 @@ CAA = "https://coverartarchive.org/release-group"
 
 GEN_INDEX = "https://1001albumsgenerator.com/albums"
 
+def _resolve_lastfm_credentials(args) -> tuple[str, str]:
+    """Devuelve (api_key, api_secret) resolviendo en este orden:
+      1. --lastfm-api-key / --lastfm-api-secret (CLI)
+      2. Variables de entorno LASTFM_API_KEY / LASTFM_API_SECRET
+      3. SOPS: sops -d --extract '["LASTFM_API_KEY"]' .encrypted.env
+    Devuelve ("", "") sin lanzar excepción si no hay credenciales."""
+    key    = getattr(args, "lastfm_api_key",    None) or ""
+    secret = getattr(args, "lastfm_api_secret", None) or ""
+
+    if not key:
+        key    = os.environ.get("LASTFM_API_KEY",    "")
+        secret = os.environ.get("LASTFM_API_SECRET", "") or secret
+
+    if not key:
+        encrypted = Path(".encrypted.env")
+        if encrypted.exists():
+            try:
+                key = subprocess.check_output(
+                    ["sops", "-d", "--extract", '["LASTFM_API_KEY"]', str(encrypted)],
+                    stderr=subprocess.DEVNULL,
+                ).decode().strip()
+                secret = subprocess.check_output(
+                    ["sops", "-d", "--extract", '["LASTFM_API_SECRET"]', str(encrypted)],
+                    stderr=subprocess.DEVNULL,
+                ).decode().strip()
+            except Exception:
+                pass
+
+    return key, secret
+
 def curl_get(url: str) -> str:
     r = subprocess.run(
         ["curl", "-s", "-L", "-A", UA, "--max-time", "30", url],
@@ -44,20 +74,32 @@ def get_total_pages(html: str) -> int:
     return max((int(p) for p in pages), default=1)
 
 def parse_page(html: str) -> list[dict]:
+    """Parsea una página de serie MusicBrainz.
+    La columna 'number-column' es opcional: algunas series MB no tienen
+    numeración explícita (p.ej. listas por año). En ese caso se asigna
+    el orden de aparición en la página como número provisional."""
     items = []
+    _counter = [0]  # contador de fila para series sin número
     for row in re.findall(r'<tr class="(?:odd|even)">(.*?)</tr>', html, re.DOTALL):
-        num_m   = re.search(r'<td class="number-column">(\d+)</td>', row)
-        year_m  = re.search(r'<td class="c">(\d{4})</td>', row)
         title_m = re.search(r'href="/release-group/([a-f0-9-]{36})"[^>]*><bdi>(.*?)</bdi>', row)
-        artist_m= re.search(r'<td><bdi>(.*?)</bdi></td>', row, re.DOTALL)
-        if not (num_m and title_m): continue
+        if not title_m:
+            continue  # fila sin álbum (cabecera de letra, etc.)
+        num_m   = re.search(r'<td class="number-column">(\d+)</td>', row)
+        # Buscar todos los años en la fila; en series sin número la primera
+        # columna <td class="c"> suele ser el año de la lista (ej. "2024") y
+        # la segunda el año de lanzamiento. Tomamos el último año encontrado
+        # como año del álbum, que suele ser el más preciso.
+        year_matches = re.findall(r'<td class="c">(\d{4})</td>', row)
+        year = int(year_matches[-1]) if year_matches else None
+        artist_m = re.search(r'<td><bdi>(.*?)</bdi></td>', row, re.DOTALL)
         artist = ""
         if artist_m:
             artist = unescape(re.sub(r'<[^>]+>', '', artist_m.group(1))).strip()
             artist = re.sub(r'\s+', ' ', artist)
+        _counter[0] += 1
         items.append({
-            "number": int(num_m.group(1)),
-            "year":   int(year_m.group(1)) if year_m else None,
+            "number": int(num_m.group(1)) if num_m else _counter[0],
+            "year":   year,
             "title":  unescape(re.sub(r'<[^>]+>', '', title_m.group(2))).strip(),
             "artist": artist,
             "mbid":   title_m.group(1),
@@ -79,13 +121,10 @@ def fetch_page_with_retry(url: str, retries: int = 3, delay: float = 3.0) -> str
 def fetch_series(series_url: str, cache_file: Path) -> list[dict]:
     if cache_file.exists():
         data = json.loads(cache_file.read_text())
-        nums = {a["number"] for a in data}
-        missing = sorted(set(range(1, 1002)) - nums)
-        if not missing:
-            print(f"📦 Caché completo ({len(data)} álbumes): {cache_file}")
+        if data:
+            print(f"📦 Caché: {len(data)} álbumes en {cache_file}")
             return data
-        print(f"📦 Caché incompleto: {len(data)} álbumes, faltan {len(missing)} (p.ej {missing[:5]})")
-        print("🔄 Re-scrapeando páginas faltantes...")
+        print("📦 Caché vacío — re-scrapeando...")
 
     sid  = extract_series_id(series_url)
     base = f"https://musicbrainz.org/series/{sid}"
@@ -108,16 +147,29 @@ def fetch_series(series_url: str, cache_file: Path) -> list[dict]:
         print(f"  → {len(items)} álbumes")
         all_items.extend(items)
 
-    all_items.sort(key=lambda x: x["number"])
+    # Detectar si la serie tiene numeración explícita (number-column en MB)
+    # Si todos los números son consecutivos desde 1 con la cuenta total,
+    # asumimos numeración real; si no, renumeramos por orden de aparición.
+    nums = sorted(a["number"] for a in all_items)
+    has_explicit_numbering = (
+        nums == list(range(1, len(nums) + 1))
+    ) if nums else False
 
-    # Verificar completitud
-    nums = {a["number"] for a in all_items}
-    expected = set(range(1, max(nums) + 1)) if nums else set()
-    missing = sorted(expected - nums)
-    if missing:
-        print(f"⚠ Huecos en numeración: {missing[:10]}{'...' if len(missing)>10 else ''}")
+    if not has_explicit_numbering:
+        # Renumerar por orden de aparición (ya vienen ordenados por página)
+        for i, item in enumerate(all_items, 1):
+            item["number"] = i
+        print(f"ℹ️  Serie sin numeración explícita — asignados números 1-{len(all_items)}")
     else:
-        print(f"✅ Lista completa ({len(all_items)} álbumes)")
+        all_items.sort(key=lambda x: x["number"])
+        # Verificar huecos solo en series con numeración real
+        nums_set = {a["number"] for a in all_items}
+        expected = set(range(1, max(nums_set) + 1)) if nums_set else set()
+        missing  = sorted(expected - nums_set)
+        if missing:
+            print(f"⚠ Huecos en numeración: {missing[:10]}{'...' if len(missing)>10 else ''}")
+        else:
+            print(f"✅ Lista completa ({len(all_items)} álbumes)")
 
     cache_file.write_text(json.dumps(all_items, ensure_ascii=False, indent=2))
     print(f"✅ {len(all_items)} álbumes scrapeados → {cache_file}")
@@ -314,15 +366,9 @@ def fetch_album_info(albums: list, cache_file: Path, args) -> dict:
     Multiple sources are merged (1001gen wins for desc_lfm_album if available)."""
     desc_db = {}
 
-    lastfm_api_key_sops = subprocess.check_output([
-        "sops", "-d", "--extract", '["LASTFM_API_KEY"]', ".encrypted.env"
-    ]).decode().strip()
-    lastfm_api_secret_sops = subprocess.check_output(["sops", "-d", "--extract", '["LASTFM_API_SECRET"]', ".encrypted.env"]).decode().strip()
-
-    use_1001   = getattr(args, "gen_1001", False)
-    lfm_key    = getattr(args, "lastfm_api_key",    lastfm_api_key_sops)
-    lfm_secret = getattr(args, "lastfm_api_secret", lastfm_api_secret_sops)
-    fetch_mb   = getattr(args, "genres", False) or True  # always fetch MB annotations if available
+    lfm_key, lfm_secret = _resolve_lastfm_credentials(args)
+    use_1001 = getattr(args, "gen_1001", False)
+    fetch_mb = True  # always fetch MB annotations if available
 
     if not any([use_1001, lfm_key]):
         print("ℹ️  Sin fuente de descripciones (usa --1001-albums o --lastfm-api-key/secret)")
@@ -485,7 +531,6 @@ def populate_user_heard(mh_conn: sqlite3.Connection,
 
     inserted = 0
     for album_id, artist_name, album_name in coll_albums:
-        nk = normkey(artist_name, album_name)
         # check_heard logic inline (substring match)
         a_n = _norm(artist_name)
         t_n = _norm(album_name)
@@ -3694,20 +3739,281 @@ def mh_save_genres(mh_conn: sqlite3.Connection, album_id: int,
         )
 
 
+def mh_sync_mb_collection(mh_conn: sqlite3.Connection,
+                           slug: str,
+                           name: str,
+                           source_url: str,
+                           albums: list[dict]) -> list[dict]:
+    """Upsert a MusicBrainz series into must_hear.db.
+    The DB has NO unique constraints on slug/name/artist, so every table
+    uses SELECT-first to avoid duplicates on repeated runs.
+    Returns album list with 'id' field populated from DB."""
+    ts = int(time.time())
+
+    # ── 1. Collection row ─────────────────────────────────────────────────────
+    row = mh_conn.execute(
+        "SELECT id FROM collections WHERE slug=?", (slug,)
+    ).fetchone()
+    if row:
+        coll_id = row[0]
+        mh_conn.execute(
+            "UPDATE collections SET name=?, source_url=?, source_type=?, "
+            "last_updated=? WHERE id=?",
+            (name, source_url, "musicbrainz", ts, coll_id)
+        )
+        print(f"  📋 Colección existente '{slug}' (id={coll_id}) — actualizando")
+    else:
+        mh_conn.execute(
+            "INSERT INTO collections "
+            "(name, slug, source_url, source_type, last_updated, added_timestamp) "
+            "VALUES (?,?,?,?,?,?)",
+            (name, slug, source_url, "musicbrainz", ts, ts)
+        )
+        coll_id = mh_conn.execute(
+            "SELECT id FROM collections WHERE slug=?", (slug,)
+        ).fetchone()[0]
+        print(f"  📋 Colección nueva '{slug}' creada (id={coll_id})")
+    mh_conn.commit()
+
+    # ── 2. Albums ─────────────────────────────────────────────────────────────
+    result = []
+    for album in albums:
+        artist_name = album.get("artist", "")
+        title       = album.get("title", "")
+        mbid        = album.get("mbid", "") or None
+        year        = album.get("year")
+        rank        = album.get("number", 0)
+
+        # Artist: SELECT by name (idx_mh_artists_name), insert only if missing
+        artist_row = mh_conn.execute(
+            "SELECT id FROM artists WHERE name=?", (artist_name,)
+        ).fetchone()
+        if artist_row:
+            artist_id = artist_row[0]
+        else:
+            mh_conn.execute(
+                "INSERT INTO artists (name, added_timestamp) VALUES (?,?)",
+                (artist_name, ts)
+            )
+            artist_id = mh_conn.execute(
+                "SELECT id FROM artists WHERE name=?", (artist_name,)
+            ).fetchone()[0]
+
+        # Album: buscar por release_group_mbid primero (tiene UNIQUE constraint),
+        # luego por (artist_id, name) como fallback.
+        album_row = None
+        if mbid:
+            album_row = mh_conn.execute(
+                "SELECT id FROM albums WHERE release_group_mbid=?", (mbid,)
+            ).fetchone()
+        if not album_row:
+            album_row = mh_conn.execute(
+                "SELECT id FROM albums WHERE artist_id=? AND name=?",
+                (artist_id, title)
+            ).fetchone()
+
+        if album_row:
+            album_id = album_row[0]
+            # Solo escribir release_group_mbid si el campo está NULL en esta fila
+            # (nunca sobreescribir — evita violar el UNIQUE constraint)
+            mh_conn.execute(
+                "UPDATE albums SET "
+                "release_group_mbid = CASE WHEN release_group_mbid IS NULL THEN ? ELSE release_group_mbid END, "
+                "year               = COALESCE(year, ?), "
+                "last_updated       = ? "
+                "WHERE id=?",
+                (mbid, year, ts, album_id)
+            )
+        else:
+            mh_conn.execute(
+                "INSERT INTO albums "
+                "(artist_id, name, year, release_group_mbid, added_timestamp) "
+                "VALUES (?,?,?,?,?)",
+                (artist_id, title, year, mbid, ts)
+            )
+            album_id = mh_conn.execute(
+                "SELECT id FROM albums WHERE artist_id=? AND name=?",
+                (artist_id, title)
+            ).fetchone()[0]
+
+        # collection_albums: SELECT by (collection_id, album_id) — no UNIQUE constraint
+        ca_row = mh_conn.execute(
+            "SELECT id FROM collection_albums "
+            "WHERE collection_id=? AND album_id=?",
+            (coll_id, album_id)
+        ).fetchone()
+        if not ca_row:
+            mh_conn.execute(
+                "INSERT INTO collection_albums (collection_id, album_id, rank) "
+                "VALUES (?,?,?)",
+                (coll_id, album_id, rank)
+            )
+
+        merged = dict(album)
+        merged["id"] = album_id
+        result.append(merged)
+
+    # ── 3. Update total ───────────────────────────────────────────────────────
+    mh_conn.execute(
+        "UPDATE collections SET total_albums=?, last_updated=? WHERE id=?",
+        (len(result), ts, coll_id)
+    )
+    mh_conn.commit()
+    print(f"  💾 DB: '{slug}' → {len(result)} álbumes guardados en must_hear.db")
+    return result
+
+
 # ── GLOBAL DB OPERATIONS (no specific collection target) ─────────────────────
 
+def mh_global_fetch_lastfm(mh_conn: sqlite3.Connection,
+                             api_key: str, api_secret: str) -> None:
+    """Fetch Last.fm + MusicBrainz descriptions for ALL albums in must_hear.db
+    that are missing at least one description field.
+    Persiste directamente en album_metadata usando mh_save_fetched_data."""
+    pylast = _try_import("pylast")
+    if not pylast:
+        print("  ⚠ pylast no disponible. Instala con: pip install pylast --break-system-packages")
+        return
+
+    # Álbumes con algún campo de descripción vacío
+    rows = mh_conn.execute("""
+        SELECT al.id, ar.name, al.name, al.release_group_mbid,
+               COALESCE(am.desc_lfm_album,  '') as dla,
+               COALESCE(am.desc_lfm_artist, '') as dlar,
+               COALESCE(am.desc_mb_album,   '') as dma,
+               COALESCE(am.desc_mb_artist,  '') as dmar
+        FROM albums al
+        JOIN artists ar ON ar.id = al.artist_id
+        LEFT JOIN album_metadata am ON am.album_id = al.id
+        WHERE COALESCE(am.desc_lfm_album,  '') = ''
+           OR COALESCE(am.desc_lfm_artist, '') = ''
+           OR COALESCE(am.desc_mb_album,   '') = ''
+           OR COALESCE(am.desc_mb_artist,  '') = ''
+        ORDER BY ar.name, al.name
+    """).fetchall()
+
+    if not rows:
+        print("✅ Todos los álbumes ya tienen descripciones en DB")
+        return
+
+    print(f"📖 {len(rows)} álbumes con alguna descripción vacía en toda la DB")
+
+    DESC_FIELDS = ("desc_lfm_album", "desc_lfm_artist", "desc_mb_album", "desc_mb_artist")
+
+    try:
+        network = pylast.LastFMNetwork(api_key=api_key, api_secret=api_secret)
+    except Exception as e:
+        print(f"  ❌ Error conectando con Last.fm: {e}")
+        return
+
+    ts      = int(time.time())
+    updated = 0
+    for i, (alb_id, artist, title, mbid, dla, dlar, dma, dmar) in enumerate(rows):
+        if i % 25 == 0:
+            print(f"  {i}/{len(rows)}...")
+
+        entry = {
+            "desc_lfm_album":  dla,
+            "desc_lfm_artist": dlar,
+            "desc_mb_album":   dma,
+            "desc_mb_artist":  dmar,
+        }
+        changed = {}
+
+        # ── Last.fm album wiki ───────────────────────────────────────────────
+        if not entry["desc_lfm_album"]:
+            try:
+                wiki = _clean_lfm_text(
+                    network.get_album(artist, title).get_wiki_summary() or ""
+                )
+                if len(wiki) > 40:
+                    changed["desc_lfm_album"] = wiki[:800]
+            except Exception:
+                pass
+            time.sleep(0.25)
+
+        # ── Last.fm artist bio ───────────────────────────────────────────────
+        if not entry["desc_lfm_artist"]:
+            try:
+                bio = _clean_lfm_text(
+                    network.get_artist(artist).get_bio_summary() or ""
+                )
+                if len(bio) > 40:
+                    changed["desc_lfm_artist"] = bio[:800]
+            except Exception:
+                pass
+            time.sleep(0.25)
+
+        # ── MusicBrainz annotation — álbum ──────────────────────────────────
+        if not entry["desc_mb_album"] and mbid:
+            try:
+                url = f"https://musicbrainz.org/ws/2/release-group/{mbid}?inc=annotation&fmt=json"
+                req = urllib.request.Request(url, headers={"User-Agent": "MustHearScraper/1.0"})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    data = json.loads(r.read())
+                ann = (data.get("annotation") or "").strip()
+                if ann and len(ann) > 40:
+                    changed["desc_mb_album"] = ann[:800]
+            except Exception:
+                pass
+            time.sleep(0.5)
+
+        # ── MusicBrainz annotation — artista ────────────────────────────────
+        if not entry["desc_mb_artist"]:
+            try:
+                # Buscar MBID del artista desde MB
+                q   = urllib.parse.quote(f'artist:"{artist}"')
+                url = f"https://musicbrainz.org/ws/2/artist?query={q}&limit=1&fmt=json"
+                req = urllib.request.Request(url, headers={"User-Agent": "MustHearScraper/1.0"})
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    data = json.loads(r.read())
+                artists_mb = data.get("artists", [])
+                if artists_mb:
+                    ambid = artists_mb[0].get("id", "")
+                    if ambid:
+                        url2 = f"https://musicbrainz.org/ws/2/artist/{ambid}?inc=annotation&fmt=json"
+                        req2 = urllib.request.Request(url2, headers={"User-Agent": "MustHearScraper/1.0"})
+                        with urllib.request.urlopen(req2, timeout=8) as r2:
+                            data2 = json.loads(r2.read())
+                        ann = (data2.get("annotation") or "").strip()
+                        if ann and len(ann) > 40:
+                            changed["desc_mb_artist"] = ann[:800]
+            except Exception:
+                pass
+            time.sleep(0.5)
+
+        if changed:
+            mh_save_fetched_data(mh_conn, alb_id, changed)
+            updated += 1
+            if updated % 50 == 0:
+                mh_conn.commit()
+
+    mh_conn.commit()
+    print(f"✅ {updated}/{len(rows)} álbumes con nuevas descripciones guardadas en DB")
+
+
 def _is_global_mode(args) -> bool:
-    """True when no specific collection target was given → operate on whole DB."""
-    return not (
-        getattr(args, "slug", None) or
-        getattr(args, "scaruffi_decades", False) or
-        getattr(args, "scaruffi_decade", None) or
-        getattr(args, "aoty_decades", False) or
-        getattr(args, "aoty_decade_list", None) or
-        getattr(args, "collection", None) or
-        args.series != DEFAULT_SERIES or
-        args.name != "1001 Albums You Must Hear Before You Die"
+    """True when no specific collection target was given → operate on whole DB.
+    Los flags de enriquecimiento global (--lastfm-info, --youtube, --caratulas)
+    sin --series/--name/--slug explícito implican siempre modo global."""
+    has_enrichment_flag = (
+        getattr(args, "lastfm_info", False) or
+        getattr(args, "youtube",     False) or
+        getattr(args, "caratulas",   False)
     )
+    has_explicit_collection = (
+        getattr(args, "slug",            None) or
+        getattr(args, "scaruffi_decades", False) or
+        getattr(args, "scaruffi_decade",  None) or
+        getattr(args, "aoty_decades",     False) or
+        getattr(args, "aoty_decade_list", None) or
+        getattr(args, "collection",       None) or
+        args.series != DEFAULT_SERIES or
+        args.name   != "1001 Albums You Must Hear Before You Die"
+    )
+    if has_enrichment_flag and not has_explicit_collection:
+        return True
+    return not has_explicit_collection
 
 
 def mh_global_fetch_covers(mh_conn: sqlite3.Connection,
@@ -3940,6 +4246,11 @@ def main():
                         help="Last.fm API key (para wiki de álbumes/artistas)")
     parser.add_argument("--lastfm-api-secret",     dest="lastfm_api_secret",     default=None,
                         help="Last.fm API secret")
+    parser.add_argument("--lastfm-info",  dest="lastfm_info", action="store_true",
+                        help="Fetch descripciones Last.fm + MusicBrainz para álbumes sin ella. "
+                             "Credenciales en orden: --lastfm-api-key/secret → env "
+                             "LASTFM_API_KEY/SECRET → SOPS (.encrypted.env). "
+                             "Requiere --must-hear-db.")
     parser.add_argument("--youtube",      action="store_true",
                         help="Pre-fetch YouTube video IDs for all albums (saved in youtube_cache.json)")
     parser.add_argument("--rateyourmusic", dest="rateyourmusic", action="store_true",
@@ -4007,9 +4318,10 @@ def main():
             if mh_conn: mh_conn.close()
             if scrobbles_conn: scrobbles_conn.close()
             return
-        do_covers  = getattr(args, "caratulas", False)
-        do_youtube = getattr(args, "youtube",   False)
-        if do_covers or do_youtube:
+        do_covers  = getattr(args, "caratulas",   False)
+        do_youtube = getattr(args, "youtube",     False)
+        do_lastfm  = getattr(args, "lastfm_info", False)
+        if do_covers or do_youtube or do_lastfm:
             if do_covers:
                 mh_global_fetch_covers(
                     mh_conn,
@@ -4018,6 +4330,16 @@ def main():
                 )
             if do_youtube:
                 mh_global_fetch_youtube(mh_conn)
+            if do_lastfm:
+                lfm_key, lfm_secret = _resolve_lastfm_credentials(args)
+                if not lfm_key:
+                    print("❌ --lastfm-info: no se encontraron credenciales.\n"
+                          "   Usa --lastfm-api-key/secret, env LASTFM_API_KEY/SECRET, "
+                          "o .encrypted.env con SOPS.",
+                          file=__import__("sys").stderr)
+                else:
+                    print(f"\n📖 Last.fm + MusicBrainz descripciones (global DB)")
+                    mh_global_fetch_lastfm(mh_conn, lfm_key, lfm_secret)
             if mh_conn: mh_conn.close()
             if scrobbles_conn: scrobbles_conn.close()
             return
@@ -4098,7 +4420,15 @@ def main():
         albums = fetch_series(args.series, cache_path)
         print(f"\n🎵 {len(albums)} álbumes en la serie")
 
-    # ── 1b. Descripciones e info enriquecida (solo si NO usamos must_hear.db) ─
+    # ── 1b. Si tenemos must_hear.db pero la colección es nueva, persistirla ahora ─
+    if mh_conn and not albums_from_db and albums:
+        print(f"\n💾 Persistiendo colección '{slug}' en must_hear.db...")
+        albums = mh_sync_mb_collection(
+            mh_conn, slug, args.name, args.series, albums
+        )
+        albums_from_db = True
+
+    # ── 1c. Descripciones e info enriquecida (solo si NO usamos must_hear.db) ─
     # Con must_hear.db ya vienen incluidas en mh_load_collection()
     if not albums_from_db:
         if args.index_only:

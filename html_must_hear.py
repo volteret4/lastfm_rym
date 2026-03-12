@@ -3866,9 +3866,11 @@ def mh_sync_mb_collection(mh_conn: sqlite3.Connection,
 # ── GLOBAL DB OPERATIONS (no specific collection target) ─────────────────────
 
 def mh_global_fetch_lastfm(mh_conn: sqlite3.Connection,
-                             api_key: str, api_secret: str) -> None:
-    """Fetch Last.fm + MusicBrainz descriptions for ALL albums in must_hear.db
+                             api_key: str, api_secret: str,
+                             album_ids: list[int] | None = None) -> None:
+    """Fetch Last.fm + MusicBrainz descriptions for albums in must_hear.db
     that are missing at least one description field.
+    If album_ids is given, only those albums are processed (targeted mode).
     Persiste directamente en album_metadata usando mh_save_fetched_data."""
     pylast = _try_import("pylast")
     if not pylast:
@@ -3876,27 +3878,47 @@ def mh_global_fetch_lastfm(mh_conn: sqlite3.Connection,
         return
 
     # Álbumes con algún campo de descripción vacío
-    rows = mh_conn.execute("""
-        SELECT al.id, ar.name, al.name, al.release_group_mbid,
-               COALESCE(am.desc_lfm_album,  '') as dla,
-               COALESCE(am.desc_lfm_artist, '') as dlar,
-               COALESCE(am.desc_mb_album,   '') as dma,
-               COALESCE(am.desc_mb_artist,  '') as dmar
-        FROM albums al
-        JOIN artists ar ON ar.id = al.artist_id
-        LEFT JOIN album_metadata am ON am.album_id = al.id
-        WHERE COALESCE(am.desc_lfm_album,  '') = ''
-           OR COALESCE(am.desc_lfm_artist, '') = ''
-           OR COALESCE(am.desc_mb_album,   '') = ''
-           OR COALESCE(am.desc_mb_artist,  '') = ''
-        ORDER BY ar.name, al.name
-    """).fetchall()
+    if album_ids:
+        placeholders = ",".join("?" * len(album_ids))
+        rows = mh_conn.execute(f"""
+            SELECT al.id, ar.name, al.name, al.release_group_mbid,
+                   COALESCE(am.desc_lfm_album,  '') as dla,
+                   COALESCE(am.desc_lfm_artist, '') as dlar,
+                   COALESCE(am.desc_mb_album,   '') as dma,
+                   COALESCE(am.desc_mb_artist,  '') as dmar
+            FROM albums al
+            JOIN artists ar ON ar.id = al.artist_id
+            LEFT JOIN album_metadata am ON am.album_id = al.id
+            WHERE al.id IN ({placeholders})
+              AND (COALESCE(am.desc_lfm_album,  '') = ''
+               OR  COALESCE(am.desc_lfm_artist, '') = ''
+               OR  COALESCE(am.desc_mb_album,   '') = ''
+               OR  COALESCE(am.desc_mb_artist,  '') = '')
+            ORDER BY ar.name, al.name
+        """, album_ids).fetchall()
+    else:
+        rows = mh_conn.execute("""
+            SELECT al.id, ar.name, al.name, al.release_group_mbid,
+                   COALESCE(am.desc_lfm_album,  '') as dla,
+                   COALESCE(am.desc_lfm_artist, '') as dlar,
+                   COALESCE(am.desc_mb_album,   '') as dma,
+                   COALESCE(am.desc_mb_artist,  '') as dmar
+            FROM albums al
+            JOIN artists ar ON ar.id = al.artist_id
+            LEFT JOIN album_metadata am ON am.album_id = al.id
+            WHERE COALESCE(am.desc_lfm_album,  '') = ''
+               OR COALESCE(am.desc_lfm_artist, '') = ''
+               OR COALESCE(am.desc_mb_album,   '') = ''
+               OR COALESCE(am.desc_mb_artist,  '') = ''
+            ORDER BY ar.name, al.name
+        """).fetchall()
 
     if not rows:
         print("✅ Todos los álbumes ya tienen descripciones en DB")
         return
 
-    print(f"📖 {len(rows)} álbumes con alguna descripción vacía en toda la DB")
+    scope = f"{len(rows)} de {len(album_ids)} álbumes objetivo" if album_ids else f"{len(rows)} álbumes en toda la DB"
+    print(f"📖 {scope} con alguna descripción vacía")
 
     DESC_FIELDS = ("desc_lfm_album", "desc_lfm_artist", "desc_mb_album", "desc_mb_artist")
 
@@ -4361,6 +4383,12 @@ def main():
         args.force_scrape   = getattr(args, "aoty_force_scrape", False)
         if mh_conn:
             args._aoty_mh_conn = mh_conn
+        # Resolve Last.fm credentials (for description fetch + covers)
+        if not getattr(args, "lastfm_api_key", None):
+            _k, _s = _resolve_lastfm_credentials(args)
+            if _k:
+                args.lastfm_api_key    = _k
+                args.lastfm_api_secret = _s
         run_aoty(args, root_dir)
         if mh_conn: mh_conn.close()
         if scrobbles_conn: scrobbles_conn.close()

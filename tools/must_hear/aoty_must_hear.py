@@ -660,8 +660,7 @@ function openPanel(a, cardEl) {{
   ];
   const descBlocks = descSrcs.filter(s=>a[s.key]&&a[s.key].length>40)
     .map(s=>'<div class="desc-block"><div class="desc-source-label '+s.cls+'">'+s.lbl+'</div><div class="desc-source-text">'+a[s.key]+'</div></div>').join('');
-  const bioHtml   = descBlocks || '<span style="color:var(--muted);font-style:italic">Loading\u2026</span>';
-  const needsFetch = !descBlocks;
+  const bioHtml = descBlocks || '<span style="color:var(--muted);font-style:italic">No info available.</span>';
 
   document.getElementById('panel-body').innerHTML =
     '<div class="panel-title">'+a.title+'</div>'
@@ -676,32 +675,6 @@ function openPanel(a, cardEl) {{
     +'<div class="panel-divider"></div>'
     +'<div class="panel-section-label">About</div>'
     +'<div class="panel-bio" id="p-bio">'+bioHtml+'</div>';
-
-  if (needsFetch) fetchBio(a.artist, a.title, a.mbid);
-}}
-
-async function fetchBio(artist, title, mbid) {{
-  const bioEl = document.getElementById('p-bio');
-  if (!bioEl) return;
-  const KEY = 'key';
-  const clean = t => t.replace(/<a href="[^"]*last\\.fm[^"]*"[^>]*>[^<]*<\\/a>/g,'').replace(/<[^>]+>/g,'').replace(/ {{2,}}/g,' ').trim().slice(0,800);
-  const blocks = [];
-  try {{
-    const d  = await fetch('https://ws.audioscrobbler.com/2.0/?method=album.getinfo&artist='+encodeURIComponent(artist)+'&album='+encodeURIComponent(title)+'&format=json&api_key='+KEY).then(r=>r.json());
-    const wiki = clean(d?.album?.wiki?.summary||d?.album?.wiki?.content||'');
-    if (wiki.length>40) blocks.push('<div class="desc-block"><div class="desc-source-label lfm">💿 Album \u00b7 Last.fm</div><div class="desc-source-text">'+wiki+'</div></div>');
-    const d2 = await fetch('https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist='+encodeURIComponent(artist)+'&format=json&api_key='+KEY).then(r=>r.json());
-    const bio = clean(d2?.artist?.bio?.summary||'');
-    if (bio.length>40) blocks.push('<div class="desc-block"><div class="desc-source-label artist">🎤 Artist \u00b7 Last.fm</div><div class="desc-source-text">'+bio+'</div></div>');
-  }} catch(e) {{}}
-  try {{
-    if (mbid) {{
-      const mb  = await fetch('https://musicbrainz.org/ws/2/release-group/'+mbid+'?inc=annotation&fmt=json').then(r=>r.json());
-      const ann = (mb?.annotation?.text||'').trim();
-      if (ann.length>20) blocks.push('<div class="desc-block"><div class="desc-source-label mb">💿 Album \u00b7 MusicBrainz</div><div class="desc-source-text">'+ann.slice(0,800)+'</div></div>');
-    }}
-  }} catch(e) {{}}
-  if (bioEl) bioEl.innerHTML = blocks.length ? blocks.join('') : 'No info available.';
 }}
 
 function setFilter(f) {{
@@ -1146,7 +1119,8 @@ def mh_aoty_fetch_covers(mh_conn: sqlite3.Connection, albums: list[dict],
 
         # Last.fm extralarge/mega
         try:
-            api_key = lfm_key or "c9b21e5a749e4f279b6cdce9d5b3a7b3"
+            api_key = lfm_key
+            if not api_key: raise ValueError("no lfm_key")
             params  = urllib.parse.urlencode({
                 "method": "album.getinfo",
                 "artist": artist, "album": title,
@@ -1265,7 +1239,8 @@ def aoty_fetch_covers(albums: list[dict], cache_dir: Path,
 
         # ── Strategy 1: Last.fm album.getInfo (extralarge ~300px, sometimes mega ~500px) ──
         try:
-            api_key = lfm_key or "c9b21e5a749e4f279b6cdce9d5b3a7b3"
+            api_key = lfm_key
+            if not api_key: raise ValueError("no lfm_key")
             params  = urllib.parse.urlencode({
                 "method": "album.getinfo",
                 "artist": artist, "album": title,
@@ -1379,6 +1354,24 @@ def run_aoty(args, root_dir: Path) -> None:
     lfm_key        = getattr(args, "lastfm_api_key", None) or ""
     discogs_token  = getattr(args, "discogs_token",  "")   or ""
 
+    # Resolve Last.fm credentials via env → SOPS if not provided
+    if not lfm_key:
+        import os
+        lfm_key = os.environ.get("LASTFM_API_KEY", "")
+    if not lfm_key:
+        try:
+            from pathlib import Path as _P
+            enc = _P(".encrypted.env")
+            if not enc.exists():
+                enc = _P(__file__).parent.parent.parent / ".encrypted.env"
+            if enc.exists():
+                lfm_key = subprocess.check_output(
+                    ["sops", "-d", "--extract", '["LASTFM_API_KEY"]', str(enc)],
+                    stderr=subprocess.DEVNULL,
+                ).decode().strip()
+        except Exception:
+            pass
+
     decades_data: dict[str, list] = {}
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -1460,6 +1453,32 @@ def run_aoty(args, root_dir: Path) -> None:
                 for decade, albums in decades_data.items():
                     (out_dir / f"aoty_{decade}_cache.json").write_text(
                         json.dumps(albums, ensure_ascii=False, indent=2))
+
+    # ── Descripciones Last.fm + MusicBrainz (server-side, no client fetch) ───
+    if mh_conn and lfm_key:
+        missing_desc = [a for a in all_albums
+                        if not a.get("desc_lfm_album") and not a.get("desc_lfm_artist")
+                        and not a.get("desc_mb_album")]
+        if missing_desc:
+            print(f"\n📖 Buscando descripciones para {len(missing_desc)} álbumes sin info...")
+            try:
+                from html_must_hear import mh_global_fetch_lastfm as _mh_lfm
+                target_ids = [a["id"] for a in missing_desc if a.get("id")]
+                _mh_lfm(mh_conn, lfm_key, "", album_ids=target_ids if target_ids else None)
+                # Reload descriptions from DB into all_albums
+                for a in all_albums:
+                    if a.get("id"):
+                        row = mh_conn.execute(
+                            "SELECT desc_lfm_album, desc_lfm_artist, desc_mb_album, desc_mb_artist"
+                            " FROM album_metadata WHERE album_id=?", (a["id"],)
+                        ).fetchone()
+                        if row:
+                            a["desc_lfm_album"]  = row[0] or ""
+                            a["desc_lfm_artist"] = row[1] or ""
+                            a["desc_mb_album"]   = row[2] or ""
+                            a["desc_mb_artist"]  = row[3] or ""
+            except ImportError:
+                pass  # standalone mode
 
     # ── Render HTMLs ──────────────────────────────────────────────────────────
     all_avail = [d for d in DECADES if d in decades_data]

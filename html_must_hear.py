@@ -3987,10 +3987,11 @@ def mh_global_fetch_lastfm(mh_conn: sqlite3.Connection,
             FROM albums al
             JOIN artists ar ON ar.id = al.artist_id
             LEFT JOIN album_metadata am ON am.album_id = al.id
-            WHERE COALESCE(am.desc_lfm_album,  '') = ''
-               OR COALESCE(am.desc_lfm_artist, '') = ''
-               OR COALESCE(am.desc_mb_album,   '') = ''
-               OR COALESCE(am.desc_mb_artist,  '') = ''
+            WHERE am.album_id IS NULL
+               OR (COALESCE(am.desc_lfm_album,  '') = ''
+              AND  COALESCE(am.desc_lfm_artist, '') = ''
+              AND  COALESCE(am.desc_mb_album,   '') = ''
+              AND  COALESCE(am.desc_mb_artist,  '') = '')
             ORDER BY ar.name, al.name
         """).fetchall()
 
@@ -4487,6 +4488,18 @@ def main():
         if mh_conn:
             args._rym_mh_conn = mh_conn
         run_rym(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
+    # Image OCR mode: --series points to an image file (jpg/png/etc.)
+    _img_exts = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp")
+    if any(args.series.lower().split("?")[0].endswith(ext) for ext in _img_exts):
+        from tools.must_hear.fourchan import run_4chan
+        args.scrobbles_db = scrobbles_db_path
+        if mh_conn:
+            args._4chan_mh_conn = mh_conn
+        run_4chan(args, root_dir)
         if mh_conn: mh_conn.close()
         if scrobbles_conn: scrobbles_conn.close()
         return

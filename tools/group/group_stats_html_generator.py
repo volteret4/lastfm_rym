@@ -61,6 +61,7 @@ class GroupStatsHTMLGenerator:
     <title>Last.fm Grupo - Estadísticas Grupales</title>
     <link rel="icon" type="image/png" href="/images/favicon.png">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/sql-wasm.js"></script>
     <!-- Umami Analytics -->
     <script defer src="{umami_script_url}" data-website-id="{umami_website_id}"></script>
 
@@ -1148,9 +1149,9 @@ class GroupStatsHTMLGenerator:
 
         // Variables para filtrado de usuarios dinámico
         let activeUsers = new Set(); // Se inicializará después de verificar groupStats.users
-        let dynamicDataCache = {{}}; // Cache para datos cargados dinámicamente
         let isLoadingData = false;
-        let consolidatedData = null; // Datos consolidados cargados una sola vez
+        let statsDb = null;
+        const [fromYear, toYear] = periodFolder.split('-').map(Number);
 
         // Función para inicializar activeUsers
         function initializeActiveUsers() {{
@@ -1163,78 +1164,227 @@ class GroupStatsHTMLGenerator:
             }}
         }}
 
-        // Cargar datos consolidados al inicio
-        async function loadConsolidatedData() {{
-            if (consolidatedData) return consolidatedData;
 
+        // Cargar la base de datos SQLite con sql.js
+        async function initDatabase() {{
+            if (statsDb) return statsDb;
             try {{
-                console.log('Cargando datos consolidados...');
-                const response = await fetch(`data/${{periodFolder}}/consolidated_data.json`);
-                if (!response.ok) {{
-                    throw new Error(`HTTP error! status: ${{response.status}}`);
-                }}
-                consolidatedData = await response.json();
-                console.log('Datos consolidados cargados exitosamente');
-                return consolidatedData;
-            }} catch (error) {{
-                console.error('Error cargando datos consolidados:', error);
-                // Usar datos estáticos si no hay consolidados
+                console.log('Inicializando sql.js...');
+                const SQL = await initSqlJs({{
+                    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.12.0/${{file}}`
+                }});
+                console.log('Cargando grupo_stats.db...');
+                const response = await fetch(`data/${{periodFolder}}/grupo_stats.db`);
+                if (!response.ok) throw new Error(`HTTP ${{response.status}}`);
+                const buf = await response.arrayBuffer();
+                statsDb = new SQL.Database(new Uint8Array(buf));
+                console.log('Base de datos lista');
+                return statsDb;
+            }} catch (e) {{
+                console.error('Error cargando base de datos:', e);
                 return null;
             }}
         }}
 
-        // Función para procesar datos scatter desde datos consolidados
-        function processScatterDataFromConsolidated(activeUsersList, category) {{
-            if (!consolidatedData || !consolidatedData.evolution_scatter || !consolidatedData.evolution_scatter[category]) {{
-                console.log(`No hay datos scatter para ${{category}}`);
-                return null;
-            }}
-
-            const scatterData = consolidatedData.evolution_scatter[category];
-            const years = consolidatedData.metadata.years;
-
-            // Filtrar datos por usuarios activos - SOLO elementos que TODOS los usuarios activos escuchen
-            const filteredData = {{}};
-
-            years.forEach(year => {{
-                if (scatterData[year]) {{
-                    filteredData[year] = scatterData[year].filter(item => {{
-                        // Filtrar solo items que tienen EXACTAMENTE TODOS los usuarios activos
-                        const itemUsers = new Set(item.users);
-                        const activeUsersSet = new Set(activeUsersList);
-
-                        // El item debe tener exactamente todos los usuarios activos seleccionados
-                        const hasAllActiveUsers = activeUsersList.every(user => itemUsers.has(user));
-                        const hasOnlyActiveUsers = item.users.every(user => activeUsersSet.has(user));
-
-                        return hasAllActiveUsers && hasOnlyActiveUsers;
-                    }}).map(item => {{
-                        // Recalcular scrobbles solo para usuarios activos (que deberan ser todos en este punto)
-                        const activeUsersForItem = item.users.filter(user => activeUsersList.includes(user));
-
-                        // Para scatter necesitamos recalcular los scrobbles solo para estos usuarios
-                        // Aqu necesitaramos acceso a los datos detallados, pero como filtro correcto
-                        // los scrobbles originales ya son los correctos para estos usuarios especficos
-                        return {{
-                            ...item,
-                            users: activeUsersForItem
-                        }};
-                    }});
-
-                    // Reordenar por scrobbles y actualizar posiciones
-                    filteredData[year].sort((a, b) => b.scrobbles - a.scrobbles);
-                    filteredData[year] = filteredData[year].slice(0, 5); // Top 5
-                    filteredData[year].forEach((item, index) => {{
-                        item.position = index + 1;
-                    }});
-                }}
+        // Ejecuta una query SQL y devuelve array de objetos
+        function dbRows(sql, params = []) {{
+            if (!statsDb) return [];
+            const result = statsDb.exec(sql, params);
+            if (!result.length) return [];
+            const cols = result[0].columns;
+            return result[0].values.map(row => {{
+                const obj = {{}};
+                cols.forEach((c, i) => obj[c] = row[i]);
+                return obj;
             }});
+        }}
 
+        // Construye datos para gráfico de tarta desde una tabla de plays
+        function buildPieData(table, nameCol, activeUsersList, chartType, title) {{
+            const ph = activeUsersList.map(() => '?').join(',');
+            const rows = dbRows(
+                `SELECT ${{nameCol}} as name, user, SUM(plays) as plays
+                 FROM ${{table}}
+                 WHERE user IN (${{ph}}) AND year >= ? AND year <= ?
+                 GROUP BY ${{nameCol}}, user`,
+                [...activeUsersList, fromYear, toYear]
+            );
+            const items = {{}};
+            for (const row of rows) {{
+                const n = row.name;
+                if (!items[n]) items[n] = {{ users: new Set(), total: 0, userPlays: {{}} }};
+                items[n].users.add(row.user);
+                items[n].total += row.plays;
+                items[n].userPlays[row.user] = (items[n].userPlays[row.user] || 0) + row.plays;
+            }}
+            let entries = Object.entries(items);
+            if (chartType === 'shared') {{
+                entries = entries.filter(([_, d]) => d.users.size >= 2);
+                entries.sort((a, b) => b[1].users.size - a[1].users.size || b[1].total - a[1].total);
+            }} else {{
+                entries.sort((a, b) => b[1].total - a[1].total);
+            }}
+            entries = entries.slice(0, 15);
+            const data = {{}}, details = {{}};
+            let total = 0;
+            for (const [name, d] of entries) {{
+                data[name] = d.total;
+                total += d.total;
+                details[name] = {{
+                    user_count: d.users.size,
+                    total_scrobbles: d.total,
+                    shared_users: Array.from(d.users),
+                    user_plays: d.userPlays
+                }};
+            }}
+            return {{ title, data, total, details, type: chartType }};
+        }}
+
+        // Construye datos compartidos (shared) para todas las categorías
+        function buildSharedChartsData(activeUsersList) {{
             return {{
-                title: `Top 5 ${{category}} Anuales`,
-                data: filteredData,
-                years: years
+                artists: buildPieData('artist_plays', 'artist', activeUsersList, 'shared', 'Artistas (Por Usuarios Compartidos)'),
+                albums: buildPieData('album_plays', 'album_key', activeUsersList, 'shared', 'Álbumes (Por Usuarios Compartidos)'),
+                tracks: buildPieData('track_plays', 'track_key', activeUsersList, 'shared', 'Canciones (Por Usuarios Compartidos)'),
+                genres: buildPieData('genre_plays', 'genre', activeUsersList, 'shared', 'Géneros (Por Usuarios Compartidos)'),
+                labels: buildPieData('label_plays', 'label', activeUsersList, 'shared', 'Sellos (Por Usuarios Compartidos)'),
+                release_years: buildPieData('release_year_plays', 'release_year', activeUsersList, 'shared', 'Años de Lanzamiento (Por Usuarios Compartidos)')
             }};
+        }}
+
+        // Construye datos de scrobbles para todas las categorías + all_combined
+        function buildScrobblesChartsData(activeUsersList) {{
+            const cats = [
+                ['artists',       'artist_plays',       'artist',        'Artistas (Por Scrobbles)'],
+                ['albums',        'album_plays',        'album_key',     'Álbumes (Por Scrobbles)'],
+                ['tracks',        'track_plays',        'track_key',     'Canciones (Por Scrobbles)'],
+                ['genres',        'genre_plays',        'genre',         'Géneros (Por Scrobbles)'],
+                ['labels',        'label_plays',        'label',         'Sellos (Por Scrobbles)'],
+                ['release_years', 'release_year_plays', 'release_year',  'Años de Lanzamiento (Por Scrobbles)']
+            ];
+            const base = {{}};
+            for (const [key, table, nameCol, title] of cats) {{
+                base[key] = buildPieData(table, nameCol, activeUsersList, 'scrobbles', title);
+            }}
+            // all_combined: top 5 de cada categoría, ordenados globalmente, top 15
+            const allItems = [];
+            for (const [catKey, catData] of Object.entries(base)) {{
+                Object.entries(catData.data).slice(0, 5).forEach(([name, plays]) => {{
+                    const label = catKey.charAt(0).toUpperCase() + catKey.slice(1);
+                    allItems.push({{
+                        name: `${{label}}: ${{name}}`,
+                        originalName: name, category: catKey, plays,
+                        details: catData.details[name] || {{}}
+                    }});
+                }});
+            }}
+            allItems.sort((a, b) => b.plays - a.plays);
+            const combinedData = {{}}, combinedDetails = {{}};
+            let combinedTotal = 0;
+            for (const item of allItems.slice(0, 15)) {{
+                combinedData[item.name] = item.plays;
+                combinedTotal += item.plays;
+                combinedDetails[item.name] = {{
+                    original_name: item.originalName,
+                    category: item.category,
+                    ...(item.details)
+                }};
+            }}
+            base.all_combined = {{
+                title: 'Top 15 Global por Scrobbles',
+                data: combinedData, total: combinedTotal,
+                details: combinedDetails, type: 'combined'
+            }};
+            return base;
+        }}
+
+        // Construye datos de evolución temporal para todas las categorías
+        function buildEvolutionData(activeUsersList) {{
+            const years = [];
+            for (let y = fromYear; y <= toYear; y++) years.push(y);
+            const cats = [
+                ['artists',       'artist_plays',       'artist',        'Top 15 Artistas por Año'],
+                ['albums',        'album_plays',        'album_key',     'Top 15 Álbumes por Año'],
+                ['tracks',        'track_plays',        'track_key',     'Top 15 Canciones por Año'],
+                ['genres',        'genre_plays',        'genre',         'Top 15 Géneros por Año'],
+                ['labels',        'label_plays',        'label',         'Top 15 Sellos por Año'],
+                ['release_years', 'release_year_plays', 'release_year',  'Top 15 Años de Lanzamiento por Año']
+            ];
+            const result = {{}};
+            for (const [catKey, table, nameCol, title] of cats) {{
+                const ph = activeUsersList.map(() => '?').join(',');
+                const rows = dbRows(
+                    `SELECT ${{nameCol}} as name, user, year, plays
+                     FROM ${{table}}
+                     WHERE user IN (${{ph}}) AND year >= ? AND year <= ?`,
+                    [...activeUsersList, fromYear, toYear]
+                );
+                const agg = {{}};
+                for (const row of rows) {{
+                    const n = row.name;
+                    if (!agg[n]) agg[n] = {{}};
+                    if (!agg[n][row.year]) agg[n][row.year] = {{ total: 0, users: {{}} }};
+                    agg[n][row.year].total += row.plays;
+                    agg[n][row.year].users[row.user] = (agg[n][row.year].users[row.user] || 0) + row.plays;
+                }}
+                const topItems = Object.entries(agg)
+                    .map(([name, yd]) => [name, Object.values(yd).reduce((s, d) => s + d.total, 0)])
+                    .sort((a, b) => b[1] - a[1]).slice(0, 15).map(([n]) => n);
+                const data = {{}};
+                for (const name of topItems) {{
+                    data[name] = {{}};
+                    for (const y of years) {{
+                        data[name][y] = agg[name][y] || {{ total: 0, users: {{}} }};
+                    }}
+                }}
+                result[catKey] = {{ title, data, years }};
+            }}
+            return result;
+        }}
+
+        // Construye datos scatter (top 5 anuales que TODOS los usuarios activos escuchan)
+        function buildScatterData(activeUsersList) {{
+            const years = [];
+            for (let y = fromYear; y <= toYear; y++) years.push(y);
+            const cats = [
+                ['artists',       'artist_plays',       'artist',        'Top 5 Artistas Anuales'],
+                ['albums',        'album_plays',        'album_key',     'Top 5 Álbumes Anuales'],
+                ['tracks',        'track_plays',        'track_key',     'Top 5 Canciones Anuales'],
+                ['genres',        'genre_plays',        'genre',         'Top 5 Géneros Anuales'],
+                ['labels',        'label_plays',        'label',         'Top 5 Sellos Anuales'],
+                ['release_years', 'release_year_plays', 'release_year',  'Top 5 Años de Lanzamiento Anuales']
+            ];
+            const result = {{}};
+            for (const [catKey, table, nameCol, title] of cats) {{
+                const ph = activeUsersList.map(() => '?').join(',');
+                const catData = {{}};
+                for (const year of years) {{
+                    const rows = dbRows(
+                        `SELECT ${{nameCol}} as name, user, SUM(plays) as plays
+                         FROM ${{table}}
+                         WHERE user IN (${{ph}}) AND year = ?
+                         GROUP BY ${{nameCol}}, user`,
+                        [...activeUsersList, year]
+                    );
+                    const items = {{}};
+                    for (const row of rows) {{
+                        const n = row.name;
+                        if (!items[n]) items[n] = {{ total: 0, users: new Set() }};
+                        items[n].users.add(row.user);
+                        items[n].total += row.plays;
+                    }}
+                    catData[year] = Object.entries(items)
+                        .filter(([_, d]) => d.users.size === activeUsersList.length)
+                        .sort((a, b) => b[1].total - a[1].total)
+                        .slice(0, 5)
+                        .map(([name, d], idx) => ({{
+                            name, scrobbles: d.total,
+                            users: Array.from(d.users), position: idx + 1
+                        }}));
+                }}
+                result[catKey] = {{ title, data: catData, years }};
+            }}
+            return result;
         }}
 
         // Funcionalidad del botón de usuario
@@ -2361,61 +2511,28 @@ class GroupStatsHTMLGenerator:
             }});
         }}
 
-        async function loadDynamicData(dataType, userKey) {{
-            if (dynamicDataCache[`${{dataType}}_${{userKey}}`]) {{
-                return dynamicDataCache[`${{dataType}}_${{userKey}}`];
-            }}
-
-            try {{
-                const response = await fetch(`data/${{periodFolder}}/${{dataType}}_${{userKey}}.json`);
-                if (!response.ok) {{
-                    throw new Error(`HTTP error! status: ${{response.status}}`);
-                }}
-                const data = await response.json();
-                dynamicDataCache[`${{dataType}}_${{userKey}}`] = data;
-                return data;
-            }} catch (error) {{
-                console.error(`Error cargando datos ${{dataType}}_${{userKey}}:`, error);
-                return null;
-            }}
-        }}
-
         async function renderSharedChartsWithFilter() {{
             if (isLoadingData) return;
             isLoadingData = true;
-
-            console.log('Renderizando gráficos compartidos con filtro...');
             showLoadingMessage('Cargando datos...');
 
-            // Asegurarse de que los datos consolidados estén cargados
-            if (!consolidatedData) {{
-                await loadConsolidatedData();
-            }}
-
-            // Obtener usuarios activos
-            const activeUsersList = Array.from(activeUsers);
-
-            // Procesar datos compartidos desde datos consolidados
-            const sharedData = processSharedData(activeUsersList);
-
-            if (!sharedData) {{
-                showLoadingMessage('Error procesando datos');
+            if (!await initDatabase()) {{
+                showLoadingMessage('Error cargando base de datos');
                 isLoadingData = false;
                 return;
             }}
 
-            // Destruir charts existentes
-            Object.values(charts).forEach(chart => {{
-                if (chart) chart.destroy();
-            }});
+            const activeUsersList = Array.from(activeUsers);
+            const sharedData = buildSharedChartsData(activeUsersList);
+
+            Object.values(charts).forEach(c => {{ if (c) c.destroy(); }});
             charts = {{}};
 
-            // Renderizar gráficos por usuarios compartidos
-            renderPieChart('sharedArtistsChart', sharedData.artists, 'sharedArtistsInfo');
-            renderPieChart('sharedAlbumsChart', sharedData.albums, 'sharedAlbumsInfo');
-            renderPieChart('sharedTracksChart', sharedData.tracks, 'sharedTracksInfo');
-            renderPieChart('sharedGenresChart', sharedData.genres, 'sharedGenresInfo');
-            renderPieChart('sharedLabelsChart', sharedData.labels, 'sharedLabelsInfo');
+            renderPieChart('sharedArtistsChart',      sharedData.artists,       'sharedArtistsInfo');
+            renderPieChart('sharedAlbumsChart',       sharedData.albums,        'sharedAlbumsInfo');
+            renderPieChart('sharedTracksChart',       sharedData.tracks,        'sharedTracksInfo');
+            renderPieChart('sharedGenresChart',       sharedData.genres,        'sharedGenresInfo');
+            renderPieChart('sharedLabelsChart',       sharedData.labels,        'sharedLabelsInfo');
             renderPieChart('sharedReleaseYearsChart', sharedData.release_years, 'sharedReleaseYearsInfo');
 
             isLoadingData = false;
@@ -2424,33 +2541,27 @@ class GroupStatsHTMLGenerator:
         async function renderScrobblesChartsWithFilter() {{
             if (isLoadingData) return;
             isLoadingData = true;
-
-            console.log('Renderizando gráficos de scrobbles con filtro...');
             showLoadingMessage('Cargando datos...');
 
-            const userKey = getUserKey();
-            const scrobblesData = await loadDynamicData('scrobbles', userKey);
-
-            if (!scrobblesData) {{
-                showLoadingMessage('Error cargando datos');
+            if (!await initDatabase()) {{
+                showLoadingMessage('Error cargando base de datos');
                 isLoadingData = false;
                 return;
             }}
 
-            // Destruir charts existentes
-            Object.values(charts).forEach(chart => {{
-                if (chart) chart.destroy();
-            }});
+            const activeUsersList = Array.from(activeUsers);
+            const scrobblesData = buildScrobblesChartsData(activeUsersList);
+
+            Object.values(charts).forEach(c => {{ if (c) c.destroy(); }});
             charts = {{}};
 
-            // Renderizar gráficos por scrobbles totales
-            renderPieChart('scrobblesArtistsChart', scrobblesData.artists, 'scrobblesArtistsInfo');
-            renderPieChart('scrobblesAlbumsChart', scrobblesData.albums, 'scrobblesAlbumsInfo');
-            renderPieChart('scrobblesTracksChart', scrobblesData.tracks, 'scrobblesTracksInfo');
-            renderPieChart('scrobblesGenresChart', scrobblesData.genres, 'scrobblesGenresInfo');
-            renderPieChart('scrobblesLabelsChart', scrobblesData.labels, 'scrobblesLabelsInfo');
+            renderPieChart('scrobblesArtistsChart',      scrobblesData.artists,       'scrobblesArtistsInfo');
+            renderPieChart('scrobblesAlbumsChart',       scrobblesData.albums,        'scrobblesAlbumsInfo');
+            renderPieChart('scrobblesTracksChart',       scrobblesData.tracks,        'scrobblesTracksInfo');
+            renderPieChart('scrobblesGenresChart',       scrobblesData.genres,        'scrobblesGenresInfo');
+            renderPieChart('scrobblesLabelsChart',       scrobblesData.labels,        'scrobblesLabelsInfo');
             renderPieChart('scrobblesReleaseYearsChart', scrobblesData.release_years, 'scrobblesReleaseYearsInfo');
-            renderPieChart('scrobblesAllCombinedChart', scrobblesData.all_combined, 'scrobblesAllCombinedInfo');
+            renderPieChart('scrobblesAllCombinedChart',  scrobblesData.all_combined,  'scrobblesAllCombinedInfo');
 
             isLoadingData = false;
         }}
@@ -2458,203 +2569,36 @@ class GroupStatsHTMLGenerator:
         async function renderEvolutionChartsWithFilter() {{
             if (isLoadingData) return;
             isLoadingData = true;
-
-            console.log('Renderizando gráficos de evolución con filtro...');
             showLoadingMessage('Cargando datos...');
 
-            // Asegurarse de que los datos consolidados estén cargados
-            if (!consolidatedData) {{
-                await loadConsolidatedData();
+            if (!await initDatabase()) {{
+                showLoadingMessage('Error cargando base de datos');
+                isLoadingData = false;
+                return;
             }}
 
             const activeUsersList = Array.from(activeUsers);
 
-            // Destruir charts existentes
-            Object.values(charts).forEach(chart => {{
-                if (chart) chart.destroy();
-            }});
+            Object.values(charts).forEach(c => {{ if (c) c.destroy(); }});
             charts = {{}};
 
-            const userKey = getUserKey();
-            const evolutionData = await loadDynamicData('evolution', userKey);
-
-            if (!evolutionData) {{
-                showLoadingMessage('Error cargando datos de evolución');
-                isLoadingData = false;
-                return;
-            }}
-
-            // Renderizar gráficos de evolución
-            renderLineChart('evolutionArtistsChart', evolutionData.artists);
-            renderLineChart('evolutionAlbumsChart', evolutionData.albums);
-            renderLineChart('evolutionTracksChart', evolutionData.tracks);
-            renderLineChart('evolutionGenresChart', evolutionData.genres);
-            renderLineChart('evolutionLabelsChart', evolutionData.labels);
+            const evolutionData = buildEvolutionData(activeUsersList);
+            renderLineChart('evolutionArtistsChart',      evolutionData.artists);
+            renderLineChart('evolutionAlbumsChart',       evolutionData.albums);
+            renderLineChart('evolutionTracksChart',       evolutionData.tracks);
+            renderLineChart('evolutionGenresChart',       evolutionData.genres);
+            renderLineChart('evolutionLabelsChart',       evolutionData.labels);
             renderLineChart('evolutionReleaseYearsChart', evolutionData.release_years);
 
-            // Usar archivos JSON especficos para scatter charts (NUEVA LÓGICA CORREGIDA)
-            console.log('Cargando datos scatter especficos para usuarios seleccionados...');
-
-            const scatterData = await loadDynamicData('evolution_scatter', userKey);
-
-            if (!scatterData) {{
-                console.log('Error cargando datos scatter especficos');
-                isLoadingData = false;
-                return;
-            }}
-
-            // Renderizar gráficos scatter con datos especficos filtrados correctamente
-            if (scatterData.artists) {{
-                console.log('Renderizando scatter artistas:', scatterData.artists);
-                renderScatterChart('evolutionScatterArtistsChart', scatterData.artists);
-            }}
-            if (scatterData.albums) {{
-                console.log('Renderizando scatter álbumes:', scatterData.albums);
-                renderScatterChart('evolutionScatterAlbumsChart', scatterData.albums);
-            }}
-            if (scatterData.tracks) {{
-                console.log('Renderizando scatter canciones:', scatterData.tracks);
-                renderScatterChart('evolutionScatterTracksChart', scatterData.tracks);
-            }}
-            if (scatterData.genres) {{
-                console.log('Renderizando scatter géneros:', scatterData.genres);
-                renderScatterChart('evolutionScatterGenresChart', scatterData.genres);
-            }}
-            if (scatterData.labels) {{
-                console.log('Renderizando scatter sellos:', scatterData.labels);
-                renderScatterChart('evolutionScatterLabelsChart', scatterData.labels);
-            }}
-            if (scatterData.release_years) {{
-                console.log('Renderizando scatter años:', scatterData.release_years);
-                renderScatterChart('evolutionScatterReleaseYearsChart', scatterData.release_years);
-            }}
+            const scatterData = buildScatterData(activeUsersList);
+            if (scatterData.artists)      renderScatterChart('evolutionScatterArtistsChart',      scatterData.artists);
+            if (scatterData.albums)       renderScatterChart('evolutionScatterAlbumsChart',       scatterData.albums);
+            if (scatterData.tracks)       renderScatterChart('evolutionScatterTracksChart',       scatterData.tracks);
+            if (scatterData.genres)       renderScatterChart('evolutionScatterGenresChart',       scatterData.genres);
+            if (scatterData.labels)       renderScatterChart('evolutionScatterLabelsChart',       scatterData.labels);
+            if (scatterData.release_years) renderScatterChart('evolutionScatterReleaseYearsChart', scatterData.release_years);
 
             isLoadingData = false;
-        }}
-
-        // Función para procesar datos compartidos desde datos consolidados
-        function processSharedData(activeUsersList) {{
-            if (!consolidatedData || !consolidatedData.raw_data) {{
-                console.error('No hay datos consolidados disponibles');
-                return null;
-            }}
-
-            console.log('Procesando datos compartidos para usuarios:', activeUsersList);
-
-            const result = {{
-                artists: {{
-                    title: 'Artistas (Por Usuarios Compartidos)',
-                    data: {{}},
-                    total: 0,
-                    details: {{}},
-                    type: 'shared'
-                }},
-                albums: {{
-                    title: 'Álbumes (Por Usuarios Compartidos)',
-                    data: {{}},
-                    total: 0,
-                    details: {{}},
-                    type: 'shared'
-                }},
-                tracks: {{
-                    title: 'Canciones (Por Usuarios Compartidos)',
-                    data: {{}},
-                    total: 0,
-                    details: {{}},
-                    type: 'shared'
-                }},
-                genres: {{
-                    title: 'Géneros (Por Usuarios Compartidos)',
-                    data: {{}},
-                    total: 0,
-                    details: {{}},
-                    type: 'shared'
-                }},
-                labels: {{
-                    title: 'Sellos (Por Usuarios Compartidos)',
-                    data: {{}},
-                    total: 0,
-                    details: {{}},
-                    type: 'shared'
-                }},
-                release_years: {{
-                    title: 'Años de Lanzamiento (Por Usuarios Compartidos)',
-                    data: {{}},
-                    total: 0,
-                    details: {{}},
-                    type: 'shared'
-                }}
-            }};
-
-            // Procesar cada categoría
-            const categories = ['artists', 'albums', 'tracks', 'genres', 'labels', 'release_years'];
-
-            categories.forEach(category => {{
-                const itemCounts = {{}};
-                const itemUsers = {{}};
-                const itemScrobbles = {{}};
-
-                // Agregar datos de cada usuario activo
-                activeUsersList.forEach(user => {{
-                    if (consolidatedData.raw_data[user] && consolidatedData.raw_data[user][category]) {{
-                        consolidatedData.raw_data[user][category].forEach(item => {{
-                            const itemName = item.name;
-
-                            if (!itemCounts[itemName]) {{
-                                itemCounts[itemName] = new Set();
-                                itemScrobbles[itemName] = 0;
-                            }}
-
-                            itemCounts[itemName].add(user);
-                            itemScrobbles[itemName] += item.total_scrobbles;
-
-                            if (!itemUsers[itemName]) {{
-                                itemUsers[itemName] = {{}};
-                            }}
-                            itemUsers[itemName][user] = item.total_scrobbles;
-                        }});
-                    }}
-                }});
-
-                // Filtrar items compartidos (al menos 2 usuarios) y crear ranking
-                const sharedItems = [];
-                Object.entries(itemCounts).forEach(([itemName, userSet]) => {{
-                    if (userSet.size >= 2) {{
-                        sharedItems.push({{
-                            name: itemName,
-                            user_count: userSet.size,
-                            total_scrobbles: itemScrobbles[itemName],
-                            shared_users: Array.from(userSet),
-                            user_plays: itemUsers[itemName] || {{}}
-                        }});
-                    }}
-                }});
-
-                // Ordenar por usuarios compartidos (desc), luego por scrobbles (desc)
-                sharedItems.sort((a, b) => {{
-                    if (a.user_count !== b.user_count) {{
-                        return b.user_count - a.user_count;
-                    }}
-                    return b.total_scrobbles - a.total_scrobbles;
-                }});
-
-                // Tomar top 15 y crear estructura de datos para gráficos
-                const top15 = sharedItems.slice(0, 15);
-
-                top15.forEach(item => {{
-                    result[category].data[item.name] = item.total_scrobbles;
-                    result[category].total += item.total_scrobbles;
-                    result[category].details[item.name] = {{
-                        user_count: item.user_count,
-                        total_scrobbles: item.total_scrobbles,
-                        shared_users: item.shared_users,
-                        user_plays: item.user_plays
-                    }};
-                }});
-            }});
-
-            console.log('Datos compartidos procesados:', result);
-            return result;
         }}
     </script>
 </body>

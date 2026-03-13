@@ -4103,7 +4103,8 @@ def _is_global_mode(args) -> bool:
     has_enrichment_flag = (
         getattr(args, "lastfm_info", False) or
         getattr(args, "youtube",     False) or
-        getattr(args, "caratulas",   False)
+        getattr(args, "caratulas",   False) or
+        getattr(args, "genres",      False)
     )
     has_explicit_collection = (
         getattr(args, "slug",            None) or
@@ -4170,6 +4171,56 @@ def mh_global_fetch_youtube(mh_conn: sqlite3.Connection) -> None:
         time.sleep(0.5)
     mh_conn.commit()
     print(f"✅ {found}/{len(rows)} YouTube IDs nuevos guardados en DB")
+
+
+def mh_global_fetch_genres(mh_conn: sqlite3.Connection) -> None:
+    """Fetch MusicBrainz genres for albums that have NO entry in album_genres."""
+    rows = mh_conn.execute("""
+        SELECT al.id, ar.name, al.name, al.release_group_mbid
+        FROM albums al
+        JOIN artists ar ON ar.id = al.artist_id
+        LEFT JOIN album_genres ag ON ag.album_id = al.id
+        WHERE ag.album_id IS NULL
+          AND al.release_group_mbid IS NOT NULL AND al.release_group_mbid != ''
+        ORDER BY ar.name, al.name
+    """).fetchall()
+
+    if not rows:
+        print("✅ Todos los álbumes con MBID ya tienen géneros en DB")
+        return
+
+    print(f"🎸 {len(rows)} álbumes sin géneros en toda la DB — consultando MusicBrainz...")
+    found  = 0
+    skipped = 0
+    for i, (alb_id, artist, title, mbid) in enumerate(rows):
+        if i % 25 == 0:
+            print(f"  {i}/{len(rows)}...")
+        try:
+            url = f"https://musicbrainz.org/ws/2/release-group/{mbid}?inc=genres&fmt=json"
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "MustHearAlbums/1.0 (https://github.com/musthear)",
+                "Accept": "application/json",
+            })
+            with urllib.request.urlopen(req, timeout=15) as r:
+                data = json.loads(r.read())
+            genres_raw = [
+                (g["name"].lower(), g.get("count", 1))
+                for g in data.get("genres", [])
+                if g["name"].lower() not in GENRE_BLACKLIST and len(g["name"]) > 2
+            ]
+            genres_raw.sort(key=lambda x: x[1], reverse=True)
+            genres = [g for g, _ in genres_raw[:6]]
+            if genres:
+                mh_save_genres(mh_conn, alb_id, genres, source="musicbrainz")
+                found += 1
+            else:
+                skipped += 1
+        except Exception:
+            skipped += 1
+        time.sleep(1.1)  # MB rate limit
+
+    mh_conn.commit()
+    print(f"✅ {found}/{len(rows)} álbumes con géneros nuevos guardados ({skipped} sin géneros en MB)")
 
 
 def _discover_group_slugs(root_dir: Path) -> dict:
@@ -4430,7 +4481,8 @@ def main():
         do_covers  = getattr(args, "caratulas",   False)
         do_youtube = getattr(args, "youtube",     False)
         do_lastfm  = getattr(args, "lastfm_info", False)
-        if do_covers or do_youtube or do_lastfm:
+        do_genres  = getattr(args, "genres",      False)
+        if do_covers or do_youtube or do_lastfm or do_genres:
             if do_covers:
                 mh_global_fetch_covers(
                     mh_conn,
@@ -4439,6 +4491,8 @@ def main():
                 )
             if do_youtube:
                 mh_global_fetch_youtube(mh_conn)
+            if do_genres:
+                mh_global_fetch_genres(mh_conn)
             if do_lastfm:
                 lfm_key, lfm_secret = _resolve_lastfm_credentials(args)
                 if not lfm_key:

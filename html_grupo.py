@@ -30,6 +30,7 @@ try:
     from tools.group.group_stats_analyzer import GroupStatsAnalyzer
     from tools.group.group_stats_database import GroupStatsDatabase
     from tools.group.group_data_json_generator import GroupDataJSONGenerator
+    from tools.group.group_stats_db_generator import GroupStatsDBGenerator
 
     # Importar nuestra versión corregida
     from tools.group.group_stats_html_generator import GroupStatsHTMLGenerator
@@ -73,6 +74,8 @@ def main():
                        help='Solo incluir scrobbles con MBID válidos')
     parser.add_argument('--no-json', action='store_true',
                        help='No regenerar archivos JSON (usar existentes)')
+    parser.add_argument('--no-db', action='store_true',
+                       help='No regenerar grupo_stats.db (usar existente)')
     parser.add_argument('--debug-scatter', action='store_true',
                        help='Mostrar información de debug para scatter charts')
     parser.add_argument('--db', type=str, default=None,
@@ -133,6 +136,16 @@ def main():
             json_index = json_generator.generate_all_user_combinations_data(users, data_dir)
         else:
             print(f"⭐️ Saltando generación de JSON (--no-json activado)")
+
+        # Generar grupo_stats.db para consultas SQL desde el navegador
+        if not args.no_db:
+            print(f"🗄️  Generando grupo_stats.db para consultas SQL dinámicas...")
+            db_generator = GroupStatsDBGenerator(database, years_back=args.years_back, mbid_only=args.mbid_only)
+            data_dir = os.path.join(os.path.dirname(args.output), 'data', period_folder)
+            db_path = os.path.join(data_dir, 'grupo_stats.db')
+            db_generator.generate_stats_db(users, db_path)
+        else:
+            print(f"⭐️ Saltando generación de DB (--no-db activado)")
 
         # Generar HTML con información del período
         print("🎨 Generando HTML...")

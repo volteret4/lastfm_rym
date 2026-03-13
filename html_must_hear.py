@@ -77,11 +77,18 @@ def parse_page(html: str) -> list[dict]:
     """Parsea una página de serie MusicBrainz.
     La columna 'number-column' es opcional: algunas series MB no tienen
     numeración explícita (p.ej. listas por año). En ese caso se asigna
-    el orden de aparición en la página como número provisional."""
+    el orden de aparición en la página como número provisional.
+    Soporta series de release-groups Y series de releases (entity_type='release').
+    """
     items = []
     _counter = [0]  # contador de fila para series sin número
     for row in re.findall(r'<tr class="(?:odd|even)">(.*?)</tr>', html, re.DOTALL):
+        # Try release-group first, then release
         title_m = re.search(r'href="/release-group/([a-f0-9-]{36})"[^>]*><bdi>(.*?)</bdi>', row)
+        entity_type = "release-group"
+        if not title_m:
+            title_m = re.search(r'href="/release/([a-f0-9-]{36})"[^>]*><bdi>(.*?)</bdi>', row)
+            entity_type = "release"
         if not title_m:
             continue  # fila sin álbum (cabecera de letra, etc.)
         num_m   = re.search(r'<td class="number-column">(\d+)</td>', row)
@@ -98,13 +105,30 @@ def parse_page(html: str) -> list[dict]:
             artist = re.sub(r'\s+', ' ', artist)
         _counter[0] += 1
         items.append({
-            "number": int(num_m.group(1)) if num_m else _counter[0],
-            "year":   year,
-            "title":  unescape(re.sub(r'<[^>]+>', '', title_m.group(2))).strip(),
-            "artist": artist,
-            "mbid":   title_m.group(1),
+            "number":      int(num_m.group(1)) if num_m else _counter[0],
+            "year":        year,
+            "title":       unescape(re.sub(r'<[^>]+>', '', title_m.group(2))).strip(),
+            "artist":      artist,
+            "mbid":        title_m.group(1),
+            "entity_type": entity_type,
         })
     return items
+
+
+def _resolve_release_to_rg(release_mbid: str) -> str:
+    """Fetch a release's release-group MBID from the MB API. Returns '' on failure."""
+    try:
+        url = (f"https://musicbrainz.org/ws/2/release/{release_mbid}"
+               f"?inc=release-groups&fmt=json")
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "MustHearAlbums/1.0 (https://github.com/musthear)",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read())
+        return data.get("release-group", {}).get("id", "")
+    except Exception:
+        return ""
 
 def fetch_page_with_retry(url: str, retries: int = 3, delay: float = 3.0) -> str:
     for attempt in range(retries):
@@ -146,6 +170,20 @@ def fetch_series(series_url: str, cache_file: Path) -> list[dict]:
         items = parse_page(html)
         print(f"  → {len(items)} álbumes")
         all_items.extend(items)
+
+    # ── Resolver releases → release-groups ────────────────────────────────────
+    releases = [a for a in all_items if a.get("entity_type") == "release"]
+    if releases:
+        print(f"🔗 {len(releases)} releases → buscando release-groups en MB API...")
+        for i, item in enumerate(releases, 1):
+            rg_mbid = _resolve_release_to_rg(item["mbid"])
+            if rg_mbid:
+                item["mbid"] = rg_mbid
+                item["entity_type"] = "release-group"
+            else:
+                print(f"  ⚠  No se encontró release-group para {item['title']!r} ({item['mbid']})")
+            if i < len(releases):
+                time.sleep(1)  # MB rate limit
 
     # Detectar si la serie tiene numeración explícita (number-column en MB)
     # Si todos los números son consecutivos desde 1 con la cuenta total,

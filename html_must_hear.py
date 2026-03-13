@@ -1256,16 +1256,37 @@ let gridCols = 10;
 let currentAlbum = null;
 let selectedGenres = new Set();
 
-// ── LAZY LOADING ──
-const imgObserver = new IntersectionObserver((entries) => {{
-  entries.forEach(e => {{
-    if (e.isIntersecting && e.target.dataset.src) {{
-      e.target.src = e.target.dataset.src;
-      e.target.removeAttribute('data-src');
-      imgObserver.unobserve(e.target);
-    }}
-  }});
-}}, {{ rootMargin: '200px' }});
+// ── COVER HELPERS ──
+function thumbUrl(url) {{
+  if (!url) return url;
+  return url
+    .replace(/\/front-500\b/, '/front-250')
+    .replace(/e\.snmc\.io\/i\/\d+\//, 'e.snmc.io/i/150/');
+}}
+
+// ── PARALLEL PRELOADER ──
+const PRELOAD_CONCURRENCY = 8;
+let _preloadQueue = [];
+let _preloadActive = 0;
+
+function _preloadTick() {{
+  while (_preloadActive < PRELOAD_CONCURRENCY && _preloadQueue.length) {{
+    _preloadActive++;
+    const img = _preloadQueue.shift();
+    const url = img.dataset.src;
+    if (!url) {{ _preloadActive--; _preloadTick(); return; }}
+    const tmp = new Image();
+    tmp.onload = () => {{ img.src = url; img.removeAttribute('data-src'); _preloadActive--; _preloadTick(); }};
+    tmp.onerror = () => {{ _preloadActive--; _preloadTick(); }};
+    tmp.src = url;
+  }}
+}}
+
+function startPreload() {{
+  _preloadQueue = Array.from(document.querySelectorAll('img[data-src]'));
+  _preloadActive = 0;
+  _preloadTick();
+}}
 
 // ── GRID SIZE ──
 function setGridSize(val) {{
@@ -1346,7 +1367,7 @@ function buildGrid() {{
     card.dataset.num    = a.n;
     card.dataset.genres = (a.genres || []).join(',');
     card.innerHTML = `
-      <img data-src="${{a.cover}}" src="{COVER_PLACEHOLDER}" alt="${{a.n}}"
+      <img data-src="${{thumbUrl(a.cover)}}" src="{COVER_PLACEHOLDER}" alt="${{a.n}}"
            onerror="this.src='{COVER_PLACEHOLDER}'">
       <div class="card-overlay">
         <div class="card-num">#${{a.n}}</div>
@@ -1356,7 +1377,7 @@ function buildGrid() {{
     card.addEventListener('click', () => openPanel(a, card));
     grid.appendChild(card);
   }});
-  document.querySelectorAll('img[data-src]').forEach(img => imgObserver.observe(img));
+  startPreload();
   applyFilters();
 }}
 
@@ -2164,15 +2185,35 @@ function isHeard(a) {{
   return a.heard_by.length > 0;
 }}
 
-const imgObs = new IntersectionObserver(entries => {{
-  entries.forEach(e => {{
-    if (e.isIntersecting && e.target.dataset.src) {{
-      e.target.src = e.target.dataset.src;
-      e.target.removeAttribute('data-src');
-      imgObs.unobserve(e.target);
-    }}
-  }});
-}}, {{rootMargin:'200px'}});
+function thumbUrl(url) {{
+  if (!url) return url;
+  return url
+    .replace(/\/front-500\b/, '/front-250')
+    .replace(/e\.snmc\.io\/i\/\d+\//, 'e.snmc.io/i/150/');
+}}
+
+const PRELOAD_CONCURRENCY = 8;
+let _preloadQueue = [];
+let _preloadActive = 0;
+
+function _preloadTick() {{
+  while (_preloadActive < PRELOAD_CONCURRENCY && _preloadQueue.length) {{
+    _preloadActive++;
+    const img = _preloadQueue.shift();
+    const url = img.dataset.src;
+    if (!url) {{ _preloadActive--; _preloadTick(); return; }}
+    const tmp = new Image();
+    tmp.onload = () => {{ img.src = url; img.removeAttribute('data-src'); _preloadActive--; _preloadTick(); }};
+    tmp.onerror = () => {{ _preloadActive--; _preloadTick(); }};
+    tmp.src = url;
+  }}
+}}
+
+function startPreload() {{
+  _preloadQueue = Array.from(document.querySelectorAll('img[data-src]'));
+  _preloadActive = 0;
+  _preloadTick();
+}}
 
 function buildGenreList() {{
   const list = document.getElementById('genre-list');
@@ -2314,7 +2355,7 @@ function buildGrid() {{
     card.dataset.num    = a.rank;
     const coverSrc = a.cover || COVER_PH;
     const img = document.createElement('img');
-    img.dataset.src = coverSrc; img.src = COVER_PH; img.alt = a.rank;
+    img.dataset.src = thumbUrl(coverSrc); img.src = COVER_PH; img.alt = a.rank;
     img.onerror = function(){{ this.onerror=null; this.src=COVER_PH; }};
     card.appendChild(img);
     if (heard) {{ const dot=document.createElement('div'); dot.className='heard-dot'; card.appendChild(dot); }}
@@ -2327,7 +2368,7 @@ function buildGrid() {{
     card.addEventListener('click', () => openPanel(a, card));
     grid.appendChild(card);
   }});
-  document.querySelectorAll('img[data-src]').forEach(img=>imgObs.observe(img));
+  startPreload();
   applyFilters();
 }}
 

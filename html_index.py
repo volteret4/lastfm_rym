@@ -148,8 +148,8 @@ def scan_html_files(docs_dir='docs'):
                         print(f"DEBUG: detectado anual -> {filename_with_path} como '{label}'")
                     continue
 
-                elif fn_norm.startswith('usuarios'):
-                    # Archivos de usuarios
+                elif relative_path.lower() == 'users' or fn_norm.startswith('usuarios'):
+                    # Archivos de usuarios (ahora detecta si está en la carpeta 'users' o empieza por 'usuarios')
                     match = re.match(r'usuarios(?:_(\d{4})-(\d{4}))?\.html', fn_norm)
                     if match:
                         if match.group(1) and match.group(2):
@@ -160,15 +160,20 @@ def scan_html_files(docs_dir='docs'):
                         else:
                             label = "Estadísticas de Usuarios"
                             date_obj = datetime.now()
-                        files['users'].append({
-                            'filename': filename_with_path,
-                            'label': label,
-                            'date': date_obj
-                        })
-                        print(f"DEBUG: detectado usuarios -> {filename_with_path} como '{label}'")
+                    else:
+                        # Si está en la carpeta 'users' pero el nombre es distinto
+                        label = fn.replace('.html', '').replace('-', ' ').replace('_', ' ').title()
+                        date_obj = datetime.now()
+
+                    files['users'].append({
+                        'filename': filename_with_path,
+                        'label': label,
+                        'date': date_obj
+                    })
+                    print(f"DEBUG: detectado usuarios -> {filename_with_path} como '{label}'")
                     continue
 
-                elif fn_norm.startswith('grupo'):
+                elif relative_path.lower() == 'grupo' or fn_norm.startswith('grupo'):
                     # Archivos de grupo
                     match = re.match(r'grupo(?:_(\d{4})-(\d{4}))?\.html', fn_norm)
                     if match:
@@ -180,16 +185,18 @@ def scan_html_files(docs_dir='docs'):
                         else:
                             label = "Estadísticas Grupales"
                             date_obj = datetime.now()
-                        files['grupo'].append({
-                            'filename': filename_with_path,
-                            'label': label,
-                            'date': date_obj
-                        })
-                        print(f"DEBUG: detectado grupo -> {filename_with_path} como '{label}'")
-                    continue
+                    else:
+                         # Si está en la carpeta 'grupo' pero el nombre es distinto
+                        label = fn.replace('.html', '').replace('-', ' ').replace('_', ' ').title()
+                        date_obj = datetime.now()
 
-                # Si llega aquí es un html que no encaja en patrones conocidos
-                print(f"DEBUG: archivo HTML no categorizado -> {filename_with_path}")
+                    files['grupo'].append({
+                        'filename': filename_with_path,
+                        'label': label,
+                        'date': date_obj
+                    })
+                    print(f"DEBUG: detectado grupo -> {filename_with_path} como '{label}'")
+                    continue
 
         except PermissionError:
             print(f"⚠️  Sin permisos para acceder a {current_dir}")

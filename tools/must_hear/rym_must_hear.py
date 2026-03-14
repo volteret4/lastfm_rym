@@ -611,7 +611,7 @@ def run_rym(args, root_dir: Path) -> None:
             encoding="utf-8"
         )
 
-        if heard_ids and mh_conn:
+        if heard_ids and mh_conn and not index_only:
             try:
                 scr_conn = sqlite3.connect(scr_path) if scr_path else None
                 mh_populate_user_heard(mh_conn, scr_conn, user, heard_ids)

@@ -864,7 +864,6 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     --text:     #e0e0e0;
     --muted:    #555;
     --gap:      6px;
-    --panel:    380px;
     --header-h: 58px;
   }}
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -879,8 +878,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
 
   /* ── LAYOUT: header top strip, grid left, panel fixed right ── */
   header {{
-    position: fixed; top: 0; left: 0;
-    right: var(--panel);   /* header stops where panel begins */
+    position: fixed; top: 0; left: 0; right: 0;
     height: var(--header-h);
     z-index: 100;
     background: rgba(10,10,10,.97);
@@ -1007,7 +1005,6 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   /* ── GRID AREA ── */
   #main {{
     margin-top: var(--header-h);
-    margin-right: var(--panel);
     padding: 16px 20px 60px;
   }}
   .count-bar {{
@@ -1053,16 +1050,18 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   .card-artist {{ font-size: .55rem; color: var(--muted); margin-top: 2px;
                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
-  /* ── SIDE PANEL (always visible, fixed) ── */
+  /* ── PANEL (full-screen overlay, hidden by default) ── */
   #panel {{
-    position: fixed; top: 0; right: 0; bottom: 0;
-    width: var(--panel);
+    position: fixed; inset: 0;
     background: #0c0c0c;
-    border-left: 1px solid var(--border);
-    z-index: 50;
+    border: none;
+    z-index: 200;
     display: flex; flex-direction: column;
     overflow: hidden;
+    transform: translateY(105%);
+    transition: transform .28s cubic-bezier(.4,0,.2,1);
   }}
+  #panel.panel-open {{ transform: translateY(0); }}
   /* Panel top strip (mirrors header height) */
   .panel-topbar {{
     height: var(--header-h);
@@ -1175,11 +1174,47 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   .back-link:hover {{ color: var(--text); }}
   #empty {{ display: none; text-align: center; padding: 60px 0; font-family: 'DM Mono', monospace; color: var(--muted); font-size: .75rem; }}
 
-  @media (max-width: 800px) {{
-    :root {{ --panel: 100vw; --header-h: 52px; }}
-    header {{ right: 0; }}
-    #main {{ margin-right: 0; }}
-    #panel {{ top: auto; bottom: 0; height: 60vh; border-left: none; border-top: 1px solid var(--border); }}
+  /* ── CLOSE BUTTON ── */
+  .panel-close-btn {{
+    display: flex;
+    position: absolute; top: 13px; right: 13px;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,.07); border: 1px solid var(--border);
+    color: var(--text); font-size: 1rem; line-height: 1; cursor: pointer;
+    align-items: center; justify-content: center; z-index: 10;
+    transition: background .15s; flex-shrink: 0;
+  }}
+  .panel-close-btn:hover {{ background: rgba(255,255,255,.18); }}
+
+  @media (max-width: 600px) {{
+    /* ── Header: info row + scrollable controls row ── */
+    header {{
+      height: auto; min-height: var(--header-h);
+      flex-wrap: wrap; align-items: center;
+      padding: 8px 12px; gap: 6px 10px;
+      overflow: visible;
+    }}
+    .header-title {{ font-size: 1.3rem; }}
+    .header-sub   {{ font-size: .6rem; }}
+
+    /* Controls: own row, scroll horizontally so nothing wraps */
+    .controls {{
+      flex: 0 0 100%; margin-left: 0;
+      overflow-x: auto; flex-wrap: nowrap;
+      gap: 6px; padding: 6px 0 2px;
+      border-top: 1px solid var(--border);
+      scrollbar-width: none;
+    }}
+    .controls::-webkit-scrollbar {{ display: none; }}
+    .search-box  {{ width: 120px; flex-shrink: 0; }}
+    .genre-wrap, .grid-sizer, .filter-btn {{ flex-shrink: 0; }}
+
+    /* Grid area */
+    #main {{ padding: 12px 10px 60px; }}
+
+    /* Panel: larger cover and video on small screens */
+    .panel-cover {{ max-height: 50vw; }}
+    .panel-yt-wrap iframe {{ height: 200px; }}
   }}
 </style>
 </head>
@@ -1218,7 +1253,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
 
     <div class="grid-sizer">
       <span id="grid-label">10×</span>
-      <input type="range" id="grid-slider" min="3" max="20" value="10" step="1" oninput="setGridSize(this.value)">
+      <input type="range" id="grid-slider" min="3" max="20" value="5" step="1" oninput="setGridSize(this.value)">
     </div>
   </div>
 </header>
@@ -1232,8 +1267,9 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   <div id="empty">No albums match your filters.</div>
 </main>
 
-<!-- Side panel: always visible -->
+<!-- Side panel: always visible on desktop, full-screen overlay on mobile -->
 <aside id="panel">
+  <button class="panel-close-btn" onclick="closePanel()" aria-label="Close">✕</button>
   <div class="panel-topbar">
     <span class="panel-topbar-label">Album detail</span>
   </div>
@@ -1382,10 +1418,17 @@ function buildGrid() {{
 }}
 
 // ── PANEL ──
+function closePanel() {{
+  document.getElementById('panel').classList.remove('panel-open');
+  document.querySelectorAll('.card.active-card').forEach(c => c.classList.remove('active-card'));
+  currentAlbum = null;
+}}
+
 function openPanel(a, cardEl) {{
   document.querySelectorAll('.card.active-card').forEach(c => c.classList.remove('active-card'));
   cardEl.classList.add('active-card');
   currentAlbum = a;
+  document.getElementById('panel').classList.add('panel-open');
 
   // Cover
   const coverWrap = document.getElementById('panel-cover-wrap');
@@ -1493,11 +1536,21 @@ function applyFilters() {{
 }}
 
 // ── INIT ──
+const _isMobile = () => window.matchMedia('(max-width: 600px)').matches;
+
+// Adjust #main top margin to match actual header height (handles wrapping on mobile)
+function adjustMainTop() {{
+  document.getElementById('main').style.marginTop = document.querySelector('header').offsetHeight + 'px';
+}}
+window.addEventListener('resize', adjustMainTop);
+
 try {{
   const saved = localStorage.getItem('grid-cols');
-  if (saved) {{ const v = Math.min(20,Math.max(3,parseInt(saved))); document.getElementById('grid-slider').value=v; setGridSize(v); }}
-  else setGridSize(10);
-}} catch(e) {{ setGridSize(10); }}
+  const defaultCols = _isMobile() ? 3 : 10;
+  const v = saved ? Math.min(20, Math.max(3, parseInt(saved))) : defaultCols;
+  document.getElementById('grid-slider').value = v;
+  setGridSize(v);
+}} catch(e) {{ setGridSize(_isMobile() ? 3 : 10); }}
 
 fetch('{data_file}')
   .then(r => {{ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }})
@@ -1505,14 +1558,17 @@ fetch('{data_file}')
     ALBUMS = data;
     buildGrid();
     buildGenreList();
-    // Open first card by default
-    setTimeout(() => {{
-      const firstCard = document.querySelector('.card:not(.hidden)');
-      if (firstCard) {{
-        const album = ALBUMS.find(a => a.n === parseInt(firstCard.dataset.num));
-        if (album) openPanel(album, firstCard);
-      }}
-    }}, 100);
+    adjustMainTop();
+    // Open first card by default (desktop only — on mobile the panel would cover the grid)
+    if (!_isMobile()) {{
+      setTimeout(() => {{
+        const firstCard = document.querySelector('.card:not(.hidden)');
+        if (firstCard) {{
+          const album = ALBUMS.find(a => a.n === parseInt(firstCard.dataset.num));
+          if (album) openPanel(album, firstCard);
+        }}
+      }}, 100);
+    }}
   }})
   .catch(err => {{
     document.getElementById('grid').innerHTML =
@@ -4237,7 +4293,8 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
                            slug: str, name: str, out_dir: Path,
                            users: list, generated: str,
                            collection_slug: str = None,
-                           collection_name: str = None) -> None:
+                           collection_name: str = None,
+                           update_db: bool = True) -> None:
     """Regenerate HTML pages for one MusicBrainz-series collection using DB data."""
     albums = mh_load_collection(mh_conn, slug)
     if not albums:
@@ -4273,7 +4330,7 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
             render_user_html(user, albums_data, name, data_file=f"data/{json_fname}"),
             encoding="utf-8"
         )
-        if heard_ids:
+        if heard_ids and update_db:
             mh_populate_user_heard(mh_conn, scrobbles_conn, user, heard_ids)
         users_index.append({
             "user": user, "file": fname,
@@ -4365,6 +4422,7 @@ def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn) -> None:
             mh_conn, scrobbles_conn, root_dir,
             slug, name, out_dir, users, generated,
             collection_slug=g_slug, collection_name=g_name,
+            update_db=False,
         )
 
     print(f"\n✅ Global index-only done → {root_dir / 'index.html'}")
@@ -4793,7 +4851,7 @@ def main():
         print(f"   ✅ {heard_count}/{len(albums_data)} escuchados ({pct}%)")
 
         # Poblar user_heard en must_hear.db
-        if mh_conn and heard_ids:
+        if mh_conn and heard_ids and not args.index_only:
             mh_populate_user_heard(mh_conn, scrobbles_conn, user, heard_ids)
 
         # Guardar JSON por usuario

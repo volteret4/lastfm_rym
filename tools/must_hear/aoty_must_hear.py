@@ -449,12 +449,23 @@ header{
 .panel-yt-wrap{margin-top:11px;border-radius:4px;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
 .panel-yt-wrap iframe{display:block;width:100%;height:145px;border:none}
 .panel-yt-placeholder{height:60px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted)}
+.panel-close-btn{display:none;position:absolute;top:13px;right:13px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--text);font-size:1rem;cursor:pointer;align-items:center;justify-content:center;z-index:10;transition:background .15s}
+.panel-close-btn:hover{background:rgba(255,255,255,.18)}
+.grid-sizer{display:flex;align-items:center;gap:5px}
+.grid-sizer span{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);min-width:24px;text-align:right}
+#grid-slider{-webkit-appearance:none;appearance:none;width:70px;height:3px;background:var(--border);border-radius:2px;outline:none;cursor:pointer}
+#grid-slider::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--accent);cursor:pointer}
+#grid-slider::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
 #empty{display:none;text-align:center;padding:50px 0;font-family:'DM Mono',monospace;color:var(--muted);font-size:.7rem}
-@media(max-width:800px){
-  :root{--panel:100vw;--header-h:50px}
-  header{right:0}
-  #main{margin-right:0}
-  #panel{top:auto;bottom:0;height:55vh;border-left:none;border-top:1px solid var(--border)}
+@media(max-width:600px){
+  :root{--header-h:50px}
+  header{right:0;height:auto;min-height:var(--header-h);flex-wrap:wrap;padding:8px 12px;gap:6px 10px;overflow:visible}
+  #main{margin-right:0;padding:10px 10px 60px}
+  #panel{inset:0;width:100%;border-left:none;transform:translateY(105%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+  #panel.panel-open{transform:translateY(0)}
+  .panel-close-btn{display:flex}
+  .controls{flex:0 0 100%;margin-left:0;overflow-x:auto;flex-wrap:nowrap;gap:5px;padding:5px 0 2px;border-top:1px solid var(--border);scrollbar-width:none}
+  .controls::-webkit-scrollbar{display:none}
   .dec-wrap{display:none}
 }"""
 
@@ -622,9 +633,23 @@ function buildGrid() {{
   applyFilters();
 }}
 
+const _isMobile = () => window.matchMedia('(max-width:600px)').matches;
+
+function closePanel() {{
+  document.getElementById('panel').classList.remove('panel-open');
+  document.querySelectorAll('.card.active-card').forEach(c=>c.classList.remove('active-card'));
+}}
+
+function setGridSize(val) {{
+  document.getElementById('grid-label').textContent = val + '\xd7';
+  document.getElementById('grid').style.gridTemplateColumns = 'repeat('+val+',1fr)';
+  try {{ localStorage.setItem('grid-cols-aoty', val); }} catch(e) {{}}
+}}
+
 function openPanel(a, cardEl) {{
   document.querySelectorAll('.card.active-card').forEach(c=>c.classList.remove('active-card'));
   cardEl.classList.add('active-card');
+  if (_isMobile()) document.getElementById('panel').classList.add('panel-open');
 
   const coverWrap = document.getElementById('panel-cover-wrap');
   coverWrap.style.display='';
@@ -710,9 +735,9 @@ function applyFilters() {{
 }}
 
 buildGenreList(); buildUserList(); buildGrid();
+try{{const sv=localStorage.getItem('grid-cols-aoty');const dv=_isMobile()?3:10;const v=sv?Math.min(20,Math.max(3,parseInt(sv))):dv;document.getElementById('grid-slider').value=v;setGridSize(v);}}catch(e){{setGridSize(_isMobile()?3:10);}}
 setTimeout(()=>{{
-  const first=document.querySelector('.card:not(.hidden)');
-  if(first){{const a=ALBUMS.find(x=>x.n===parseInt(first.dataset.num));if(a)openPanel(a,first);}}
+  if(!_isMobile()){{const first=document.querySelector('.card:not(.hidden)');if(first){{const a=ALBUMS.find(x=>x.n===parseInt(first.dataset.num));if(a)openPanel(a,first);}}}}
 }},100);"""
 
     return f"""<!DOCTYPE html>
@@ -752,6 +777,10 @@ setTimeout(()=>{{
         <span class="u-name" id="user-btn-label">All users</span> &#x25BE;
       </button>
     </div>
+    <div class="grid-sizer">
+      <span id="grid-label">10×</span>
+      <input type="range" id="grid-slider" min="3" max="20" value="10" step="1" oninput="setGridSize(this.value)">
+    </div>
   </div>
 </header>
 <main id="main">
@@ -763,6 +792,7 @@ setTimeout(()=>{{
   <div id="empty">No albums match your filters.</div>
 </main>
 <aside id="panel">
+  <button class="panel-close-btn" onclick="closePanel()" aria-label="Close">&#x2715;</button>
   <div class="panel-topbar">
     <span class="panel-topbar-label">Album detail</span>
   </div>

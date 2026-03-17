@@ -864,6 +864,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     --text:     #e0e0e0;
     --muted:    #555;
     --gap:      6px;
+    --panel:    390px;
     --header-h: 58px;
   }}
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -878,7 +879,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
 
   /* ── LAYOUT: header top strip, grid left, panel fixed right ── */
   header {{
-    position: fixed; top: 0; left: 0; right: 0;
+    position: fixed; top: 0; left: 0; right: var(--panel);
     height: var(--header-h);
     z-index: 100;
     background: rgba(10,10,10,.97);
@@ -1005,6 +1006,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   /* ── GRID AREA ── */
   #main {{
     margin-top: var(--header-h);
+    margin-right: var(--panel);
     padding: 16px 20px 60px;
   }}
   .count-bar {{
@@ -1050,18 +1052,15 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   .card-artist {{ font-size: .55rem; color: var(--muted); margin-top: 2px;
                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
-  /* ── PANEL (full-screen overlay, hidden by default) ── */
+  /* ── PANEL (sidebar on desktop, hidden overlay on mobile) ── */
   #panel {{
-    position: fixed; inset: 0;
+    position: fixed; top: 0; right: 0; bottom: 0; width: var(--panel);
     background: #0c0c0c;
-    border: none;
+    border-left: 1px solid var(--border);
     z-index: 200;
     display: flex; flex-direction: column;
     overflow: hidden;
-    transform: translateY(105%);
-    transition: transform .28s cubic-bezier(.4,0,.2,1);
   }}
-  #panel.panel-open {{ transform: translateY(0); }}
   /* Panel top strip (mirrors header height) */
   .panel-topbar {{
     height: var(--header-h);
@@ -1174,9 +1173,9 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   .back-link:hover {{ color: var(--text); }}
   #empty {{ display: none; text-align: center; padding: 60px 0; font-family: 'DM Mono', monospace; color: var(--muted); font-size: .75rem; }}
 
-  /* ── CLOSE BUTTON ── */
+  /* ── CLOSE BUTTON (visible only on mobile) ── */
   .panel-close-btn {{
-    display: flex;
+    display: none;
     position: absolute; top: 13px; right: 13px;
     width: 34px; height: 34px; border-radius: 50%;
     background: rgba(255,255,255,.07); border: 1px solid var(--border);
@@ -1187,8 +1186,9 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   .panel-close-btn:hover {{ background: rgba(255,255,255,.18); }}
 
   @media (max-width: 600px) {{
-    /* ── Header: info row + scrollable controls row ── */
+    /* ── Header: full width, wraps to two rows ── */
     header {{
+      right: 0;
       height: auto; min-height: var(--header-h);
       flex-wrap: wrap; align-items: center;
       padding: 8px 12px; gap: 6px 10px;
@@ -1210,9 +1210,16 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     .genre-wrap, .grid-sizer, .filter-btn {{ flex-shrink: 0; }}
 
     /* Grid area */
-    #main {{ padding: 12px 10px 60px; }}
+    #main {{ padding: 12px 10px 60px; margin-right: 0; }}
 
-    /* Panel: larger cover and video on small screens */
+    /* Panel: full-screen overlay, hidden by default */
+    #panel {{
+      inset: 0; width: 100%; border-left: none;
+      transform: translateY(105%);
+      transition: transform .28s cubic-bezier(.4,0,.2,1);
+    }}
+    #panel.panel-open {{ transform: translateY(0); }}
+    .panel-close-btn {{ display: flex; }}
     .panel-cover {{ max-height: 50vw; }}
     .panel-yt-wrap iframe {{ height: 200px; }}
   }}
@@ -1428,7 +1435,7 @@ function openPanel(a, cardEl) {{
   document.querySelectorAll('.card.active-card').forEach(c => c.classList.remove('active-card'));
   cardEl.classList.add('active-card');
   currentAlbum = a;
-  document.getElementById('panel').classList.add('panel-open');
+  if (_isMobile()) document.getElementById('panel').classList.add('panel-open');
 
   // Cover
   const coverWrap = document.getElementById('panel-cover-wrap');
@@ -2202,12 +2209,23 @@ header{
 .panel-yt-wrap{margin-top:11px;border-radius:4px;overflow:hidden;background:var(--surface);border:1px solid var(--border)}
 .panel-yt-wrap iframe{display:block;width:100%;height:145px;border:none}
 .panel-yt-placeholder{height:60px;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted)}
+.panel-close-btn{display:none;position:absolute;top:13px;right:13px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--text);font-size:1rem;cursor:pointer;align-items:center;justify-content:center;z-index:10;transition:background .15s}
+.panel-close-btn:hover{background:rgba(255,255,255,.18)}
+.grid-sizer{display:flex;align-items:center;gap:5px}
+.grid-sizer span{font-family:'DM Mono',monospace;font-size:.6rem;color:var(--muted);min-width:24px;text-align:right}
+#grid-slider{-webkit-appearance:none;appearance:none;width:70px;height:3px;background:var(--border);border-radius:2px;outline:none;cursor:pointer}
+#grid-slider::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--accent);cursor:pointer}
+#grid-slider::-moz-range-thumb{width:11px;height:11px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
 #empty{display:none;text-align:center;padding:50px 0;font-family:'DM Mono',monospace;color:var(--muted);font-size:.7rem}
-@media(max-width:800px){
-  :root{--panel:100vw;--header-h:50px}
-  header{right:0}
-  #main{margin-right:0}
-  #panel{top:auto;bottom:0;height:55vh;border-left:none;border-top:1px solid var(--border)}
+@media(max-width:600px){
+  :root{--header-h:50px}
+  header{right:0;height:auto;min-height:var(--header-h);flex-wrap:wrap;padding:8px 12px;gap:6px 10px;overflow:visible}
+  #main{margin-right:0;padding:10px 10px 60px}
+  #panel{inset:0;width:100%;border-left:none;transform:translateY(105%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+  #panel.panel-open{transform:translateY(0)}
+  .panel-close-btn{display:flex}
+  .controls{flex:0 0 100%;margin-left:0;overflow-x:auto;flex-wrap:nowrap;gap:5px;padding:5px 0 2px;border-top:1px solid var(--border);scrollbar-width:none}
+  .controls::-webkit-scrollbar{display:none}
   .dec-wrap{display:none}
 }
 .user-wrap{position:relative}
@@ -2428,9 +2446,23 @@ function buildGrid() {{
   applyFilters();
 }}
 
+const _isMobile = () => window.matchMedia('(max-width:600px)').matches;
+
+function closePanel() {{
+  document.getElementById('panel').classList.remove('panel-open');
+  document.querySelectorAll('.card.active-card').forEach(c=>c.classList.remove('active-card'));
+}}
+
+function setGridSize(val) {{
+  document.getElementById('grid-label').textContent = val + '\xd7';
+  document.getElementById('grid').style.gridTemplateColumns = 'repeat('+val+',1fr)';
+  try {{ localStorage.setItem('grid-cols-scaruffi', val); }} catch(e) {{}}
+}}
+
 function openPanel(a, cardEl) {{
   document.querySelectorAll('.card.active-card').forEach(c=>c.classList.remove('active-card'));
   cardEl.classList.add('active-card');
+  if (_isMobile()) document.getElementById('panel').classList.add('panel-open');
 
   const coverWrap = document.getElementById('panel-cover-wrap');
   coverWrap.style.display='';
@@ -2548,9 +2580,9 @@ function applyFilters() {{
 }}
 
 buildGenreList(); buildRatingBtns(); buildUserList(); buildGrid();
+try{{const sv=localStorage.getItem('grid-cols-scaruffi');const dv=_isMobile()?3:10;const v=sv?Math.min(20,Math.max(3,parseInt(sv))):dv;document.getElementById('grid-slider').value=v;setGridSize(v);}}catch(e){{setGridSize(_isMobile()?3:10);}}
 setTimeout(()=>{{
-  const first=document.querySelector('.card:not(.hidden)');
-  if(first){{const a=ALBUMS.find(x=>x.rank===parseInt(first.dataset.num));if(a)openPanel(a,first);}}
+  if(!_isMobile()){{const first=document.querySelector('.card:not(.hidden)');if(first){{const a=ALBUMS.find(x=>x.rank===parseInt(first.dataset.num));if(a)openPanel(a,first);}}}}
 }},100);"""
 
     return f"""<!DOCTYPE html>
@@ -2595,6 +2627,10 @@ setTimeout(()=>{{
       </button>
     </div>
     <div class="rating-wrap" id="rating-btns"></div>
+    <div class="grid-sizer">
+      <span id="grid-label">10×</span>
+      <input type="range" id="grid-slider" min="3" max="20" value="10" step="1" oninput="setGridSize(this.value)">
+    </div>
   </div>
 </header>
 <main id="main">
@@ -2606,6 +2642,7 @@ setTimeout(()=>{{
   <div id="empty">No albums match your filters.</div>
 </main>
 <aside id="panel">
+  <button class="panel-close-btn" onclick="closePanel()" aria-label="Close">&#x2715;</button>
   <div class="panel-topbar">
     <span class="panel-topbar-label">Album detail</span>
   </div>

@@ -952,9 +952,9 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     padding: 1px 6px; font-size: .58rem; font-weight: 700;
   }}
   .genre-dropdown {{
-    display: none; position: absolute; top: calc(100% + 6px); right: 0;
+    display: none; position: fixed;
     background: #161616; border: 1px solid var(--border); border-radius: 4px;
-    z-index: 500; min-width: 220px; max-height: 360px;
+    z-index: 9999; min-width: 220px; max-height: 360px;
     overflow-y: auto; padding: 6px 0;
     scrollbar-width: thin; scrollbar-color: var(--border) transparent;
     box-shadow: 0 8px 32px rgba(0,0,0,.6);
@@ -1358,10 +1358,16 @@ function buildGenreList() {{
 }}
 
 function toggleGenreDropdown() {{
-  const dd = document.getElementById('genre-dropdown');
+  const dd  = document.getElementById('genre-dropdown');
   const btn = document.getElementById('genre-btn');
-  dd.classList.toggle('open');
-  btn.classList.toggle('active', dd.classList.contains('open') || selectedGenres.size > 0);
+  const open = !dd.classList.contains('open');
+  dd.classList.toggle('open', open);
+  btn.classList.toggle('active', open || selectedGenres.size > 0);
+  if (open) {{
+    const r = btn.getBoundingClientRect();
+    dd.style.top  = (r.bottom + 4) + 'px';
+    dd.style.left = Math.max(4, r.right - 220) + 'px';
+  }}
 }}
 
 function toggleGenre(genre, checked) {{

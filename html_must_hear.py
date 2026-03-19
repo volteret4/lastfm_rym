@@ -3681,7 +3681,7 @@ def mh_album_to_json(album: dict, heard: bool) -> dict:
     compatibilidad con los templates HTML existentes.
     """
     mbid = album.get("mbid", "")
-    cover = album.get("cover_url") or (f"{CAA}/{mbid}/front-500" if mbid else "")
+    cover = (f"{CAA}/{mbid}/front-500" if mbid else "") or album.get("cover_url", "")
     return {
         "n":               album.get("number", 0),
         "title":           album.get("title", ""),

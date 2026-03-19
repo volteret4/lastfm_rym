@@ -1008,6 +1008,8 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     margin-top: var(--header-h);
     margin-right: var(--panel);
     padding: 16px 20px 60px;
+    position: relative;
+    z-index: 0;
   }}
   .count-bar {{
     font-family: 'DM Mono', monospace; font-size: .68rem;
@@ -1249,13 +1251,6 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
       <button class="genre-btn" id="genre-btn" onclick="toggleGenreDropdown()">
         Genre <span class="badge" id="genre-badge" style="display:none">0</span> ▾
       </button>
-      <div class="genre-dropdown" id="genre-dropdown">
-        <div class="genre-dropdown-header">
-          Filter by genre
-          <span class="genre-clear" onclick="clearGenres()">clear</span>
-        </div>
-        <div id="genre-list"></div>
-      </div>
     </div>
 
     <div class="grid-sizer">
@@ -1264,6 +1259,14 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     </div>
   </div>
 </header>
+<!-- Genre dropdown at body level so backdrop-filter on header doesn't trap it -->
+<div class="genre-dropdown" id="genre-dropdown">
+  <div class="genre-dropdown-header">
+    Filter by genre
+    <span class="genre-clear" onclick="clearGenres()">clear</span>
+  </div>
+  <div id="genre-list"></div>
+</div>
 
 <main id="main">
   <div class="count-bar">
@@ -2148,7 +2151,7 @@ header{
 }
 .rating-btn:hover{border-color:var(--muted);color:var(--text)}
 .rating-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(232,255,71,.06)}
-#main{margin-top:var(--header-h);margin-right:var(--panel);padding:14px 18px 60px}
+#main{margin-top:var(--header-h);margin-right:var(--panel);padding:14px 18px 60px;position:relative;z-index:0}
 .count-bar{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);margin-bottom:10px;display:flex;gap:14px}
 .count-bar b{color:var(--text)}
 #grid{display:grid;grid-template-columns:repeat(10,1fr);gap:var(--gap)}

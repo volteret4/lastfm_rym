@@ -376,7 +376,7 @@ header{
 .user-item.active{color:var(--accent)}
 .user-item .u-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--border)}
 .user-item.active .u-dot{background:var(--accent)}
-#main{margin-top:var(--header-h);margin-right:var(--panel);padding:14px 18px 60px}
+#main{margin-top:var(--header-h);margin-right:var(--panel);padding:14px 18px 60px;position:relative;z-index:0}
 .count-bar{font-family:'DM Mono',monospace;font-size:.62rem;color:var(--muted);margin-bottom:10px;display:flex;gap:14px}
 .count-bar b{color:var(--text)}
 #grid{display:grid;grid-template-columns:repeat(10,1fr);gap:var(--gap)}

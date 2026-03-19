@@ -3681,7 +3681,7 @@ def mh_album_to_json(album: dict, heard: bool) -> dict:
     compatibilidad con los templates HTML existentes.
     """
     mbid = album.get("mbid", "")
-    cover = (f"{CAA}/{mbid}/front-500" if mbid else "") or album.get("cover_url", "")
+    cover = album.get("cover_url") or (f"{CAA}/{mbid}/front-500" if mbid else "")
     return {
         "n":               album.get("number", 0),
         "title":           album.get("title", ""),
@@ -3758,8 +3758,8 @@ def mh_fetch_covers(mh_conn: sqlite3.Connection, albums: list,
             print("⬆ 250→500")
             continue
 
-        # Si ya tiene portada de fuente externa (no CAA vacía), saltamos
-        if current and CAA_PREFIX not in current:
+        # Si ya tiene portada externa (no archive.org), saltamos
+        if current and CAA_PREFIX not in current and "archive.org" not in current:
             already_ok += 1
             print("✓")
             continue

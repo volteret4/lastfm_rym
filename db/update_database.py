@@ -601,22 +601,33 @@ class NormalizedDatabase:
     # ── Artist enrichment ─────────────────────────────────────────────────────
 
     def update_artist(self, artist_id: int, fields: Dict):
-        """COALESCE: solo rellena campos vacíos."""
+        """COALESCE: solo rellena campos vacíos.
+        Si hay conflicto UNIQUE (mbid duplicado), reintenta sin los campos únicos."""
         if not fields:
             return
         ts = int(time.time())
+        # Campos con índice UNIQUE que pueden colisionar con otros artistas
+        unique_fields = {'mbid'}
         with self.lock:
-            set_parts, params = [], []
-            for col, val in fields.items():
-                if isinstance(val, (list, dict)):
-                    val = json.dumps(val, ensure_ascii=False)
-                set_parts.append(f"{col} = COALESCE({col}, ?)")
-                params.append(val)
-            set_parts.append("last_updated = ?")
-            params.extend([ts, artist_id])
-            self.conn.execute(
-                f"UPDATE artists SET {', '.join(set_parts)} WHERE id=?", params
-            )
+            def _build_and_run(flds):
+                set_parts, params = [], []
+                for col, val in flds.items():
+                    if isinstance(val, (list, dict)):
+                        val = json.dumps(val, ensure_ascii=False)
+                    set_parts.append(f"{col} = COALESCE({col}, ?)")
+                    params.append(val)
+                set_parts.append("last_updated = ?")
+                params.extend([ts, artist_id])
+                self.conn.execute(
+                    f"UPDATE artists SET {', '.join(set_parts)} WHERE id=?", params
+                )
+            try:
+                _build_and_run(fields)
+            except sqlite3.IntegrityError:
+                # Reintenta sin los campos únicos conflictivos
+                safe_fields = {k: v for k, v in fields.items() if k not in unique_fields}
+                if safe_fields:
+                    _build_and_run(safe_fields)
             self.pending_commits += 1
 
     def save_artist_genres(self, artist_id: int, genres: List, source: str = None):
@@ -645,19 +656,27 @@ class NormalizedDatabase:
         ts = int(time.time())
         meta  = {k: v for k, v in fields.items() if k in _ALBUM_METADATA_FIELDS}
         album = {k: v for k, v in fields.items() if k not in _ALBUM_METADATA_FIELDS}
+        unique_fields = {'mbid'}
         with self.lock:
             if album:
-                set_parts, params = [], []
-                for col, val in album.items():
-                    if isinstance(val, (list, dict)):
-                        val = json.dumps(val, ensure_ascii=False)
-                    set_parts.append(f"{col} = COALESCE({col}, ?)")
-                    params.append(val)
-                set_parts.append("last_updated = ?")
-                params.extend([ts, album_id])
-                self.conn.execute(
-                    f"UPDATE albums SET {', '.join(set_parts)} WHERE id=?", params
-                )
+                def _run_album(flds):
+                    set_parts, params = [], []
+                    for col, val in flds.items():
+                        if isinstance(val, (list, dict)):
+                            val = json.dumps(val, ensure_ascii=False)
+                        set_parts.append(f"{col} = COALESCE({col}, ?)")
+                        params.append(val)
+                    set_parts.append("last_updated = ?")
+                    params.extend([ts, album_id])
+                    self.conn.execute(
+                        f"UPDATE albums SET {', '.join(set_parts)} WHERE id=?", params
+                    )
+                try:
+                    _run_album(album)
+                except sqlite3.IntegrityError:
+                    safe = {k: v for k, v in album.items() if k not in unique_fields}
+                    if safe:
+                        _run_album(safe)
             if meta:
                 self.conn.execute(
                     "INSERT OR IGNORE INTO album_metadata (album_id) VALUES (?)",
@@ -673,6 +692,30 @@ class NormalizedDatabase:
                     params
                 )
             self.pending_commits += 1
+
+    def save_artist_similarities(self, artist_id: int,
+                                   similar_names: List[str], source: str = 'lastfm'):
+        """Inserta en artist_similarities para los artistas similares que ya existen en la BD."""
+        with self.lock:
+            # Crear tabla si no existe (puede que el migrador aún no haya corrido)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS artist_similarities (
+                    artist_id        INTEGER NOT NULL REFERENCES artists(id),
+                    similar_artist_id INTEGER NOT NULL REFERENCES artists(id),
+                    score            REAL    NOT NULL DEFAULT 1.0,
+                    source           TEXT,
+                    PRIMARY KEY (artist_id, similar_artist_id)
+                )
+            """)
+            for name in similar_names:
+                sim_id = self._artist_cache.get(name)
+                if sim_id and sim_id != artist_id:
+                    self.conn.execute(
+                        "INSERT OR IGNORE INTO artist_similarities "
+                        "(artist_id, similar_artist_id, score, source) VALUES (?,?,?,?)",
+                        (artist_id, sim_id, 1.0, source)
+                    )
+            self.pending_commits += len(similar_names)
 
     def save_album_genres(self, album_id: int, genres: List, source: str = None):
         with self.lock:
@@ -697,35 +740,50 @@ class NormalizedDatabase:
         if not fields:
             return
         ts = int(time.time())
+        unique_fields = {'mbid', 'isrc'}
         with self.lock:
-            set_parts, params = [], []
-            for col, val in fields.items():
-                set_parts.append(f"{col} = COALESCE({col}, ?)")
-                params.append(val)
-            set_parts.append("last_updated = ?")
-            params.extend([ts, track_id])
-            self.conn.execute(
-                f"UPDATE tracks SET {', '.join(set_parts)} WHERE id=?", params
-            )
+            def _run_track(flds):
+                set_parts, params = [], []
+                for col, val in flds.items():
+                    set_parts.append(f"{col} = COALESCE({col}, ?)")
+                    params.append(val)
+                set_parts.append("last_updated = ?")
+                params.extend([ts, track_id])
+                self.conn.execute(
+                    f"UPDATE tracks SET {', '.join(set_parts)} WHERE id=?", params
+                )
+            try:
+                _run_track(fields)
+            except sqlite3.IntegrityError:
+                safe = {k: v for k, v in fields.items() if k not in unique_fields}
+                if safe:
+                    _run_track(safe)
             self.pending_commits += 1
 
     # ── Queries for enrichment queue ──────────────────────────────────────────
 
-    def _scrobble_count_expr(self, entity_col: str) -> str:
+    def _scrobble_counts_subquery(self, entity_col: str) -> str:
         """
-        Expresión SQL para contar scrobbles totales de una entidad
-        sumando sobre todas las tablas por usuario.
+        Subconsulta que agrega scrobbles de todos los usuarios en un solo pase
+        (UNION ALL + GROUP BY), mucho más rápida que subqueries correlacionadas.
         """
         tables = self._known_user_tables()
         if not tables:
-            return "0"
-        parts = [f"(SELECT COUNT(*) FROM {t} s WHERE s.{entity_col} = e.id)"
-                 for t in tables]
-        return " + ".join(parts)
+            return "(SELECT 0 AS entity_id, 0 AS cnt)"
+        union = " UNION ALL ".join(
+            f"SELECT {entity_col} AS entity_id FROM {t}"
+            for t in tables
+        )
+        return f"(SELECT entity_id, COUNT(*) AS cnt FROM ({union}) GROUP BY entity_id)"
 
     def get_entities_to_enrich(self, entity_type: str, limit: int = 1000) -> List[Tuple]:
         """
-        Entidades sin enriquecer (last_updated IS NULL), ordenadas por popularidad.
+        Entidades sin enriquecer, ordenadas por popularidad.
+
+        Criterio "no enriquecido":
+          artist → mbid IS NULL  (el enricher siempre lo rellena)
+          album  → year IS NULL  (viene de MB/Discogs, nunca del ingesto)
+          track  → mbid IS NULL
 
         Returns:
           artist → [(artist_id, artist_name), ...]
@@ -733,36 +791,39 @@ class NormalizedDatabase:
           track  → [(track_id, artist_name, track_name), ...]
         """
         if entity_type == 'artist':
-            order = self._scrobble_count_expr("artist_id")
+            sq = self._scrobble_counts_subquery("artist_id")
             rows = self.conn.execute(f"""
                 SELECT e.id, e.name
                 FROM artists e
-                WHERE e.last_updated IS NULL
-                ORDER BY ({order}) DESC
+                LEFT JOIN {sq} sc ON sc.entity_id = e.id
+                WHERE e.mbid IS NULL
+                ORDER BY COALESCE(sc.cnt, 0) DESC
                 LIMIT ?
             """, (limit,)).fetchall()
             return [(r[0], r[1]) for r in rows]
 
         elif entity_type == 'album':
-            order = self._scrobble_count_expr("album_id")
+            sq = self._scrobble_counts_subquery("album_id")
             rows = self.conn.execute(f"""
                 SELECT e.id, ar.name, e.name
                 FROM albums e
                 JOIN artists ar ON ar.id = e.artist_id
-                WHERE e.last_updated IS NULL
-                ORDER BY ({order}) DESC
+                LEFT JOIN {sq} sc ON sc.entity_id = e.id
+                WHERE e.year IS NULL
+                ORDER BY COALESCE(sc.cnt, 0) DESC
                 LIMIT ?
             """, (limit,)).fetchall()
             return [(r[0], r[1], r[2]) for r in rows]
 
         elif entity_type == 'track':
-            order = self._scrobble_count_expr("track_id")
+            sq = self._scrobble_counts_subquery("track_id")
             rows = self.conn.execute(f"""
                 SELECT e.id, ar.name, e.name
                 FROM tracks e
                 JOIN artists ar ON ar.id = e.artist_id
-                WHERE e.last_updated IS NULL
-                ORDER BY ({order}) DESC
+                LEFT JOIN {sq} sc ON sc.entity_id = e.id
+                WHERE e.mbid IS NULL
+                ORDER BY COALESCE(sc.cnt, 0) DESC
                 LIMIT ?
             """, (limit,)).fetchall()
             return [(r[0], r[1], r[2]) for r in rows]
@@ -886,13 +947,19 @@ class MultithreadedLastFMUpdater:
         with self.stats_lock:
             self.stats[key] = self.stats.get(key, 0) + n
 
+    def _save_similar_artists(self, artist_id: int, similar: List[Dict], source: str):
+        names = [s.get('name', '') for s in similar if s.get('name')]
+        if names:
+            self.db.save_artist_similarities(artist_id, names, source)
+
     # ── Artist enrichment worker ──────────────────────────────────────────────
 
     def enrich_artist_worker(self, artist_id: int, artist_name: str) -> bool:
         try:
-            lastfm, mb, _ = self._create_worker_clients()
+            lastfm, mb, discogs = self._create_worker_clients()
             details: Dict = {}
 
+            # ── LastFM ────────────────────────────────────────────────────────
             lfm = lastfm.get_artist_info(artist_name)
             if lfm and 'artist' in lfm:
                 a = lfm['artist']
@@ -902,9 +969,9 @@ class MultithreadedLastFMUpdater:
                     'listeners':  int(a.get('stats', {}).get('listeners', 0)) or None,
                     'playcount':  int(a.get('stats', {}).get('playcount', 0)) or None,
                     'lastfm_url': a.get('url') or None,
-                    'img_url':    (a.get('image', [{}])[-1].get('#text', '') or None)
-                                  if a.get('image') else None,
                 })
+                # La API de LastFM deprecó imágenes de artistas (~2019);
+                # el campo viene vacío o con placeholder genérico — lo ignoramos.
                 tags = a.get('tags', {}).get('tag', [])
                 if isinstance(tags, list) and tags:
                     details['tags'] = json.dumps([t.get('name', '') for t in tags[:10]])
@@ -913,10 +980,9 @@ class MultithreadedLastFMUpdater:
                     self.db.save_artist_genres(artist_id, lfm_genres, 'lastfm')
                 similar = a.get('similar', {}).get('artist', [])
                 if isinstance(similar, list) and similar:
-                    details['similar_artists'] = json.dumps(
-                        [s.get('name', '') for s in similar[:5]]
-                    )
+                    self._save_similar_artists(artist_id, similar[:10], 'lastfm')
 
+            # ── MusicBrainz ───────────────────────────────────────────────────
             mb_data = None
             if details.get('mbid'):
                 mb_data = mb.get_artist_by_mbid(details['mbid'])
@@ -937,13 +1003,31 @@ class MultithreadedLastFMUpdater:
                                  for t in mb_data['tags'][:10]]
                 if mb_genres:
                     self.db.save_artist_genres(artist_id, mb_genres, 'musicbrainz')
+                begin_date = (mb_data.get('life-span') or {}).get('begin') or None
+                formed_year = None
+                if begin_date:
+                    try:
+                        formed_year = int(begin_date[:4])
+                    except (ValueError, TypeError):
+                        pass
                 details.update({
                     'country':        mb_data.get('country') or None,
-                    'begin_date':     (mb_data.get('life-span') or {}).get('begin') or None,
+                    'begin_date':     begin_date,
                     'end_date':       (mb_data.get('life-span') or {}).get('end') or None,
+                    'formed_year':    formed_year,
                     'artist_type':    mb_data.get('type') or None,
                     'disambiguation': mb_data.get('disambiguation') or None,
                 })
+
+            # ── Discogs — imagen del artista ──────────────────────────────────
+            if discogs.token:
+                dr = discogs.search_artist(artist_name)
+                if dr and dr.get('results'):
+                    res = dr['results'][0]
+                    cover = res.get('cover_image') or res.get('thumb')
+                    # Filtramos el placeholder genérico de Discogs
+                    if cover and 'spacer.gif' not in cover:
+                        details['img_discogs'] = cover
 
             details = {k: v for k, v in details.items() if v is not None}
             self.db.update_artist(artist_id, details)
@@ -1019,11 +1103,11 @@ class MultithreadedLastFMUpdater:
                 if mb_genres:
                     self.db.save_album_genres(album_id, mb_genres, 'musicbrainz')
 
-            if not details.get('year') and discogs.token:
+            if discogs.token and (not details.get('year') or not details.get('producers')):
                 dr = discogs.search_release(artist_name, album_name)
                 if dr and dr.get('results'):
                     res = dr['results'][0]
-                    if res.get('year'):
+                    if not details.get('year') and res.get('year'):
                         try:
                             details['year'] = int(res['year'])
                         except Exception:
@@ -1035,6 +1119,17 @@ class MultithreadedLastFMUpdater:
                               for g in res['genre'][:10] if g]
                         if dg:
                             self.db.save_album_genres(album_id, dg, 'discogs')
+                    discogs_id = res.get('id')
+                    if discogs_id:
+                        full = discogs.get_release_details(discogs_id)
+                        if full:
+                            extra = full.get('extraartists', [])
+                            producers = [
+                                e['name'] for e in extra
+                                if 'producer' in e.get('role', '').lower()
+                            ]
+                            if producers:
+                                details['producers'] = json.dumps(producers, ensure_ascii=False)
 
             details = {k: v for k, v in details.items() if v is not None}
             self.db.update_album(album_id, details)

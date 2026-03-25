@@ -142,8 +142,8 @@ def fetch_page_with_retry(url: str, retries: int = 3, delay: float = 3.0) -> str
             time.sleep(wait)
     return html  # devolver aunque esté vacío
 
-def fetch_series(series_url: str, cache_file: Path) -> list[dict]:
-    if cache_file.exists():
+def fetch_series(series_url: str, cache_file: Path, force: bool = False) -> list[dict]:
+    if not force and cache_file.exists():
         data = json.loads(cache_file.read_text())
         if data:
             print(f"📦 Caché: {len(data)} álbumes en {cache_file}")
@@ -628,11 +628,14 @@ def check_heard(user_albums: set, album: dict) -> bool:
 
 def _yt_search(query: str) -> str:
     """Return first YouTube video ID for query using yt-dlp (no API key needed)."""
-    r = subprocess.run(
-        ["yt-dlp", "--no-playlist", "--get-id", "--quiet",
-         f"ytsearch1:{query}"],
-        capture_output=True, text=True, timeout=30
-    )
+    try:
+        r = subprocess.run(
+            ["yt-dlp", "--no-playlist", "--get-id", "--quiet",
+             f"ytsearch1:{query}"],
+            capture_output=True, text=True, timeout=30
+        )
+    except subprocess.TimeoutExpired:
+        return ""
     vid = r.stdout.strip()
     return vid if len(vid) == 11 else ""
 
@@ -4497,8 +4500,8 @@ def main():
     parser.add_argument("--cache",  default=None,
                         help="Caché local del scraping (por defecto <out>/<slug>/series_cache.json)")
     parser.add_argument("--users",       nargs="*", help="Usuarios específicos (por defecto todos)")
-    parser.add_argument("--from-cache",  action="store_true",
-                        help="No re-scrapear series, solo actualizar HTMLs con la DB")
+    parser.add_argument("--force-scrape", action="store_true",
+                        help="Re-scrapear la fuente aunque haya caché (para cuando la colección fue actualizada)")
     # ── Fuentes de descripción (opcionales, combinables) ──
     parser.add_argument("--1001-albums", dest="gen_1001", action="store_true",
                         help="Scrape 1001albumsgenerator.com para descripciones y Spotify IDs")
@@ -4682,38 +4685,23 @@ def main():
 
     cache_path = Path(args.cache) if args.cache else out_dir / "series_cache.json"
 
-    if args.index_only:
-        args.from_cache = True
-
     # ── 1. Lista de álbumes ──────────────────────────────────────────────────
     albums_from_db = False
     if mh_conn:
         # Modo must_hear.db: cargar directamente de la BD
         albums = mh_load_collection(mh_conn, slug)
-        if albums:
+        if albums and not args.force_scrape:
             albums_from_db = True
             print(f"\n📦 {len(albums)} álbumes desde must_hear.db (colección '{slug}')")
         else:
-            print(f"ℹ  Colección '{slug}' no encontrada en must_hear.db, scrapeando desde MusicBrainz...")
-            if args.from_cache:
-                if not cache_path.exists():
-                    print(f"❌ --from-cache / --index-only: no existe {cache_path}")
-                    if mh_conn: mh_conn.close()
-                    if scrobbles_conn: scrobbles_conn.close()
-                    return
-                albums = json.loads(cache_path.read_text())
-                print(f"\n📦 caché: {len(albums)} álbumes desde {cache_path}")
+            if args.force_scrape:
+                print(f"🔄 --force-scrape: re-scrapeando '{slug}' desde MusicBrainz...")
             else:
-                albums = fetch_series(args.series, cache_path)
-                print(f"\n🎵 {len(albums)} álbumes en la serie")
-    elif args.from_cache:
-        if not cache_path.exists():
-            print(f"❌ --from-cache / --index-only: no existe {cache_path}")
-            return
-        albums = json.loads(cache_path.read_text())
-        print(f"\n📦 caché: {len(albums)} álbumes desde {cache_path}")
+                print(f"ℹ  Colección '{slug}' no encontrada en must_hear.db, scrapeando desde MusicBrainz...")
+            albums = fetch_series(args.series, cache_path, force=args.force_scrape)
+            print(f"\n🎵 {len(albums)} álbumes en la serie")
     else:
-        albums = fetch_series(args.series, cache_path)
+        albums = fetch_series(args.series, cache_path, force=args.force_scrape)
         print(f"\n🎵 {len(albums)} álbumes en la serie")
 
     # ── 1b. Si tenemos must_hear.db pero la colección es nueva, persistirla ahora ─

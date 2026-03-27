@@ -4217,7 +4217,9 @@ def _is_global_mode(args) -> bool:
         getattr(args, "scaruffi_decade",  None) or
         getattr(args, "aoty_decades",     False) or
         getattr(args, "aoty_decade_list", None) or
+        getattr(args, "sputnik_years",    None) or
         getattr(args, "rym_url",          None) or
+        getattr(args, "rym_chart_url",    None) or
         getattr(args, "collection",       None) or
         args.series != DEFAULT_SERIES or
         args.name   != "1001 Albums You Must Hear Before You Die"
@@ -4451,11 +4453,36 @@ def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn) -> None:
         for c in json.loads(root_meta.read_text()):
             group_names[c["slug"]] = c["name"]
 
+    # ── Sputnikmusic ──────────────────────────────────────────────────────────
+    if (root_dir / "sputnik").exists():
+        print("\n── Sputnikmusic ───────────────────────────────────────────────")
+        try:
+            from tools.must_hear.sputnik_must_hear import run_sputnik
+            sp_rows = mh_conn.execute(
+                "SELECT slug FROM collections WHERE slug LIKE 'sputnik_%'"
+            ).fetchall()
+            sp_years = sorted(
+                int(r[0].replace("sputnik_", ""))
+                for r in sp_rows
+                if r[0].replace("sputnik_", "").isdigit()
+            )
+            if sp_years:
+                orig_idx          = args.index_only
+                args.sputnik_years = sp_years
+                args.force_scrape  = False
+                args.index_only    = True
+                args._sputnik_mh_conn = mh_conn
+                run_sputnik(args, root_dir)
+                args.index_only    = orig_idx
+        except Exception as e:
+            print(f"  ⚠ Sputnik error: {e}")
+
     skip = {"scaruffi"}
     rows = mh_conn.execute("SELECT slug, name FROM collections ORDER BY name").fetchall()
     mb_rows = [(s, n) for s, n in rows
                if s not in skip and not s.startswith("aoty")
-               and not s.startswith("scaruffi_")]
+               and not s.startswith("scaruffi_")
+               and not s.startswith("sputnik_")]
 
     for slug, name in mb_rows:
         print(f"\n── {name} ({slug}) ──────────────────────────────────────────")
@@ -4543,9 +4570,19 @@ def main():
                         help="Décadas AOTY específicas a (re)scrapear: 1950s 1960s ... 2020s")
     parser.add_argument("--aoty-force", dest="aoty_force_scrape", action="store_true",
                         help="Re-scrapear AOTY aunque haya caché")
+    parser.add_argument("--sputnik-years", dest="sputnik_years", nargs="+", type=int,
+                        metavar="YEAR",
+                        help="Scrapear charts de Sputnikmusic: --sputnik-years 2020 2021 2022")
+    parser.add_argument("--sputnik-force", dest="sputnik_force_scrape", action="store_true",
+                        help="Re-scrapear Sputnikmusic aunque haya caché")
     parser.add_argument("--rym-list", dest="rym_url", default=None, metavar="URL",
                         help="URL de lista RateYourMusic a scrapear (abre navegador visible "
                              "para pasar Cloudflare; estado guardado en ~/.rym_playwright_state/)")
+    parser.add_argument("--rym-chart", dest="rym_chart_url", default=None, metavar="URL",
+                        help="URL de chart RateYourMusic (ej: rateyourmusic.com/charts/top/album/all-time/g:ambient-americana/)")
+    parser.add_argument("--rym-chart-limit", dest="rym_chart_limit", type=int, default=0,
+                        metavar="N",
+                        help="Limitar el chart a N álbumes (0 = sin límite)")
     args = parser.parse_args()
 
     root_dir = Path(args.out)
@@ -4642,6 +4679,18 @@ def main():
         if scrobbles_conn: scrobbles_conn.close()
         return
 
+    # Sputnikmusic mode: fully separate flow
+    if getattr(args, "sputnik_years", None):
+        from tools.must_hear.sputnik_must_hear import run_sputnik
+        args.scrobbles_db     = scrobbles_db_path
+        args.force_scrape     = getattr(args, "sputnik_force_scrape", False)
+        if mh_conn:
+            args._sputnik_mh_conn = mh_conn
+        run_sputnik(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
     # RateYourMusic list mode: fully separate flow
     if getattr(args, "rym_url", None):
         from tools.must_hear.rym_must_hear import run_rym
@@ -4649,6 +4698,17 @@ def main():
         if mh_conn:
             args._rym_mh_conn = mh_conn
         run_rym(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
+    # RateYourMusic chart mode
+    if getattr(args, "rym_chart_url", None):
+        from tools.must_hear.rym_charts_must_hear import run_rym_chart
+        args.scrobbles_db = scrobbles_db_path
+        if mh_conn:
+            args._rym_chart_mh_conn = mh_conn
+        run_rym_chart(args, root_dir)
         if mh_conn: mh_conn.close()
         if scrobbles_conn: scrobbles_conn.close()
         return

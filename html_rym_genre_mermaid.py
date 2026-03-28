@@ -155,7 +155,7 @@ def render_html(
   :root {{
     --bg:#0a0a0a; --surface:#111; --border:#1e1e1e;
     --accent:#c9a227; --muted:#555; --text:#e0e0e0; --header-h:52px;
-    --sidebar-w:210px; --panel-w:340px;
+    --panel-w:340px;
   }}
   *, *::before, *::after {{ box-sizing:border-box; margin:0; padding:0; }}
   body {{ background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif;
@@ -166,48 +166,57 @@ def render_html(
     position:fixed; top:0; left:0; right:0; z-index:200; height:var(--header-h);
     background:rgba(10,10,10,.97); backdrop-filter:blur(12px);
     border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:14px; padding:0 24px;
+    display:flex; align-items:center; gap:12px; padding:0 18px;
   }}
-  .site-label {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em;
-                 text-transform:uppercase; color:var(--muted); }}
-  h1 {{ font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:.06em;
-        line-height:1; color:var(--accent); white-space:nowrap; }}
-  .header-meta {{ font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); margin-left:auto; }}
-  .header-nav-link {{
-    font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.1em;
-    text-transform:uppercase; padding:4px 10px; border-radius:3px;
-    border:1px solid var(--border); color:var(--muted); text-decoration:none; transition:all .12s;
+  /* MH unified nav */
+  .mh-title {{ font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.1em; color:var(--text); white-space:nowrap; flex-shrink:0; }}
+  .mh-nav {{ display:flex; gap:2px; flex-shrink:0; }}
+  .mh-na {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:3px 8px; border-radius:3px; transition:all .12s; }}
+  .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
+  .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
+  /* Genre picker dropdown */
+  .genre-picker {{ position:relative; flex-shrink:0; }}
+  .genre-picker-btn {{
+    display:flex; align-items:center; gap:8px; padding:5px 12px;
+    background:none; border:1px solid var(--border); border-radius:5px;
+    color:var(--text); font-family:'DM Sans',sans-serif; font-size:.82rem;
+    cursor:pointer; white-space:nowrap; min-width:170px; justify-content:space-between;
+    transition:border-color .12s;
   }}
-  .header-nav-link:hover {{ border-color:var(--accent); color:var(--accent); }}
-
-  /* ── layout ── */
-  #layout {{
-    display:flex; position:fixed;
-    top:var(--header-h); left:0; right:0; bottom:0;
+  .genre-picker-btn:hover {{ border-color:var(--accent); }}
+  .genre-picker-btn.open {{ border-color:var(--accent); color:var(--accent); }}
+  .gp-caret {{ font-size:.65rem; color:var(--muted); transition:transform .15s; flex-shrink:0; }}
+  .genre-picker-btn.open .gp-caret {{ transform:rotate(180deg); color:var(--accent); }}
+  .genre-picker-dd {{
+    display:none; position:absolute; top:calc(100% + 6px); left:0;
+    background:#0d0d0d; border:1px solid var(--border); border-radius:6px;
+    padding:4px 0; min-width:220px; max-height:65vh;
+    overflow-y:auto; z-index:300;
+    box-shadow:0 6px 24px rgba(0,0,0,.6);
+    scrollbar-width:thin; scrollbar-color:var(--border) transparent;
   }}
-
-  /* ── sidebar ── */
-  #sidebar {{
-    width:var(--sidebar-w); flex-shrink:0; overflow-y:auto;
-    border-right:1px solid var(--border); padding:8px 0;
-    background:var(--bg);
-  }}
-  .sidebar-label {{
-    font-family:'DM Mono',monospace; font-size:.52rem; letter-spacing:.2em;
-    text-transform:uppercase; color:var(--muted); padding:8px 14px 10px;
-    border-bottom:1px solid var(--border); margin-bottom:4px;
-  }}
+  .genre-picker-dd.open {{ display:block; }}
   .mg-link {{
     display:flex; align-items:center; gap:8px; padding:6px 14px;
     font-size:.82rem; cursor:pointer; transition:background .1s, color .1s;
     color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }}
   .mg-link.scraped {{ color:var(--text); }}
-  .mg-link:hover, .mg-link.active {{ background:var(--surface); color:var(--accent); }}
-  .dot {{
-    flex-shrink:0; width:6px; height:6px; border-radius:50%; background:#333;
-  }}
+  .mg-link:hover, .mg-link.active {{ background:rgba(255,255,255,.04); color:var(--accent); }}
+  .dot {{ flex-shrink:0; width:6px; height:6px; border-radius:50%; background:#333; }}
   .dot-scraped {{ background:var(--accent); }}
+  /* MH user switcher */
+  .mh-usr {{ position:relative; margin-left:auto; flex-shrink:0; }}
+  .mh-usr-b {{ display:flex; align-items:center; gap:4px; background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:.62rem; padding:4px 9px; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-b:hover {{ color:var(--text); border-color:var(--accent); }}
+  .mh-usr-d {{ display:none; position:absolute; right:0; top:calc(100% + 5px); background:#0f0f0f; border:1px solid var(--border); border-radius:6px; padding:4px; min-width:130px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.5); }}
+  .mh-usr-d.open {{ display:block; }}
+  .mh-usr-o {{ display:block; padding:4px 10px; border-radius:3px; font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted); text-decoration:none; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-o:hover {{ background:var(--border); color:var(--text); }}
+  .mh-usr-o.cur {{ color:var(--accent); }}
+
+  /* ── layout ── */
+  #layout {{ display:flex; position:fixed; top:var(--header-h); left:0; right:0; bottom:0; }}
 
   /* ── tree canvas ── */
   #tree-wrap {{
@@ -313,29 +322,37 @@ def render_html(
                text-align:center; padding:20px 0; }}
 
   @media (max-width:700px) {{
-    :root {{ --sidebar-w:0; --panel-w:100vw; }}
-    #sidebar {{ display:none; }}
+    :root {{ --panel-w:100vw; }}
   }}
 </style>
 </head>
 <body>
 <header>
-  <div class="site-label">
-    <a href="rym_charts/index.html" style="color:var(--muted);text-decoration:none;letter-spacing:.2em">&larr; RYM Charts</a>
+  <div class="mh-title">Géneros RYM</div>
+  <nav class="mh-nav">
+    <a class="mh-na" href="../index.html">Colección</a>
+    <a class="mh-na" href="../index_alternativo.html">Explorador</a>
+    <a class="mh-na on" href="rym_genre_tree.html">Géneros RYM</a>
+    <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
+  </nav>
+  <div class="genre-picker" id="genrePicker">
+    <button class="genre-picker-btn" id="gpBtn" onclick="togglePicker()">
+      <span id="gpLabel">Selecciona un género…</span>
+      <span class="gp-caret">▾</span>
+    </button>
+    <div class="genre-picker-dd" id="gpDd">
+{sidebar_html}    </div>
   </div>
-  <h1>RYM Genre Tree</h1>
-  <div class="header-meta">{n_scraped}&thinsp;/&thinsp;{n_total} géneros scrapeados</div>
-  <a class="header-nav-link" href="../index_alternativo.html">Explorador ↗</a>
+  <div class="mh-usr">
+    <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">—</span></button>
+    <div class="mh-usr-d" id="mhUDd"></div>
+  </div>
 </header>
 
 <div id="layout">
-  <aside id="sidebar">
-    <div class="sidebar-label">Géneros principales</div>
-{sidebar_html}  </aside>
-
   <div id="tree-wrap">
     <svg id="tree-svg"></svg>
-    <div id="tree-placeholder">← Selecciona un género<br>para ver su árbol</div>
+    <div id="tree-placeholder">Selecciona un género para ver su árbol</div>
   </div>
 
   <aside id="panel">
@@ -517,63 +534,76 @@ function render() {{
       return kids > 0 ? kids + ' sub' : '';
     }});
 
-  // Caret (▶ collapsed, ▼ expanded) — only if has children
-  enter.append('text')
-    .attr('class', '_caret')
-    .attr('x', NODE_W - 10)
-    .attr('y', NODE_H / 2 + 4)
-    .attr('text-anchor', 'middle')
-    .attr('fill', C_MUTED)
-    .attr('font-size', '8px')
-    .style('pointer-events', 'none')
-    .text(d => {{
-      const hasKids = (d.data.node._raw.c || []).length > 0;
-      if (!hasKids) return '';
-      return d.data.node.children !== null ? '▼' : '▶';
-    }});
-
-  // "+" info button — always visible, click opens panel
-  enter.append('circle')
-    .attr('cx', BX)
-    .attr('cy', BY)
-    .attr('r', BTN_R)
-    .attr('fill', '#1e1e1e')
-    .attr('stroke', '#3a3a3a')
+  // ── "ℹ" info button inside rect (always) → opens panel ───────────────────
+  const infoG = enter.append('g')
+    .attr('class', '_info_g')
     .style('cursor', 'pointer')
-    .on('mouseover', function() {{ d3.select(this).attr('fill', C_ACCENT).attr('stroke', C_ACCENT); }})
-    .on('mouseout',  function() {{ d3.select(this).attr('fill', '#1e1e1e').attr('stroke', '#3a3a3a'); }})
-    .on('click', (e, d) => {{
-      e.stopPropagation();
-      showPanel(d.data.node.slug);
+    .on('click', (e, d) => {{ e.stopPropagation(); showPanel(d.data.node.slug); }})
+    .on('mouseover', function() {{
+      d3.select(this).select('circle').attr('fill', C_ACCENT).attr('stroke', C_ACCENT);
+      d3.select(this).select('text').attr('fill', '#000');
+    }})
+    .on('mouseout', function() {{
+      d3.select(this).select('circle').attr('fill', '#1e1e1e').attr('stroke', '#3a3a3a');
+      d3.select(this).select('text').attr('fill', C_ACCENT);
     }});
 
-  enter.append('text')
-    .attr('x', BX)
-    .attr('y', BY)
-    .attr('text-anchor', 'middle')
-    .attr('dominant-baseline', 'central')
+  infoG.append('circle')
+    .attr('cx', NODE_W - 14).attr('cy', NODE_H / 2).attr('r', 9)
+    .attr('fill', '#1e1e1e').attr('stroke', '#3a3a3a');
+
+  infoG.append('text')
+    .attr('x', NODE_W - 14).attr('y', NODE_H / 2)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
     .attr('fill', C_ACCENT)
     .attr('font-family', "'DM Mono', monospace")
-    .attr('font-size', '16px')
-    .attr('font-weight', '700')
+    .attr('font-size', '11px').attr('font-weight', '700')
     .style('pointer-events', 'none')
-    .text('+');
+    .text('i');
 
-  // Animate enter
-  enter.transition().duration(250).style('opacity', 1)
-    .attr('transform', d => `translate(${{d.y}},${{d.x}})`);
+  // ── "+" expand button outside rect (only for nodes with children) ─────────
+  const expandG = enter.append('g')
+    .attr('class', '_expand_g')
+    .style('display', d => (d.data.node._raw.c || []).length > 0 ? null : 'none')
+    .style('cursor', 'pointer')
+    .on('click', (e, d) => {{
+      e.stopPropagation();
+      const n = d.data.node;
+      if ((n._raw.c || []).length > 0) toggleExpand(n);
+    }})
+    .on('mouseover', function() {{
+      d3.select(this).select('circle').attr('fill', C_ACCENT).attr('stroke', C_ACCENT);
+      d3.select(this).select('._expand_txt').attr('fill', '#000');
+    }})
+    .on('mouseout', function() {{
+      d3.select(this).select('circle').attr('fill', '#1e1e1e').attr('stroke', '#3a3a3a');
+      d3.select(this).select('._expand_txt').attr('fill', C_ACCENT);
+    }});
 
-  // ── update existing nodes (position + caret direction) ──────────────────
+  expandG.append('circle')
+    .attr('cx', BX).attr('cy', BY).attr('r', BTN_R)
+    .attr('fill', '#1e1e1e').attr('stroke', '#3a3a3a');
+
+  expandG.append('text')
+    .attr('class', '_expand_txt')
+    .attr('x', BX).attr('y', BY)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('fill', C_ACCENT)
+    .attr('font-family', "'DM Mono', monospace")
+    .attr('font-size', '16px').attr('font-weight', '700')
+    .style('pointer-events', 'none')
+    .text(d => d.data.node.children !== null ? '−' : '+');
+
+  // ── update + enter: position, opacity, expand button state ───────────────
   const update = nodeSel.merge(enter);
   update.transition().duration(250)
+    .style('opacity', 1)
     .attr('transform', d => `translate(${{d.y}},${{d.x}})`);
 
   update.each(function(d) {{
-    const isOpen = d.data.node.children !== null;
+    const isOpen  = d.data.node.children !== null;
     const hasKids = (d.data.node._raw.c || []).length > 0;
-    d3.select(this).select('._caret').text(
-      !hasKids ? '' : isOpen ? '▼' : '▶'
-    );
+    d3.select(this).select('._expand_txt').text(!hasKids ? '' : isOpen ? '−' : '+');
   }});
 
   // ── exit ───────────────────────────────────────────────────────────────
@@ -581,11 +611,23 @@ function render() {{
 }}
 
 // ── Genre selection ────────────────────────────────────────────────────────
+function togglePicker() {{
+  const btn = document.getElementById('gpBtn');
+  const dd  = document.getElementById('gpDd');
+  btn.classList.toggle('open');
+  dd.classList.toggle('open');
+}}
+
 function selectGenre(slug) {{
-  // Highlight sidebar
-  document.querySelectorAll('.mg-link').forEach(el => el.classList.remove('active'));
+  // Update picker label and close dropdown
   const link = document.querySelector(`.mg-link[data-slug="${{slug}}"]`);
+  if (link) {{
+    document.getElementById('gpLabel').textContent = link.textContent.trim();
+  }}
+  document.querySelectorAll('.mg-link').forEach(el => el.classList.remove('active'));
   if (link) link.classList.add('active');
+  document.getElementById('gpBtn').classList.remove('open');
+  document.getElementById('gpDd').classList.remove('open');
 
   document.getElementById('tree-placeholder').style.display = 'none';
 
@@ -671,6 +713,27 @@ function closePanel() {{
   document.getElementById('panel').classList.remove('open');
   document.getElementById('tree-wrap').classList.remove('panel-open');
 }}
+
+// Close genre picker on outside click
+document.addEventListener('click', e => {{
+  const picker = document.getElementById('genrePicker');
+  if (picker && !picker.contains(e.target)) {{
+    document.getElementById('gpBtn').classList.remove('open');
+    document.getElementById('gpDd').classList.remove('open');
+  }}
+}});
+
+// MH user switcher
+(function() {{
+  const KEY = 'mh_user';
+  const btn = document.getElementById('mhUBtn');
+  const dd  = document.getElementById('mhUDd');
+  if (!btn || !dd) return;
+  const stored = localStorage.getItem(KEY);
+  if (stored) document.getElementById('mhULbl').textContent = stored;
+  btn.addEventListener('click', e => {{ e.stopPropagation(); dd.classList.toggle('open'); }});
+  document.addEventListener('click', () => dd.classList.remove('open'));
+}})();
 </script>
 </body>
 </html>

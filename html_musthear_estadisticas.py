@@ -501,17 +501,22 @@ def render_html(data: dict, generated: str) -> str:
     position:fixed; top:0; left:0; right:0; z-index:100; height:var(--header-h);
     background:rgba(10,10,10,.97); backdrop-filter:blur(12px);
     border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:14px; padding:0 24px;
+    display:flex; align-items:center; gap:12px; padding:0 24px;
   }}
-  .site-label {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); white-space:nowrap; }}
-  h1 {{ font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:.06em; line-height:1; color:var(--accent); white-space:nowrap; }}
-  .header-meta {{ font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); margin-left:auto; white-space:nowrap; }}
-  .header-nav-link {{
-    font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.1em; text-transform:uppercase;
-    padding:4px 10px; border-radius:3px; border:1px solid var(--border);
-    color:var(--muted); text-decoration:none; transition:all .12s; flex-shrink:0;
-  }}
-  .header-nav-link:hover {{ border-color:var(--accent); color:var(--accent); }}
+  /* ── MH unified nav ── */
+  .mh-title {{ font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.1em; color:var(--text); white-space:nowrap; flex-shrink:0; }}
+  .mh-nav {{ display:flex; gap:2px; flex-shrink:0; }}
+  .mh-na {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:3px 8px; border-radius:3px; transition:all .12s; }}
+  .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
+  .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
+  .mh-usr {{ position:relative; margin-left:auto; flex-shrink:0; }}
+  .mh-usr-b {{ display:flex; align-items:center; gap:4px; background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:.62rem; padding:4px 9px; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-b:hover {{ color:var(--text); border-color:var(--accent); }}
+  .mh-usr-d {{ display:none; position:absolute; right:0; top:calc(100% + 5px); background:#0f0f0f; border:1px solid var(--border); border-radius:6px; padding:4px; min-width:130px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.5); }}
+  .mh-usr-d.open {{ display:block; }}
+  .mh-usr-o {{ display:block; padding:4px 10px; border-radius:3px; font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted); text-decoration:none; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-o:hover {{ background:var(--border); color:var(--text); }}
+  .mh-usr-o.cur {{ color:var(--accent); }}
   /* layout */
   main {{ margin-top:var(--header-h); padding:32px 40px 80px; max-width:1200px; }}
   section {{ margin-bottom:52px; }}
@@ -563,11 +568,17 @@ def render_html(data: dict, generated: str) -> str:
 </head>
 <body>
 <header>
-  <div class="site-label">Must Hear</div>
-  <h1>Estadísticas</h1>
-  <div class="header-meta">{n_users} usuarios · {len(colls)} colecciones</div>
-  <a class="header-nav-link" href="index.html">Collections</a>
-  <a class="header-nav-link" href="index_alternativo.html">Explorador ↗</a>
+  <div class="mh-title">Estadísticas</div>
+  <nav class="mh-nav">
+    <a class="mh-na" href="index.html">Colección</a>
+    <a class="mh-na" href="index_alternativo.html">Explorador</a>
+    <a class="mh-na" href="rym_genre_tree.html">Géneros RYM</a>
+    <a class="mh-na on" href="estadisticas.html">Estadísticas</a>
+  </nav>
+  <div class="mh-usr">
+    <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">—</span></button>
+    <div class="mh-usr-d" id="mhUDd"></div>
+  </div>
 </header>
 <main>
 
@@ -738,6 +749,20 @@ new Chart(document.getElementById('radarChart'), {{
 }});
 
 {temporal_js}
+
+// ── MH user switcher ──────────────────────────────────────────────────────
+(function() {{
+  const KEY = 'mh_user';
+  const stored = localStorage.getItem(KEY);
+  const lbl = document.getElementById('mhULbl');
+  if (stored && lbl) lbl.textContent = stored;
+  const btn = document.getElementById('mhUBtn');
+  const dd  = document.getElementById('mhUDd');
+  if (!btn || !dd) return;
+  btn.addEventListener('click', e => {{ e.stopPropagation(); dd.classList.toggle('open'); }});
+  document.addEventListener('click', () => dd.classList.remove('open'));
+  if (stored) dd.innerHTML = `<span class="mh-usr-o cur">${{stored}}</span>`;
+}})();
 </script>
 </body>
 </html>

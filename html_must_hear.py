@@ -837,10 +837,15 @@ def album_to_json(album: dict, heard: bool, desc_db: dict = None,
 
 def render_user_html(user: str, albums_data: list[dict], series_name: str,
                      data_file: str = "data/albums.json",
-                     source_url: str = "") -> str:
+                     source_url: str = "",
+                     users_list: list | None = None) -> str:
     heard_count   = sum(1 for a in albums_data if a["heard"])
     pending_count = len(albums_data) - heard_count
     pct           = round(heard_count / len(albums_data) * 100, 1) if albums_data else 0
+    users_js      = json.dumps(
+        [{"user": u["user"], "file": u["file"]} for u in (users_list or [])],
+        ensure_ascii=False
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -869,7 +874,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     --muted:    #555;
     --gap:      6px;
     --panel:    390px;
-    --header-h: 58px;
+    --header-h: 80px;
   }}
   *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
   html {{ scroll-behavior: smooth; }}
@@ -890,20 +895,29 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
     border-right: 1px solid var(--border);
-    padding: 0 20px;
-    display: flex; align-items: center; gap: 16px;
-    overflow: hidden;
+    display: flex; flex-direction: column; overflow: hidden;
   }}
-  .header-title {{
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 1.6rem; letter-spacing: .08em;
-    color: var(--accent); text-decoration: none; white-space: nowrap;
-  }}
+  /* ── MH unified nav row ── */
+  .mh-r1 {{ display:flex; align-items:center; gap:10px; padding:0 16px; height:40px; flex-shrink:0; }}
+  .mh-title {{ font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:.1em; color:var(--text); white-space:nowrap; flex-shrink:0; }}
+  .mh-nav {{ display:flex; gap:2px; flex-shrink:0; }}
+  .mh-na {{ font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:2px 7px; border-radius:3px; transition:all .12s; }}
+  .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
+  .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
+  .mh-usr {{ position:relative; margin-left:auto; flex-shrink:0; }}
+  .mh-usr-b {{ display:flex; align-items:center; gap:4px; background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:.6rem; padding:3px 8px; cursor:pointer; white-space:nowrap; line-height:1.2; }}
+  .mh-usr-b:hover {{ color:var(--text); border-color:var(--accent); }}
+  .mh-usr-d {{ display:none; position:absolute; right:0; top:calc(100% + 4px); background:#0f0f0f; border:1px solid var(--border); border-radius:6px; padding:4px; min-width:130px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.5); }}
+  .mh-usr-d.open {{ display:block; }}
+  .mh-usr-o {{ display:block; padding:4px 10px; border-radius:3px; font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); text-decoration:none; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-o:hover {{ background:var(--border); color:var(--text); }}
+  .mh-usr-o.cur {{ color:var(--accent); }}
+  /* ── Controls row ── */
+  .hdr-r2 {{ display:flex; align-items:center; gap:8px; padding:0 16px; height:40px; flex-shrink:0; border-top:1px solid var(--border); overflow:hidden; }}
   .header-sub {{
-    font-family: 'DM Mono', monospace; font-size: .65rem;
-    color: var(--muted); line-height: 1.5; flex-shrink: 0;
+    font-family: 'DM Mono', monospace; font-size: .62rem;
+    color: var(--muted); line-height: 1.5; flex-shrink: 0; white-space:nowrap;
   }}
-  .header-sub strong {{ color: var(--text); }}
 
   /* ── PROGRESS BAR ── */
   .progress-wrap {{ width: 110px; flex-shrink: 0; }}
@@ -1244,34 +1258,41 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
 <body>
 
 <header>
-  <a href="index.html" class="back-link">←</a>
-  <a href="#" class="header-title">{user}</a>
-  <div class="header-sub">
-    <strong>{series_name}</strong><br>
-    {heard_count} heard &middot; {pending_count} pending
-  </div>
-  <div class="progress-wrap">
-    <div class="progress-bar"><div class="progress-fill"></div></div>
-    <div class="progress-label"><span id="prog-pct">{pct}%</span></div>
-  </div>
-  <div class="controls">
-    <button class="filter-btn active" id="btn-all"     onclick="setFilter('all')">All</button>
-    <button class="filter-btn"        id="btn-heard"   onclick="setFilter('heard')">Heard</button>
-    <button class="filter-btn"        id="btn-pending" onclick="setFilter('pending')">Pending</button>
-    <input class="search-box" id="search" placeholder="Search…" oninput="applyFilters()">
-
-    <!-- Genre multi-select -->
-    <div class="genre-wrap">
-      <button class="genre-btn" id="genre-btn" onclick="toggleGenreDropdown()">
-        Genre <span class="badge" id="genre-badge" style="display:none">0</span> ▾
-      </button>
+  <div class="mh-r1">
+    <div class="mh-title">{series_name}</div>
+    <nav class="mh-nav">
+      <a class="mh-na on" href="index.html">Colección</a>
+      <a class="mh-na" href="../index_alternativo.html">Explorador</a>
+      <a class="mh-na" href="../rym_genre_tree.html">Géneros RYM</a>
+      <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
+    </nav>
+    <div class="mh-usr">
+      <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">{user}</span></button>
+      <div class="mh-usr-d" id="mhUDd"></div>
     </div>
-
-    <div class="grid-sizer">
-      <span id="grid-label">10×</span>
-      <input type="range" id="grid-slider" min="3" max="20" value="5" step="1" oninput="setGridSize(this.value)">
+  </div>
+  <div class="hdr-r2">
+    <div class="header-sub">{heard_count} heard &middot; {pending_count} pending</div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+      <div class="progress-label"><span id="prog-pct">{pct}%</span></div>
     </div>
-    <a href="../../index_alternativo.html" class="filter-btn" style="text-decoration:none">Explorador</a>
+    <div class="controls">
+      <button class="filter-btn active" id="btn-all"     onclick="setFilter('all')">All</button>
+      <button class="filter-btn"        id="btn-heard"   onclick="setFilter('heard')">Heard</button>
+      <button class="filter-btn"        id="btn-pending" onclick="setFilter('pending')">Pending</button>
+      <input class="search-box" id="search" placeholder="Search…" oninput="applyFilters()">
+      <!-- Genre multi-select -->
+      <div class="genre-wrap">
+        <button class="genre-btn" id="genre-btn" onclick="toggleGenreDropdown()">
+          Genre <span class="badge" id="genre-badge" style="display:none">0</span> ▾
+        </button>
+      </div>
+      <div class="grid-sizer">
+        <span id="grid-label">10×</span>
+        <input type="range" id="grid-slider" min="3" max="20" value="5" step="1" oninput="setGridSize(this.value)">
+      </div>
+    </div>
   </div>
 </header>
 <!-- Genre dropdown at body level so backdrop-filter on header doesn't trap it -->
@@ -1594,6 +1615,29 @@ fetch('{data_file}')
     document.getElementById('grid').innerHTML =
       '<div style="color:var(--muted);font-family:monospace;padding:40px">⚠ Could not load data: ' + err.message + '</div>';
   }});
+
+// ── MH user switcher ──────────────────────────────────────────────────────
+const MH_USERS = {users_js};
+const MH_CURRENT = {json.dumps(user)};
+(function() {{
+  const KEY = 'mh_user';
+  const stored = localStorage.getItem(KEY);
+  if (MH_CURRENT) localStorage.setItem(KEY, MH_CURRENT);
+  const btn = document.getElementById('mhUBtn');
+  const dd  = document.getElementById('mhUDd');
+  if (!btn || !dd) return;
+  btn.addEventListener('click', e => {{ e.stopPropagation(); dd.classList.toggle('open'); }});
+  document.addEventListener('click', () => dd.classList.remove('open'));
+  if (MH_USERS && MH_USERS.length) {{
+    dd.innerHTML = MH_USERS.map(u =>
+      `<a class="mh-usr-o${{u.user === MH_CURRENT ? ' cur' : ''}}" href="${{u.file}}"
+          onclick="localStorage.setItem('mh_user','${{u.user}}')">${{u.user}}</a>`
+    ).join('');
+  }} else {{
+    const act = MH_CURRENT || stored;
+    if (act) dd.innerHTML = `<span class="mh-usr-o cur">${{act}}</span>`;
+  }}
+}})();
 </script>
 <div class="page-footer">
   Fuente: {'<a href="' + source_url + '" target="_blank">' + series_name + '</a>' if source_url else series_name}
@@ -3156,28 +3200,20 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
     border-bottom:1px solid var(--border);
     display:flex; align-items:center; gap:14px; padding:0 24px;
   }}
-  .site-label {{
-    font-family:'DM Mono',monospace; font-size:.6rem;
-    letter-spacing:.18em; text-transform:uppercase; color:var(--muted);
-    white-space:nowrap;
-  }}
-  h1 {{
-    font-family:'Bebas Neue',sans-serif; font-size:1.6rem;
-    letter-spacing:.06em; line-height:1; color:var(--accent);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;
-  }}
-  .header-meta {{
-    font-family:'DM Mono',monospace; font-size:.6rem;
-    color:var(--muted); white-space:nowrap; flex-shrink:0;
-  }}
-  .header-nav-link {{
-    font-family:'DM Mono',monospace; font-size:.58rem;
-    letter-spacing:.1em; text-transform:uppercase;
-    padding:4px 10px; border-radius:3px;
-    border:1px solid var(--border); color:var(--muted);
-    text-decoration:none; transition:all .12s; flex-shrink:0;
-  }}
-  .header-nav-link:hover {{ border-color:var(--accent); color:var(--accent); }}
+  /* ── MH unified nav ── */
+  .mh-title {{ font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.1em; color:var(--text); white-space:nowrap; flex-shrink:0; }}
+  .mh-nav {{ display:flex; gap:2px; }}
+  .mh-na {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:3px 8px; border-radius:3px; transition:all .12s; }}
+  .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
+  .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
+  .mh-usr {{ position:relative; margin-left:auto; flex-shrink:0; }}
+  .mh-usr-b {{ display:flex; align-items:center; gap:4px; background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:.62rem; padding:4px 9px; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-b:hover {{ color:var(--text); border-color:var(--accent); }}
+  .mh-usr-d {{ display:none; position:absolute; right:0; top:calc(100% + 5px); background:#0f0f0f; border:1px solid var(--border); border-radius:6px; padding:4px; min-width:130px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.5); }}
+  .mh-usr-d.open {{ display:block; }}
+  .mh-usr-o {{ display:block; padding:4px 10px; border-radius:3px; font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted); text-decoration:none; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-o:hover {{ background:var(--border); color:var(--text); }}
+  .mh-usr-o.cur {{ color:var(--accent); }}
 
   main {{
     position:relative; z-index:1;
@@ -3268,10 +3304,17 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
 </head>
 <body>
 <header>
-  <div class="site-label"><a href="../index.html" style="color:var(--muted);text-decoration:none;letter-spacing:.2em">&larr; Collections</a></div>
-  <h1>{series_name}</h1>
-  <div class="header-meta"><span>{len(users_data)}</span> users</div>
-  <a class="header-nav-link" href="../index_alternativo.html">Explorador ↗</a>
+  <div class="mh-title">{series_name}</div>
+  <nav class="mh-nav">
+    <a class="mh-na on" href="index.html">Colección</a>
+    <a class="mh-na" href="../index_alternativo.html">Explorador</a>
+    <a class="mh-na" href="../rym_genre_tree.html">Géneros RYM</a>
+    <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
+  </nav>
+  <div class="mh-usr">
+    <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">—</span></button>
+    <div class="mh-usr-d" id="mhUDd"></div>
+  </div>
 </header>
 <main>
   <div class="section-label">Users — click to explore</div>
@@ -3280,6 +3323,21 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
   </div>
 </main>
 <footer>Data from MusicBrainz &amp; Last.fm · Cover art from Cover Art Archive{' · Fuente: <a href="' + source_url + '" target="_blank" style="color:var(--muted);text-decoration:underline">' + series_name + '</a>' if source_url else ''}</footer>
+<script>
+// ── MH user switcher ──────────────────────────────────────────────────────
+(function() {{
+  const KEY = 'mh_user';
+  const stored = localStorage.getItem(KEY);
+  const lbl = document.getElementById('mhULbl');
+  if (stored && lbl) lbl.textContent = stored;
+  const btn = document.getElementById('mhUBtn');
+  const dd  = document.getElementById('mhUDd');
+  if (!btn || !dd) return;
+  btn.addEventListener('click', e => {{ e.stopPropagation(); dd.classList.toggle('open'); }});
+  document.addEventListener('click', () => dd.classList.remove('open'));
+  if (stored) dd.innerHTML = `<span class="mh-usr-o cur">${{stored}}</span>`;
+}})();
+</script>
 </body>
 </html>
 """
@@ -3561,18 +3619,24 @@ def render_rym_charts_index_html(
     position:fixed; top:0; left:0; right:0; z-index:100; height:var(--header-h);
     background:rgba(10,10,10,.97); backdrop-filter:blur(12px);
     border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:14px; padding:0 24px;
+    display:flex; align-items:center; gap:12px; padding:0 24px;
   }}
-  .site-label {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }}
-  h1 {{ font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:.06em; line-height:1; color:var(--accent); white-space:nowrap; }}
-  .header-meta {{ font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); margin-left:auto; }}
-  .header-nav-link {{
-    font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.1em;
-    text-transform:uppercase; padding:4px 10px; border-radius:3px;
-    border:1px solid var(--border); color:var(--muted); text-decoration:none; transition:all .12s; flex-shrink:0;
-  }}
-  .header-nav-link:hover {{ border-color:var(--accent); color:var(--accent); }}
-  .hdr-btns {{ display:flex; gap:8px; }}
+  /* ── MH unified nav ── */
+  .mh-title {{ font-family:'Bebas Neue',sans-serif; font-size:1.1rem; letter-spacing:.1em; color:var(--text); white-space:nowrap; flex-shrink:0; }}
+  .mh-nav {{ display:flex; gap:2px; flex-shrink:0; }}
+  .mh-na {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:3px 8px; border-radius:3px; transition:all .12s; }}
+  .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
+  .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
+  .mh-usr {{ position:relative; margin-left:auto; flex-shrink:0; }}
+  .mh-usr-b {{ display:flex; align-items:center; gap:4px; background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:.62rem; padding:4px 9px; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-b:hover {{ color:var(--text); border-color:var(--accent); }}
+  .mh-usr-d {{ display:none; position:absolute; right:0; top:calc(100% + 5px); background:#0f0f0f; border:1px solid var(--border); border-radius:6px; padding:4px; min-width:130px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.5); }}
+  .mh-usr-d.open {{ display:block; }}
+  .mh-usr-o {{ display:block; padding:4px 10px; border-radius:3px; font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted); text-decoration:none; cursor:pointer; white-space:nowrap; }}
+  .mh-usr-o:hover {{ background:var(--border); color:var(--text); }}
+  .mh-usr-o.cur {{ color:var(--accent); }}
+  /* ── tree controls bar ── */
+  .tree-controls {{ display:flex; gap:8px; margin-bottom:16px; }}
   .hdr-btn {{
     font-family:'DM Mono',monospace; font-size:.55rem; letter-spacing:.08em; text-transform:uppercase;
     padding:3px 8px; border-radius:3px; border:1px solid var(--border);
@@ -3580,7 +3644,7 @@ def render_rym_charts_index_html(
   }}
   .hdr-btn:hover {{ border-color:var(--accent); color:var(--accent); }}
   main {{ padding:24px 40px 80px; margin-top:var(--header-h); max-width:960px; }}
-  .section-label {{ font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:20px; }}
+  .section-label {{ font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }}
   .genre-tree {{ display:flex; flex-direction:column; gap:2px; }}
   /* ── rows ── */
   .grow {{ display:flex; align-items:flex-start; gap:6px; border-bottom:1px solid var(--border); }}
@@ -3631,18 +3695,24 @@ def render_rym_charts_index_html(
 </head>
 <body>
 <header>
-  <div class="site-label"><a href="../index.html" style="color:var(--muted);text-decoration:none;letter-spacing:.2em">&larr; Collections</a></div>
-  <h1>RYM Charts</h1>
-  <div class="header-meta">{n_scraped} de {total_genres} géneros scrapeados</div>
-  <div class="hdr-btns">
+  <div class="mh-title">RYM Charts</div>
+  <nav class="mh-nav">
+    <a class="mh-na" href="../index.html">Colección</a>
+    <a class="mh-na" href="../index_alternativo.html">Explorador</a>
+    <a class="mh-na" href="rym_genre_tree.html">Géneros RYM</a>
+    <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
+  </nav>
+  <div class="mh-usr">
+    <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">—</span></button>
+    <div class="mh-usr-d" id="mhUDd"></div>
+  </div>
+</header>
+<main>
+  <div class="section-label">Géneros · {len(genre_tree)} principales · {total_genres} totales · {n_scraped} scrapeados</div>
+  <div class="tree-controls">
     <button class="hdr-btn" onclick="expandAll()">Expandir todo</button>
     <button class="hdr-btn" onclick="collapseAll()">Colapsar todo</button>
   </div>
-  <a class="header-nav-link" href="rym_genre_tree.html">Árbol ⊞</a>
-  <a class="header-nav-link" href="../index_alternativo.html">Explorador ↗</a>
-</header>
-<main>
-  <div class="section-label">Géneros · {len(genre_tree)} principales · {total_genres} totales</div>
   <div class="genre-tree" id="gtree">
 {main_rows_html}  </div>
 </main>
@@ -3749,6 +3819,20 @@ function collapseAll() {{
     if (t) t.classList.remove('open');
   }});
 }}
+
+// ── MH user switcher ──────────────────────────────────────────────────────
+(function() {{
+  const KEY = 'mh_user';
+  const stored = localStorage.getItem(KEY);
+  const lbl = document.getElementById('mhULbl');
+  if (stored && lbl) lbl.textContent = stored;
+  const btn = document.getElementById('mhUBtn');
+  const dd  = document.getElementById('mhUDd');
+  if (!btn || !dd) return;
+  btn.addEventListener('click', e => {{ e.stopPropagation(); dd.classList.toggle('open'); }});
+  document.addEventListener('click', () => dd.classList.remove('open'));
+  if (stored) dd.innerHTML = `<span class="mh-usr-o cur">${{stored}}</span>`;
+}})();
 </script>
 </body>
 </html>
@@ -4668,7 +4752,8 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
     data_dir = out_dir / "data"
     data_dir.mkdir(exist_ok=True)
 
-    users_index = []
+    # Pass 1: collect per-user data, write JSON and update DB
+    user_data = []
     for user in users:
         user_scrobbles = mh_get_user_albums(scrobbles_conn, user) if scrobbles_conn else set()
         albums_data    = []
@@ -4689,20 +4774,31 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
         (data_dir / json_fname).write_text(
             json.dumps(albums_data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
         )
-        (out_dir / fname).write_text(
-            render_user_html(user, albums_data, name, data_file=f"data/{json_fname}",
-                             source_url=source_url),
-            encoding="utf-8"
-        )
         if heard_ids and update_db:
             mh_populate_user_heard(mh_conn, scrobbles_conn, user, heard_ids)
-        users_index.append({
-            "user": user, "file": fname,
-            "heard": heard_count, "total": len(albums_data), "pct": pct,
+        user_data.append({
+            "user": user, "albums_data": albums_data,
+            "fname": fname, "json_fname": json_fname,
+            "heard_count": heard_count, "pct": pct,
         })
         print(f"   {user}: {heard_count}/{len(albums_data)} ({pct}%)")
 
-    users_index.sort(key=lambda u: u["pct"], reverse=True)
+    # Build sorted users_index with full data available
+    users_index = sorted(
+        [{"user": d["user"], "file": d["fname"],
+          "heard": d["heard_count"], "total": len(d["albums_data"]), "pct": d["pct"]}
+         for d in user_data],
+        key=lambda u: u["pct"], reverse=True,
+    )
+
+    # Pass 2: write HTML for each user with full users list for user-switcher nav
+    for d in user_data:
+        (out_dir / d["fname"]).write_text(
+            render_user_html(d["user"], d["albums_data"], name,
+                             data_file=f"data/{d['json_fname']}",
+                             source_url=source_url, users_list=users_index),
+            encoding="utf-8"
+        )
     (out_dir / "index.html").write_text(
         render_collection_index_html(users_index, name, generated, source_url=source_url),
         encoding="utf-8"

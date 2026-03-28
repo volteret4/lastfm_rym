@@ -773,7 +773,8 @@ aside {
   <div class="header-title">Must Hear</div>
   <nav class="header-nav">
     <a class="header-nav-link active" href="index_alternativo.html">Explorador</a>
-    <a class="header-nav-link" href="index.html">Collections</a>
+    <a class="header-nav-link" href="index.html">Colección</a>
+    <a class="header-nav-link" href="rym_genre_tree.html">Géneros RYM</a>
     <a class="header-nav-link" href="estadisticas.html">Estadísticas</a>
   </nav>
   <div id="statusBar">Cargando…</div>
@@ -1167,11 +1168,24 @@ function buildUserModal() {
     el.addEventListener('click', () => selectUser(i, el));
     opts.appendChild(el);
   });
+  // Restore persisted user from localStorage
+  const saved = localStorage.getItem('mh_user');
+  if (saved) {
+    const idx = DB.users.findIndex(u => u.name === saved);
+    if (idx >= 0) {
+      activeUser = idx;
+      const els = opts.querySelectorAll('.user-opt');
+      els[0].classList.remove('active');
+      els[idx + 1].classList.add('active');
+    }
+  }
   updateUserBtn();
 }
 
 function selectUser(idx, el) {
   activeUser = idx;
+  if (idx !== null) localStorage.setItem('mh_user', DB.users[idx].name);
+  else localStorage.removeItem('mh_user');
   document.querySelectorAll('.user-opt').forEach(e => e.classList.remove('active'));
   el.classList.add('active');
   updateUserBtn();

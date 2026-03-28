@@ -144,10 +144,10 @@ def run(db_a: Path, db_b: Path, dry_run: bool) -> None:
 def main() -> None:
     here = Path(__file__).parent
     p = argparse.ArgumentParser(description="Merge yt_id from DB-A into DB-B")
-    p.add_argument("--db-a",    default=str(here / "must_hear_rym_new.db"),
-                   help="Fuente: DB con yt_ids (default: must_hear_rym_new.db)")
-    p.add_argument("--db-b",    default=str(here / "must_hear_youtube.db"),
-                   help="Destino: DB master a actualizar (default: must_hear_youtube.db)")
+    p.add_argument("--db-a",    default=str(here / "must_hear_youtube.db"),
+                   help="Fuente: DB con yt_ids (default: must_hear_youtube.db)")
+    p.add_argument("--db-b",    default=str(here / "must_hear_rym_new.db"),
+                   help="Destino: DB master a actualizar (default: must_hear_rym_new.db)")
     p.add_argument("--dry-run", action="store_true",
                    help="Mostrar qué se haría sin escribir nada")
     args = p.parse_args()

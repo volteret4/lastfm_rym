@@ -404,7 +404,7 @@
   <a href="#" class="header-title">Frikomid</a>
   <div class="header-sub">
     <strong>RYM Top — Rock — Doom Metal</strong><br>
-    7 heard &middot; 193 pending
+    7 heard &middot; 192 pending
   </div>
   <div class="progress-wrap">
     <div class="progress-bar"><div class="progress-fill"></div></div>
@@ -441,10 +441,16 @@
 
 <main id="main">
   <div class="count-bar">
-    <span>Showing <b id="vis-count">200</b> of 200</span>
+    <span>Showing <b id="vis-count">199</b> of 199</span>
     <span><b id="vis-heard">0</b> heard · <b id="vis-pending">0</b> pending</span>
   </div>
   <div id="grid"></div>
+  <div id="load-more-wrap" style="display:none;text-align:center;padding:20px 0 10px;">
+    <button id="load-more-btn" onclick="loadMore()" class="filter-btn"
+            style="padding:8px 28px;font-size:.82rem;letter-spacing:.04em;">
+      Cargar más · <span id="load-more-remaining">0</span> restantes
+    </button>
+  </div>
   <div id="empty">No albums match your filters.</div>
 </main>
 
@@ -472,6 +478,8 @@ let filter = 'all';
 let gridCols = 10;
 let currentAlbum = null;
 let selectedGenres = new Set();
+const PAGE_SIZE = 60;
+let _renderedUpTo = 0;
 
 // ── COVER HELPERS ──
 function thumbUrl(url) {
@@ -578,29 +586,66 @@ document.addEventListener('click', e => {
 });
 
 // ── GRID BUILD ──
+function _makeCard(a) {
+  const card = document.createElement('div');
+  card.className = `card ${a.heard ? 'heard' : 'pending'}`;
+  card.dataset.title  = a.title.toLowerCase();
+  card.dataset.artist = a.artist.toLowerCase();
+  card.dataset.heard  = a.heard ? '1' : '0';
+  card.dataset.num    = a.n;
+  card.dataset.genres = (a.genres || []).join(',');
+  card.innerHTML = `
+    <img data-src="${thumbUrl(a.cover)}" src="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22250%22%20height=%22250%22%20viewBox=%220%200%20250%20250%22%3E%3Crect%20width=%22250%22%20height=%22250%22%20fill=%22%23111%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%2260%22%20fill=%22none%22%20stroke=%22%23333%22%20stroke-width=%222%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%228%22%20fill=%22%23333%22/%3E%3C/svg%3E" alt="${a.n}"
+         onerror="this.src='data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22250%22%20height=%22250%22%20viewBox=%220%200%20250%20250%22%3E%3Crect%20width=%22250%22%20height=%22250%22%20fill=%22%23111%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%2260%22%20fill=%22none%22%20stroke=%22%23333%22%20stroke-width=%222%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%228%22%20fill=%22%23333%22/%3E%3C/svg%3E'">
+    <div class="card-overlay">
+      <div class="card-num">#${a.n}</div>
+      <div class="card-title">${a.title}</div>
+      <div class="card-artist">${a.artist} · ${a.year ?? ''}</div>
+    </div>`;
+  card.addEventListener('click', () => openPanel(a, card));
+  return card;
+}
+
+function _renderBatch() {
+  const grid = document.getElementById('grid');
+  const batch = ALBUMS.slice(_renderedUpTo, _renderedUpTo + PAGE_SIZE);
+  const frag = document.createDocumentFragment();
+  const newImgs = [];
+  batch.forEach(a => {
+    const card = _makeCard(a);
+    const img = card.querySelector('img[data-src]');
+    if (img) newImgs.push(img);
+    frag.appendChild(card);
+  });
+  grid.appendChild(frag);
+  _renderedUpTo += batch.length;
+  _preloadQueue.push(...newImgs);
+  _preloadTick();
+}
+
+function _updateLoadMoreBtn() {
+  const remaining = ALBUMS.length - _renderedUpTo;
+  const wrap = document.getElementById('load-more-wrap');
+  if (remaining > 0) {
+    wrap.style.display = '';
+    document.getElementById('load-more-remaining').textContent = remaining;
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+function loadMore() {
+  _renderBatch();
+  applyFilters();
+  _updateLoadMoreBtn();
+}
+
 function buildGrid() {
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
-  ALBUMS.forEach(a => {
-    const card = document.createElement('div');
-    card.className = `card ${a.heard ? 'heard' : 'pending'}`;
-    card.dataset.title  = a.title.toLowerCase();
-    card.dataset.artist = a.artist.toLowerCase();
-    card.dataset.heard  = a.heard ? '1' : '0';
-    card.dataset.num    = a.n;
-    card.dataset.genres = (a.genres || []).join(',');
-    card.innerHTML = `
-      <img data-src="${thumbUrl(a.cover)}" src="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22250%22%20height=%22250%22%20viewBox=%220%200%20250%20250%22%3E%3Crect%20width=%22250%22%20height=%22250%22%20fill=%22%23111%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%2260%22%20fill=%22none%22%20stroke=%22%23333%22%20stroke-width=%222%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%228%22%20fill=%22%23333%22/%3E%3C/svg%3E" alt="${a.n}"
-           onerror="this.src='data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22250%22%20height=%22250%22%20viewBox=%220%200%20250%20250%22%3E%3Crect%20width=%22250%22%20height=%22250%22%20fill=%22%23111%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%2260%22%20fill=%22none%22%20stroke=%22%23333%22%20stroke-width=%222%22/%3E%3Ccircle%20cx=%22125%22%20cy=%22125%22%20r=%228%22%20fill=%22%23333%22/%3E%3C/svg%3E'">
-      <div class="card-overlay">
-        <div class="card-num">#${a.n}</div>
-        <div class="card-title">${a.title}</div>
-        <div class="card-artist">${a.artist} · ${a.year ?? ''}</div>
-      </div>`;
-    card.addEventListener('click', () => openPanel(a, card));
-    grid.appendChild(card);
-  });
-  startPreload();
+  _renderedUpTo = 0;
+  _renderBatch();
+  _updateLoadMoreBtn();
   applyFilters();
 }
 

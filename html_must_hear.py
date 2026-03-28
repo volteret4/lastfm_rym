@@ -3533,6 +3533,17 @@ def render_rym_charts_index_html(
     compact_tree_json = json.dumps(_compact(genre_tree),
                                    ensure_ascii=False, separators=(",", ":"))
 
+    # ── description index (slug → truncated desc, for JS panel) ──────────
+    _desc_idx: dict[str, str] = {}
+    def _collect_desc(nodes: list[dict]) -> None:
+        for n in nodes:
+            d = n.get("desc", "")
+            if d:
+                _desc_idx[n["slug"]] = (d[:130] + "…") if len(d) > 130 else d
+            _collect_desc(n.get("subgenres", []))
+    _collect_desc(genre_tree)
+    desc_idx_json = json.dumps(_desc_idx, ensure_ascii=False, separators=(",", ":"))
+
     # ── per-genre Mermaid diagrams ────────────────────────────────────────────
     def _cslug(s: str) -> str:
         return "rym_chart_all_time_" + s.replace("-", "_")
@@ -3548,7 +3559,7 @@ def render_rym_charts_index_html(
     chart_slugs_set = {s["slug"] for s in series}
 
     def _build_mermaid(g: dict, max_depth: int = 99) -> str:
-        """Build Mermaid graph for one main genre, filtered to scraped branches."""
+        """Build Mermaid graph for one main genre. All nodes shown; scraped ones highlighted."""
         lines: list[str] = ["graph LR"]
 
         def add(node: dict, parent_id: str | None, depth: int) -> None:
@@ -3570,8 +3581,7 @@ def render_rym_charts_index_html(
 
             if depth < max_depth:
                 for c in kids:
-                    if _has_scraped(c):
-                        add(c, nid, depth + 1)
+                    add(c, nid, depth + 1)
 
         add(g, None, 0)
         lines += [
@@ -3582,6 +3592,7 @@ def render_rym_charts_index_html(
         return "\n".join(lines)
 
     def _count_mermaid_nodes(g: dict, max_depth: int = 99) -> int:
+        """Count scraped-only nodes (used as size heuristic for depth cap)."""
         def cnt(node: dict, d: int) -> int:
             if d > max_depth or not _has_scraped(node):
                 return 0
@@ -3702,6 +3713,8 @@ def render_rym_charts_index_html(
   .depth-2 {{ padding:4px 8px 4px 52px; background:rgba(255,255,255,.015); font-size:.85em; }}
   .depth-3 {{ padding:3px 8px 3px 76px; opacity:.8; font-size:.8em; }}
   /* ── toggle ── */
+  .grow:has(.toggle[data-slug]) {{ cursor:pointer; }}
+  .grow a {{ cursor:pointer; }}
   .toggle {{
     flex-shrink:0; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center;
     cursor:pointer; font-size:.6rem; color:var(--muted); transition:transform .15s, color .15s;
@@ -3726,10 +3739,10 @@ def render_rym_charts_index_html(
   .gstats-bar {{ width:40px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; flex-shrink:0; }}
   .gstats-bar span {{ display:block; height:100%; background:var(--accent); }}
   .gkids {{
-    margin-left:auto; font-family:'DM Mono',monospace; font-size:.55rem;
-    color:var(--muted); padding:1px 6px; border:1px solid var(--border); border-radius:10px; white-space:nowrap; flex-shrink:0;
+    margin-left:auto; font-family:'DM Mono',monospace; font-size:.68rem;
+    color:var(--muted); padding:2px 8px; border:1px solid var(--border); border-radius:10px; white-space:nowrap; flex-shrink:0;
   }}
-  .gdesc {{ font-size:.74rem; color:var(--muted); margin-top:4px; line-height:1.45; max-width:700px; }}
+  .gdesc {{ font-size:.82rem; color:var(--muted); margin-top:5px; line-height:1.5; max-width:700px; }}
   .gchildren {{ overflow:hidden; }}
   /* ── diagram panel ── */
   .content-wrap {{ display:flex; gap:16px; align-items:flex-start; }}
@@ -3767,6 +3780,7 @@ def render_rym_charts_index_html(
     <button class="hdr-btn" onclick="collapseAll()">Colapsar todo</button>
     <button class="hdr-btn" id="diagToggleBtn" onclick="toggleDiagPanel()">Diagrama ⊞</button>
   </div>
+  <a class="header-nav-link" href="rym_genre_tree.html">Árbol ⊞</a>
   <a class="header-nav-link" href="../index_alternativo.html">Explorador ↗</a>
 </header>
 <main>
@@ -3831,6 +3845,7 @@ async function showGenreDiagram(slug, name) {{
 
 const TREE_IDX = {{}};  // slug → compact node
 const CHARTS   = {chart_data_json};
+const DESC_IDX = {desc_idx_json};
 
 (function buildIdx(nodes) {{
   for (const n of nodes) {{ TREE_IDX[n.s] = n; buildIdx(n.c || []); }}
@@ -3855,55 +3870,72 @@ function renderNodes(nodes, depth) {{
     const stats = chart
       ? `<span class="gstats"><span class="gstats-bar"><span style="width:${{chart.pct}}%"></span></span>${{chart.total}}&thinsp;álb&thinsp;·&thinsp;${{chart.pct}}%</span>`
       : '';
-    h += `<div class="grow ${{dcls}}${{chart?' has-chart':''}}" data-slug="${{n.s}}">${{tog}}<div class="ginfo"><div class="gline">${{nameEl}}${{stats}}</div></div></div>`;
+    const desc = DESC_IDX[n.s] || '';
+    const descHtml = desc ? `<div class="gdesc">${{desc}}</div>` : '';
+    h += `<div class="grow ${{dcls}}${{chart?' has-chart':''}}" data-slug="${{n.s}}">${{tog}}<div class="ginfo"><div class="gline">${{nameEl}}${{stats}}</div>${{descHtml}}</div></div>`;
     if (hasKids) h += `<div class="gchildren" id="gc-${{n.s}}" style="display:none"></div>`;
   }}
   return h;
 }}
 
-function toggle(slug) {{
-  const el = document.getElementById('gc-' + slug);
+// toggle: uses rowEl.nextElementSibling to avoid duplicate-ID issues
+function toggle(slug, rowEl) {{
+  let el = rowEl && rowEl.nextElementSibling;
+  if (!el || !el.classList.contains('gchildren')) {{
+    el = document.getElementById('gc-' + slug);  // static depth-0 fallback
+  }}
   if (!el) return;
-  const row = el.previousElementSibling;
-  const t = row && row.querySelector('.toggle[data-slug]');
+  const t = rowEl && rowEl.querySelector('.toggle[data-slug]');
   const isOpen = el.style.display !== 'none';
   if (!isOpen && !el.dataset.rendered) {{
     const node = TREE_IDX[slug];
     if (node) {{
-      const depth = parseInt(row.className.match(/depth-(\\d)/)?.[1] || '0') + 1;
+      const depth = parseInt(rowEl.className.match(/depth-(\\d)/)?.[1] ?? '0') + 1;
       el.innerHTML = renderNodes(node.c, depth);
       el.dataset.rendered = '1';
-      el.querySelectorAll('.toggle[data-slug]').forEach(t2 => {{
-        t2.addEventListener('click', () => toggle(t2.dataset.slug));
-      }});
     }}
   }}
   el.style.display = isOpen ? 'none' : 'block';
   if (t) t.classList.toggle('open', !isOpen);
 }}
 
+// Single delegated listener on the whole tree — handles all depths
+document.getElementById('gtree').addEventListener('click', e => {{
+  const row = e.target.closest('.grow');
+  if (!row) return;
+  if (e.target.closest('a')) return;        // let name links navigate normally
+  const t = row.querySelector('.toggle[data-slug]');
+  if (!t) return;
+  const slug = t.dataset.slug;
+  toggle(slug, row);
+  // Update diagram panel if open
+  if (diagPanelOpen) showGenreDiagram(slug, row.querySelector('.gname')?.textContent || slug);
+}});
+
 function expandAll() {{
-  document.querySelectorAll('.gchildren').forEach(el => {{
-    const row = el.previousElementSibling;
-    if (!row) return;
-    const t = row.querySelector('.toggle[data-slug]');
-    const slug = t && t.dataset.slug;
-    if (slug && !el.dataset.rendered) {{
-      const node = TREE_IDX[slug];
-      if (node) {{
-        const depth = parseInt(row.className.match(/depth-(\\d)/)?.[1] || '0') + 1;
-        el.innerHTML = renderNodes(node.c, depth);
-        el.dataset.rendered = '1';
-        el.querySelectorAll('.toggle[data-slug]').forEach(t2 => {{
-          t2.addEventListener('click', () => toggle(t2.dataset.slug));
-        }});
+  function doExpand(root) {{
+    root.querySelectorAll('.gchildren').forEach(el => {{
+      const row = el.previousElementSibling;
+      if (!row) return;
+      const t = row.querySelector('.toggle[data-slug]');
+      if (!t) return;
+      const slug = t.dataset.slug;
+      if (!el.dataset.rendered) {{
+        const node = TREE_IDX[slug];
+        if (node) {{
+          const depth = parseInt(row.className.match(/depth-(\\d)/)?.[1] ?? '0') + 1;
+          el.innerHTML = renderNodes(node.c, depth);
+          el.dataset.rendered = '1';
+        }}
       }}
-    }}
-    el.style.display = 'block';
-    if (t) t.classList.add('open');
-  }});
-  // Re-run to catch newly rendered children
-  document.querySelectorAll('.gchildren').forEach(el => {{ el.style.display = 'block'; }});
+      el.style.display = 'block';
+      t.classList.add('open');
+    }});
+  }}
+  // Three passes: each pass exposes newly rendered .gchildren
+  doExpand(document.getElementById('gtree'));
+  doExpand(document.getElementById('gtree'));
+  doExpand(document.getElementById('gtree'));
 }}
 
 function collapseAll() {{
@@ -3914,28 +3946,6 @@ function collapseAll() {{
     if (t) t.classList.remove('open');
   }});
 }}
-
-// Wire up depth-0 toggles (static HTML)
-document.querySelectorAll('.depth-0 .toggle[data-slug]').forEach(t => {{
-  t.addEventListener('click', () => toggle(t.dataset.slug));
-}});
-
-// Wire up depth-0 row clicks for diagram panel
-document.querySelectorAll('.depth-0').forEach(row => {{
-  const t = row.querySelector('.toggle[data-slug]');
-  if (!t) return;
-  const slug = t.dataset.slug;
-  const name = row.querySelector('.gname') && row.querySelector('.gname').textContent;
-  row.style.cursor = 'pointer';
-  row.addEventListener('click', e => {{
-    // Don't interfere with the toggle arrow click
-    if (e.target.closest('.toggle')) return;
-    if (!diagPanelOpen) {{
-      toggleDiagPanel();
-    }}
-    showGenreDiagram(slug, name || slug);
-  }});
-}});
 </script>
 </body>
 </html>
@@ -5120,6 +5130,12 @@ def main():
                         help="Scrapear chart del género/subgénero indicado (ej: dark-ambient)")
     parser.add_argument("--rym-genre-all", dest="rym_genre_all", default=None, metavar="PARENT",
                         help="Scrapear charts de todos los subgéneros de un género padre (ej: ambient)")
+    parser.add_argument("--rym-genre-mermaid", dest="rym_genre_mermaid", action="store_true",
+                        help="Generar página interactiva del árbol de géneros RYM (html_rym_genre_mermaid.py)")
+    parser.add_argument("--genres-json", dest="genres_json", default="",
+                        help="Ruta explícita a rym_genres.json (para --rym-genre-mermaid)")
+    parser.add_argument("--output", dest="output", default="",
+                        help="Ruta de salida para --rym-genre-mermaid")
     args = parser.parse_args()
 
     root_dir = Path(args.out)
@@ -5284,6 +5300,20 @@ def main():
         if mh_conn:
             args._rym_chart_mh_conn = mh_conn
         run_rym_genre_all(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
+    # RYM Genre Tree — full interactive mermaid page
+    if getattr(args, "rym_genre_mermaid", False):
+        import html_rym_genre_mermaid
+        import types
+        sub = types.SimpleNamespace(
+            mh_db=str(mh_db_path),
+            genres_json=getattr(args, "genres_json", ""),
+            output=getattr(args, "output", ""),
+        )
+        html_rym_genre_mermaid.run(sub)
         if mh_conn: mh_conn.close()
         if scrobbles_conn: scrobbles_conn.close()
         return

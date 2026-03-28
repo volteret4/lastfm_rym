@@ -1289,12 +1289,6 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
     <span><b id="vis-heard">0</b> heard · <b id="vis-pending">0</b> pending</span>
   </div>
   <div id="grid"></div>
-  <div id="load-more-wrap" style="display:none;text-align:center;padding:20px 0 10px;">
-    <button id="load-more-btn" onclick="loadMore()" class="filter-btn"
-            style="padding:8px 28px;font-size:.82rem;letter-spacing:.04em;">
-      Cargar más · <span id="load-more-remaining">0</span> restantes
-    </button>
-  </div>
   <div id="empty">No albums match your filters.</div>
 </main>
 
@@ -1322,8 +1316,6 @@ let filter = 'all';
 let gridCols = 10;
 let currentAlbum = null;
 let selectedGenres = new Set();
-const PAGE_SIZE = 60;
-let _renderedUpTo = 0;
 
 // ── COVER HELPERS ──
 function thumbUrl(url) {{
@@ -1333,29 +1325,19 @@ function thumbUrl(url) {{
     .replace(/e\.snmc\.io\/i\/\d+\//, 'e.snmc.io/i/150/');
 }}
 
-// ── PARALLEL PRELOADER ──
-const PRELOAD_CONCURRENCY = 8;
-let _preloadQueue = [];
-let _preloadActive = 0;
-
-function _preloadTick() {{
-  while (_preloadActive < PRELOAD_CONCURRENCY && _preloadQueue.length) {{
-    _preloadActive++;
-    const img = _preloadQueue.shift();
-    const url = img.dataset.src;
-    if (!url) {{ _preloadActive--; _preloadTick(); return; }}
-    const tmp = new Image();
-    tmp.onload = () => {{ img.src = url; img.removeAttribute('data-src'); _preloadActive--; _preloadTick(); }};
-    tmp.onerror = () => {{ _preloadActive--; _preloadTick(); }};
-    tmp.src = url;
-  }}
-}}
-
-function startPreload() {{
-  _preloadQueue = Array.from(document.querySelectorAll('img[data-src]'));
-  _preloadActive = 0;
-  _preloadTick();
-}}
+// ── INTERSECTION OBSERVER (lazy image loading) ──
+const _imgObserver = new IntersectionObserver(entries => {{
+  entries.forEach(e => {{
+    if (e.isIntersecting) {{
+      const img = e.target;
+      if (img.dataset.src) {{
+        img.src = img.dataset.src;
+        delete img.dataset.src;
+      }}
+      _imgObserver.unobserve(img);
+    }}
+  }});
+}}, {{ rootMargin: '300px' }});
 
 // ── GRID SIZE ──
 function setGridSize(val) {{
@@ -1430,66 +1412,28 @@ document.addEventListener('click', e => {{
 }});
 
 // ── GRID BUILD ──
-function _makeCard(a) {{
-  const card = document.createElement('div');
-  card.className = `card ${{a.heard ? 'heard' : 'pending'}}`;
-  card.dataset.title  = a.title.toLowerCase();
-  card.dataset.artist = a.artist.toLowerCase();
-  card.dataset.heard  = a.heard ? '1' : '0';
-  card.dataset.num    = a.n;
-  card.dataset.genres = (a.genres || []).join(',');
-  card.innerHTML = `
-    <img data-src="${{thumbUrl(a.cover)}}" src="{COVER_PLACEHOLDER}" alt="${{a.n}}"
-         onerror="this.src='{COVER_PLACEHOLDER}'">
-    <div class="card-overlay">
-      <div class="card-num">#${{a.n}}</div>
-      <div class="card-title">${{a.title}}</div>
-      <div class="card-artist">${{a.artist}} · ${{a.year ?? ''}}</div>
-    </div>`;
-  card.addEventListener('click', () => openPanel(a, card));
-  return card;
-}}
-
-function _renderBatch() {{
-  const grid = document.getElementById('grid');
-  const batch = ALBUMS.slice(_renderedUpTo, _renderedUpTo + PAGE_SIZE);
-  const frag = document.createDocumentFragment();
-  const newImgs = [];
-  batch.forEach(a => {{
-    const card = _makeCard(a);
-    const img = card.querySelector('img[data-src]');
-    if (img) newImgs.push(img);
-    frag.appendChild(card);
-  }});
-  grid.appendChild(frag);
-  _renderedUpTo += batch.length;
-  _preloadQueue.push(...newImgs);
-  _preloadTick();
-}}
-
-function _updateLoadMoreBtn() {{
-  const remaining = ALBUMS.length - _renderedUpTo;
-  const wrap = document.getElementById('load-more-wrap');
-  if (remaining > 0) {{
-    wrap.style.display = '';
-    document.getElementById('load-more-remaining').textContent = remaining;
-  }} else {{
-    wrap.style.display = 'none';
-  }}
-}}
-
-function loadMore() {{
-  _renderBatch();
-  applyFilters();
-  _updateLoadMoreBtn();
-}}
-
 function buildGrid() {{
   const grid = document.getElementById('grid');
-  grid.innerHTML = '';
-  _renderedUpTo = 0;
-  _renderBatch();
-  _updateLoadMoreBtn();
+  // Build all cards as one HTML string — faster than individual DOM insertions
+  grid.innerHTML = ALBUMS.map((a, idx) => `
+    <div class="card ${{a.heard ? 'heard' : 'pending'}}"
+         data-title="${{a.title.toLowerCase().replace(/"/g,'&quot;')}}"
+         data-artist="${{a.artist.toLowerCase().replace(/"/g,'&quot;')}}"
+         data-heard="${{a.heard ? '1' : '0'}}"
+         data-num="${{a.n}}"
+         data-genres="${{(a.genres||[]).join(',')}}"
+         data-idx="${{idx}}"
+         onclick="openPanel(ALBUMS[${{idx}}],this)">
+      <img data-src="${{thumbUrl(a.cover)}}" src="{COVER_PLACEHOLDER}" alt="${{a.n}}"
+           onerror="this.src='{COVER_PLACEHOLDER}'">
+      <div class="card-overlay">
+        <div class="card-num">#${{a.n}}</div>
+        <div class="card-title">${{a.title}}</div>
+        <div class="card-artist">${{a.artist}} · ${{a.year ?? ''}}</div>
+      </div>
+    </div>`).join('');
+  // Register all images with the IntersectionObserver
+  grid.querySelectorAll('img[data-src]').forEach(img => _imgObserver.observe(img));
   applyFilters();
 }}
 
@@ -3544,73 +3488,7 @@ def render_rym_charts_index_html(
     _collect_desc(genre_tree)
     desc_idx_json = json.dumps(_desc_idx, ensure_ascii=False, separators=(",", ":"))
 
-    # ── per-genre Mermaid diagrams ────────────────────────────────────────────
-    def _cslug(s: str) -> str:
-        return "rym_chart_all_time_" + s.replace("-", "_")
-
-    def _mid(s: str) -> str:
-        return re.sub(r"[^a-zA-Z0-9]", "_", s)
-
-    def _has_scraped(node: dict) -> bool:
-        if _cslug(node["slug"]) in chart_slugs_set:
-            return True
-        return any(_has_scraped(c) for c in node.get("subgenres", []))
-
     chart_slugs_set = {s["slug"] for s in series}
-
-    def _build_mermaid(g: dict, max_depth: int = 99) -> str:
-        """Build Mermaid graph for one main genre. All nodes shown; scraped ones highlighted."""
-        lines: list[str] = ["graph LR"]
-
-        def add(node: dict, parent_id: str | None, depth: int) -> None:
-            slug    = node["slug"]
-            nid     = _mid(slug)
-            name    = node["name"].replace('"', "'")
-            scraped = _cslug(slug) in chart_slugs_set
-            kids    = node.get("subgenres", [])
-
-            if depth == 0:
-                lines.append(f'  {nid}(["{name}"]):::mg')
-            elif scraped:
-                lines.append(f'  {nid}["{name}"]:::sc')
-            else:
-                lines.append(f'  {nid}["{name}"]:::un')
-
-            if parent_id:
-                lines.append(f"  {parent_id} --> {nid}")
-
-            if depth < max_depth:
-                for c in kids:
-                    add(c, nid, depth + 1)
-
-        add(g, None, 0)
-        lines += [
-            "  classDef mg fill:#c9a227,color:#000,stroke:#c9a227,font-weight:bold",
-            "  classDef sc fill:#2a1e00,color:#c9a227,stroke:#5c4400",
-            "  classDef un fill:#111,color:#3a3a3a,stroke:#1e1e1e",
-        ]
-        return "\n".join(lines)
-
-    def _count_mermaid_nodes(g: dict, max_depth: int = 99) -> int:
-        """Count scraped-only nodes (used as size heuristic for depth cap)."""
-        def cnt(node: dict, d: int) -> int:
-            if d > max_depth or not _has_scraped(node):
-                return 0
-            return 1 + sum(cnt(c, d + 1) for c in node.get("subgenres", [])
-                           if _has_scraped(c))
-        return cnt(g, 0)
-
-    mermaid_diagrams: dict[str, str] = {}
-    for g in genre_tree:
-        if not _has_scraped(g):
-            continue
-        # Pick max_depth to keep node count ≤ 100
-        for max_d in (99, 2, 1, 0):
-            if _count_mermaid_nodes(g, max_d) <= 100:
-                break
-        mermaid_diagrams[g["slug"]] = _build_mermaid(g, max_d)
-
-    mermaid_json = json.dumps(mermaid_diagrams, ensure_ascii=False)
 
     # ── chart data JSON (small: only scraped entries) ────────────────────────
     chart_data_json = json.dumps(
@@ -3672,7 +3550,6 @@ def render_rym_charts_index_html(
 <link rel="icon" type="image/png" href="/images/discount.png" />
 <script defer src="https://cloud.umami.is/script.js" data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
   :root {{
     --bg:#0a0a0a; --surface:#111; --border:#1e1e1e;
@@ -3744,29 +3621,11 @@ def render_rym_charts_index_html(
   }}
   .gdesc {{ font-size:.82rem; color:var(--muted); margin-top:5px; line-height:1.5; max-width:700px; }}
   .gchildren {{ overflow:hidden; }}
-  /* ── diagram panel ── */
-  .content-wrap {{ display:flex; gap:16px; align-items:flex-start; }}
-  #gtree {{ flex:1; min-width:0; }}
-  #diagPanel {{
-    width:420px; flex-shrink:0; display:none;
-    position:sticky; top:calc(var(--header-h) + 16px);
-    background:var(--surface); border:1px solid var(--border); border-radius:6px;
-    padding:14px; overflow-y:auto; max-height:calc(100vh - var(--header-h) - 32px);
-  }}
-  #diagPanel.open {{ display:block; }}
-  .diag-title {{ font-family:'Bebas Neue',sans-serif; font-size:1.1rem; color:var(--accent); margin-bottom:10px; }}
-  .diag-legend {{ display:flex; gap:12px; margin-bottom:10px; flex-wrap:wrap; }}
-  .diag-legend span {{ font-family:'DM Mono',monospace; font-size:.55rem; color:var(--muted); display:flex; align-items:center; gap:4px; }}
-  .diag-legend i {{ display:inline-block; width:10px; height:10px; border-radius:2px; }}
-  #diagSvg {{ overflow-x:auto; }}
-  #diagSvg svg {{ max-width:100%; height:auto; }}
-  #diagEmpty {{ font-family:'DM Mono',monospace; font-size:.65rem; color:#333; padding:20px 0; text-align:center; }}
   footer {{ padding:24px 40px; border-top:1px solid var(--border); font-family:'DM Mono',monospace; font-size:.65rem; color:var(--muted); }}
   @media (max-width:900px) {{
     main, footer {{ padding-left:16px; padding-right:16px; }}
     .gname {{ max-width:220px; }}
     .depth-2 {{ padding-left:36px; }} .depth-3 {{ padding-left:52px; }}
-    #diagPanel {{ display:none !important; }}
   }}
 </style>
 </head>
@@ -3778,71 +3637,17 @@ def render_rym_charts_index_html(
   <div class="hdr-btns">
     <button class="hdr-btn" onclick="expandAll()">Expandir todo</button>
     <button class="hdr-btn" onclick="collapseAll()">Colapsar todo</button>
-    <button class="hdr-btn" id="diagToggleBtn" onclick="toggleDiagPanel()">Diagrama ⊞</button>
   </div>
   <a class="header-nav-link" href="rym_genre_tree.html">Árbol ⊞</a>
   <a class="header-nav-link" href="../index_alternativo.html">Explorador ↗</a>
 </header>
 <main>
   <div class="section-label">Géneros · {len(genre_tree)} principales · {total_genres} totales</div>
-  <div class="content-wrap">
-    <div class="genre-tree" id="gtree">
-{main_rows_html}    </div>
-    <div id="diagPanel">
-      <div class="diag-title" id="diagTitle">—</div>
-      <div class="diag-legend">
-        <span><i style="background:#c9a227"></i> género principal</span>
-        <span><i style="background:#2a1e00;border:1px solid #5c4400"></i> con chart</span>
-        <span><i style="background:#111;border:1px solid #1e1e1e"></i> sin chart</span>
-      </div>
-      <div id="diagSvg"><div id="diagEmpty">Selecciona un género</div></div>
-    </div>
-  </div>
+  <div class="genre-tree" id="gtree">
+{main_rows_html}  </div>
 </main>
 <footer>Generated {generated} · Datos de RateYourMusic</footer>
 <script>
-// Mermaid init
-mermaid.initialize({{
-  startOnLoad: false, theme: 'dark',
-  themeVariables: {{
-    darkMode: true,
-    primaryColor: '#111', primaryTextColor: '#e0e0e0',
-    primaryBorderColor: '#333', lineColor: '#444',
-    secondaryColor: '#1a1a1a', tertiaryColor: '#0a0a0a',
-    edgeLabelBackground: '#0a0a0a',
-  }},
-  flowchart: {{ curve: 'basis', htmlLabels: true }},
-}});
-
-const DIAGRAMS = {mermaid_json};
-let diagPanelOpen = false;
-let diagRenderCounter = 0;
-
-function toggleDiagPanel() {{
-  diagPanelOpen = !diagPanelOpen;
-  document.getElementById('diagPanel').classList.toggle('open', diagPanelOpen);
-  document.getElementById('diagToggleBtn').textContent = diagPanelOpen ? 'Diagrama ✕' : 'Diagrama ⊞';
-}}
-
-async function showGenreDiagram(slug, name) {{
-  if (!diagPanelOpen) return;
-  const code = DIAGRAMS[slug];
-  document.getElementById('diagTitle').textContent = name;
-  const svgEl = document.getElementById('diagSvg');
-  if (!code) {{
-    svgEl.innerHTML = '<div id="diagEmpty">Sin diagrama para este género</div>';
-    return;
-  }}
-  svgEl.innerHTML = '<div id="diagEmpty">Renderizando…</div>';
-  try {{
-    const id = 'diag_' + (++diagRenderCounter);
-    const {{ svg }} = await mermaid.render(id, code);
-    svgEl.innerHTML = svg;
-  }} catch(e) {{
-    svgEl.innerHTML = '<div id="diagEmpty">Error al renderizar</div>';
-  }}
-}}
-
 const TREE_IDX = {{}};  // slug → compact node
 const CHARTS   = {chart_data_json};
 const DESC_IDX = {desc_idx_json};
@@ -3908,8 +3713,6 @@ document.getElementById('gtree').addEventListener('click', e => {{
   if (!t) return;
   const slug = t.dataset.slug;
   toggle(slug, row);
-  // Update diagram panel if open
-  if (diagPanelOpen) showGenreDiagram(slug, row.querySelector('.gname')?.textContent || slug);
 }});
 
 function expandAll() {{

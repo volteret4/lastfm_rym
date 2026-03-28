@@ -3653,6 +3653,8 @@ def render_rym_charts_index_html(
   .depth-1 {{ padding:6px 8px 6px 28px; }}
   .depth-2 {{ padding:4px 8px 4px 52px; background:rgba(255,255,255,.015); font-size:.85em; }}
   .depth-3 {{ padding:3px 8px 3px 76px; opacity:.8; font-size:.8em; }}
+  /* depth-4+ handled via inline --d variable set in JS */
+  .depth-deep {{ padding:3px 8px; padding-left:calc(76px + (var(--d,4) - 3) * 24px); opacity:.75; font-size:.78em; }}
   /* ── toggle ── */
   .grow:has(.toggle[data-slug]) {{ cursor:pointer; }}
   .grow a {{ cursor:pointer; }}
@@ -3690,6 +3692,7 @@ def render_rym_charts_index_html(
     main, footer {{ padding-left:16px; padding-right:16px; }}
     .gname {{ max-width:220px; }}
     .depth-2 {{ padding-left:36px; }} .depth-3 {{ padding-left:52px; }}
+    .depth-deep {{ padding-left:calc(52px + (var(--d,4) - 3) * 16px); }}
   }}
 </style>
 </head>
@@ -3728,9 +3731,14 @@ const DESC_IDX = {desc_idx_json};
 
 function chartSlug(s) {{ return 'rym_chart_all_time_' + s.replace(/-/g,'_'); }}
 
+function depthClass(depth) {{
+  if (depth <= 3) return `depth-${{depth}}`;
+  return `depth-deep" style="--d:${{depth}}`;  // closes class, injects style
+}}
+
 function renderNodes(nodes, depth) {{
   if (!nodes || !nodes.length) return '';
-  const dcls = ['depth-1','depth-2','depth-3'][Math.min(depth-1,2)];
+  const dcls = depthClass(depth);
   let h = '';
   for (const n of nodes) {{
     const cslug = chartSlug(n.s);
@@ -3765,7 +3773,9 @@ function toggle(slug, rowEl) {{
   if (!isOpen && !el.dataset.rendered) {{
     const node = TREE_IDX[slug];
     if (node) {{
-      const depth = parseInt(rowEl.className.match(/depth-(\\d)/)?.[1] ?? '0') + 1;
+      const depth = (parseInt(rowEl.className.match(/depth-(\\d+)/)?.[1])
+                     || parseInt(rowEl.style.getPropertyValue('--d'))
+                     || 0) + 1;
       el.innerHTML = renderNodes(node.c, depth);
       el.dataset.rendered = '1';
     }}
@@ -3796,7 +3806,9 @@ function expandAll() {{
       if (!el.dataset.rendered) {{
         const node = TREE_IDX[slug];
         if (node) {{
-          const depth = parseInt(row.className.match(/depth-(\\d)/)?.[1] ?? '0') + 1;
+          const depth = (parseInt(row.className.match(/depth-(\\d+)/)?.[1])
+                         || parseInt(row.style.getPropertyValue('--d'))
+                         || 0) + 1;
           el.innerHTML = renderNodes(node.c, depth);
           el.dataset.rendered = '1';
         }}

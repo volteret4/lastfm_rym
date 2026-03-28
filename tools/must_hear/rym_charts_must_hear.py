@@ -406,16 +406,17 @@ def run_rym_chart(args, root_dir: Path) -> None:
     chart_url  = getattr(args, "rym_chart_url",   None) or getattr(args, "url", None)
     name       = getattr(args, "name",             "") or ""
     slug       = getattr(args, "slug",             None)
-    collection = getattr(args, "collection",       None)
+    collection = getattr(args, "collection",       None) or "RYM Charts"
     index_only = getattr(args, "index_only",       False)
     force      = getattr(args, "force_scrape",     False)
     limit      = getattr(args, "rym_chart_limit",  0) or 0
 
-    if not chart_url:
+    if not chart_url and not (index_only and slug):
         print("❌ --rym-chart requerido (URL de chart RateYourMusic)")
         return
 
-    chart_url = chart_url.rstrip("/") + "/"
+    if chart_url:
+        chart_url = chart_url.rstrip("/") + "/"
 
     # ── Slug & output dir ────────────────────────────────────────────────────
     if not slug:
@@ -507,7 +508,7 @@ def run_rym_chart(args, root_dir: Path) -> None:
                 return
 
         if not name:
-            name = _name_from_chart_url(chart_url)
+            name = _name_from_chart_url(chart_url) if chart_url else slug.replace("_", " ").title()
 
         if mh_conn and not index_only:
             albums = rym_sync_to_db(mh_conn, slug, name, chart_url, albums)

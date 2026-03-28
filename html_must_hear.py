@@ -836,7 +836,8 @@ def album_to_json(album: dict, heard: bool, desc_db: dict = None,
     }
 
 def render_user_html(user: str, albums_data: list[dict], series_name: str,
-                     data_file: str = "data/albums.json") -> str:
+                     data_file: str = "data/albums.json",
+                     source_url: str = "") -> str:
     heard_count   = sum(1 for a in albums_data if a["heard"])
     pending_count = len(albums_data) - heard_count
     pct           = round(heard_count / len(albums_data) * 100, 1) if albums_data else 0
@@ -1177,6 +1178,16 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
   .back-link {{ font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--muted); text-decoration: none; }}
   .back-link:hover {{ color: var(--text); }}
   #empty {{ display: none; text-align: center; padding: 60px 0; font-family: 'DM Mono', monospace; color: var(--muted); font-size: .75rem; }}
+  .page-footer {{
+    position: fixed; bottom: 0; left: 0; right: var(--panel);
+    height: 28px; background: rgba(10,10,10,.95);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px;
+    font-family: 'DM Mono', monospace; font-size: .58rem; color: var(--muted);
+    z-index: 50;
+  }}
+  .page-footer a {{ color: var(--muted); text-decoration: underline; }}
+  .page-footer a:hover {{ color: var(--text); }}
 
   /* ── CLOSE BUTTON (visible only on mobile) ── */
   .panel-close-btn {{
@@ -1260,6 +1271,7 @@ def render_user_html(user: str, albums_data: list[dict], series_name: str,
       <span id="grid-label">10×</span>
       <input type="range" id="grid-slider" min="3" max="20" value="5" step="1" oninput="setGridSize(this.value)">
     </div>
+    <a href="../../index_alternativo.html" class="filter-btn" style="text-decoration:none">Explorador</a>
   </div>
 </header>
 <!-- Genre dropdown at body level so backdrop-filter on header doesn't trap it -->
@@ -1594,6 +1606,9 @@ fetch('{data_file}')
       '<div style="color:var(--muted);font-family:monospace;padding:40px">⚠ Could not load data: ' + err.message + '</div>';
   }});
 </script>
+<div class="page-footer">
+  Fuente: {'<a href="' + source_url + '" target="_blank">' + series_name + '</a>' if source_url else series_name}
+</div>
 </body>
 </html>
 """
@@ -2755,7 +2770,7 @@ footer{{padding:24px 60px;border-top:1px solid var(--border);font-family:'DM Mon
     <tbody>{rows}</tbody>
   </table>
 </main>
-<footer>Generated {generated}</footer>
+<footer>Generated {generated} · Fuente: <a href="https://scaruffiplaylists.netlify.app" target="_blank" style="color:var(--muted);text-decoration:underline">Scaruffi's Playlists</a></footer>
 </body>
 </html>"""
 
@@ -3099,7 +3114,8 @@ def run_scaruffi(args, root_dir: Path) -> None:
     print(f"Root index updated -> {root_dir / 'index.html'}")
     print(f"\nDone! Open: {out_dir / 'index.html'}")
 
-def render_collection_index_html(users_data: list[dict], series_name: str, generated: str) -> str:
+def render_collection_index_html(users_data: list[dict], series_name: str, generated: str,
+                                  source_url: str = "") -> str:
     cards_html = ""
     for u in users_data:
         pct  = u["pct"]
@@ -3136,70 +3152,53 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {{
-    --bg:     #0a0a0a;
-    --surface:#111;
-    --border: #1e1e1e;
-    --accent: #e8ff47;
-    --muted:  #555;
-    --text:   #e0e0e0;
+    --bg:#0a0a0a; --surface:#111; --border:#1e1e1e;
+    --accent:#c9a227; --muted:#555; --text:#e0e0e0;
+    --header-h:52px;
   }}
-  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Sans', sans-serif;
-    min-height: 100vh;
-  }}
-
-  /* noise grain overlay */
-  body::before {{
-    content: '';
-    position: fixed; inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-    pointer-events: none; z-index: 0; opacity: .4;
-  }}
+  *, *::before, *::after {{ box-sizing:border-box; margin:0; padding:0; }}
+  body {{ background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; }}
 
   header {{
-    position: relative; z-index: 1;
-    padding: 60px 60px 40px;
-    border-bottom: 1px solid var(--border);
+    position:fixed; top:0; left:0; right:0; z-index:100;
+    height:var(--header-h);
+    background:rgba(10,10,10,.97);
+    backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:14px; padding:0 24px;
   }}
   .site-label {{
-    font-family: 'DM Mono', monospace;
-    font-size: .7rem;
-    letter-spacing: .2em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
+    font-family:'DM Mono',monospace; font-size:.6rem;
+    letter-spacing:.18em; text-transform:uppercase; color:var(--muted);
+    white-space:nowrap;
   }}
   h1 {{
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(2.4rem, 6vw, 5rem);
-    letter-spacing: .04em;
-    line-height: .95;
-    color: var(--accent);
+    font-family:'Bebas Neue',sans-serif; font-size:1.6rem;
+    letter-spacing:.06em; line-height:1; color:var(--accent);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;
   }}
   .header-meta {{
-    font-family: 'DM Mono', monospace;
-    font-size: .72rem;
-    color: var(--muted);
-    margin-top: 16px;
+    font-family:'DM Mono',monospace; font-size:.6rem;
+    color:var(--muted); white-space:nowrap; flex-shrink:0;
   }}
-  .header-meta span {{ color: var(--text); }}
+  .header-nav-link {{
+    font-family:'DM Mono',monospace; font-size:.58rem;
+    letter-spacing:.1em; text-transform:uppercase;
+    padding:4px 10px; border-radius:3px;
+    border:1px solid var(--border); color:var(--muted);
+    text-decoration:none; transition:all .12s; flex-shrink:0;
+  }}
+  .header-nav-link:hover {{ border-color:var(--accent); color:var(--accent); }}
 
   main {{
-    position: relative; z-index: 1;
-    padding: 48px 60px 80px;
+    position:relative; z-index:1;
+    padding:32px 60px 80px; margin-top:var(--header-h);
   }}
   .section-label {{
-    font-family: 'DM Mono', monospace;
-    font-size: .65rem;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 24px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid var(--border);
+    font-family:'DM Mono',monospace; font-size:.65rem;
+    letter-spacing:.18em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:24px;
+    padding-bottom:10px; border-bottom:1px solid var(--border);
   }}
 
   .users-grid {{
@@ -3268,29 +3267,22 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
   }}
 
   footer {{
-    position: relative; z-index: 1;
-    padding: 24px 60px;
-    border-top: 1px solid var(--border);
-    font-family: 'DM Mono', monospace;
-    font-size: .65rem;
-    color: var(--muted);
+    position:relative; z-index:1;
+    padding:24px 60px; border-top:1px solid var(--border);
+    font-family:'DM Mono',monospace; font-size:.65rem; color:var(--muted);
   }}
 
-  @media (max-width: 700px) {{
-    header, main, footer {{ padding-left: 20px; padding-right: 20px; }}
-    header {{ padding-top: 36px; }}
+  @media (max-width:700px) {{
+    main, footer {{ padding-left:20px; padding-right:20px; }}
   }}
 </style>
 </head>
 <body>
 <header>
-  <div class="site-label"><a href="../index.html" style="color:var(--muted);text-decoration:none;letter-spacing:.2em">← All Collections</a></div>
+  <div class="site-label"><a href="../index.html" style="color:var(--muted);text-decoration:none;letter-spacing:.2em">&larr; Collections</a></div>
   <h1>{series_name}</h1>
-  <div class="header-meta">
-    <span>{len(users_data)}</span> users &nbsp;·&nbsp;
-    <span>1,001</span> albums &nbsp;·&nbsp;
-    Generated {generated}
-  </div>
+  <div class="header-meta"><span>{len(users_data)}</span> users</div>
+  <a class="header-nav-link" href="../index_alternativo.html">Explorador ↗</a>
 </header>
 <main>
   <div class="section-label">Users — click to explore</div>
@@ -3298,7 +3290,7 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
     {cards_html}
   </div>
 </main>
-<footer>Data from MusicBrainz &amp; Last.fm · Cover art from Cover Art Archive</footer>
+<footer>Data from MusicBrainz &amp; Last.fm · Cover art from Cover Art Archive{' · Fuente: <a href="' + source_url + '" target="_blank" style="color:var(--muted);text-decoration:underline">' + series_name + '</a>' if source_url else ''}</footer>
 </body>
 </html>
 """
@@ -3349,37 +3341,45 @@ def render_root_index_html(collections: list[dict], generated: str,
 <style>
   :root {{
     --bg:#0a0a0a; --surface:#111; --border:#1e1e1e;
-    --accent:#e8ff47; --muted:#555; --text:#e0e0e0;
+    --accent:#c9a227; --muted:#555; --text:#e0e0e0;
+    --header-h:52px;
   }}
   *, *::before, *::after {{ box-sizing:border-box; margin:0; padding:0; }}
   body {{
     background:var(--bg); color:var(--text);
     font-family:'DM Sans',sans-serif; min-height:100vh;
   }}
-  body::before {{
-    content:''; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.4;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  }}
   header {{
-    position:relative; z-index:1;
-    padding:60px 60px 40px;
+    position:fixed; top:0; left:0; right:0; z-index:100;
+    height:var(--header-h);
+    background:rgba(10,10,10,.97);
+    backdrop-filter:blur(12px);
     border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:14px; padding:0 24px;
   }}
   .site-label {{
-    font-family:'DM Mono',monospace; font-size:.7rem;
-    letter-spacing:.2em; text-transform:uppercase;
-    color:var(--muted); margin-bottom:12px;
+    font-family:'DM Mono',monospace; font-size:.6rem;
+    letter-spacing:.18em; text-transform:uppercase;
+    color:var(--muted);
   }}
   h1 {{
     font-family:'Bebas Neue',sans-serif;
-    font-size:clamp(2.4rem,6vw,5rem);
-    letter-spacing:.04em; line-height:.95; color:var(--accent);
+    font-size:1.6rem; letter-spacing:.06em; line-height:1;
+    color:var(--accent); white-space:nowrap;
   }}
   .header-meta {{
-    font-family:'DM Mono',monospace; font-size:.72rem;
-    color:var(--muted); margin-top:16px;
+    font-family:'DM Mono',monospace; font-size:.6rem;
+    color:var(--muted); margin-left:auto;
   }}
-  main {{ position:relative; z-index:1; padding:40px 60px 80px; }}
+  .header-nav-link {{
+    font-family:'DM Mono',monospace; font-size:.58rem;
+    letter-spacing:.1em; text-transform:uppercase;
+    padding:4px 10px; border-radius:3px;
+    border:1px solid var(--border); color:var(--muted);
+    text-decoration:none; transition:all .12s; flex-shrink:0;
+  }}
+  .header-nav-link:hover {{ border-color:var(--accent); color:var(--accent); }}
+  main {{ position:relative; z-index:1; padding:24px 40px 80px; margin-top:var(--header-h); }}
   .section-label {{
     font-family:'DM Mono',monospace; font-size:.65rem;
     letter-spacing:.2em; text-transform:uppercase;
@@ -3426,13 +3426,11 @@ def render_root_index_html(collections: list[dict], generated: str,
     font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted);
   }}
   footer {{
-    position:relative; z-index:1;
-    padding:24px 60px; border-top:1px solid var(--border);
+    padding:24px 40px; border-top:1px solid var(--border);
     font-family:'DM Mono',monospace; font-size:.65rem; color:var(--muted);
   }}
   @media (max-width:700px) {{
-    header,main,footer {{ padding-left:20px; padding-right:20px; }}
-    header {{ padding-top:36px; }}
+    main,footer {{ padding-left:20px; padding-right:20px; }}
   }}
 </style>
 </head>
@@ -3440,17 +3438,302 @@ def render_root_index_html(collections: list[dict], generated: str,
 <header>
   {site_label}
   <h1>{title}</h1>
-  <div class="header-meta">
-    {len(collections)} collection{'s' if len(collections) != 1 else ''} &nbsp;&middot;&nbsp;
-    Generated {generated}
-  </div>
+  <div class="header-meta">{len(collections)} collection{'s' if len(collections) != 1 else ''}</div>
+  <a class="header-nav-link" href="index_alternativo.html">Explorador ↗</a>
+  <a class="header-nav-link" href="estadisticas.html">Estadísticas</a>
 </header>
 <main>
   <div class="section-label">All Lists</div>
   <div class="collections-grid">{cards_html}
   </div>
 </main>
-<footer>Generated {generated}</footer>
+<footer>Generated {generated} · Data from MusicBrainz, Last.fm, RYM &amp; Scaruffi</footer>
+</body>
+</html>
+"""
+
+
+def render_rym_charts_index_html(
+    series: list[dict],
+    genre_tree: list[dict],
+    generated: str,
+) -> str:
+    """
+    Specialized index for RYM Charts — a lazily-rendered, collapsible genre tree.
+    The full genre hierarchy (slug+name only) is embedded as JSON; children are
+    rendered into the DOM on first expand. Genres with a scraped chart appear as
+    links with stats; unscraped genres are shown greyed out but still expandable.
+    """
+    # ── pre-compute stats for each main genre ────────────────────────────────
+    def _all_descendants(node: dict):
+        for s in node.get("subgenres", []):
+            yield s
+            yield from _all_descendants(s)
+
+    def _count_all(node: dict) -> int:
+        return sum(1 + _count_all(s) for s in node.get("subgenres", []))
+
+    def _chart_slug(genre_slug: str) -> str:
+        return "rym_chart_all_time_" + genre_slug.replace("-", "_")
+
+    chart_lookup = {s["slug"]: s for s in series}
+    n_scraped    = len(series)
+    total_genres = sum(1 + _count_all(g) for g in genre_tree)
+
+    # ── compact tree JSON (no descriptions — keep it lean ~360KB) ───────────
+    def _compact(nodes: list[dict]) -> list[dict]:
+        return [{"s": n["slug"], "n": n["name"],
+                 "c": _compact(n.get("subgenres", []))} for n in nodes]
+
+    compact_tree_json = json.dumps(_compact(genre_tree),
+                                   ensure_ascii=False, separators=(",", ":"))
+
+    # ── chart data JSON (small: only scraped entries) ────────────────────────
+    chart_data_json = json.dumps(
+        {s["slug"]: {"total": s.get("total", 0), "pct": round(s.get("avg_pct", 0), 1)}
+         for s in series},
+        ensure_ascii=False, separators=(",", ":"),
+    )
+
+    # ── static HTML rows for main genres (depth-0 only, includes description) ─
+    main_rows_html = ""
+    for g in genre_tree:
+        slug   = g["slug"]
+        name   = g["name"]
+        desc   = g.get("desc", "")
+        cslug  = _chart_slug(slug)
+        chart  = chart_lookup.get(cslug)
+        n_sc   = sum(1 for d in _all_descendants(g) if _chart_slug(d["slug"]) in chart_lookup)
+        if chart:
+            n_sc += 1  # count the main genre itself
+        n_tot  = 1 + _count_all(g)
+        kids   = g.get("subgenres", [])
+
+        if chart:
+            pct   = chart.get("avg_pct", 0)
+            total = chart.get("total", 0)
+            name_html  = f'<a class="gname scraped" href="{cslug}/index.html">{name}</a>'
+            stats_html = (
+                f'<span class="gstats">'
+                f'<span class="gstats-bar"><span style="width:{pct:.0f}%"></span></span>'
+                f'{total}&thinsp;álb&thinsp;·&thinsp;{pct:.0f}%</span>'
+            )
+        else:
+            name_html  = f'<span class="gname unscraped">{name}</span>'
+            stats_html = ""
+
+        desc_short = (desc[:130] + "…") if len(desc) > 130 else desc
+        desc_html  = f'<div class="gdesc">{desc_short}</div>' if desc_short else ""
+        badge_html = f'<span class="gkids">{n_sc}/{n_tot}</span>'
+        toggle_html = f'<span class="toggle" data-slug="{slug}">▶</span>' if kids else '<span class="toggle-ph"></span>'
+
+        main_rows_html += (
+            f'<div class="grow depth-0{" has-chart" if chart else ""}" data-slug="{slug}">'
+            f'  {toggle_html}'
+            f'  <div class="ginfo">'
+            f'    <div class="gline">{name_html}{stats_html}{badge_html}</div>'
+            f'    {desc_html}'
+            f'  </div>'
+            f'</div>'
+            f'<div class="gchildren" id="gc-{slug}" style="display:none"></div>'
+        )
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Must Hear — RYM Charts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" type="image/png" href="/images/discount.png" />
+<script defer src="https://cloud.umami.is/script.js" data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {{
+    --bg:#0a0a0a; --surface:#111; --border:#1e1e1e;
+    --accent:#c9a227; --muted:#555; --text:#e0e0e0; --header-h:52px;
+  }}
+  *, *::before, *::after {{ box-sizing:border-box; margin:0; padding:0; }}
+  body {{ background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; min-height:100vh; }}
+  header {{
+    position:fixed; top:0; left:0; right:0; z-index:100; height:var(--header-h);
+    background:rgba(10,10,10,.97); backdrop-filter:blur(12px);
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:14px; padding:0 24px;
+  }}
+  .site-label {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }}
+  h1 {{ font-family:'Bebas Neue',sans-serif; font-size:1.6rem; letter-spacing:.06em; line-height:1; color:var(--accent); white-space:nowrap; }}
+  .header-meta {{ font-family:'DM Mono',monospace; font-size:.6rem; color:var(--muted); margin-left:auto; }}
+  .header-nav-link {{
+    font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.1em;
+    text-transform:uppercase; padding:4px 10px; border-radius:3px;
+    border:1px solid var(--border); color:var(--muted); text-decoration:none; transition:all .12s; flex-shrink:0;
+  }}
+  .header-nav-link:hover {{ border-color:var(--accent); color:var(--accent); }}
+  .hdr-btns {{ display:flex; gap:8px; }}
+  .hdr-btn {{
+    font-family:'DM Mono',monospace; font-size:.55rem; letter-spacing:.08em; text-transform:uppercase;
+    padding:3px 8px; border-radius:3px; border:1px solid var(--border);
+    color:var(--muted); background:none; cursor:pointer; transition:all .12s;
+  }}
+  .hdr-btn:hover {{ border-color:var(--accent); color:var(--accent); }}
+  main {{ padding:24px 40px 80px; margin-top:var(--header-h); max-width:960px; }}
+  .section-label {{ font-family:'DM Mono',monospace; font-size:.65rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin-bottom:20px; }}
+  .genre-tree {{ display:flex; flex-direction:column; gap:2px; }}
+  /* ── rows ── */
+  .grow {{ display:flex; align-items:flex-start; gap:6px; border-bottom:1px solid var(--border); }}
+  .depth-0 {{ padding:10px 12px; background:var(--surface); border-radius:4px; border-bottom:none; }}
+  .depth-0 + .gchildren {{ margin-bottom:6px; border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; padding:0; }}
+  .depth-1 {{ padding:6px 8px 6px 28px; }}
+  .depth-2 {{ padding:4px 8px 4px 52px; background:rgba(255,255,255,.015); font-size:.85em; }}
+  .depth-3 {{ padding:3px 8px 3px 76px; opacity:.8; font-size:.8em; }}
+  /* ── toggle ── */
+  .toggle {{
+    flex-shrink:0; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center;
+    cursor:pointer; font-size:.6rem; color:var(--muted); transition:transform .15s, color .15s;
+    user-select:none; margin-top:2px;
+  }}
+  .toggle.open {{ transform:rotate(90deg); color:var(--accent); }}
+  .toggle-ph {{ flex-shrink:0; width:18px; }}
+  /* ── content ── */
+  .ginfo {{ flex:1; min-width:0; }}
+  .gline {{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }}
+  .gname {{ font-size:.88rem; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:380px; }}
+  a.gname.scraped {{ color:var(--text); text-decoration:none; transition:color .12s; }}
+  a.gname.scraped:hover {{ color:var(--accent); }}
+  .gname.unscraped {{ color:var(--muted); }}
+  .depth-0 .gname {{ font-family:'Bebas Neue',sans-serif; font-size:1.3rem; letter-spacing:.04em; max-width:none; }}
+  .depth-0 a.gname.scraped {{ color:var(--accent); }}
+  .depth-0 .gname.unscraped {{ color:#666; }}
+  .gstats {{
+    display:inline-flex; align-items:center; gap:5px;
+    font-family:'DM Mono',monospace; font-size:.58rem; color:var(--muted); flex-shrink:0;
+  }}
+  .gstats-bar {{ width:40px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; flex-shrink:0; }}
+  .gstats-bar span {{ display:block; height:100%; background:var(--accent); }}
+  .gkids {{
+    margin-left:auto; font-family:'DM Mono',monospace; font-size:.55rem;
+    color:var(--muted); padding:1px 6px; border:1px solid var(--border); border-radius:10px; white-space:nowrap; flex-shrink:0;
+  }}
+  .gdesc {{ font-size:.74rem; color:var(--muted); margin-top:4px; line-height:1.45; max-width:700px; }}
+  .gchildren {{ overflow:hidden; }}
+  footer {{ padding:24px 40px; border-top:1px solid var(--border); font-family:'DM Mono',monospace; font-size:.65rem; color:var(--muted); }}
+  @media (max-width:700px) {{
+    main, footer {{ padding-left:16px; padding-right:16px; }}
+    .gname {{ max-width:220px; }}
+    .depth-2 {{ padding-left:36px; }} .depth-3 {{ padding-left:52px; }}
+  }}
+</style>
+</head>
+<body>
+<header>
+  <div class="site-label"><a href="../index.html" style="color:var(--muted);text-decoration:none;letter-spacing:.2em">&larr; Collections</a></div>
+  <h1>RYM Charts</h1>
+  <div class="header-meta">{n_scraped} de {total_genres} géneros scrapeados</div>
+  <div class="hdr-btns">
+    <button class="hdr-btn" onclick="expandAll()">Expandir todo</button>
+    <button class="hdr-btn" onclick="collapseAll()">Colapsar todo</button>
+  </div>
+  <a class="header-nav-link" href="../index_alternativo.html">Explorador ↗</a>
+</header>
+<main>
+  <div class="section-label">Géneros · {len(genre_tree)} principales · {total_genres} totales</div>
+  <div class="genre-tree" id="gtree">
+{main_rows_html}  </div>
+</main>
+<footer>Generated {generated} · Datos de RateYourMusic</footer>
+<script>
+const TREE_IDX = {{}};  // slug → compact node
+const CHARTS   = {chart_data_json};
+
+(function buildIdx(nodes) {{
+  for (const n of nodes) {{ TREE_IDX[n.s] = n; buildIdx(n.c || []); }}
+}})({compact_tree_json});
+
+function chartSlug(s) {{ return 'rym_chart_all_time_' + s.replace(/-/g,'_'); }}
+
+function renderNodes(nodes, depth) {{
+  if (!nodes || !nodes.length) return '';
+  const dcls = ['depth-1','depth-2','depth-3'][Math.min(depth-1,2)];
+  let h = '';
+  for (const n of nodes) {{
+    const cslug = chartSlug(n.s);
+    const chart = CHARTS[cslug];
+    const hasKids = n.c && n.c.length > 0;
+    const tog = hasKids
+      ? `<span class="toggle" data-slug="${{n.s}}">▶</span>`
+      : '<span class="toggle-ph"></span>';
+    const nameEl = chart
+      ? `<a class="gname scraped" href="${{cslug}}/index.html">${{n.n}}</a>`
+      : `<span class="gname unscraped">${{n.n}}</span>`;
+    const stats = chart
+      ? `<span class="gstats"><span class="gstats-bar"><span style="width:${{chart.pct}}%"></span></span>${{chart.total}}&thinsp;álb&thinsp;·&thinsp;${{chart.pct}}%</span>`
+      : '';
+    h += `<div class="grow ${{dcls}}${{chart?' has-chart':''}}" data-slug="${{n.s}}">${{tog}}<div class="ginfo"><div class="gline">${{nameEl}}${{stats}}</div></div></div>`;
+    if (hasKids) h += `<div class="gchildren" id="gc-${{n.s}}" style="display:none"></div>`;
+  }}
+  return h;
+}}
+
+function toggle(slug) {{
+  const el = document.getElementById('gc-' + slug);
+  if (!el) return;
+  const row = el.previousElementSibling;
+  const t = row && row.querySelector('.toggle[data-slug]');
+  const isOpen = el.style.display !== 'none';
+  if (!isOpen && !el.dataset.rendered) {{
+    const node = TREE_IDX[slug];
+    if (node) {{
+      const depth = parseInt(row.className.match(/depth-(\\d)/)?.[1] || '0') + 1;
+      el.innerHTML = renderNodes(node.c, depth);
+      el.dataset.rendered = '1';
+      el.querySelectorAll('.toggle[data-slug]').forEach(t2 => {{
+        t2.addEventListener('click', () => toggle(t2.dataset.slug));
+      }});
+    }}
+  }}
+  el.style.display = isOpen ? 'none' : 'block';
+  if (t) t.classList.toggle('open', !isOpen);
+}}
+
+function expandAll() {{
+  document.querySelectorAll('.gchildren').forEach(el => {{
+    const row = el.previousElementSibling;
+    if (!row) return;
+    const t = row.querySelector('.toggle[data-slug]');
+    const slug = t && t.dataset.slug;
+    if (slug && !el.dataset.rendered) {{
+      const node = TREE_IDX[slug];
+      if (node) {{
+        const depth = parseInt(row.className.match(/depth-(\\d)/)?.[1] || '0') + 1;
+        el.innerHTML = renderNodes(node.c, depth);
+        el.dataset.rendered = '1';
+        el.querySelectorAll('.toggle[data-slug]').forEach(t2 => {{
+          t2.addEventListener('click', () => toggle(t2.dataset.slug));
+        }});
+      }}
+    }}
+    el.style.display = 'block';
+    if (t) t.classList.add('open');
+  }});
+  // Re-run to catch newly rendered children
+  document.querySelectorAll('.gchildren').forEach(el => {{ el.style.display = 'block'; }});
+}}
+
+function collapseAll() {{
+  document.querySelectorAll('.gchildren').forEach(el => {{
+    el.style.display = 'none';
+    const row = el.previousElementSibling;
+    const t = row && row.querySelector('.toggle[data-slug]');
+    if (t) t.classList.remove('open');
+  }});
+}}
+
+// Wire up depth-0 toggles (static HTML)
+document.querySelectorAll('.depth-0 .toggle[data-slug]').forEach(t => {{
+  t.addEventListener('click', () => toggle(t.dataset.slug));
+}});
+</script>
 </body>
 </html>
 """
@@ -3524,12 +3807,17 @@ def update_collection_group_index(root_dir: Path, collection_name: str,
     existing_series.sort(key=lambda s: s["name"])
     meta_file.write_text(json.dumps(existing_series, ensure_ascii=False, indent=2))
 
-    # Render collection-group index (reuse root index template with back-link)
-    html = render_root_index_html(
-        existing_series, generated,
-        title=collection_name,
-        back_link="../index.html",
-    )
+    # For RYM Charts, use the genre-tree index if rym_genres.json is available
+    genres_json = coll_dir / "rym_genres.json"
+    if collection_slug == "rym_charts" and genres_json.exists():
+        genre_tree = json.loads(genres_json.read_text())
+        html = render_rym_charts_index_html(existing_series, genre_tree, generated)
+    else:
+        html = render_root_index_html(
+            existing_series, generated,
+            title=collection_name,
+            back_link="../index.html",
+        )
     (coll_dir / "index.html").write_text(html, encoding="utf-8")
     print(f"📋 group index → {coll_dir / 'index.html'} ({len(existing_series)} series)")
 
@@ -4218,8 +4506,12 @@ def _is_global_mode(args) -> bool:
         getattr(args, "aoty_decades",     False) or
         getattr(args, "aoty_decade_list", None) or
         getattr(args, "sputnik_years",    None) or
-        getattr(args, "rym_url",          None) or
+        getattr(args, "rym_url",           None) or
         getattr(args, "rym_chart_url",    None) or
+        getattr(args, "rym_genres_fetch", False) or
+        getattr(args, "rym_genres_print", False) or
+        getattr(args, "rym_genre",        None) or
+        getattr(args, "rym_genre_all",    None) or
         getattr(args, "collection",       None) or
         args.series != DEFAULT_SERIES or
         args.name   != "1001 Albums You Must Hear Before You Die"
@@ -4347,6 +4639,10 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
                            collection_name: str = None,
                            update_db: bool = True) -> None:
     """Regenerate HTML pages for one MusicBrainz-series collection using DB data."""
+    source_url_row = mh_conn.execute(
+        "SELECT source_url FROM collections WHERE slug=?", (slug,)
+    ).fetchone()
+    source_url = (source_url_row[0] or "") if source_url_row else ""
     albums = mh_load_collection(mh_conn, slug)
     if not albums:
         print(f"  ⚠ '{slug}' vacía, saltando")
@@ -4378,7 +4674,8 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
             json.dumps(albums_data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
         )
         (out_dir / fname).write_text(
-            render_user_html(user, albums_data, name, data_file=f"data/{json_fname}"),
+            render_user_html(user, albums_data, name, data_file=f"data/{json_fname}",
+                             source_url=source_url),
             encoding="utf-8"
         )
         if heard_ids and update_db:
@@ -4391,7 +4688,8 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
 
     users_index.sort(key=lambda u: u["pct"], reverse=True)
     (out_dir / "index.html").write_text(
-        render_collection_index_html(users_index, name, generated), encoding="utf-8"
+        render_collection_index_html(users_index, name, generated, source_url=source_url),
+        encoding="utf-8"
     )
     print(f"  📋 {out_dir / 'index.html'}")
 
@@ -4477,12 +4775,37 @@ def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn) -> None:
         except Exception as e:
             print(f"  ⚠ Sputnik error: {e}")
 
+    # ── RYM Charts ────────────────────────────────────────────────────────────
+    rc_rows = mh_conn.execute(
+        "SELECT slug, name, source_url FROM collections WHERE slug LIKE 'rym_chart_%'"
+    ).fetchall()
+    if rc_rows:
+        print("\n── RYM Charts ─────────────────────────────────────────────────")
+        try:
+            from tools.must_hear.rym_charts_must_hear import run_rym_chart
+            orig_idx = args.index_only
+            args.index_only = True
+            args.force_scrape = False
+            for rc_slug, rc_name, rc_url in rc_rows:
+                print(f"  {rc_name} ({rc_slug})")
+                args.rym_chart_url = rc_url or f"https://rateyourmusic.com/charts/top/album/{rc_slug.replace('rym_chart_', '')}/"
+                args.slug          = rc_slug
+                args.name          = rc_name or ""
+                args._rym_chart_mh_conn = mh_conn
+                run_rym_chart(args, root_dir)
+            args.index_only = orig_idx
+            args.slug = None
+            args.name = ""
+        except Exception as e:
+            print(f"  ⚠ RYM Charts error: {e}")
+
     skip = {"scaruffi"}
     rows = mh_conn.execute("SELECT slug, name FROM collections ORDER BY name").fetchall()
     mb_rows = [(s, n) for s, n in rows
                if s not in skip and not s.startswith("aoty")
                and not s.startswith("scaruffi_")
-               and not s.startswith("sputnik_")]
+               and not s.startswith("sputnik_")
+               and not s.startswith("rym_chart_")]
 
     for slug, name in mb_rows:
         print(f"\n── {name} ({slug}) ──────────────────────────────────────────")
@@ -4583,6 +4906,17 @@ def main():
     parser.add_argument("--rym-chart-limit", dest="rym_chart_limit", type=int, default=0,
                         metavar="N",
                         help="Limitar el chart a N álbumes (0 = sin límite)")
+    # ── RYM Genres ──
+    parser.add_argument("--rym-genres-fetch", dest="rym_genres_fetch", action="store_true",
+                        default=False,
+                        help="Obtener árbol de géneros de rateyourmusic.com/genres/ y guardarlo")
+    parser.add_argument("--rym-genres-print", dest="rym_genres_print", action="store_true",
+                        default=False,
+                        help="Mostrar árbol de géneros guardado")
+    parser.add_argument("--rym-genre", dest="rym_genre", default=None, metavar="SLUG",
+                        help="Scrapear chart del género/subgénero indicado (ej: dark-ambient)")
+    parser.add_argument("--rym-genre-all", dest="rym_genre_all", default=None, metavar="PARENT",
+                        help="Scrapear charts de todos los subgéneros de un género padre (ej: ambient)")
     args = parser.parse_args()
 
     root_dir = Path(args.out)
@@ -4709,6 +5043,44 @@ def main():
         if mh_conn:
             args._rym_chart_mh_conn = mh_conn
         run_rym_chart(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
+    # RYM Genres — fetch tree
+    if getattr(args, "rym_genres_fetch", False):
+        from tools.must_hear.rym_genres_scraper import run_rym_genres_fetch
+        run_rym_genres_fetch(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
+    # RYM Genres — print tree
+    if getattr(args, "rym_genres_print", False):
+        from tools.must_hear.rym_genres_scraper import run_rym_genres_print
+        run_rym_genres_print(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
+    # RYM Genre — scrape one genre's chart
+    if getattr(args, "rym_genre", None) and not getattr(args, "rym_genres_print", False):
+        from tools.must_hear.rym_genres_scraper import run_rym_genre
+        args.scrobbles_db = scrobbles_db_path
+        if mh_conn:
+            args._rym_chart_mh_conn = mh_conn
+        run_rym_genre(args, root_dir)
+        if mh_conn: mh_conn.close()
+        if scrobbles_conn: scrobbles_conn.close()
+        return
+
+    # RYM Genre All — scrape all subgenres of a parent
+    if getattr(args, "rym_genre_all", None):
+        from tools.must_hear.rym_genres_scraper import run_rym_genre_all
+        args.scrobbles_db = scrobbles_db_path
+        if mh_conn:
+            args._rym_chart_mh_conn = mh_conn
+        run_rym_genre_all(args, root_dir)
         if mh_conn: mh_conn.close()
         if scrobbles_conn: scrobbles_conn.close()
         return
@@ -4960,7 +5332,8 @@ def main():
 
         fname    = f"user_{safe_user}.html"
         data_rel = f"data/{json_fname}"
-        html     = render_user_html(user, albums_data, args.name, data_file=data_rel)
+        html     = render_user_html(user, albums_data, args.name, data_file=data_rel,
+                                    source_url=getattr(args, "series", ""))
         (out_dir / fname).write_text(html, encoding="utf-8")
         print(f"   💾 {out_dir / fname}  +  {data_dir / json_fname}")
 
@@ -4975,7 +5348,8 @@ def main():
     # ── 4. Collection index ───────────────────────────────────────────────────
     users_index.sort(key=lambda u: u["pct"], reverse=True)
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
-    index_html = render_collection_index_html(users_index, args.name, generated)
+    index_html = render_collection_index_html(users_index, args.name, generated,
+                                               source_url=getattr(args, "series", ""))
     (out_dir / "index.html").write_text(index_html, encoding="utf-8")
     print(f"\n📋 collection index → {out_dir / 'index.html'}")
 

@@ -174,21 +174,21 @@ def render_html(
   .mh-na {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:3px 8px; border-radius:3px; transition:all .12s; }}
   .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
   .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
-  /* Genre picker dropdown */
-  .genre-picker {{ position:relative; flex-shrink:0; }}
+  /* Genre picker dropdown — floats over tree, top-right */
+  .genre-picker {{ position:absolute; top:12px; right:16px; z-index:50; }}
   .genre-picker-btn {{
     display:flex; align-items:center; gap:8px; padding:5px 12px;
-    background:none; border:1px solid var(--border); border-radius:5px;
+    background:rgba(10,10,10,.9); border:1px solid var(--border); border-radius:5px;
     color:var(--text); font-family:'DM Sans',sans-serif; font-size:.82rem;
     cursor:pointer; white-space:nowrap; min-width:170px; justify-content:space-between;
-    transition:border-color .12s;
+    transition:border-color .12s; backdrop-filter:blur(8px);
   }}
   .genre-picker-btn:hover {{ border-color:var(--accent); }}
   .genre-picker-btn.open {{ border-color:var(--accent); color:var(--accent); }}
   .gp-caret {{ font-size:.65rem; color:var(--muted); transition:transform .15s; flex-shrink:0; }}
   .genre-picker-btn.open .gp-caret {{ transform:rotate(180deg); color:var(--accent); }}
   .genre-picker-dd {{
-    display:none; position:absolute; top:calc(100% + 6px); left:0;
+    display:none; position:absolute; top:calc(100% + 6px); right:0; left:auto;
     background:#0d0d0d; border:1px solid var(--border); border-radius:6px;
     padding:4px 0; min-width:220px; max-height:65vh;
     overflow-y:auto; z-index:300;
@@ -323,6 +323,7 @@ def render_html(
 
   @media (max-width:700px) {{
     :root {{ --panel-w:100vw; }}
+    .mh-na.on {{ display:none; }}
   }}
 </style>
 </head>
@@ -335,14 +336,6 @@ def render_html(
     <a class="mh-na on" href="../rym_genre_tree.html">Géneros RYM</a>
     <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
   </nav>
-  <div class="genre-picker" id="genrePicker">
-    <button class="genre-picker-btn" id="gpBtn" onclick="togglePicker()">
-      <span id="gpLabel">Selecciona un género…</span>
-      <span class="gp-caret">▾</span>
-    </button>
-    <div class="genre-picker-dd" id="gpDd">
-{sidebar_html}    </div>
-  </div>
   <div class="mh-usr">
     <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">—</span></button>
     <div class="mh-usr-d" id="mhUDd"></div>
@@ -353,6 +346,14 @@ def render_html(
   <div id="tree-wrap">
     <svg id="tree-svg"></svg>
     <div id="tree-placeholder">Selecciona un género para ver su árbol</div>
+    <div class="genre-picker" id="genrePicker">
+      <button class="genre-picker-btn" id="gpBtn" onclick="togglePicker()">
+        <span id="gpLabel">Selecciona un género…</span>
+        <span class="gp-caret">▾</span>
+      </button>
+      <div class="genre-picker-dd" id="gpDd">
+{sidebar_html}      </div>
+    </div>
   </div>
 
   <aside id="panel">

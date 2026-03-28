@@ -626,14 +626,13 @@ def check_heard(user_albums: set, album: dict) -> bool:
 
 # ── YOUTUBE PRE-FETCH ────────────────────────────────────────────────────────
 
-def _yt_search(query: str) -> str:
+def _yt_search(query: str, proxy: str = "") -> str:
     """Return first YouTube video ID for query using yt-dlp (no API key needed)."""
+    cmd = ["yt-dlp", "--no-playlist", "--get-id", "--quiet", f"ytsearch1:{query}"]
+    if proxy:
+        cmd += ["--proxy", proxy]
     try:
-        r = subprocess.run(
-            ["yt-dlp", "--no-playlist", "--get-id", "--quiet",
-             f"ytsearch1:{query}"],
-            capture_output=True, text=True, timeout=30
-        )
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     except subprocess.TimeoutExpired:
         return ""
     vid = r.stdout.strip()
@@ -643,20 +642,31 @@ def _yt_search(query: str) -> str:
 def fetch_youtube_ids(albums: list, cache_file: Path, force: bool = False) -> dict:
     """Pre-fetch YouTube video IDs for all albums.
     Returns dict keyed by mbid → video_id (str, may be "").
-    Uses YouTube search page HTML scrape — no API key needed."""
+    Uses YouTube search page HTML scrape — no API key needed.
+    Albums that already have yt_id set are never re-queried."""
     yt_cache = cache_file.parent / "youtube_cache.json"
     if yt_cache.exists() and not force:
         cached = json.loads(yt_cache.read_text())
-        # Re-try entries that are missing OR were cached as empty (possible bot-wall hit)
-        missing = [a for a in albums if a["mbid"] not in cached or cached[a["mbid"]] == ""]
-        if not missing:
-            print(f"  📦 YouTube caché completo: {yt_cache}")
-            return cached
-        print(f"  📦 YouTube caché: {len(cached)-sum(1 for v in cached.values() if not v)} con vídeo, "
-              f"{sum(1 for v in cached.values() if not v)} vacíos, {len(missing)} a buscar")
     else:
         cached = {}
-        missing = albums
+
+    # Pre-populate from albums that already have yt_id (e.g. from DB)
+    for a in albums:
+        if a.get("yt_id") and a.get("mbid"):
+            cached[a["mbid"]] = a["yt_id"]
+
+    # Only search for albums without yt_id that are missing/empty in cache
+    missing = [
+        a for a in albums
+        if a.get("mbid")
+        and not a.get("yt_id")
+        and (force or a["mbid"] not in cached or cached[a["mbid"]] == "")
+    ]
+    if not missing:
+        print(f"  📦 YouTube caché completo: {yt_cache}")
+        return cached
+    print(f"  📦 YouTube caché: {sum(1 for v in cached.values() if v)}/{len(cached)} con vídeo, "
+          f"{len(missing)} a buscar")
 
     print(f"  🎬 Buscando {len(missing)} vídeos en YouTube (yt-dlp)...")
     for i, album in enumerate(missing):
@@ -4656,32 +4666,110 @@ def mh_global_fetch_covers(mh_conn: sqlite3.Connection,
     mh_fetch_covers(mh_conn, albums, lfm_key=lfm_key, discogs_token=discogs_token)
 
 
-def mh_global_fetch_youtube(mh_conn: sqlite3.Connection) -> None:
-    """Fetch YouTube IDs for ALL albums in must_hear.db that are missing one."""
+def mh_global_fetch_youtube(mh_conn: sqlite3.Connection,
+                             cooldown_days: int = 30,
+                             proxies: list[str] | None = None,
+                             commit_every: int = 25) -> None:
+    """Fetch YouTube IDs for ALL albums in must_hear.db that are missing one.
+
+    Writes and commits to DB incrementally (every ``commit_every`` searches)
+    so progress is never lost if the script is interrupted.
+    Albums searched within ``cooldown_days`` are skipped even if no video
+    was found, to avoid hammering YouTube for dead ends.
+    """
+    import threading
+
+    # Ensure yt_searched_at column exists (one-time migration)
+    cols = {r[1] for r in mh_conn.execute("PRAGMA table_info(albums)")}
+    if "yt_searched_at" not in cols:
+        mh_conn.execute("ALTER TABLE albums ADD COLUMN yt_searched_at INTEGER")
+        mh_conn.commit()
+
+    cooldown_sec = cooldown_days * 86400
     rows = mh_conn.execute("""
         SELECT al.id, ar.name, al.name
         FROM albums al JOIN artists ar ON ar.id = al.artist_id
-        WHERE al.yt_id IS NULL OR al.yt_id = ''
+        WHERE (al.yt_id IS NULL OR al.yt_id = '')
+          AND (al.yt_searched_at IS NULL
+               OR al.yt_searched_at < strftime('%s','now') - ?)
         ORDER BY ar.name, al.name
-    """).fetchall()
+    """, (cooldown_sec,)).fetchall()
     if not rows:
-        print("✅ Todos los álbumes ya tienen YouTube ID en DB")
+        print("✅ Sin álbumes pendientes de búsqueda YouTube (todos tienen ID o fueron buscados recientemente)")
         return
-    print(f"🎬 {len(rows)} álbumes sin YouTube en toda la DB (yt-dlp)...")
+
+    n_proxies = len(proxies) if proxies else 1
+    print(f"🎬 {len(rows)} álbumes sin YouTube "
+          f"({'paralelo ×' + str(n_proxies) + ' proxies' if proxies else 'secuencial'}, "
+          f"guardando cada {commit_every})...")
+    import queue as _queue
+
     ts    = int(time.time())
-    found = 0
-    for i, (alb_id, artist, title) in enumerate(rows):
-        if i % 25 == 0:
-            print(f"  {i}/{len(rows)}...")
-        yt_id = _yt_search(f"{artist} {title} full album")
+    total = len(rows)
+    result_q: _queue.Queue = _queue.Queue()
+
+    # Workers: ONLY search YouTube, never touch the DB
+    def worker(chunk: list, proxy: str, label: str) -> None:
+        for alb_id, artist, title in chunk:
+            yt_id = _yt_search(f"{artist} {title} full album", proxy=proxy)
+            result_q.put((alb_id, yt_id, artist, title, label))
+            time.sleep(1.5 if proxy else 0.5)
+        result_q.put(None)  # sentinel: this worker is done
+
+    if proxies:
+        chunks: list[list] = [[] for _ in proxies]
+        for i, row in enumerate(rows):
+            chunks[i % len(proxies)].append(row)
+        threads = [
+            threading.Thread(
+                target=worker,
+                args=(chunk, proxy, proxy.split("//")[-1].split("@")[-1]),
+                daemon=True,
+            )
+            for proxy, chunk in zip(proxies, chunks)
+        ]
+        n_workers = len(proxies)
+    else:
+        threads = [threading.Thread(target=worker, args=(rows, "", "local"), daemon=True)]
+        n_workers = 1
+
+    for t in threads:
+        t.start()
+
+    # Main thread is the sole writer — mh_conn stays in its own thread
+    done = found = pending = sentinels = 0
+    while sentinels < n_workers:
+        item = result_q.get()
+        if item is None:
+            sentinels += 1
+            continue
+        alb_id, yt_id, artist, title, label = item
         if yt_id:
             mh_conn.execute(
-                "UPDATE albums SET yt_id=?, last_updated=? WHERE id=?", (yt_id, ts, alb_id)
+                "UPDATE albums SET yt_id=?, last_updated=?, yt_searched_at=? WHERE id=?",
+                (yt_id, ts, ts, alb_id),
             )
             found += 1
-        time.sleep(0.5)
-    mh_conn.commit()
-    print(f"✅ {found}/{len(rows)} YouTube IDs nuevos guardados en DB")
+        else:
+            mh_conn.execute(
+                "UPDATE albums SET yt_searched_at=? WHERE id=?", (ts, alb_id)
+            )
+        done += 1
+        pending += 1
+        if pending >= commit_every:
+            mh_conn.commit()
+            pending = 0
+        if yt_id or done % 50 == 0:
+            print(f"  [{label}] {done}/{total}  encontrados:{found}  "
+                  f"{'✓' if yt_id else '·'} {artist} — {title}")
+
+    if pending:
+        mh_conn.commit()
+
+    for t in threads:
+        t.join()
+
+    print(f"✅ {found}/{total} YouTube IDs nuevos guardados en DB")
 
 
 def mh_global_fetch_genres(mh_conn: sqlite3.Connection) -> None:
@@ -4991,6 +5079,11 @@ def main():
                              "Requiere --must-hear-db.")
     parser.add_argument("--youtube",      action="store_true",
                         help="Pre-fetch YouTube video IDs for all albums (saved in youtube_cache.json)")
+    parser.add_argument("--youtube-proxies", default="", metavar="PROXY_LIST",
+                        help="Comma-separated proxies for parallel YouTube search. "
+                             "Accepts: full URL (socks5://127.0.0.1:9050) or bare "
+                             "user:pass@host:port (http:// added automatically). "
+                             "Example: user:pass@1.2.3.4:6754,socks5://127.0.0.1:9050")
     parser.add_argument("--rateyourmusic", dest="rateyourmusic", action="store_true",
                         help="Pre-fetch RateYourMusic URLs via SearXNG (saved in rym_cache.json)")
     parser.add_argument("--searxng",      dest="searxng", default="http://localhost:8485",
@@ -5098,7 +5191,12 @@ def main():
                     discogs_token=getattr(args, "discogs_token", "") or "",
                 )
             if do_youtube:
-                mh_global_fetch_youtube(mh_conn)
+                yt_proxies = [
+                    p if "://" in p else "http://" + p
+                    for raw in args.youtube_proxies.split(",")
+                    if (p := raw.strip())
+                ]
+                mh_global_fetch_youtube(mh_conn, proxies=yt_proxies or None)
             if do_genres:
                 mh_global_fetch_genres(mh_conn)
             if do_lastfm:
@@ -5336,9 +5434,9 @@ def main():
         # Con must_hear.db: si se pasan flags de fetch, enriquecer y persistir
         if args.youtube and not args.index_only:
             print("\n🎬 YouTube pre-fetch")
-            # Construir lista compatible con fetch_youtube_ids
+            # Construir lista compatible con fetch_youtube_ids (incluir yt_id para que se salte los que ya tienen)
             yt_input = [{"artist": a["artist"], "title": a["title"],
-                         "mbid": a["mbid"]} for a in albums]
+                         "mbid": a["mbid"], "yt_id": a.get("yt_id", "")} for a in albums]
             yt_result = fetch_youtube_ids(yt_input, cache_path)
             for album in albums:
                 yt_id = yt_result.get(album["mbid"], "")

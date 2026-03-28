@@ -626,15 +626,24 @@ def check_heard(user_albums: set, album: dict) -> bool:
 
 # ── YOUTUBE PRE-FETCH ────────────────────────────────────────────────────────
 
-def _yt_search(query: str, proxy: str = "") -> str:
-    """Return first YouTube video ID for query using yt-dlp (no API key needed)."""
-    cmd = ["yt-dlp", "--no-playlist", "--get-id", "--quiet", f"ytsearch1:{query}"]
+def _yt_search(query: str, proxy: str = "") -> str | None:
+    """Return first YouTube video ID for query using yt-dlp.
+
+    Returns:
+        str (11 chars) — video found
+        ""             — YouTube responded but no result (genuine not-found)
+        None           — connection/proxy error; caller should retry
+    """
+    cmd = ["yt-dlp", "--no-playlist", "--get-id", "--quiet",
+           "--socket-timeout", "8", f"ytsearch1:{query}"]
     if proxy:
         cmd += ["--proxy", proxy]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
     except subprocess.TimeoutExpired:
-        return ""
+        return None  # network stall → retry
+    if r.returncode != 0:
+        return None  # proxy/connection error → retry
     vid = r.stdout.strip()
     return vid if len(vid) == 11 else ""
 
@@ -4666,18 +4675,116 @@ def mh_global_fetch_covers(mh_conn: sqlite3.Connection,
     mh_fetch_covers(mh_conn, albums, lfm_key=lfm_key, discogs_token=discogs_token)
 
 
+def _load_proxies_from_env(env_path: str) -> list[str]:
+    """Parse PROXY_N= lines from an .env file (only uncommented lines)."""
+    import re as _re
+    proxies = []
+    try:
+        for line in Path(env_path).read_text(errors="replace").splitlines():
+            m = _re.match(r"^\s*PROXY_\d+\s*=\s*(.+)", line)
+            if m:
+                raw = m.group(1).strip().strip("'\"")
+                if raw:
+                    proxies.append(raw if "://" in raw else "http://" + raw)
+    except FileNotFoundError:
+        pass
+    return proxies
+
+
+def _probe_proxies_from_env(env_path: str,
+                             timeout: float = 0.5,
+                             max_good: int = 50) -> list[str]:
+    """TCP-test ALL PROXY_NNN= entries (commented or not), rewrite .env with
+    results (uncomment fast ones, comment slow/dead ones), return good URLs."""
+    import re as _re
+    import socket
+    import time as _time
+    import concurrent.futures as _cf
+
+    try:
+        text = Path(env_path).read_text(encoding="utf-8", errors="replace")
+    except FileNotFoundError:
+        return []
+
+    # Match only zero-padded keys (PROXY_001+) to skip header Tailscale/Webshare entries
+    pattern = _re.compile(r"^(#?)(PROXY_\d{3,})=(.+)$", _re.MULTILINE)
+    entries = pattern.findall(text)  # [(comment, key, url), ...]
+    if not entries:
+        return []
+
+    def _normalise(raw: str) -> str:
+        raw = raw.strip().strip("'\"")
+        return raw if "://" in raw else "http://" + raw
+
+    all_proxies = [(_normalise(url), key) for _, key, url in entries]
+
+    def _tcp_test(proxy_key: tuple[str, str]) -> tuple[str, str, float | None]:
+        url, key = proxy_key
+        host_port = url.split("//")[-1].split("@")[-1]
+        host, _, port_s = host_port.rpartition(":")
+        if not host or not port_s:
+            return url, key, None
+        try:
+            port = int(port_s)
+        except ValueError:
+            return url, key, None
+        t0 = _time.monotonic()
+        try:
+            with socket.create_connection((host, port), timeout=timeout):
+                pass
+            return url, key, _time.monotonic() - t0
+        except Exception:
+            return url, key, None
+
+    n = len(all_proxies)
+    workers = min(n, 256)
+    print(f"  🔍 probando {n} proxies con timeout={timeout}s …")
+    with _cf.ThreadPoolExecutor(max_workers=workers) as ex:
+        results = list(ex.map(_tcp_test, all_proxies))
+
+    good = sorted(
+        [(url, key, t) for url, key, t in results if t is not None],
+        key=lambda x: x[2],
+    )[:max_good]
+
+    good_keys = {key for _, key, _ in good}
+    ms_range = (
+        f"{good[0][2]*1000:.0f}–{good[-1][2]*1000:.0f} ms"
+        if good else "—"
+    )
+    print(f"  ✅ {len(good)}/{n} proxies válidos  latencia {ms_range}")
+
+    def _replace(m: "_re.Match[str]") -> str:
+        key = m.group(2)
+        url = m.group(3)
+        if key in good_keys:
+            return f"{key}={url}"
+        return f"#{key}={url}"
+
+    new_text = pattern.sub(_replace, text)
+    try:
+        Path(env_path).write_text(new_text, encoding="utf-8")
+    except OSError:
+        pass
+
+    return [url for url, _, _ in good]
+
+
 def mh_global_fetch_youtube(mh_conn: sqlite3.Connection,
                              cooldown_days: int = 30,
                              proxies: list[str] | None = None,
-                             commit_every: int = 25) -> None:
+                             commit_every: int = 25,
+                             dead_threshold: int = 2,
+                             env_path: str = "db/.env") -> None:
     """Fetch YouTube IDs for ALL albums in must_hear.db that are missing one.
 
-    Writes and commits to DB incrementally (every ``commit_every`` searches)
-    so progress is never lost if the script is interrupted.
-    Albums searched within ``cooldown_days`` are skipped even if no video
-    was found, to avoid hammering YouTube for dead ends.
+    Uses a shared work queue: if a proxy dies (``dead_threshold`` consecutive
+    failures), it is deactivated and its remaining work is picked up by other
+    workers.  Commits to DB every ``commit_every`` results so progress is
+    never lost on interruption.
     """
     import threading
+    import queue as _queue
 
     # Ensure yt_searched_at column exists (one-time migration)
     cols = {r[1] for r in mh_conn.execute("PRAGMA table_info(albums)")}
@@ -4695,55 +4802,163 @@ def mh_global_fetch_youtube(mh_conn: sqlite3.Connection,
         ORDER BY ar.name, al.name
     """, (cooldown_sec,)).fetchall()
     if not rows:
-        print("✅ Sin álbumes pendientes de búsqueda YouTube (todos tienen ID o fueron buscados recientemente)")
+        print("✅ Sin álbumes pendientes de búsqueda YouTube")
         return
 
     n_proxies = len(proxies) if proxies else 1
-    print(f"🎬 {len(rows)} álbumes sin YouTube "
-          f"({'paralelo ×' + str(n_proxies) + ' proxies' if proxies else 'secuencial'}, "
-          f"guardando cada {commit_every})...")
-    import queue as _queue
+    print(f"🎬 {len(rows)} álbumes  ·  {n_proxies} {'proxies' if proxies else 'hilo local'}  "
+          f"·  commit cada {commit_every}")
 
-    ts    = int(time.time())
-    total = len(rows)
+    ts      = int(time.time())
+    total   = len(rows)
+    work_q: _queue.Queue  = _queue.Queue()
     result_q: _queue.Queue = _queue.Queue()
+    for row in rows:
+        work_q.put(row)
 
-    # Workers: ONLY search YouTube, never touch the DB
-    def worker(chunk: list, proxy: str, label: str) -> None:
-        for alb_id, artist, title in chunk:
-            yt_id = _yt_search(f"{artist} {title} full album", proxy=proxy)
-            result_q.put((alb_id, yt_id, artist, title, label))
-            time.sleep(1.5 if proxy else 0.5)
-        result_q.put(None)  # sentinel: this worker is done
+    def _is_public_proxy(p: str) -> bool:
+        """True for unauthenticated non-local proxies (disposable public proxies)."""
+        # Authenticated proxies have credentials (user:pass@host)
+        host_part = p.split("//")[-1]   # strip scheme
+        if "@" in host_part:
+            return False                # has credentials → trusted
+        # Local / Tailscale proxies
+        bare = host_part.split(":")[0].lower()
+        if bare in ("127.0.0.1", "localhost", "::1") or bare.startswith("100."):
+            return False                # loopback or Tailscale CGNAT range
+        return True                     # bare host:port with no auth → public
+
+    dead_proxies: set[str] = set()
+
+    def _rotate_proxy(dead_url: str) -> str | None:
+        """Comment out dead proxy, uncomment next public #PROXY_NNN=, return new URL."""
+        import re as _re
+        env = Path(env_path)
+        try:
+            lines = env.read_text(encoding="utf-8").splitlines(keepends=True)
+        except OSError as e:
+            print(f"  ⚠ _rotate_proxy: no se puede leer {env_path}: {e}")
+            return None
+
+        dead_bare = dead_url.split("//")[-1].strip()
+
+        # Pass 1: comment the dead proxy
+        out: list[str] = []
+        commented = False
+        for line in lines:
+            raw = line.rstrip("\r\n")
+            if (not commented
+                    and not raw.startswith("#")
+                    and "PROXY_" in raw
+                    and "=" in raw):
+                val = raw.split("=", 1)[1].strip().strip("'\"")
+                val_bare = val.split("//")[-1].strip()
+                if val_bare == dead_bare:
+                    out.append("#" + line)
+                    commented = True
+                    continue
+            out.append(line)
+
+        if not commented:
+            print(f"  ⚠ _rotate_proxy: no encontrado en .env: {dead_bare}")
+
+        # Pass 2: activate next commented public PROXY_NNN=
+        new_url: str | None = None
+        out2: list[str] = []
+        for line in out:
+            raw = line.rstrip("\r\n")
+            if (new_url is None
+                    and _re.match(r"^#PROXY_\d{3,}=", raw)
+                    and "=" in raw):
+                val = raw[1:].split("=", 1)[1].strip().strip("'\"")
+                full = val if "://" in val else "http://" + val
+                if _is_public_proxy(full):
+                    # uncomment: strip leading '#'
+                    out2.append(line[1:])
+                    new_url = full
+                    continue
+            out2.append(line)
+
+        try:
+            env.write_text("".join(out2), encoding="utf-8")
+            print(f"  .env: comentado {dead_bare}"
+                  + (f"  →  activado {new_url.split('//')[-1]}" if new_url else "  (sin reemplazo)"))
+        except OSError as e:
+            print(f"  ⚠ _rotate_proxy: no se puede escribir {env_path}: {e}")
+        return new_url
+
+    def worker(proxy: str, label: str) -> None:
+        consecutive_fail = 0
+        disposable = _is_public_proxy(proxy)
+        while True:
+            try:
+                alb_id, artist, title = work_q.get_nowait()
+            except _queue.Empty:
+                break
+
+            if proxy in dead_proxies:
+                work_q.put((alb_id, artist, title))
+                break
+
+            yt_id: str | None = None
+            for attempt in range(3):
+                result = _yt_search(f"{artist} {title} full album", proxy=proxy)
+                if result is not None:
+                    yt_id = result
+                    consecutive_fail = 0
+                    break
+                wait = attempt + 1
+                print(f"  [{label}] ⚠ intento {attempt+1}/3 +{wait}s — {artist} — {title}")
+                time.sleep(wait)
+
+            if yt_id is None:
+                consecutive_fail += 1
+                work_q.put((alb_id, artist, title))
+                if disposable and consecutive_fail >= dead_threshold:
+                    dead_proxies.add(proxy)
+                    print(f"  [{label}] ✗ proxy público eliminado tras {consecutive_fail} fallos")
+                    result_q.put(("DEAD", proxy))
+                    break
+                # authenticated/local proxy: log but keep trying
+                if not disposable:
+                    print(f"  [{label}] ⚠ fallo {consecutive_fail} (proxy de confianza, no se elimina)")
+            else:
+                result_q.put((alb_id, yt_id, artist, title, label))
+
+        result_q.put(None)  # sentinel
+
+    def _start_worker(proxy: str) -> threading.Thread:
+        label = proxy.split("//")[-1].split("@")[-1] if proxy else "local"
+        t = threading.Thread(target=worker, args=(proxy, label), daemon=True)
+        t.start()
+        return t
 
     if proxies:
-        chunks: list[list] = [[] for _ in proxies]
-        for i, row in enumerate(rows):
-            chunks[i % len(proxies)].append(row)
-        threads = [
-            threading.Thread(
-                target=worker,
-                args=(chunk, proxy, proxy.split("//")[-1].split("@")[-1]),
-                daemon=True,
-            )
-            for proxy, chunk in zip(proxies, chunks)
-        ]
+        threads = [_start_worker(p) for p in proxies]
         n_workers = len(proxies)
     else:
-        threads = [threading.Thread(target=worker, args=(rows, "", "local"), daemon=True)]
+        threads = [_start_worker("")]
         n_workers = 1
 
-    for t in threads:
-        t.start()
-
-    # Main thread is the sole writer — mh_conn stays in its own thread
-    done = found = pending = sentinels = 0
+    # Main thread: sole writer
+    done = found = skipped = pending = sentinels = 0
     while sentinels < n_workers:
         item = result_q.get()
         if item is None:
             sentinels += 1
             continue
+        if isinstance(item, tuple) and len(item) == 2 and item[0] == "DEAD":
+            new_proxy = _rotate_proxy(item[1])
+            if new_proxy:
+                new_label = new_proxy.split("//")[-1].split("@")[-1]
+                print(f"  ↺ {item[1].split('//')[-1]} → {new_label}")
+                threads.append(_start_worker(new_proxy))
+                n_workers += 1
+            continue
         alb_id, yt_id, artist, title, label = item
+        if yt_id is None:
+            skipped += 1
+            continue
         if yt_id:
             mh_conn.execute(
                 "UPDATE albums SET yt_id=?, last_updated=?, yt_searched_at=? WHERE id=?",
@@ -4760,16 +4975,20 @@ def mh_global_fetch_youtube(mh_conn: sqlite3.Connection,
             mh_conn.commit()
             pending = 0
         if yt_id or done % 50 == 0:
-            print(f"  [{label}] {done}/{total}  encontrados:{found}  "
+            print(f"  [{label}] {done}/{total}  ✓{found}  ✗{skipped}  "
                   f"{'✓' if yt_id else '·'} {artist} — {title}")
 
     if pending:
         mh_conn.commit()
 
+    remaining = work_q.qsize()
     for t in threads:
         t.join()
 
-    print(f"✅ {found}/{total} YouTube IDs nuevos guardados en DB")
+    print(f"✅ {found}/{total} YouTube IDs guardados  "
+          f"·  sin resultado:{done - found}  "
+          f"·  proxies muertos:{len(dead_proxies)}  "
+          f"·  sin procesar (proxies agotados):{remaining}")
 
 
 def mh_global_fetch_genres(mh_conn: sqlite3.Connection) -> None:
@@ -5080,10 +5299,11 @@ def main():
     parser.add_argument("--youtube",      action="store_true",
                         help="Pre-fetch YouTube video IDs for all albums (saved in youtube_cache.json)")
     parser.add_argument("--youtube-proxies", default="", metavar="PROXY_LIST",
-                        help="Comma-separated proxies for parallel YouTube search. "
-                             "Accepts: full URL (socks5://127.0.0.1:9050) or bare "
-                             "user:pass@host:port (http:// added automatically). "
-                             "Example: user:pass@1.2.3.4:6754,socks5://127.0.0.1:9050")
+                        help="Comma-separated proxies. Bare user:pass@host:port gets http:// prepended.")
+    parser.add_argument("--youtube-proxies-env", default="", metavar="PATH",
+                        help="Ruta a .env con entradas PROXY_N= (comentadas o no). "
+                             "Se combinan con --youtube-proxies. "
+                             "Defecto: db/.env si existe.")
     parser.add_argument("--rateyourmusic", dest="rateyourmusic", action="store_true",
                         help="Pre-fetch RateYourMusic URLs via SearXNG (saved in rym_cache.json)")
     parser.add_argument("--searxng",      dest="searxng", default="http://localhost:8485",
@@ -5191,12 +5411,19 @@ def main():
                     discogs_token=getattr(args, "discogs_token", "") or "",
                 )
             if do_youtube:
+                # Explicit proxies from --youtube-proxies flag
                 yt_proxies = [
                     p if "://" in p else "http://" + p
                     for raw in args.youtube_proxies.split(",")
                     if (p := raw.strip())
                 ]
-                mh_global_fetch_youtube(mh_conn, proxies=yt_proxies or None)
+                env_path = args.youtube_proxies_env or "db/.env"
+                if not yt_proxies:
+                    # Probe ALL PROXY_NNN= entries in .env, keep the fast ones
+                    yt_proxies = _probe_proxies_from_env(env_path)
+                else:
+                    print(f"  Proxies explícitos: {len(yt_proxies)}")
+                mh_global_fetch_youtube(mh_conn, proxies=yt_proxies or None, env_path=env_path)
             if do_genres:
                 mh_global_fetch_genres(mh_conn)
             if do_lastfm:

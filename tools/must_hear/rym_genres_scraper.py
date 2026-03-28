@@ -418,11 +418,22 @@ def run_rym_genre(args, root_dir: Path) -> None:
     run_rym_chart(args, root_dir)
 
 
+def _collection_album_count(mh_conn, db_slug: str) -> int:
+    """Return the number of albums already stored for a chart slug (0 if not found)."""
+    row = mh_conn.execute(
+        """SELECT COUNT(*) FROM collection_albums ca
+           JOIN collections c ON c.id = ca.collection_id
+           WHERE c.slug = ?""",
+        (db_slug,),
+    ).fetchone()
+    return row[0] if row else 0
+
+
 def run_rym_genre_all(args, root_dir: Path) -> None:
     """
     --rym-genre-all PARENT: scrape charts for every subgenre under a parent genre.
     """
-    from tools.must_hear.rym_charts_must_hear import run_rym_chart
+    from tools.must_hear.rym_charts_must_hear import run_rym_chart, _slug_from_chart_url
 
     parent_slug = (getattr(args, "rym_genre_all", None) or "").strip()
     if not parent_slug:
@@ -442,12 +453,15 @@ def run_rym_genre_all(args, root_dir: Path) -> None:
 
     all_descendants = _flatten_all(parent)
     targets = [parent] + all_descendants
-    print(f"🎼 Scrapeando {len(targets)} chart(s) bajo '{parent['name']}'…")
+    force   = getattr(args, "force_scrape", False)
+    mh_conn = getattr(args, "_rym_chart_mh_conn", None)
+    print(f"🎼 {len(targets)} chart(s) bajo '{parent['name']}'…")
 
     for entry in targets:
         slug = entry["slug"]
         name = entry["name"]
         chart_url = chart_url_from_slug(slug)
+        db_slug   = _slug_from_chart_url(chart_url)
 
         if entry is parent:
             derived_name = f"RYM Top — {name}"
@@ -455,6 +469,14 @@ def run_rym_genre_all(args, root_dir: Path) -> None:
             derived_name = f"RYM Top — {parent['name']} — {name}"
 
         print(f"\n── {derived_name} ──")
+
+        # Skip if already scraped and --force-scrape not requested
+        if not force and mh_conn:
+            count = _collection_album_count(mh_conn, db_slug)
+            if count:
+                print(f"  ⏭  Ya en DB ({count} álbumes), omitiendo")
+                continue
+
         args.rym_chart_url = chart_url
         args.name          = derived_name
         args.slug          = None   # let run_rym_chart derive it

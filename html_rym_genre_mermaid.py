@@ -330,10 +330,10 @@ def render_html(
 <header>
   <div class="mh-title">Géneros RYM</div>
   <nav class="mh-nav">
-    <a class="mh-na" href="../index.html">Colección</a>
-    <a class="mh-na" href="../index_alternativo.html">Explorador</a>
+    <a class="mh-na" href="index.html">Colección</a>
+    <a class="mh-na" href="index_alternativo.html">Explorador</a>
     <a class="mh-na on" href="rym_genre_tree.html">Géneros RYM</a>
-    <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
+    <a class="mh-na" href="estadisticas.html">Estadísticas</a>
   </nav>
   <div class="genre-picker" id="genrePicker">
     <button class="genre-picker-btn" id="gpBtn" onclick="togglePicker()">

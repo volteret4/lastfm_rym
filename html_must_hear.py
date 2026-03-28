@@ -3702,7 +3702,7 @@ def render_rym_charts_index_html(
   <nav class="mh-nav">
     <a class="mh-na" href="../index.html">Colección</a>
     <a class="mh-na" href="../index_alternativo.html">Explorador</a>
-    <a class="mh-na" href="rym_genre_tree.html">Géneros RYM</a>
+    <a class="mh-na" href="../rym_genre_tree.html">Géneros RYM</a>
     <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
   </nav>
   <div class="mh-usr">

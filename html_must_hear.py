@@ -6,9 +6,15 @@ generates per-user HTML grids + index.html
 """
 
 import subprocess, os, json, re, time, argparse, sqlite3, urllib.parse, urllib.request, urllib.error
+import threading, copy
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from html import unescape
 from pathlib import Path
 from datetime import datetime
+
+# Reentrant lock for concurrent index writes (update_root_index / update_collection_group_index)
+# RLock needed because update_collection_group_index calls update_root_index
+_INDEX_LOCK = threading.RLock()
 
 # Optional clients — imported lazily so the script works without them
 def _try_import(mod):
@@ -3888,40 +3894,41 @@ def update_root_index(root_dir: Path, collection_name: str, slug: str,
                       users_index: list[dict], generated: str,
                       url: str = "") -> None:
     """Read existing root index data (if any), upsert this collection, rewrite."""
-    meta_file = root_dir / ".collections_meta.json"
+    with _INDEX_LOCK:
+        meta_file = root_dir / ".collections_meta.json"
 
-    # Load existing metadata
-    if meta_file.exists():
-        collections = json.loads(meta_file.read_text())
-    else:
-        collections = []
+        # Load existing metadata
+        if meta_file.exists():
+            collections = json.loads(meta_file.read_text())
+        else:
+            collections = []
 
-    # Compute avg completion for this collection
-    avg_pct = (sum(u["pct"] for u in users_index) / len(users_index)) if users_index else 0
-    total   = users_index[0]["total"] if users_index else 0
+        # Compute avg completion for this collection
+        avg_pct = (sum(u["pct"] for u in users_index) / len(users_index)) if users_index else 0
+        total   = users_index[0]["total"] if users_index else 0
 
-    entry = {
-        "slug":    slug,
-        "name":    collection_name,
-        "users":   len(users_index),
-        "total":   total,
-        "avg_pct": round(avg_pct, 1),
-        "updated": generated,
-    }
-    if url:
-        entry["url"] = url
+        entry = {
+            "slug":    slug,
+            "name":    collection_name,
+            "users":   len(users_index),
+            "total":   total,
+            "avg_pct": round(avg_pct, 1),
+            "updated": generated,
+        }
+        if url:
+            entry["url"] = url
 
-    # Upsert by slug
-    existing = [c for c in collections if c["slug"] != slug]
-    existing.append(entry)
-    existing.sort(key=lambda c: c["name"])
+        # Upsert by slug
+        existing = [c for c in collections if c["slug"] != slug]
+        existing.append(entry)
+        existing.sort(key=lambda c: c["name"])
 
-    meta_file.write_text(json.dumps(existing, ensure_ascii=False, indent=2))
+        meta_file.write_text(json.dumps(existing, ensure_ascii=False, indent=2))
 
-    # Render and write root index
-    html = render_root_index_html(existing, generated)
-    (root_dir / "index.html").write_text(html, encoding="utf-8")
-    print(f"📋 root index → {root_dir / 'index.html'} ({len(existing)} collections)")
+        # Render and write root index
+        html = render_root_index_html(existing, generated)
+        (root_dir / "index.html").write_text(html, encoding="utf-8")
+        print(f"📋 root index → {root_dir / 'index.html'} ({len(existing)} collections)")
 
 
 def update_collection_group_index(root_dir: Path, collection_name: str,
@@ -3930,56 +3937,57 @@ def update_collection_group_index(root_dir: Path, collection_name: str,
                                    generated: str) -> None:
     """Upsert a series into a collection-group index (e.g. pitchfork/index.html),
     then update the root index with the group as a single entry."""
-    coll_dir  = root_dir / collection_slug
-    coll_dir.mkdir(parents=True, exist_ok=True)
-    meta_file = coll_dir / ".series_meta.json"
+    with _INDEX_LOCK:
+        coll_dir  = root_dir / collection_slug
+        coll_dir.mkdir(parents=True, exist_ok=True)
+        meta_file = coll_dir / ".series_meta.json"
 
-    series = json.loads(meta_file.read_text()) if meta_file.exists() else []
+        series = json.loads(meta_file.read_text()) if meta_file.exists() else []
 
-    avg_pct = (sum(u["pct"] for u in users_index) / len(users_index)) if users_index else 0
-    total   = users_index[0]["total"] if users_index else 0
+        avg_pct = (sum(u["pct"] for u in users_index) / len(users_index)) if users_index else 0
+        total   = users_index[0]["total"] if users_index else 0
 
-    entry = {
-        "slug":    series_slug,
-        "name":    series_name,
-        "users":   len(users_index),
-        "total":   total,
-        "avg_pct": round(avg_pct, 1),
-        "updated": generated,
-    }
-    existing_series = [s for s in series if s["slug"] != series_slug]
-    existing_series.append(entry)
-    existing_series.sort(key=lambda s: s["name"])
-    meta_file.write_text(json.dumps(existing_series, ensure_ascii=False, indent=2))
+        entry = {
+            "slug":    series_slug,
+            "name":    series_name,
+            "users":   len(users_index),
+            "total":   total,
+            "avg_pct": round(avg_pct, 1),
+            "updated": generated,
+        }
+        existing_series = [s for s in series if s["slug"] != series_slug]
+        existing_series.append(entry)
+        existing_series.sort(key=lambda s: s["name"])
+        meta_file.write_text(json.dumps(existing_series, ensure_ascii=False, indent=2))
 
-    # For RYM Charts, use the genre-tree index if rym_genres.json is available
-    genres_json = coll_dir / "rym_genres.json"
-    if collection_slug == "rym_charts" and genres_json.exists():
-        genre_tree = json.loads(genres_json.read_text())
-        html = render_rym_charts_index_html(existing_series, genre_tree, generated)
-    else:
-        html = render_root_index_html(
-            existing_series, generated,
-            title=collection_name,
-            back_link="../index.html",
+        # For RYM Charts, use the genre-tree index if rym_genres.json is available
+        genres_json = coll_dir / "rym_genres.json"
+        if collection_slug == "rym_charts" and genres_json.exists():
+            genre_tree = json.loads(genres_json.read_text())
+            html = render_rym_charts_index_html(existing_series, genre_tree, generated)
+        else:
+            html = render_root_index_html(
+                existing_series, generated,
+                title=collection_name,
+                back_link="../index.html",
+            )
+        (coll_dir / "index.html").write_text(html, encoding="utf-8")
+        print(f"📋 group index → {coll_dir / 'index.html'} ({len(existing_series)} series)")
+
+        # Update root index: represent the whole group as one entry
+        group_avg   = round(sum(s["avg_pct"] for s in existing_series) / len(existing_series), 1)
+        group_total = sum(s["total"] for s in existing_series)
+        group_users = len(users_index)
+        root_proxy  = [{"user": "_group", "pct": group_avg, "total": group_total, "heard": 0}
+                       for _ in range(group_users)]
+        update_root_index(
+            root_dir,
+            collection_name=collection_name,
+            slug=collection_slug,
+            users_index=root_proxy,
+            generated=generated,
+            url=f"{collection_slug}/index.html",
         )
-    (coll_dir / "index.html").write_text(html, encoding="utf-8")
-    print(f"📋 group index → {coll_dir / 'index.html'} ({len(existing_series)} series)")
-
-    # Update root index: represent the whole group as one entry
-    group_avg   = round(sum(s["avg_pct"] for s in existing_series) / len(existing_series), 1)
-    group_total = sum(s["total"] for s in existing_series)
-    group_users = len(users_index)
-    root_proxy  = [{"user": "_group", "pct": group_avg, "total": group_total, "heard": 0}
-                   for _ in range(group_users)]
-    update_root_index(
-        root_dir,
-        collection_name=collection_name,
-        slug=collection_slug,
-        users_index=root_proxy,
-        generated=generated,
-        url=f"{collection_slug}/index.html",
-    )
 
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
@@ -5151,8 +5159,15 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
         update_root_index(root_dir, name, slug, users_index, generated)
 
 
-def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn) -> None:
-    """Regenerate HTML pages for ALL known collections (scaruffi, aoty, MB series)."""
+def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn,
+                      workers: int = 8) -> None:
+    """Regenerate HTML pages for ALL known collections (scaruffi, aoty, MB series).
+
+    RYM Charts (1512 collections) and MB series loops run in parallel using
+    ThreadPoolExecutor.  Each thread opens its own DB connection so that
+    SQLite is never shared across threads.  update_root_index /
+    update_collection_group_index are protected by _INDEX_LOCK (RLock).
+    """
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
     users = getattr(args, "users", None) or (mh_get_users(mh_conn) if mh_conn else [])
     if not users:
@@ -5160,31 +5175,45 @@ def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn) -> None:
         return
     print(f"👥 {len(users)} usuarios: {', '.join(users)}")
 
+    mh_db_path  = getattr(args, "must_hear_db", None)
+    scr_db_path = getattr(args, "scrobbles_db", None) or getattr(args, "db", None)
+
+    def _open_mh():
+        if not mh_db_path:
+            return None
+        c = sqlite3.connect(mh_db_path)
+        c.execute("PRAGMA journal_mode=WAL")
+        return c
+
+    def _open_scr():
+        if not scr_db_path:
+            return None
+        c = sqlite3.connect(scr_db_path)
+        c.execute("PRAGMA journal_mode=WAL")
+        return c
+
     # ── Scaruffi ──────────────────────────────────────────────────────────────
     if (root_dir / "scaruffi").exists():
         print("\n── Scaruffi ──────────────────────────────────────────────────")
-        orig_sca = getattr(args, "scaruffi_decades", False)
-        orig_idx = args.index_only
-        args.scaruffi_decades = True
-        args.index_only       = True
+        a = copy.copy(args)
+        a.scaruffi_decades = True
+        a.index_only       = True
         if mh_conn:
-            args._sca_mh_conn = mh_conn
-        run_scaruffi(args, root_dir)
-        args.scaruffi_decades = orig_sca
-        args.index_only       = orig_idx
+            a._sca_mh_conn = mh_conn
+        run_scaruffi(a, root_dir)
 
     # ── AOTY ──────────────────────────────────────────────────────────────────
     if (root_dir / "aoty").exists():
         print("\n── AOTY ──────────────────────────────────────────────────────")
         try:
             from tools.must_hear.aoty_must_hear import run_aoty
-            args.aoty_decades  = None   # None = all available from cache/DB
-            args.force_scrape  = False
-            args.scrobbles_db  = getattr(args, "scrobbles_db", None) or getattr(args, "db", None)
+            a = copy.copy(args)
+            a.aoty_decades = None
+            a.force_scrape = False
+            a.scrobbles_db = scr_db_path
             if mh_conn:
-                args._aoty_mh_conn = mh_conn
-            run_aoty(args, root_dir)
-            args.aoty_decades = False
+                a._aoty_mh_conn = mh_conn
+            run_aoty(a, root_dir)
         except Exception as e:
             print(f"  ⚠ AOTY error: {e}")
 
@@ -5214,40 +5243,58 @@ def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn) -> None:
                 if r[0].replace("sputnik_", "").isdigit()
             )
             if sp_years:
-                orig_idx          = args.index_only
-                args.sputnik_years = sp_years
-                args.force_scrape  = False
-                args.index_only    = True
-                args._sputnik_mh_conn = mh_conn
-                run_sputnik(args, root_dir)
-                args.index_only    = orig_idx
+                a = copy.copy(args)
+                a.sputnik_years   = sp_years
+                a.force_scrape    = False
+                a.index_only      = True
+                a._sputnik_mh_conn = mh_conn
+                run_sputnik(a, root_dir)
         except Exception as e:
             print(f"  ⚠ Sputnik error: {e}")
 
-    # ── RYM Charts ────────────────────────────────────────────────────────────
+    # ── RYM Charts (parallelized) ──────────────────────────────────────────────
     rc_rows = mh_conn.execute(
         "SELECT slug, name, source_url FROM collections WHERE slug LIKE 'rym_chart_%'"
     ).fetchall()
     if rc_rows:
-        print("\n── RYM Charts ─────────────────────────────────────────────────")
+        print(f"\n── RYM Charts ({len(rc_rows)} colecciones, {workers} hilos) ──────────")
         try:
             from tools.must_hear.rym_charts_must_hear import run_rym_chart
-            orig_idx = args.index_only
-            args.index_only = True
-            args.force_scrape = False
-            for rc_slug, rc_name, rc_url in rc_rows:
-                print(f"  {rc_name} ({rc_slug})")
-                args.rym_chart_url = rc_url or f"https://rateyourmusic.com/charts/top/album/{rc_slug.replace('rym_chart_', '')}/"
-                args.slug          = rc_slug
-                args.name          = rc_name or ""
-                args._rym_chart_mh_conn = mh_conn
-                run_rym_chart(args, root_dir)
-            args.index_only = orig_idx
-            args.slug = None
-            args.name = ""
+
+            def _rym_worker(rc_slug, rc_name, rc_url):
+                th_mh = _open_mh()
+                try:
+                    a = copy.copy(args)
+                    a.index_only          = True
+                    a.force_scrape        = False
+                    a.rym_chart_url       = rc_url or (
+                        "https://rateyourmusic.com/charts/top/album/"
+                        + rc_slug.replace("rym_chart_", "") + "/")
+                    a.slug                = rc_slug
+                    a.name                = rc_name or ""
+                    a._rym_chart_mh_conn  = th_mh
+                    run_rym_chart(a, root_dir)
+                finally:
+                    if th_mh:
+                        th_mh.close()
+
+            n_workers = min(workers, len(rc_rows))
+            with ThreadPoolExecutor(max_workers=n_workers) as pool:
+                futs = {pool.submit(_rym_worker, s, n, u): s for s, n, u in rc_rows}
+                done = 0
+                for fut in as_completed(futs):
+                    done += 1
+                    rc_slug = futs[fut]
+                    try:
+                        fut.result()
+                    except Exception as exc:
+                        print(f"  ⚠ RYM Charts {rc_slug}: {exc}")
+                    if done % 100 == 0 or done == len(rc_rows):
+                        print(f"  … {done}/{len(rc_rows)} RYM charts listos")
         except Exception as e:
             print(f"  ⚠ RYM Charts error: {e}")
 
+    # ── MB series (parallelized) ───────────────────────────────────────────────
     skip = {"scaruffi"}
     rows = mh_conn.execute("SELECT slug, name FROM collections ORDER BY name").fetchall()
     mb_rows = [(s, n) for s, n in rows
@@ -5256,22 +5303,41 @@ def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn) -> None:
                and not s.startswith("sputnik_")
                and not s.startswith("rym_chart_")]
 
-    for slug, name in mb_rows:
-        print(f"\n── {name} ({slug}) ──────────────────────────────────────────")
-        g_slug = group_map.get(slug)
-        if g_slug:
-            out_dir = root_dir / g_slug / slug
-            g_name  = group_names.get(g_slug, g_slug.replace("_", " ").title())
-        else:
-            out_dir = root_dir / slug
-            g_slug  = None
-            g_name  = None
-        _regen_one_collection(
-            mh_conn, scrobbles_conn, root_dir,
-            slug, name, out_dir, users, generated,
-            collection_slug=g_slug, collection_name=g_name,
-            update_db=False,
-        )
+    if mb_rows:
+        print(f"\n── MB series ({len(mb_rows)} colecciones, {workers} hilos) ────────────")
+
+        def _mb_worker(slug, name):
+            th_mh  = _open_mh()
+            th_scr = _open_scr()
+            try:
+                g_slug = group_map.get(slug)
+                if g_slug:
+                    out_dir = root_dir / g_slug / slug
+                    g_name  = group_names.get(g_slug, g_slug.replace("_", " ").title())
+                else:
+                    out_dir = root_dir / slug
+                    g_slug  = None
+                    g_name  = None
+                print(f"  ── {name} ({slug})")
+                _regen_one_collection(
+                    th_mh, th_scr, root_dir,
+                    slug, name, out_dir, users, generated,
+                    collection_slug=g_slug, collection_name=g_name,
+                    update_db=False,
+                )
+            finally:
+                if th_mh:  th_mh.close()
+                if th_scr: th_scr.close()
+
+        n_workers = min(workers, len(mb_rows))
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            futs = {pool.submit(_mb_worker, s, n): s for s, n in mb_rows}
+            for fut in as_completed(futs):
+                slug = futs[fut]
+                try:
+                    fut.result()
+                except Exception as exc:
+                    print(f"  ⚠ MB {slug}: {exc}")
 
     print(f"\n✅ Global index-only done → {root_dir / 'index.html'}")
 
@@ -5336,6 +5402,8 @@ def main():
                         help="Mostrar álbumes sin descripción / sin YouTube y salir")
     parser.add_argument("--index-only",   action="store_true",
                         help="Solo regenerar HTMLs y ambos índices desde caché existente, sin scrapear ni APIs")
+    parser.add_argument("--index-workers", dest="index_workers", type=int, default=8,
+                        help="Hilos paralelos para --index-only (default: 8)")
     parser.add_argument("--scaruffi-decades", dest="scaruffi_decades", action="store_true",
                         help="Scrapear decadas de Scaruffi (scaruffiplaylists.netlify.app)")
     parser.add_argument("--decade", dest="scaruffi_decade", nargs="+", metavar="DECADE",
@@ -5417,7 +5485,8 @@ def main():
     # ── Global mode: no specific collection target ────────────────────────────
     if mh_conn and _is_global_mode(args):
         if args.index_only:
-            global_index_only(args, root_dir, mh_conn, scrobbles_conn)
+            global_index_only(args, root_dir, mh_conn, scrobbles_conn,
+                              workers=getattr(args, "index_workers", 8))
             if mh_conn: mh_conn.close()
             if scrobbles_conn: scrobbles_conn.close()
             return

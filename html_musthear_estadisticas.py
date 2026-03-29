@@ -72,6 +72,63 @@ def _coll_group(slug: str, name: str, parent_map: dict | None = None) -> str:
 
 # ── data gathering ────────────────────────────────────────────────────────────
 
+def _backfill_user_heard(mh_conn: sqlite3.Connection,
+                          scr_conn: sqlite3.Connection,
+                          user_id: int, lastfm_u: str) -> int:
+    """Populate user_heard for a user who has no entries yet.
+
+    Matches all must-hear albums against the user's scrobble table using
+    normalized (artist, album) names, then inserts (user_id, album_id,
+    first_heard_at) rows.  Returns number of albums inserted.
+    """
+    table = f"scrobbles_{_safe(lastfm_u)}"
+    exists = scr_conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone()
+    if not exists:
+        return 0
+
+    # First-play timestamp per (artist_norm, album_norm) in user scrobbles
+    try:
+        scr_rows = scr_conn.execute(f"""
+            SELECT LOWER(TRIM(ar.name)) AS an,
+                   LOWER(TRIM(al.name)) AS bn,
+                   MIN(s.timestamp)     AS ts
+            FROM "{table}" s
+            JOIN artists ar ON s.artist_id = ar.id
+            JOIN albums  al ON s.album_id  = al.id
+            WHERE s.timestamp > 0
+            GROUP BY ar.id, al.id
+        """).fetchall()
+    except Exception as e:
+        print(f"      scrobbles error: {e}")
+        return 0
+
+    lookup = {(r[0], r[1]): r[2] for r in scr_rows}
+    if not lookup:
+        return 0
+
+    # All must-hear albums with their ids and normalized names
+    mh_albums = mh_conn.execute("""
+        SELECT a.id, LOWER(TRIM(ar.name)) AS an, LOWER(TRIM(a.name)) AS bn
+        FROM albums a
+        JOIN artists ar ON a.artist_id = ar.id
+    """).fetchall()
+
+    inserted = 0
+    for alb_id, an, bn in mh_albums:
+        ts = lookup.get((an, bn))
+        if ts and ts > 0:
+            mh_conn.execute(
+                "INSERT OR IGNORE INTO user_heard (user_id, album_id, first_heard_at) VALUES (?,?,?)",
+                (user_id, alb_id, ts)
+            )
+            inserted += 1
+
+    mh_conn.commit()
+    return inserted
+
+
 def gather_data(mh_path: str, scr_path: str, meta_dir: Path | None = None) -> dict:
     conn = sqlite3.connect(mh_path)
     conn.row_factory = sqlite3.Row
@@ -81,7 +138,23 @@ def gather_data(mh_path: str, scr_path: str, meta_dir: Path | None = None) -> di
         "SELECT id, username, lastfm_username FROM users ORDER BY username"
     ).fetchall()]
 
+    # Backfill user_heard for any users with 0 entries (e.g. newly added users)
+    if Path(scr_path).exists():
+        heard_counts = {r[0]: r[1] for r in conn.execute(
+            "SELECT user_id, COUNT(*) FROM user_heard GROUP BY user_id"
+        ).fetchall()}
+        scr_conn = sqlite3.connect(scr_path)
+        for u in users:
+            if heard_counts.get(u["id"], 0) == 0:
+                lastfm_u = u.get("lastfm_username") or u["username"]
+                print(f"    ↺ backfill {u['username']}…", end=" ", flush=True)
+                n = _backfill_user_heard(conn, scr_conn, u["id"], lastfm_u)
+                print(f"{n} álbumes")
+        scr_conn.close()
+
     # Collections (only those with heard data)
+    parent_map = _build_parent_map(meta_dir) if meta_dir else {}
+
     colls = [dict(r) for r in conn.execute("""
         SELECT c.id, c.slug, c.name, c.total_albums, c.source_url
         FROM collections c
@@ -94,8 +167,6 @@ def gather_data(mh_path: str, scr_path: str, meta_dir: Path | None = None) -> di
     """).fetchall()]
     for c in colls:
         c["group"] = _coll_group(c["slug"], c["name"], parent_map)
-
-    parent_map = _build_parent_map(meta_dir) if meta_dir else {}
 
     coll_ids = [c["id"] for c in colls]
 

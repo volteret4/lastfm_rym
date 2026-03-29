@@ -78,6 +78,36 @@ def lfm_get(method: str, params: dict) -> dict:
 
 # ── DB queries ─────────────────────────────────────────────────────────────────
 
+def _collection_group(slug: str, name: str) -> str:
+    s = slug.lower()
+    prefixes = [
+        ("aoty_",            "AOTY"),
+        ("scaruffi_",        "Scaruffi"),
+        ("bandcamp",         "Bandcamp"),
+        ("kerrang",          "Kerrang!"),
+        ("pitchfork",        "Pitchfork"),
+        ("rym_",             "Rate Your Music"),
+        ("rate_your_music",  "Rate Your Music"),
+        ("sputnikmusic",     "Sputnikmusic"),
+        ("resident_advisor", "Resident Advisor"),
+        ("rolling_stone",    "Rolling Stone"),
+        ("grammy",           "Grammy"),
+        ("juno",             "Juno Awards"),
+        ("mu_",              "/mu/ 4chan"),
+    ]
+    for prefix, group in prefixes:
+        if s.startswith(prefix):
+            return group
+    return "Otros"
+
+
+def _rym_tree_path(name: str) -> list[str] | None:
+    """'RYM Top — Blues — Chicago Blues' → ['Blues', 'Chicago Blues']. Else None."""
+    if not name.startswith("RYM Top \u2014 "):
+        return None
+    return name[len("RYM Top \u2014 "):].split(" \u2014 ")
+
+
 @lru_cache(maxsize=1)
 def get_all_collections() -> list[dict]:
     conn = get_db()
@@ -85,7 +115,13 @@ def get_all_collections() -> list[dict]:
         "SELECT id, slug, name, total_albums, source_type FROM collections ORDER BY name"
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["group"]     = _collection_group(d["slug"], d["name"])
+        d["tree_path"] = _rym_tree_path(d["name"])
+        result.append(d)
+    return result
 
 
 def get_collection_albums(slug: str) -> list[dict]:
@@ -103,13 +139,25 @@ def get_collection_albums(slug: str) -> list[dict]:
         WHERE c.slug = ?
         ORDER BY ca.rank ASC NULLS LAST, al.year ASC
     """, (slug,)).fetchall()
+    # Genres per album
+    album_ids = [r["id"] for r in rows]
+    genres_map: dict[int, list[str]] = {}
+    if album_ids:
+        placeholders = ",".join("?" * len(album_ids))
+        genre_rows = conn.execute(f"""
+            SELECT ag.album_id, g.name
+            FROM album_genres ag JOIN genres g ON g.id = ag.genre_id
+            WHERE ag.album_id IN ({placeholders})
+        """, album_ids).fetchall()
+        for gr in genre_rows:
+            genres_map.setdefault(gr[0], []).append(gr[1])
     conn.close()
     result = []
     for i, r in enumerate(rows):
         d = dict(r)
         d["number"] = d["rank"] or (i + 1)
-        mbid = d.get("mbid", "")
         d["cover"] = d.get("cover_url") or (f"/api/cover?mbid={d['mbid']}" if d.get("mbid") else "")
+        d["genres"] = genres_map.get(d["id"], [])
         result.append(d)
     return result
 
@@ -288,15 +336,16 @@ def api_collection():
     if not albums:
         return jsonify({"error": f"Colección '{slug}' no encontrada o vacía"}), 404
     result = [{
-        "n":      a["number"],
-        "artist": a["artist"],
-        "title":  a["title"],
-        "year":   a.get("year"),
-        "mbid":   a.get("mbid", ""),
-        "cover":  a.get("cover_url") or (f"/api/cover?mbid={a['mbid']}" if a.get("mbid") else ""),
-        "yt_id":  a.get("yt_id", ""),
-        "aoty":   a.get("aoty_critic_score"),
-        "scaruffi": a.get("scaruffi_rating"),
+        "n":       a["number"],
+        "artist":  a["artist"],
+        "title":   a["title"],
+        "year":    a.get("year"),
+        "mbid":    a.get("mbid", ""),
+        "cover":   a.get("cover", ""),
+        "yt_id":   a.get("yt_id", ""),
+        "aoty":    a.get("aoty_critic_score"),
+        "scaruffi":a.get("scaruffi_rating"),
+        "genres":  a.get("genres", []),
     } for a in albums]
     return jsonify({"slug": slug, "albums": result})
 
@@ -870,121 +919,348 @@ input::placeholder { color: var(--ink3); }
 #empty.visible { display: block; }
 #empty p { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; }
 
+/* ── App shell ─────────────────────────────────────────────────────── */
+.app-shell {
+  display: flex;
+  height: calc(100vh - 0px);
+  overflow: hidden;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────────── */
+#sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sb-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.sb-scroll::-webkit-scrollbar { width: 3px; }
+.sb-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+
+/* ── Sidebar panel ─────────────────────────────────────────────────── */
+.sb-panel { margin-bottom: 0.25rem; }
+.sb-panel-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  user-select: none;
+}
+.sb-panel-title {
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.sb-panel-arrow {
+  font-size: 0.55rem;
+  color: var(--ink3);
+  transition: transform 0.15s;
+}
+.sb-panel.open .sb-panel-arrow { transform: rotate(90deg); }
+.sb-panel-body { display: none; }
+.sb-panel.open .sb-panel-body { display: block; }
+
+/* ── Collapsible groups ─────────────────────────────────────────────── */
+.sb-grp { border-top: 1px solid var(--border); }
+.sb-grp-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.42rem 0.9rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s;
+}
+.sb-grp-hdr:hover { background: var(--bg3); }
+.sb-grp-name {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.sb-grp-arrow {
+  font-size: 0.5rem;
+  color: var(--ink3);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.sb-grp.open .sb-grp-arrow { transform: rotate(90deg); }
+.sb-grp-body { display: none; }
+.sb-grp.open .sb-grp-body { display: block; }
+
+/* ── Flat collection item ───────────────────────────────────────────── */
+.sb-coll-item {
+  display: flex;
+  align-items: center;
+  padding: 0.36rem 0.9rem 0.36rem 1.1rem;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  color: var(--ink2);
+  line-height: 1.2;
+  gap: 0.4rem;
+}
+.sb-coll-item:hover  { background: var(--bg3); color: var(--ink); }
+.sb-coll-item.active { background: rgba(232,193,74,0.08); color: var(--accent); border-left: 2px solid var(--accent); padding-left: calc(1.1rem - 2px); }
+.sb-coll-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  color: var(--ink3);
+  flex-shrink: 0;
+}
+
+/* ── Genre tree (RYM Charts) ───────────────────────────────────────── */
+.tree-genre { }
+.tree-genre-hdr {
+  display: flex;
+  align-items: center;
+  padding: 0.36rem 0.9rem 0.36rem 1.1rem;
+  cursor: pointer;
+  transition: background 0.1s;
+  gap: 0.35rem;
+}
+.tree-genre-hdr:hover { background: var(--bg3); }
+.tree-genre-hdr.active { background: rgba(232,193,74,0.08); border-left: 2px solid var(--accent); padding-left: calc(1.1rem - 2px); }
+.tree-genre-name {
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  color: var(--ink2);
+  flex: 1;
+}
+.tree-genre-hdr:hover .tree-genre-name,
+.tree-genre-hdr.active .tree-genre-name { color: var(--accent); }
+.tree-genre-arrow {
+  font-size: 0.48rem;
+  color: var(--ink3);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.tree-genre.open > .tree-genre-hdr .tree-genre-arrow { transform: rotate(90deg); }
+.tree-sub { display: none; }
+.tree-genre.open > .tree-sub { display: block; }
+.tree-sub-item {
+  display: flex;
+  align-items: center;
+  padding: 0.3rem 0.9rem 0.3rem 2rem;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-family: var(--sans);
+  font-size: 0.7rem;
+  color: var(--ink3);
+  line-height: 1.2;
+}
+.tree-sub-item:hover  { background: var(--bg3); color: var(--ink); }
+.tree-sub-item.active { color: var(--accent); background: rgba(232,193,74,0.06); }
+
+/* ── Pill filters (genres, decades) ───────────────────────────────── */
+.sb-pills {
+  padding: 0.4rem 0.7rem 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.pill {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 0.22rem 0.55rem;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  color: var(--ink3);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.pill:hover  { border-color: var(--ink3); color: var(--ink); }
+.pill.active { background: var(--accent); border-color: var(--accent); color: #0d0d0d; }
+.sb-empty {
+  padding: 0.5rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--ink3);
+  font-style: italic;
+}
+
+/* ── Main content area ─────────────────────────────────────────────── */
+#main {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.main-inner {
+  padding: 1.25rem 1.5rem 3rem;
+  max-width: 1400px;
+  width: 100%;
+}
+
 /* ── Responsive ────────────────────────────────────────────────────── */
-@media (max-width: 700px) {
-  .search-panel { grid-template-columns: 1fr; }
+@media (max-width: 800px) {
+  .app-shell { flex-direction: column; }
+  #sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+  .sb-scroll { max-height: 260px; }
   #grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
-  header { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 }
 </style>
 </head>
 <body>
-<div class="page">
 
-  <!-- Header -->
-  <header>
-    <div>
-      <div class="logo">must<em>listen</em></div>
-    </div>
-    <div>
-      <div class="tagline">Tu historial · Las listas · Lo que te falta</div>
-    </div>
-  </header>
-
-  <!-- Search -->
-  <div class="search-panel">
-    <div>
-      <label for="inp-user">Usuario Last.fm</label>
-      <input id="inp-user" type="text" placeholder="tu_usuario" autocomplete="off" spellcheck="false">
-    </div>
-    <div>
-      <label for="inp-coll">Lista / Colección</label>
-      <select id="inp-coll"><option value="">Cargando...</option></select>
-    </div>
-    <div>
-      <button class="btn" id="btn-go" disabled>Buscar</button>
-    </div>
+<!-- ── Header ─────────────────────────────────────────────────────────── -->
+<header style="height:52px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 1.2rem;gap:1.2rem;flex-shrink:0;position:relative;z-index:10;">
+  <div class="logo" style="font-size:1.3rem">must<em>listen</em></div>
+  <div style="flex:1;display:flex;align-items:center;gap:0.6rem;">
+    <input id="inp-user" type="text" placeholder="Usuario Last.fm" autocomplete="off" spellcheck="false"
+      style="width:180px;padding:0.4rem 0.7rem;font-size:0.8rem;">
+    <button class="btn" id="btn-go" style="padding:0.4rem 1rem;font-size:0.72rem;">Cargar</button>
+    <button class="btn-sm" id="btn-save-session" style="display:none">↓ Sesión</button>
+    <button class="btn-sm" id="btn-sync-session" style="display:none">↻ Sync</button>
+    <button class="btn-sm" id="btn-import">↑ Importar</button>
   </div>
-
-  <!-- User badge -->
-  <div id="user-badge">
-    <img id="badge-avatar" src="" alt="">
-    <span id="badge-name"></span>
-    <span id="badge-plays"></span>
-    <span id="badge-date"></span>
-    <div class="badge-actions">
-      <button class="btn-sm" id="btn-save-session" style="display:none">↓ Guardar sesión</button>
-      <button class="btn-sm" id="btn-sync-session" style="display:none">↻ Sincronizar</button>
-    </div>
+  <div id="badge-inline" style="display:none;align-items:center;gap:0.5rem;">
+    <img id="badge-avatar" src="" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover;background:var(--bg3);">
+    <span id="badge-name" style="font-family:var(--mono);font-size:0.75rem;color:var(--ink);"></span>
+    <span id="badge-plays" style="font-family:var(--mono);font-size:0.65rem;color:var(--ink3);"></span>
   </div>
+</header>
 
-  <!-- Session bar (cargar sesión guardada) -->
-  <div id="session-bar">
-    <span class="session-label">Sesión guardada</span>
-    <span id="session-info"></span>
-    <button class="btn-sm primary" id="btn-load-session">Cargar</button>
-    <button class="btn-sm" id="btn-discard-session">✕</button>
-  </div>
-  <input type="file" id="inp-session" accept=".json">
+<input type="file" id="inp-session" accept=".json" style="display:none">
 
-  <!-- Error -->
-  <div id="error-msg"></div>
+<!-- Session bar -->
+<div id="session-bar" style="display:none;align-items:center;gap:0.6rem;padding:0.4rem 1.2rem;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;">
+  <span class="session-label">Sesión guardada:</span>
+  <span id="session-info" style="font-family:var(--mono);font-size:0.72rem;color:var(--ink2);"></span>
+  <button class="btn-sm primary" id="btn-load-session">Cargar</button>
+  <button class="btn-sm" id="btn-discard-session">✕</button>
+</div>
 
-  <!-- Loading -->
-  <div id="loading">
-    <div class="spinner"></div>
-    <span id="loading-text">Cargando scrobbles...</span>
-  </div>
+<!-- ── App shell ───────────────────────────────────────────────────────── -->
+<div class="app-shell">
 
-  <!-- Stats -->
-  <div id="stats-bar">
-    <div class="stat">
-      <div class="stat-val" id="s-total">—</div>
-      <div class="stat-lbl">Total</div>
+  <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="sb-scroll">
+
+      <!-- Colecciones -->
+      <div class="sb-panel open" id="panel-colls">
+        <div class="sb-panel-hdr" onclick="togglePanel('panel-colls')">
+          <span class="sb-panel-title">Colecciones</span>
+          <span class="sb-panel-arrow">▶</span>
+        </div>
+        <div class="sb-panel-body" id="colls-body">
+          <div class="sb-empty">Cargando…</div>
+        </div>
+      </div>
+
+      <!-- Géneros -->
+      <div class="sb-panel open" id="panel-genres">
+        <div class="sb-panel-hdr" onclick="togglePanel('panel-genres')">
+          <span class="sb-panel-title">Géneros</span>
+          <span class="sb-panel-arrow">▶</span>
+        </div>
+        <div class="sb-panel-body">
+          <div class="sb-pills" id="genre-pills">
+            <div class="sb-empty">Selecciona una colección</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fechas -->
+      <div class="sb-panel open" id="panel-dates">
+        <div class="sb-panel-hdr" onclick="togglePanel('panel-dates')">
+          <span class="sb-panel-title">Fechas</span>
+          <span class="sb-panel-arrow">▶</span>
+        </div>
+        <div class="sb-panel-body">
+          <div class="sb-pills" id="decade-pills">
+            <div class="sb-empty">Selecciona una colección</div>
+          </div>
+        </div>
+      </div>
+
     </div>
-    <div class="stat-sep"></div>
-    <div class="stat">
-      <div class="stat-val accent" id="s-heard">—</div>
-      <div class="stat-lbl">Escuchados</div>
-    </div>
-    <div class="stat-sep"></div>
-    <div class="stat">
-      <div class="stat-val" id="s-missing">—</div>
-      <div class="stat-lbl">Pendientes</div>
-    </div>
-    <div class="stat-sep"></div>
-    <div class="stat">
-      <div class="stat-val" id="s-pct">—</div>
-      <div class="stat-lbl">Completado</div>
-    </div>
-    <div class="stat-sep"></div>
-    <div class="prog-wrap">
-      <div class="stat-lbl">Progreso</div>
-      <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
-    </div>
-  </div>
+  </aside>
 
-  <!-- Filters -->
-  <div id="filters">
-    <button class="filter-btn active" data-filter="all">Todos</button>
-    <button class="filter-btn" data-filter="missing">Pendientes</button>
-    <button class="filter-btn" data-filter="heard">Escuchados</button>
-    <div class="filter-sep"></div>
-    <label for="sort-select" style="margin:0">
-      <select id="sort-select">
-        <option value="rank">Orden lista</option>
-        <option value="year_asc">Año ↑</option>
-        <option value="year_desc">Año ↓</option>
-        <option value="artist">Artista A–Z</option>
-      </select>
-    </label>
-  </div>
+  <!-- ── Main ──────────────────────────────────────────────────────────── -->
+  <div id="main">
+    <div class="main-inner">
 
-  <!-- Grid -->
-  <div id="grid"></div>
-  <div id="empty"><p>No hay álbumes para mostrar</p></div>
+      <!-- Error -->
+      <div id="error-msg"></div>
 
-</div><!-- .page -->
+      <!-- Loading -->
+      <div id="loading">
+        <div class="spinner"></div>
+        <span id="loading-text">Cargando scrobbles...</span>
+      </div>
+
+      <!-- Stats -->
+      <div id="stats-bar">
+        <div class="stat">
+          <div class="stat-val" id="s-total">—</div>
+          <div class="stat-lbl">Total</div>
+        </div>
+        <div class="stat-sep"></div>
+        <div class="stat">
+          <div class="stat-val accent" id="s-heard">—</div>
+          <div class="stat-lbl">Escuchados</div>
+        </div>
+        <div class="stat-sep"></div>
+        <div class="stat">
+          <div class="stat-val" id="s-missing">—</div>
+          <div class="stat-lbl">Pendientes</div>
+        </div>
+        <div class="stat-sep"></div>
+        <div class="stat">
+          <div class="stat-val" id="s-pct">—</div>
+          <div class="stat-lbl">Completado</div>
+        </div>
+        <div class="stat-sep"></div>
+        <div class="prog-wrap">
+          <div class="stat-lbl">Progreso</div>
+          <div class="prog-track"><div class="prog-fill" id="prog-fill"></div></div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div id="filters">
+        <button class="filter-btn active" data-filter="all">Todos</button>
+        <button class="filter-btn" data-filter="missing">Pendientes</button>
+        <button class="filter-btn" data-filter="heard">Escuchados</button>
+        <div class="filter-sep"></div>
+        <label for="sort-select" style="margin:0">
+          <select id="sort-select">
+            <option value="rank">Orden lista</option>
+            <option value="year_asc">Año ↑</option>
+            <option value="year_desc">Año ↓</option>
+            <option value="artist">Artista A–Z</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- Grid -->
+      <div id="grid"></div>
+      <div id="empty"><p>No hay álbumes para mostrar</p></div>
+
+    </div><!-- .main-inner -->
+  </div><!-- #main -->
+
+</div><!-- .app-shell -->
 
 <!-- Modal -->
 <div id="modal-bg">
@@ -1009,17 +1285,19 @@ input::placeholder { color: var(--ink3); }
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
-let allAlbums    = [];
-let heardCache   = null; // { user, pairs:[[a,t],...], count, fetched_at }
-let collCache    = {};   // slug → albums[]
-let activeFilter = 'all';
-let activeSort   = 'rank';
-let loadedUser   = null;
-let pendingSession = null; // sesión cargada de fichero, esperando confirmación
+let allAlbums      = [];
+let heardCache     = null;     // { user, pairs:[[a,t],...], count, fetched_at }
+let collCache      = {};       // slug → albums[]
+let activeSlug     = null;
+let activeFilter   = 'all';
+let activeSort     = 'rank';
+let activeGenres   = new Set();
+let activeDecades  = new Set();
+let loadedUser     = null;
+let pendingSession = null;
 
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const inpUser    = document.getElementById('inp-user');
-const inpColl    = document.getElementById('inp-coll');
 const btnGo      = document.getElementById('btn-go');
 const grid       = document.getElementById('grid');
 const loading    = document.getElementById('loading');
@@ -1028,22 +1306,135 @@ const errMsg     = document.getElementById('error-msg');
 const statsBar   = document.getElementById('stats-bar');
 const filtersEl  = document.getElementById('filters');
 const emptyEl    = document.getElementById('empty');
-const userBadge  = document.getElementById('user-badge');
 const sessionBar = document.getElementById('session-bar');
 const inpSession = document.getElementById('inp-session');
 
-// ── Init: load collections ─────────────────────────────────────────────────
+// ── Sidebar panel toggle ───────────────────────────────────────────────────
+function togglePanel(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── Init: load collections into sidebar ───────────────────────────────────
 (async () => {
   try {
     const cols = await fetch('/api/collections').then(r => r.json());
-    inpColl.innerHTML = cols.map(c =>
-      `<option value="${c.slug}">${c.name}${c.total_albums ? ' ('+c.total_albums+')' : ''}</option>`
-    ).join('');
-    btnGo.disabled = false;
+    renderCollsSidebar(cols);
   } catch(e) {
-    inpColl.innerHTML = '<option value="">Error cargando colecciones</option>';
+    document.getElementById('colls-body').innerHTML = '<div class="sb-empty">Error cargando</div>';
   }
 })();
+
+function renderCollsSidebar(cols) {
+  const groups = {};
+  for (const c of cols) {
+    const g = c.group || 'Otros';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(c);
+  }
+  const order = Object.keys(groups).sort((a,b) => a.localeCompare(b));
+  let html = '';
+  for (const g of order) {
+    const gid = 'grp-' + g.replace(/[^a-z0-9]/gi,'_');
+    const isRym = (g === 'Rate Your Music');
+    html += `<div class="sb-grp" id="${gid}">
+      <div class="sb-grp-hdr" onclick="toggleGrp('${gid}')">
+        <span class="sb-grp-name">${escH(g)}</span>
+        <span class="sb-grp-arrow">▶</span>
+      </div>
+      <div class="sb-grp-body">`;
+
+    if (isRym) {
+      html += buildRymTree(groups[g]);
+    } else {
+      for (const c of groups[g]) {
+        const lbl = c.name.replace(/^(AOTY Must Hear|Scaruffi|Bandcamp:|Kerrang!|Pitchfork) ?/,'').trim() || c.name;
+        html += `<div class="sb-coll-item" data-slug="${escH(c.slug)}" onclick="selectCollection('${escH(c.slug)}')">
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(lbl)}</span>
+          ${c.total_albums ? `<span class="sb-coll-count">${c.total_albums}</span>` : ''}
+        </div>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+  document.getElementById('colls-body').innerHTML = html;
+}
+
+function buildRymTree(cols) {
+  // Separate structured (tree_path) from legacy (no tree_path starting with "RYM Top")
+  const byTopGenre = {};  // topGenre → { self: col|null, subs: [{label, col}] }
+  const legacy = [];
+
+  for (const c of cols) {
+    const tp = c.tree_path;
+    if (!tp) { legacy.push(c); continue; }
+    const top = tp[0];
+    if (!byTopGenre[top]) byTopGenre[top] = { self: null, subs: [] };
+    if (tp.length === 1) byTopGenre[top].self = c;
+    else byTopGenre[top].subs.push({ label: tp[tp.length-1], col: c });
+  }
+
+  let html = '';
+  const topGenres = Object.keys(byTopGenre).sort();
+  for (const top of topGenres) {
+    const node   = byTopGenre[top];
+    const nid    = 'tree-' + top.replace(/[^a-z0-9]/gi,'_');
+    const selfSlug = node.self ? escH(node.self.slug) : '';
+    const hasSubs  = node.subs.length > 0;
+    html += `<div class="tree-genre" id="${nid}">
+      <div class="tree-genre-hdr${node.self ? '' : ''}"
+           onclick="${hasSubs ? `toggleTree('${nid}');` : ''}${selfSlug ? `selectCollection('${selfSlug}')` : ''}"
+           data-slug="${selfSlug}">
+        <span class="tree-genre-name">${escH(top)}</span>
+        ${hasSubs ? `<span class="tree-genre-arrow">▶</span>` : ''}
+        ${node.self && node.self.total_albums ? `<span class="sb-coll-count">${node.self.total_albums}</span>` : ''}
+      </div>`;
+    if (hasSubs) {
+      html += `<div class="tree-sub">`;
+      for (const sub of node.subs.sort((a,b)=>a.label.localeCompare(b.label))) {
+        html += `<div class="tree-sub-item" data-slug="${escH(sub.col.slug)}"
+            onclick="selectCollection('${escH(sub.col.slug)}')">
+          ${escH(sub.label)}
+          ${sub.col.total_albums ? `<span class="sb-coll-count" style="margin-left:auto">${sub.col.total_albums}</span>` : ''}
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (legacy.length) {
+    html += `<div style="padding:0.3rem 0.9rem 0.1rem;font-family:var(--mono);font-size:0.55rem;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase;border-top:1px solid var(--border);margin-top:0.3rem">Otros</div>`;
+    for (const c of legacy) {
+      html += `<div class="sb-coll-item" data-slug="${escH(c.slug)}" onclick="selectCollection('${escH(c.slug)}')">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(c.name)}</span>
+        ${c.total_albums ? `<span class="sb-coll-count">${c.total_albums}</span>` : ''}
+      </div>`;
+    }
+  }
+  return html;
+}
+
+function toggleGrp(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+function toggleTree(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+async function selectCollection(slug) {
+  activeSlug = slug;
+  // Highlight active across all item types
+  document.querySelectorAll('.sb-coll-item, .tree-genre-hdr, .tree-sub-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.slug === slug);
+  });
+  activeGenres.clear();
+  activeDecades.clear();
+
+  if (heardCache) {
+    await loadAndRender(slug);
+  }
+}
 
 // ── User validation (debounced) ────────────────────────────────────────────
 let userTimer = null;
@@ -1061,18 +1452,18 @@ async function validateUser(u) {
   const data = await fetch(`/api/check_user?user=${encodeURIComponent(u)}`).then(r=>r.json()).catch(()=>null);
   if (!data || !data.ok) return;
   showUserBadge(data.username, data.image,
-    Number(data.playcount).toLocaleString() + ' scrobbles totales', null);
+    Number(data.playcount).toLocaleString() + ' scrobbles', null);
 }
 
 function showUserBadge(username, img, plays, fetchedAt) {
-  document.getElementById('badge-avatar').src         = img || '';
-  document.getElementById('badge-name').textContent   = username;
-  document.getElementById('badge-plays').textContent  = plays || '';
-  document.getElementById('badge-date').textContent   =
-    fetchedAt ? '· descargado ' + new Date(fetchedAt * 1000).toLocaleDateString() : '';
-  userBadge.classList.add('visible');
+  const bd = document.getElementById('badge-inline');
+  document.getElementById('badge-avatar').src       = img || '';
+  document.getElementById('badge-name').textContent = username;
+  document.getElementById('badge-plays').textContent = plays
+    + (fetchedAt ? ' · ' + new Date(fetchedAt*1000).toLocaleDateString() : '');
+  bd.style.display = 'flex';
 }
-function hideUserBadge() { userBadge.classList.remove('visible'); }
+function hideUserBadge() { document.getElementById('badge-inline').style.display = 'none'; }
 
 // ── Session: guardar ───────────────────────────────────────────────────────
 document.getElementById('btn-save-session').addEventListener('click', () => {
@@ -1092,13 +1483,7 @@ document.getElementById('btn-save-session').addEventListener('click', () => {
 });
 
 // ── Session: cargar fichero ────────────────────────────────────────────────
-// Botón en la search panel para abrir el selector
-const btnImport = document.createElement('button');
-btnImport.className = 'btn-sm';
-btnImport.textContent = '↑ Cargar sesión';
-btnImport.style.cssText = 'margin-left:0.5rem';
-btnImport.addEventListener('click', () => inpSession.click());
-document.querySelector('.search-panel').appendChild(btnImport);
+document.getElementById('btn-import').addEventListener('click', () => inpSession.click());
 
 inpSession.addEventListener('change', async e => {
   const file = e.target.files[0];
@@ -1205,21 +1590,16 @@ function checkHeard(pairs, artist, title) {
   return false;
 }
 
-// ── Main search ────────────────────────────────────────────────────────────
-btnGo.addEventListener('click', doSearch);
-inpUser.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
-inpColl.addEventListener('change', () => { if (heardCache) applyCollection(); });
+// ── Main: Cargar scrobbles ─────────────────────────────────────────────────
+btnGo.addEventListener('click', doLoadUser);
+inpUser.addEventListener('keydown', e => { if (e.key === 'Enter') doLoadUser(); });
 
-async function doSearch() {
+async function doLoadUser() {
   const user = inpUser.value.trim();
-  const slug = inpColl.value;
-  if (!user || !slug) return;
-
+  if (!user) return;
   hideError();
   btnGo.disabled = true;
-
   try {
-    // ── Scrobbles (solo si no hay caché o cambió el usuario) ───────────────
     if (!heardCache || loadedUser !== user.toLowerCase()) {
       showLoading('Descargando scrobbles de Last.fm...');
       hideResults();
@@ -1227,12 +1607,7 @@ async function doSearch() {
       if (sData.error) { showError(sData.error); return; }
       loadHeardCache(sData);
     }
-
-    // ── Colección (con caché local) ────────────────────────────────────────
-    showLoading('Cargando colección...');
-    await ensureCollection(slug);
-    applyCollection();
-
+    if (activeSlug) await loadAndRender(activeSlug);
   } catch(e) {
     showError('Error de red: ' + e.message);
   } finally {
@@ -1241,17 +1616,26 @@ async function doSearch() {
   }
 }
 
-async function ensureCollection(slug) {
-  if (!collCache[slug]) {
-    const cData = await fetch(`/api/collection?slug=${encodeURIComponent(slug)}`).then(r => r.json());
-    if (cData.error) throw new Error(cData.error);
-    collCache[slug] = cData.albums;
+async function loadAndRender(slug) {
+  hideError();
+  showLoading('Cargando colección...');
+  try {
+    if (!collCache[slug]) {
+      const cData = await fetch(`/api/collection?slug=${encodeURIComponent(slug)}`).then(r => r.json());
+      if (cData.error) throw new Error(cData.error);
+      collCache[slug] = cData.albums;
+    }
+    applyCollection(slug);
+  } catch(e) {
+    showError('Error: ' + e.message);
+  } finally {
+    hideLoading();
   }
 }
 
-function applyCollection() {
-  const slug = inpColl.value;
-  const raw  = collCache[slug];
+function applyCollection(slug) {
+  slug = slug || activeSlug;
+  const raw = collCache[slug];
   if (!raw || !heardCache) return;
 
   allAlbums = raw.map(a => ({ ...a, heard: checkHeard(heardCache.pairs, a.artist, a.title) }));
@@ -1268,6 +1652,54 @@ function applyCollection() {
 
   statsBar.classList.add('visible');
   filtersEl.classList.add('visible');
+
+  buildGenrePills();
+  buildDecadePills();
+  renderGrid();
+}
+
+// ── Genre pills ────────────────────────────────────────────────────────────
+function buildGenrePills() {
+  const freq = {};
+  for (const a of allAlbums)
+    for (const g of (a.genres || []))
+      freq[g] = (freq[g] || 0) + 1;
+  const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,20).map(e=>e[0]);
+  if (!top.length) {
+    document.getElementById('genre-pills').innerHTML = '<div class="sb-empty">Sin géneros</div>';
+    return;
+  }
+  document.getElementById('genre-pills').innerHTML = top.map(g =>
+    `<span class="pill${activeGenres.has(g)?' active':''}" onclick="toggleGenre('${escH(g)}')">${escH(g)}</span>`
+  ).join('');
+}
+
+function toggleGenre(g) {
+  if (activeGenres.has(g)) activeGenres.delete(g);
+  else activeGenres.add(g);
+  buildGenrePills();
+  renderGrid();
+}
+
+// ── Decade pills ───────────────────────────────────────────────────────────
+function buildDecadePills() {
+  const decades = new Set();
+  for (const a of allAlbums)
+    if (a.year) decades.add(Math.floor(a.year / 10) * 10);
+  const sorted = [...decades].sort();
+  if (!sorted.length) {
+    document.getElementById('decade-pills').innerHTML = '<div class="sb-empty">Sin fechas</div>';
+    return;
+  }
+  document.getElementById('decade-pills').innerHTML = sorted.map(d =>
+    `<span class="pill${activeDecades.has(d)?' active':''}" onclick="toggleDecade(${d})">${d}s</span>`
+  ).join('');
+}
+
+function toggleDecade(d) {
+  if (activeDecades.has(d)) activeDecades.delete(d);
+  else activeDecades.add(d);
+  buildDecadePills();
   renderGrid();
 }
 
@@ -1276,6 +1708,8 @@ function renderGrid() {
   let f = [...allAlbums];
   if (activeFilter === 'missing') f = f.filter(a => !a.heard);
   if (activeFilter === 'heard')   f = f.filter(a =>  a.heard);
+  if (activeGenres.size)  f = f.filter(a => (a.genres||[]).some(g => activeGenres.has(g)));
+  if (activeDecades.size) f = f.filter(a => a.year && activeDecades.has(Math.floor(a.year/10)*10));
   if (activeSort === 'year_asc')  f.sort((a,b) => (a.year||0)-(b.year||0));
   if (activeSort === 'year_desc') f.sort((a,b) => (b.year||0)-(a.year||0));
   if (activeSort === 'artist')    f.sort((a,b) => a.artist.localeCompare(b.artist));
@@ -1406,6 +1840,7 @@ function hideResults()    {
   statsBar.classList.remove('visible');
   filtersEl.classList.remove('visible');
   emptyEl.classList.remove('visible');
+  activeGenres.clear(); activeDecades.clear();
 }
 function escH(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

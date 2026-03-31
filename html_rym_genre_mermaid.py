@@ -110,7 +110,9 @@ def render_html(
     panel_data: dict[str, dict],
     scraped_map: dict[str, dict],
     generated: str,
+    users: list[str] = None,
 ) -> str:
+    from html_must_hear import _mh_user_modal_css, _mh_user_modal_html, _mh_user_modal_btn, _mh_user_modal_js
     # Compact tree for JS: {s, n, c[]}
     def _compact(nodes: list[dict]) -> list[dict]:
         return [{"s": n["slug"], "n": n["name"],
@@ -205,15 +207,8 @@ def render_html(
   .mg-link:hover, .mg-link.active {{ background:rgba(255,255,255,.04); color:var(--accent); }}
   .dot {{ flex-shrink:0; width:6px; height:6px; border-radius:50%; background:#333; }}
   .dot-scraped {{ background:var(--accent); }}
-  /* MH user switcher */
-  .mh-usr {{ position:relative; margin-left:auto; flex-shrink:0; }}
-  .mh-usr-b {{ display:flex; align-items:center; gap:4px; background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:.62rem; padding:4px 9px; cursor:pointer; white-space:nowrap; }}
-  .mh-usr-b:hover {{ color:var(--text); border-color:var(--accent); }}
-  .mh-usr-d {{ display:none; position:absolute; right:0; top:calc(100% + 5px); background:#0f0f0f; border:1px solid var(--border); border-radius:6px; padding:4px; min-width:130px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.5); }}
-  .mh-usr-d.open {{ display:block; }}
-  .mh-usr-o {{ display:block; padding:4px 10px; border-radius:3px; font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted); text-decoration:none; cursor:pointer; white-space:nowrap; }}
-  .mh-usr-o:hover {{ background:var(--border); color:var(--text); }}
-  .mh-usr-o.cur {{ color:var(--accent); }}
+  /* MH user modal */
+  {_mh_user_modal_css()}
 
   /* ── layout ── */
   #layout {{ display:flex; position:fixed; top:var(--header-h); left:0; right:0; bottom:0; }}
@@ -328,6 +323,7 @@ def render_html(
 </style>
 </head>
 <body>
+{_mh_user_modal_html(users or [])}
 <header>
   <div class="mh-title">Géneros RYM</div>
   <nav class="mh-nav">
@@ -336,10 +332,7 @@ def render_html(
     <a class="mh-na on" href="../rym_genre_tree.html">Géneros RYM</a>
     <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
   </nav>
-  <div class="mh-usr">
-    <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">—</span></button>
-    <div class="mh-usr-d" id="mhUDd"></div>
-  </div>
+  <div style="margin-left:auto">{_mh_user_modal_btn()}</div>
 </header>
 
 <div id="layout">
@@ -724,18 +717,9 @@ document.addEventListener('click', e => {{
   }}
 }});
 
-// MH user switcher
-(function() {{
-  const KEY = 'mh_user';
-  const btn = document.getElementById('mhUBtn');
-  const dd  = document.getElementById('mhUDd');
-  if (!btn || !dd) return;
-  const stored = localStorage.getItem(KEY);
-  if (stored) document.getElementById('mhULbl').textContent = stored;
-  btn.addEventListener('click', e => {{ e.stopPropagation(); dd.classList.toggle('open'); }});
-  document.addEventListener('click', () => dd.classList.remove('open'));
-}})();
+
 </script>
+{_mh_user_modal_js(users or [])}
 </body>
 </html>
 """
@@ -773,13 +757,14 @@ def run(args: argparse.Namespace) -> None:
     conn = sqlite3.connect(str(mh_db))
     scraped_map  = get_scraped_collections(conn)
     top_albums   = get_top_albums_per_collection(conn, list(scraped_map.keys()), n=5)
+    users = [r[0] for r in conn.execute("SELECT username FROM users ORDER BY username").fetchall()]
     conn.close()
     print(f"✅ {len(scraped_map)} scraped collections")
 
     panel_data = build_panel_data(genre_tree, scraped_map, top_albums)
     generated  = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    html = render_html(genre_tree, panel_data, scraped_map, generated)
+    html = render_html(genre_tree, panel_data, scraped_map, generated, users=users)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(html, encoding="utf-8")
     print(f"✨ {out_path}  ({len(html)//1024}KB)")

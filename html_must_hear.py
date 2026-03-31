@@ -3182,7 +3182,7 @@ def run_scaruffi(args, root_dir: Path) -> None:
     existing.append(entry)
     existing.sort(key=lambda c: c["name"])
     meta_file.write_text(json.dumps(existing, ensure_ascii=False, indent=2))
-    (root_dir / "index.html").write_text(render_root_index_html(existing, generated), encoding="utf-8")
+    (root_dir / "index.html").write_text(render_root_index_html(existing, generated, users=users), encoding="utf-8")
     print(f"Root index updated -> {root_dir / 'index.html'}")
     print(f"\nDone! Open: {out_dir / 'index.html'}")
 
@@ -3382,9 +3382,134 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
 """
 
 
+def _mh_user_modal_css() -> str:
+    """Shared CSS for the user modal button + overlay (inject inside <style>)."""
+    return """
+  /* ── MH user modal ── */
+  .mh-usr-btn {
+    display:flex; align-items:center; gap:4px;
+    background:none; border:1px solid var(--border,#1e1e1e); border-radius:4px;
+    color:var(--muted,#555); font-family:'DM Mono',monospace;
+    font-size:.62rem; padding:4px 9px; cursor:pointer; flex-shrink:0;
+    white-space:nowrap; transition:border-color .12s, color .12s;
+  }
+  .mh-usr-btn:hover { border-color:var(--accent,#c9a227); color:var(--text,#e0e0e0); }
+  .mh-usr-btn.has-user { border-color:var(--accent,#c9a227); color:var(--accent,#c9a227); }
+  .mh-modal-ov {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.78);
+    z-index:500; align-items:center; justify-content:center;
+  }
+  .mh-modal-ov.open { display:flex; }
+  .mh-modal-box {
+    background:var(--surface,#111); border:1px solid var(--border,#1e1e1e);
+    border-top:2px solid var(--accent,#c9a227); border-radius:6px;
+    padding:1.4rem; width:min(300px,92vw); max-height:80vh; overflow-y:auto;
+  }
+  .mh-modal-title {
+    font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--muted,#555);
+    margin-bottom:1rem; text-align:center;
+  }
+  .mh-usr-opt {
+    padding:9px 12px; margin-bottom:5px;
+    background:var(--surface2,#161616); border:1px solid var(--border,#1e1e1e);
+    border-radius:4px; cursor:pointer; transition:all .15s;
+    font-family:'DM Mono',monospace; font-size:.75rem;
+    letter-spacing:.04em; color:var(--muted,#555);
+  }
+  .mh-usr-opt:hover { border-color:var(--accent,#c9a227); color:var(--text,#e0e0e0); }
+  .mh-usr-opt.active { border-color:var(--accent,#c9a227); color:var(--accent,#c9a227); background:rgba(201,162,39,.07); }
+  .mh-modal-close {
+    display:block; margin:1rem auto 0; padding:6px 18px;
+    background:var(--surface2,#161616); color:var(--muted,#555);
+    border:1px solid var(--border,#1e1e1e); border-radius:4px;
+    cursor:pointer; font-family:'DM Mono',monospace; font-size:.68rem;
+  }
+  .mh-modal-close:hover { color:var(--text,#e0e0e0); }"""
+
+
+def _mh_user_modal_html(users: list[str]) -> str:
+    """Shared modal overlay HTML (inject inside <body>, before <header>)."""
+    return f"""
+<div class="mh-modal-ov" id="mhUserModal">
+  <div class="mh-modal-box">
+    <div class="mh-modal-title">Seleccionar usuario</div>
+    <div id="mhUserOpts"></div>
+    <button class="mh-modal-close" id="mhModalClose">Cerrar</button>
+  </div>
+</div>"""
+
+
+def _mh_user_modal_btn() -> str:
+    """Button HTML for the header (inject at the end of <header>)."""
+    return '<button class="mh-usr-btn" id="mhUserBtn" title="Seleccionar usuario">👤 <span id="mhULbl">—</span></button>'
+
+
+def _mh_user_modal_js(users: list[str], on_select_js: str = "") -> str:
+    """Shared JS for user modal logic.
+
+    on_select_js: extra JS snippet called after a user is selected,
+                  receives `username` (string or null).
+    """
+    users_json = json.dumps(users, ensure_ascii=False)
+    return f"""
+<script>
+(function() {{
+  const USERS = {users_json};
+  const KEY   = 'mh_user';
+  const modal  = document.getElementById('mhUserModal');
+  const btn    = document.getElementById('mhUserBtn');
+  const opts   = document.getElementById('mhUserOpts');
+  const close  = document.getElementById('mhModalClose');
+  if (!modal || !btn || !opts) return;
+
+  function buildOpts() {{
+    opts.innerHTML = '';
+    const all = document.createElement('div');
+    all.className = 'mh-usr-opt' + (localStorage.getItem(KEY) ? '' : ' active');
+    all.textContent = 'Todos (sin filtro)';
+    all.onclick = () => selectUser(null);
+    opts.appendChild(all);
+    USERS.forEach(u => {{
+      const el = document.createElement('div');
+      el.className = 'mh-usr-opt' + (localStorage.getItem(KEY) === u ? ' active' : '');
+      el.textContent = u;
+      el.onclick = () => selectUser(u);
+      opts.appendChild(el);
+    }});
+  }}
+
+  function updateBtn() {{
+    const u = localStorage.getItem(KEY);
+    const lbl = document.getElementById('mhULbl');
+    if (lbl) lbl.textContent = u || '—';
+    btn.title = u ? u : 'Seleccionar usuario';
+    btn.classList.toggle('has-user', !!u);
+  }}
+
+  function selectUser(u) {{
+    if (u) localStorage.setItem(KEY, u);
+    else localStorage.removeItem(KEY);
+    updateBtn();
+    buildOpts();
+    modal.classList.remove('open');
+    {on_select_js}
+  }}
+
+  btn.addEventListener('click', e => {{ e.stopPropagation(); buildOpts(); modal.classList.add('open'); }});
+  close.addEventListener('click', () => modal.classList.remove('open'));
+  modal.addEventListener('click', e => {{ if (e.target === modal) modal.classList.remove('open'); }});
+  document.addEventListener('keydown', e => {{ if (e.key === 'Escape') modal.classList.remove('open'); }});
+
+  updateBtn();
+}})();
+</script>"""
+
+
 def render_root_index_html(collections: list[dict], generated: str,
                             title: str = "Collections",
-                            back_link: str = "") -> str:
+                            back_link: str = "",
+                            users: list[str] = None) -> str:
     """Top-level index listing all music collections (reused for collection-group index too)."""
     cards_html = ""
     for c in collections:
@@ -3518,15 +3643,18 @@ def render_root_index_html(collections: list[dict], generated: str,
   @media (max-width:700px) {{
     main,footer {{ padding-left:20px; padding-right:20px; }}
   }}
+  {_mh_user_modal_css()}
 </style>
 </head>
 <body>
+{_mh_user_modal_html(users or [])}
 <header>
   {site_label}
   <h1>{title}</h1>
   <div class="header-meta">{len(collections)} collection{'s' if len(collections) != 1 else ''}</div>
   <a class="header-nav-link" href="index_alternativo.html">Explorador ↗</a>
   <a class="header-nav-link" href="estadisticas.html">Estadísticas</a>
+  {_mh_user_modal_btn()}
 </header>
 <main>
   <div class="section-label">All Lists</div>
@@ -3534,6 +3662,7 @@ def render_root_index_html(collections: list[dict], generated: str,
   </div>
 </main>
 <footer>Generated {generated} · Data from MusicBrainz, Last.fm, RYM &amp; Scaruffi</footer>
+{_mh_user_modal_js(users or [])}
 </body>
 </html>
 """
@@ -3543,6 +3672,7 @@ def render_rym_charts_index_html(
     series: list[dict],
     genre_tree: list[dict],
     generated: str,
+    users: list[str] = None,
 ) -> str:
     """
     Specialized index for RYM Charts — a lazily-rendered, collapsible genre tree.
@@ -3666,14 +3796,7 @@ def render_rym_charts_index_html(
   .mh-na {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:3px 8px; border-radius:3px; transition:all .12s; }}
   .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
   .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
-  .mh-usr {{ position:relative; margin-left:auto; flex-shrink:0; }}
-  .mh-usr-b {{ display:flex; align-items:center; gap:4px; background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:.62rem; padding:4px 9px; cursor:pointer; white-space:nowrap; }}
-  .mh-usr-b:hover {{ color:var(--text); border-color:var(--accent); }}
-  .mh-usr-d {{ display:none; position:absolute; right:0; top:calc(100% + 5px); background:#0f0f0f; border:1px solid var(--border); border-radius:6px; padding:4px; min-width:130px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.5); }}
-  .mh-usr-d.open {{ display:block; }}
-  .mh-usr-o {{ display:block; padding:4px 10px; border-radius:3px; font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted); text-decoration:none; cursor:pointer; white-space:nowrap; }}
-  .mh-usr-o:hover {{ background:var(--border); color:var(--text); }}
-  .mh-usr-o.cur {{ color:var(--accent); }}
+  {_mh_user_modal_css()}
   /* ── tree controls bar ── */
   .tree-controls {{ display:flex; gap:8px; margin-bottom:16px; }}
   .hdr-btn {{
@@ -3735,6 +3858,7 @@ def render_rym_charts_index_html(
   }}
 </style>
 </head>
+{_mh_user_modal_html(users or [])}
 <body>
 <header>
   <div class="mh-title">RYM Charts</div>
@@ -3744,10 +3868,7 @@ def render_rym_charts_index_html(
     <a class="mh-na" href="../rym_genre_tree.html">Géneros RYM</a>
     <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
   </nav>
-  <div class="mh-usr">
-    <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">—</span></button>
-    <div class="mh-usr-d" id="mhUDd"></div>
-  </div>
+  <div style="margin-left:auto">{_mh_user_modal_btn()}</div>
 </header>
 <main>
   <div class="section-label">Géneros · {len(genre_tree)} principales · {total_genres} totales · {n_scraped} scrapeados</div>
@@ -3871,20 +3992,9 @@ function collapseAll() {{
   }});
 }}
 
-// ── MH user switcher ──────────────────────────────────────────────────────
-(function() {{
-  const KEY = 'mh_user';
-  const stored = localStorage.getItem(KEY);
-  const lbl = document.getElementById('mhULbl');
-  if (stored && lbl) lbl.textContent = stored;
-  const btn = document.getElementById('mhUBtn');
-  const dd  = document.getElementById('mhUDd');
-  if (!btn || !dd) return;
-  btn.addEventListener('click', e => {{ e.stopPropagation(); dd.classList.toggle('open'); }});
-  document.addEventListener('click', () => dd.classList.remove('open'));
-  if (stored) dd.innerHTML = `<span class="mh-usr-o cur">${{stored}}</span>`;
-}})();
+
 </script>
+{_mh_user_modal_js(users or [])}
 </body>
 </html>
 """
@@ -3892,7 +4002,7 @@ function collapseAll() {{
 
 def update_root_index(root_dir: Path, collection_name: str, slug: str,
                       users_index: list[dict], generated: str,
-                      url: str = "") -> None:
+                      url: str = "", users: list[str] = None) -> None:
     """Read existing root index data (if any), upsert this collection, rewrite."""
     with _INDEX_LOCK:
         meta_file = root_dir / ".collections_meta.json"
@@ -3926,7 +4036,10 @@ def update_root_index(root_dir: Path, collection_name: str, slug: str,
         meta_file.write_text(json.dumps(existing, ensure_ascii=False, indent=2))
 
         # Render and write root index
-        html = render_root_index_html(existing, generated)
+        render_users = users or sorted(
+            u["user"] for u in users_index if u.get("user") and u["user"] != "_group"
+        ) or None
+        html = render_root_index_html(existing, generated, users=render_users)
         (root_dir / "index.html").write_text(html, encoding="utf-8")
         print(f"📋 root index → {root_dir / 'index.html'} ({len(existing)} collections)")
 
@@ -3934,7 +4047,7 @@ def update_root_index(root_dir: Path, collection_name: str, slug: str,
 def update_collection_group_index(root_dir: Path, collection_name: str,
                                    collection_slug: str, series_name: str,
                                    series_slug: str, users_index: list[dict],
-                                   generated: str) -> None:
+                                   generated: str, users: list[str] = None) -> None:
     """Upsert a series into a collection-group index (e.g. pitchfork/index.html),
     then update the root index with the group as a single entry."""
     with _INDEX_LOCK:
@@ -3964,12 +4077,13 @@ def update_collection_group_index(root_dir: Path, collection_name: str,
         genres_json = coll_dir / "rym_genres.json"
         if collection_slug == "rym_charts" and genres_json.exists():
             genre_tree = json.loads(genres_json.read_text())
-            html = render_rym_charts_index_html(existing_series, genre_tree, generated)
+            html = render_rym_charts_index_html(existing_series, genre_tree, generated, users=users)
         else:
             html = render_root_index_html(
                 existing_series, generated,
                 title=collection_name,
                 back_link="../index.html",
+                users=users,
             )
         (coll_dir / "index.html").write_text(html, encoding="utf-8")
         print(f"📋 group index → {coll_dir / 'index.html'} ({len(existing_series)} series)")
@@ -3987,6 +4101,7 @@ def update_collection_group_index(root_dir: Path, collection_name: str,
             users_index=root_proxy,
             generated=generated,
             url=f"{collection_slug}/index.html",
+            users=users,
         )
 
 
@@ -5150,13 +5265,14 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
     )
     print(f"  📋 {out_dir / 'index.html'}")
 
+    usernames = [d["user"] for d in user_data]
     if collection_slug:
         update_collection_group_index(
             root_dir, collection_name, collection_slug,
-            name, slug, users_index, generated,
+            name, slug, users_index, generated, users=usernames,
         )
     else:
-        update_root_index(root_dir, name, slug, users_index, generated)
+        update_root_index(root_dir, name, slug, users_index, generated, users=usernames)
 
 
 def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn,

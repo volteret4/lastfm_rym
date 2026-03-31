@@ -321,6 +321,7 @@ header {
   font-size: .65rem;
   color: var(--muted);
   white-space: nowrap;
+  margin-left: auto;
 }
 
 /* ── Round user button ── */

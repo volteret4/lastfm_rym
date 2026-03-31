@@ -62,6 +62,7 @@ def _coll_group(slug: str, name: str, parent_map: dict | None = None) -> str:
     if "1001" in s:                     return "1001 Albums"
     if "rolling_stone" in s:            return "Rolling Stone"
     if s.startswith("pitchfork"):       return "Pitchfork"
+    if s.startswith("sputnik"):         return "Sputnik"
     if s.startswith("rym_chart"):       return "RYM Charts"
     if parent_map:
         parent = parent_map.get(slug)
@@ -222,9 +223,10 @@ def gather_data(mh_path: str, scr_path: str, meta_dir: Path | None = None) -> di
 
     # Popular albums — HAVING n_users >= 2, LIMIT 1000
     popular = [dict(r) for r in conn.execute("""
-        SELECT a.name AS album, ar.name AS artist, a.year,
+        SELECT a.id AS album_id, a.name AS album, ar.name AS artist, a.year,
                COUNT(DISTINCT uh.user_id) AS n_users,
-               GROUP_CONCAT(DISTINCT u.username ORDER BY u.username) AS who
+               GROUP_CONCAT(DISTINCT u.username ORDER BY u.username) AS who,
+               a.rateyourmusic_url, a.youtube_url, a.yt_id, a.musicbrainz_url
         FROM user_heard uh
         JOIN albums a ON uh.album_id = a.id
         JOIN artists ar ON a.artist_id = ar.id
@@ -284,22 +286,24 @@ def gather_data(mh_path: str, scr_path: str, meta_dir: Path | None = None) -> di
                 for ou, w in sim_users
             ) / total_sim
             delta = weighted - my_pct
-            if delta > 5 and weighted > 15:
+            if delta > 3 and weighted > 10:
                 recs.append({
                     "slug": c["slug"], "name": c["name"],
                     "my_pct": round(my_pct, 1),
                     "sim_pct": round(weighted, 1),
                     "delta": round(delta, 1),
                 })
-        recommendations[uid] = sorted(recs, key=lambda r: r["delta"], reverse=True)[:6]
+        recommendations[uid] = sorted(recs, key=lambda r: r["delta"], reverse=True)[:12]
 
     # Pending albums (heard by most but not by me)
     pending_per_user = {}
     for u in users:
         uid = u["id"]
         rows_pending = conn.execute("""
-            SELECT ar.name, a.name, a.year, COUNT(DISTINCT uh.user_id) AS n,
-                   GROUP_CONCAT(DISTINCT us.username ORDER BY us.username) AS who
+            SELECT a.id AS album_id, ar.name, a.name, a.year,
+                   COUNT(DISTINCT uh.user_id) AS n,
+                   GROUP_CONCAT(DISTINCT us.username ORDER BY us.username) AS who,
+                   a.rateyourmusic_url, a.yt_id, a.musicbrainz_url
             FROM user_heard uh
             JOIN albums a ON uh.album_id = a.id
             JOIN artists ar ON a.artist_id = ar.id
@@ -312,9 +316,31 @@ def gather_data(mh_path: str, scr_path: str, meta_dir: Path | None = None) -> di
             LIMIT 200
         """, (uid,)).fetchall()
         pending_per_user[uid] = [
-            {"artist": r[0], "title": r[1], "year": r[2], "n": r[3], "who": r[4]}
+            {"album_id": r[0], "artist": r[1], "title": r[2], "year": r[3],
+             "n": r[4], "who": r[5],
+             "rym": r[6], "yt_id": r[7], "mb": r[8]}
             for r in rows_pending
         ]
+
+    # Album → collections membership (top 8 non-rym_chart first, then rym_chart)
+    pop_ids = [p["album_id"] for p in popular]
+    pend_ids = list({a["album_id"] for lst in pending_per_user.values() for a in lst})
+    all_link_ids = list(set(pop_ids + pend_ids))
+    album_colls: dict[int, list] = {}
+    if all_link_ids:
+        ph = ",".join("?" * len(all_link_ids))
+        raw_colls: dict[int, list] = {}
+        for r in conn.execute(
+            f"SELECT ca.album_id, c.slug, c.name "
+            f"FROM collection_albums ca JOIN collections c ON ca.collection_id=c.id "
+            f"WHERE ca.album_id IN ({ph}) ORDER BY ca.album_id, c.name",
+            all_link_ids
+        ).fetchall():
+            raw_colls.setdefault(r[0], []).append({"slug": r[1], "name": r[2]})
+        for aid, lst in raw_colls.items():
+            named  = [c for c in lst if not c["slug"].startswith("rym_chart")]
+            charts = [c for c in lst if c["slug"].startswith("rym_chart")]
+            album_colls[aid] = (named + charts)[:8]
 
     conn.close()
 
@@ -338,6 +364,7 @@ def gather_data(mh_path: str, scr_path: str, meta_dir: Path | None = None) -> di
         "similarity":        {str(k): {str(k2): v for k2, v in vd.items()} for k, vd in similarity.items()},
         "recommendations":   {str(k): v for k, v in recommendations.items()},
         "pending_per_user":  {str(k): v for k, v in pending_per_user.items()},
+        "album_colls":       {str(k): v for k, v in album_colls.items()},
     }
 
 
@@ -420,6 +447,7 @@ def gather_temporal(mh_path: str, scr_path: str, users: list[dict]) -> dict:
 # ── HTML rendering ────────────────────────────────────────────────────────────
 
 def render_html(data: dict, generated: str) -> str:
+    from html_must_hear import _mh_user_modal_css, _mh_user_modal_html, _mh_user_modal_btn, _mh_user_modal_js
     users        = data["users"]
     colls        = data["colls"]
     uc_heard     = {int(k): v for k, v in data["uc_heard"].items()}
@@ -432,6 +460,7 @@ def render_html(data: dict, generated: str) -> str:
     similarity   = data.get("similarity", {})
     recommendations = data.get("recommendations", {})
     pending_per_user = data.get("pending_per_user", {})
+    album_colls  = {int(k): v for k, v in data.get("album_colls", {}).items()}
 
     n_users       = len(users)
     n_total       = data["total_unique_heard"]
@@ -440,12 +469,25 @@ def render_html(data: dict, generated: str) -> str:
 
     # Sort users by total heard desc
     users_sorted = sorted(users, key=lambda u: total_heard.get(u["id"], 0), reverse=True)
+    usernames_list = [u["username"] for u in users_sorted]
+
+    # User modal snippets
+    mh_modal_css  = _mh_user_modal_css()
+    mh_modal_html = _mh_user_modal_html(usernames_list)
+    mh_modal_btn  = _mh_user_modal_btn()
+    # On select: highlight matching user rows in the page
+    mh_modal_js   = _mh_user_modal_js(usernames_list, on_select_js="""
+      const u2 = localStorage.getItem('mh_user');
+      document.querySelectorAll('[data-username]').forEach(el => {{
+        el.classList.toggle('usr-active', el.dataset.username === u2);
+      }});
+    """)
     user_color   = {u["username"]: USER_COLORS[i % len(USER_COLORS)]
                     for i, u in enumerate(users_sorted)}
 
     # ── collection groups completion ──────────────────────────────────────────
     GROUP_ORDER = ["Scaruffi", "AOTY", "1001 Albums", "Rolling Stone",
-                   "Pitchfork", "RYM Charts", "Otras"]
+                   "Pitchfork", "Sputnik", "RYM Charts", "Otras"]
 
     from collections import defaultdict
     grp_heard_n  = defaultdict(lambda: defaultdict(int))   # group → user_id → heard count
@@ -505,7 +547,7 @@ def render_html(data: dict, generated: str) -> str:
     )
 
     # ── accordion: all groups unified ─────────────────────────────────────────
-    PINNED = ["Scaruffi", "AOTY", "1001 Albums", "Rolling Stone", "Pitchfork", "RYM Charts"]
+    PINNED = ["Scaruffi", "AOTY", "1001 Albums", "Rolling Stone", "Pitchfork", "Sputnik", "RYM Charts"]
     all_group_names = {c["group"] for c in colls}
     ordered_groups  = [g for g in PINNED if g in all_group_names]
     ordered_groups += sorted(g for g in all_group_names if g not in PINNED)
@@ -557,6 +599,78 @@ def render_html(data: dict, generated: str) -> str:
             )
         return bars
 
+    def _inner_rows_rym_tree(rym_colls):
+        """Render RYM Charts as a collapsible genre/subgenre tree."""
+        tree: dict[str, dict] = {}
+        for c in rym_colls:
+            parts = [p.strip() for p in c["name"].split("\u2014")]
+            if len(parts) >= 3:
+                parent = parts[1]
+                tree.setdefault(parent, {"_self": None, "children": []})["children"].append(c)
+            elif len(parts) == 2:
+                parent = parts[1]
+                tree.setdefault(parent, {"_self": None, "children": []})["_self"] = c
+            else:
+                tree.setdefault("Otros", {"_self": None, "children": []})["children"].append(c)
+
+        rows = ""
+        for parent in sorted(tree.keys()):
+            entry = tree[parent]
+            all_parent = ([entry["_self"]] if entry["_self"] else []) + entry["children"]
+            gid = _safe(f"rg_{parent}")
+            n_subs = len(entry["children"])
+            sub_txt = f"{n_subs} subgén." if n_subs else ""
+
+            bars = ""
+            for u in users_sorted:
+                h = sum(uc_heard.get(u["id"], {}).get(c["id"], 0) for c in all_parent)
+                t = sum(c["total_albums"] for c in all_parent)
+                pct = h / t * 100 if t else 0
+                bars += (
+                    f'<span style="width:22px;height:3px;background:#222;border-radius:1px;'
+                    f'display:inline-block;overflow:hidden;vertical-align:middle;margin:0 1px">'
+                    f'<span style="display:block;height:100%;width:{pct:.0f}%;background:{user_color[u["username"]]}"></span>'
+                    f'</span>'
+                )
+
+            rows += (
+                f'<tr class="rym-genre-hdr" onclick="toggleRymGroup(\'{gid}\')">'
+                f'<td colspan="{2 + len(users_sorted)}" style="padding:5px 12px;background:#161616;cursor:pointer;user-select:none">'
+                f'<span style="font-family:\'Bebas Neue\',sans-serif;font-size:.82rem;letter-spacing:.05em;color:var(--accent)">{parent}</span>'
+                f'<span style="font-family:\'DM Mono\',monospace;font-size:.54rem;color:var(--muted);margin-left:8px">{sub_txt}</span>'
+                f'<span id="rym-caret-{gid}" style="font-size:.55rem;color:var(--muted);margin-left:6px">&#9654;</span>'
+                f'<span style="float:right;display:inline-flex;align-items:center;gap:1px">{bars}</span>'
+                f'</td></tr>'
+            )
+
+            if entry["_self"]:
+                c = entry["_self"]
+                row = (f'<tr class="rym-genre-row" data-grp="{gid}">'
+                       f'<td class="coll-name" style="padding-left:16px">'
+                       f'<a href="{c["slug"]}/index.html" style="color:var(--muted);text-decoration:none">'
+                       f'&#8627; {parent}</a></td>'
+                       f'<td class="coll-total">{c["total_albums"]}</td>')
+                for u in users_sorted:
+                    h = uc_heard.get(u["id"], {}).get(c["id"], 0)
+                    pct = h / c["total_albums"] * 100 if c["total_albums"] else 0
+                    row += pct_cell(pct)
+                rows += row + "</tr>"
+
+            for c in sorted(entry["children"], key=lambda x: x["name"]):
+                sub_name = c["name"].split("\u2014")[-1].strip()
+                row = (f'<tr class="rym-genre-row" data-grp="{gid}">'
+                       f'<td class="coll-name" style="padding-left:28px">'
+                       f'<a href="{c["slug"]}/index.html" style="color:var(--muted);text-decoration:none">'
+                       f'{sub_name}</a></td>'
+                       f'<td class="coll-total">{c["total_albums"]}</td>')
+                for u in users_sorted:
+                    h = uc_heard.get(u["id"], {}).get(c["id"], 0)
+                    pct = h / c["total_albums"] * 100 if c["total_albums"] else 0
+                    row += pct_cell(pct)
+                rows += row + "</tr>"
+
+        return rows
+
     accordion_html = ""
 
     for g in ordered_groups:
@@ -568,10 +682,11 @@ def render_html(data: dict, generated: str) -> str:
         gid     = _safe(g)
         n_word  = "series" if n_colls != 1 else "serie"
         meta    = f"{n_colls} {n_word} &middot; {total} &aacute;lbumes"
+        inner = _inner_rows_rym_tree(g_colls) if g == "RYM Charts" else _inner_rows(g_colls)
         accordion_html += _acc_entry(
             gid, g, meta,
             _user_bars(grp_heard_n[g], total),
-            _inner_rows(g_colls),
+            inner,
         )
 
     # ── genre chart data ──────────────────────────────────────────────────────
@@ -600,7 +715,11 @@ def render_html(data: dict, generated: str) -> str:
     pop_data_js = json.dumps(
         [{"artist": p["artist"], "album": p["album"],
           "year": p["year"] or "", "n": p["n_users"],
-          "who": (p["who"] or "").split(",")}
+          "who": (p["who"] or "").split(","),
+          "rym": p.get("rateyourmusic_url") or None,
+          "yt": p.get("yt_id") or None,
+          "mb": p.get("musicbrainz_url") or None,
+          "colls": album_colls.get(p.get("album_id"), [])}
          for p in popular],
         ensure_ascii=False,
     )
@@ -612,7 +731,11 @@ def render_html(data: dict, generated: str) -> str:
 
     # ── pending albums per user — JS data for pagination ──────────────────────
     pend_data_js = json.dumps(
-        {str(uid): lst for uid, lst in pending_per_user.items()},
+        {str(uid): [
+            {**a,
+             "colls": album_colls.get(a.get("album_id"), [])}
+            for a in lst
+         ] for uid, lst in pending_per_user.items()},
         ensure_ascii=False,
     )
 
@@ -752,6 +875,7 @@ def render_html(data: dict, generated: str) -> str:
         <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border);text-align:left">Álbum</th>
         <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border);text-align:left">Año</th>
         <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border);text-align:left">Escuchado por</th>
+        <th style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--border);text-align:left">Links</th>
       </tr></thead>
       <tbody id="pendTbody-{uid_str}"></tbody>
     </table>
@@ -829,14 +953,8 @@ def render_html(data: dict, generated: str) -> str:
   .mh-na {{ font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:3px 8px; border-radius:3px; transition:all .12s; }}
   .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
   .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
-  .mh-usr {{ position:relative; margin-left:auto; flex-shrink:0; }}
-  .mh-usr-b {{ display:flex; align-items:center; gap:4px; background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-family:'DM Mono',monospace; font-size:.62rem; padding:4px 9px; cursor:pointer; white-space:nowrap; }}
-  .mh-usr-b:hover {{ color:var(--text); border-color:var(--accent); }}
-  .mh-usr-d {{ display:none; position:absolute; right:0; top:calc(100% + 5px); background:#0f0f0f; border:1px solid var(--border); border-radius:6px; padding:4px; min-width:130px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,.5); }}
-  .mh-usr-d.open {{ display:block; }}
-  .mh-usr-o {{ display:block; padding:4px 10px; border-radius:3px; font-family:'DM Mono',monospace; font-size:.62rem; color:var(--muted); text-decoration:none; cursor:pointer; white-space:nowrap; }}
-  .mh-usr-o:hover {{ background:var(--border); color:var(--text); }}
-  .mh-usr-o.cur {{ color:var(--accent); }}
+  /* MH user modal */
+  {mh_modal_css}
   /* layout */
   main {{ margin-top:var(--header-h); padding:32px 40px 80px; max-width:1200px; }}
   section {{ margin-bottom:52px; }}
@@ -914,9 +1032,28 @@ def render_html(data: dict, generated: str) -> str:
   .rec-bar-track {{ flex:1; height:4px; background:#222; border-radius:2px; }}
   .rec-bar-fill {{ height:100%; border-radius:2px; }}
   .rec-delta {{ font-family:'DM Mono',monospace; font-size:.68rem; color:var(--accent); font-weight:700; }}
+  /* album links */
+  .alb-links {{ display:flex; flex-wrap:wrap; gap:3px; align-items:center; }}
+  .alb-link {{ font-family:'DM Mono',monospace; font-size:.55rem; padding:1px 5px; border:1px solid #2a2a2a; border-radius:3px; color:#666; text-decoration:none; white-space:nowrap; }}
+  .alb-link:hover {{ border-color:var(--accent); color:var(--accent); }}
+  .alb-link.rym {{ color:#c17d40; border-color:#3a2a1a; }}
+  .alb-link.yt  {{ color:#c44; border-color:#2a1a1a; }}
+  .alb-link.mb  {{ color:#5588aa; border-color:#1a2530; }}
+  .alb-coll-badge {{ font-family:'DM Mono',monospace; font-size:.55rem; padding:1px 5px; border:1px solid #2a2a2a; border-radius:3px; color:#666; cursor:pointer; position:relative; }}
+  .alb-coll-badge:hover {{ border-color:var(--border); color:var(--muted); }}
+  .coll-popover {{ position:absolute; right:0; top:100%; z-index:200; background:#161616; border:1px solid var(--border); border-radius:4px; padding:6px 0; min-width:200px; max-width:280px; box-shadow:0 4px 16px rgba(0,0,0,.6); display:none; }}
+  .coll-popover.open {{ display:block; }}
+  .coll-pop-item {{ display:block; font-family:'DM Mono',monospace; font-size:.58rem; color:var(--muted); padding:4px 10px; text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+  .coll-pop-item:hover {{ color:var(--accent); background:rgba(255,255,255,.03); }}
+  /* rym genre tree */
+  .rym-genre-hdr {{ background:#161616; }}
+  .rym-genre-hdr:hover td {{ background:#1a1a1a; }}
+  .rym-genre-row {{ display:none; }}
+  .rym-genre-row.open {{ display:table-row; }}
 </style>
 </head>
 <body>
+{mh_modal_html}
 <header>
   <div class="mh-title">Estadísticas</div>
   <nav class="mh-nav">
@@ -925,10 +1062,7 @@ def render_html(data: dict, generated: str) -> str:
     <a class="mh-na" href="rym_genre_tree.html">Géneros RYM</a>
     <a class="mh-na on" href="estadisticas.html">Estadísticas</a>
   </nav>
-  <div class="mh-usr">
-    <button class="mh-usr-b" id="mhUBtn">👤 <span id="mhULbl">—</span></button>
-    <div class="mh-usr-d" id="mhUDd"></div>
-  </div>
+  <div style="margin-left:auto">{mh_modal_btn}</div>
 </header>
 <main>
 
@@ -966,7 +1100,7 @@ def render_html(data: dict, generated: str) -> str:
     <div style="overflow-x:auto">
       <table class="pop-table">
         <thead>
-          <tr><th>#</th><th>Artista</th><th>Álbum</th><th>Año</th><th>Usuarios</th><th></th></tr>
+          <tr><th>#</th><th>Artista</th><th>Álbum</th><th>Año</th><th>Usuarios</th><th></th><th>Links</th></tr>
         </thead>
         <tbody id="popTbody"></tbody>
       </table>
@@ -1064,6 +1198,46 @@ new Chart(document.getElementById('radarChart'), {{
 
 {temporal_js}
 
+// ── Album links helper ────────────────────────────────────────────────────
+function buildAlbLinks(r, idx) {{
+  let html = '<div class="alb-links">';
+  if (r.rym)  html += `<a class="alb-link rym" href="${{r.rym}}" target="_blank" rel="noopener">RYM</a>`;
+  if (r.yt)   html += `<a class="alb-link yt"  href="https://music.youtube.com/browse/${{r.yt}}" target="_blank" rel="noopener">YT</a>`;
+  if (r.mb)   html += `<a class="alb-link mb"  href="${{r.mb}}" target="_blank" rel="noopener">MB</a>`;
+  const colls = r.colls || [];
+  if (colls.length > 0) {{
+    const pid = 'cp-' + idx;
+    const items = colls.map(c =>
+      `<a class="coll-pop-item" href="${{c.slug}}/index.html">${{c.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}}</a>`
+    ).join('');
+    html += `<span class="alb-coll-badge" onclick="toggleCollPop('${{pid}}',event)">${{colls.length}} col.<div class="coll-popover" id="${{pid}}">${{items}}</div></span>`;
+  }}
+  html += '</div>';
+  return html;
+}}
+
+function toggleCollPop(id, e) {{
+  e.stopPropagation();
+  const el = document.getElementById(id);
+  if (!el) return;
+  const wasOpen = el.classList.contains('open');
+  document.querySelectorAll('.coll-popover.open').forEach(p => p.classList.remove('open'));
+  if (!wasOpen) el.classList.add('open');
+}}
+document.addEventListener('click', () => {{
+  document.querySelectorAll('.coll-popover.open').forEach(p => p.classList.remove('open'));
+}});
+
+// ── RYM genre tree toggle ─────────────────────────────────────────────────
+function toggleRymGroup(gid) {{
+  const rows = document.querySelectorAll('.rym-genre-row[data-grp="' + gid + '"]');
+  const caret = document.getElementById('rym-caret-' + gid);
+  let anyOpen = false;
+  rows.forEach(r => {{ if (r.classList.contains('open')) anyOpen = true; }});
+  rows.forEach(r => r.classList.toggle('open', !anyOpen));
+  if (caret) caret.innerHTML = anyOpen ? '&#9654;' : '&#9660;';
+}}
+
 // ── Accordion ──────────────────────────────────────────────────────────────
 function toggleAcc(id) {{
   const body = document.getElementById('accb-' + id);
@@ -1106,7 +1280,8 @@ function renderPopPage(page) {{
       const c = POP_COLORS[uu] || '#555';
       return `<span title="${{uu}}" style="width:9px;height:9px;border-radius:50%;background:${{c}};display:inline-block;flex-shrink:0"></span>`;
     }}).join('');
-    const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const links = buildAlbLinks(r, start + i);
     return `<tr>
       <td class="pop-year">${{start + i + 1}}</td>
       <td class="pop-artist">${{esc(r.artist)}}</td>
@@ -1114,6 +1289,7 @@ function renderPopPage(page) {{
       <td class="pop-year">${{r.year || '—'}}</td>
       <td class="pop-n">${{r.n}}</td>
       <td><div class="pop-dots">${{dots}}</div></td>
+      <td>${{links}}</td>
     </tr>`;
   }}).join('');
   document.getElementById('popPageInfo').textContent =
@@ -1141,11 +1317,12 @@ function renderPendPage(uid, page) {{
   const tbody = document.getElementById('pendTbody-' + uid);
   if (!tbody) return;
   const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  tbody.innerHTML = slice.map(r => `<tr>
+  tbody.innerHTML = slice.map((r, i) => `<tr>
     <td style="color:var(--muted);font-size:.72rem;padding:5px 8px">${{esc(r.artist)}}</td>
     <td style="font-size:.75rem;padding:5px 8px">${{esc(r.title)}}</td>
     <td style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);padding:5px 8px">${{r.year || '—'}}</td>
     <td style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--accent);padding:5px 8px">${{esc(r.who)}}</td>
+    <td style="padding:5px 8px">${{buildAlbLinks(r, 'p'+i)}}</td>
   </tr>`).join('');
   const info = document.getElementById('pendPageInfo-' + uid);
   if (info) info.textContent = data.length
@@ -1175,20 +1352,9 @@ function showParaTi(uid) {{
 renderPopPage(0);
 Object.keys(PEND_DATA).forEach(uid => renderPendPage(uid, 0));
 
-// ── MH user switcher ──────────────────────────────────────────────────────
-(function() {{
-  const KEY = 'mh_user';
-  const stored = localStorage.getItem(KEY);
-  const lbl = document.getElementById('mhULbl');
-  if (stored && lbl) lbl.textContent = stored;
-  const btn = document.getElementById('mhUBtn');
-  const dd  = document.getElementById('mhUDd');
-  if (!btn || !dd) return;
-  btn.addEventListener('click', e => {{ e.stopPropagation(); dd.classList.toggle('open'); }});
-  document.addEventListener('click', () => dd.classList.remove('open'));
-  if (stored) dd.innerHTML = `<span class="mh-usr-o cur">${{stored}}</span>`;
-}})();
+
 </script>
+{mh_modal_js}
 </body>
 </html>
 """

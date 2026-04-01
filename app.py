@@ -696,7 +696,7 @@ input::placeholder { color: var(--ink3); }
   transition: z-index 0s;
   aspect-ratio: 1;
 }
-.card.heard   { background: var(--heard-tint); }
+.card.heard   { background: var(--heard-tint); box-shadow: inset 0 0 0 2px var(--accent); }
 .card.missing { background: var(--missing-tint); }
 
 .card-cover {
@@ -756,14 +756,47 @@ input::placeholder { color: var(--ink3); }
   padding: 0.1rem 0.3rem;
   border-radius: 1px;
 }
-.badge-heard {
+/* extra-user dots on cards */
+.extra-dots {
   position: absolute; top: 0.4rem; right: 0.4rem;
-  width: 18px; height: 18px;
-  background: var(--accent);
-  border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-end;
 }
-.badge-heard svg { width: 10px; height: 10px; }
+.extra-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  opacity: 0.22; transition: opacity .12s;
+}
+.extra-dot.heard { opacity: 1; box-shadow: 0 0 4px currentColor; }
+
+/* extra users list in sidebar */
+.u-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0.3rem 0.9rem; font-family: var(--mono);
+  font-size: 0.68rem; color: var(--ink2);
+}
+.u-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.u-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.u-count { font-size: 0.6rem; color: var(--ink3); }
+.u-del { background: none; border: none; color: var(--ink3); cursor: pointer; font-size: 0.8rem; padding: 0 2px; }
+.u-del:hover { color: var(--red); }
+.u-add-row { display: flex; gap: 0.4rem; padding: 0.4rem 0.9rem; }
+.u-add-row input { flex: 1; padding: 0.3rem 0.5rem; font-size: 0.72rem; }
+
+/* floating sidebar button (mobile) */
+#sidebar-fab {
+  display: none;
+  position: fixed; bottom: 1.5rem; left: 1rem; z-index: 300;
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--accent); color: #0d0d0d; border: none;
+  font-size: 1.15rem; cursor: pointer;
+  align-items: center; justify-content: center;
+  box-shadow: 0 3px 14px rgba(0,0,0,0.55);
+  transition: background 0.15s;
+}
+#sidebar-fab:hover { background: var(--accent2); }
+#sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 199;
+}
 
 /* ── Cover placeholder ─────────────────────────────────────────────── */
 .card-placeholder {
@@ -1112,10 +1145,21 @@ input::placeholder { color: var(--ink3); }
 
 /* ── Responsive ────────────────────────────────────────────────────── */
 @media (max-width: 800px) {
-  .app-shell { flex-direction: column; }
-  #sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
-  .sb-scroll { max-height: 260px; }
+  #sidebar {
+    position: fixed; top: 52px; left: 0; bottom: 0;
+    width: 280px; z-index: 200;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    border-right: 1px solid var(--border2);
+  }
+  #sidebar.mobile-open { transform: translateX(0); }
+  #sidebar-overlay.visible { display: block; }
+  #sidebar-fab { display: flex; }
   #grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+}
+@media (min-width: 801px) {
+  #sidebar-fab { display: none !important; }
+  #sidebar-overlay { display: none !important; }
 }
 </style>
 </head>
@@ -1149,6 +1193,10 @@ input::placeholder { color: var(--ink3); }
   <button class="btn-sm" id="btn-discard-session">✕</button>
 </div>
 
+<!-- Mobile sidebar overlay + FAB -->
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+<button id="sidebar-fab" onclick="toggleSidebar()">☰</button>
+
 <!-- ── App shell ───────────────────────────────────────────────────────── -->
 <div class="app-shell">
 
@@ -1164,6 +1212,23 @@ input::placeholder { color: var(--ink3); }
         </div>
         <div class="sb-panel-body" id="colls-body">
           <div class="sb-empty">Cargando…</div>
+        </div>
+      </div>
+
+      <!-- Usuarios adicionales -->
+      <div class="sb-panel open" id="panel-users">
+        <div class="sb-panel-hdr" onclick="togglePanel('panel-users')">
+          <span class="sb-panel-title">Usuarios</span>
+          <span class="sb-panel-arrow">▶</span>
+        </div>
+        <div class="sb-panel-body">
+          <div id="users-list"></div>
+          <div class="u-add-row">
+            <input id="inp-extra-user" type="text" placeholder="usuario last.fm"
+              autocomplete="off" spellcheck="false"
+              onkeydown="if(event.key==='Enter')addExtraUser()">
+            <button class="btn-sm" onclick="addExtraUser()">+</button>
+          </div>
         </div>
       </div>
 
@@ -1242,6 +1307,7 @@ input::placeholder { color: var(--ink3); }
         <button class="filter-btn active" data-filter="all">Todos</button>
         <button class="filter-btn" data-filter="missing">Pendientes</button>
         <button class="filter-btn" data-filter="heard">Escuchados</button>
+        <button class="filter-btn" data-filter="recomendar" id="btn-filter-rec" style="display:none">Recomendados</button>
         <div class="filter-sep"></div>
         <label for="sort-select" style="margin:0">
           <select id="sort-select">
@@ -1273,6 +1339,7 @@ input::placeholder { color: var(--ink3); }
         <div class="modal-artist" id="m-artist"></div>
         <div class="modal-year"   id="m-year"></div>
         <div class="modal-status" id="m-status"></div>
+        <div id="m-extra-status" style="display:none;flex-wrap:wrap;gap:6px;margin-top:5px"></div>
       </div>
     </div>
     <div class="modal-body">
@@ -1296,6 +1363,10 @@ let activeDecades  = new Set();
 let loadedUser     = null;
 let pendingSession = null;
 
+// extra users for cross-reference / recommendation
+const USER_COLORS = ['#6a9fb5','#78b56c','#b56c6c','#9b6cb5','#b59b6c','#6cb5b5','#b56ca0','#7ab5a0'];
+let extraUsers = [];  // [{user, pairs, color, count, fetched_at}]
+
 // ── DOM refs ───────────────────────────────────────────────────────────────
 const inpUser    = document.getElementById('inp-user');
 const btnGo      = document.getElementById('btn-go');
@@ -1314,8 +1385,85 @@ function togglePanel(id) {
   document.getElementById(id).classList.toggle('open');
 }
 
+// ── Mobile sidebar ─────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const ov = document.getElementById('sidebar-overlay');
+  const isOpen = sb.classList.toggle('mobile-open');
+  ov.classList.toggle('visible', isOpen);
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('sidebar-overlay').classList.remove('visible');
+}
+
+// ── Extra users (recommendation) ──────────────────────────────────────────
+function saveExtraUsersLS() {
+  localStorage.setItem('ml_extra_users', JSON.stringify(
+    extraUsers.map(u => ({ user: u.user, pairs: u.pairs, color: u.color, count: u.count, fetched_at: u.fetched_at }))
+  ));
+}
+
+function loadExtraUsersLS() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('ml_extra_users') || '[]');
+    for (const u of saved) {
+      if (u.user && u.pairs) extraUsers.push(u);
+    }
+    buildUsersList();
+  } catch(e) {}
+}
+
+function buildUsersList() {
+  const list = document.getElementById('users-list');
+  if (!extraUsers.length) { list.innerHTML = ''; return; }
+  list.innerHTML = extraUsers.map((u, i) => `
+    <div class="u-row">
+      <div class="u-dot" style="background:${u.color}"></div>
+      <span class="u-name">${escH(u.user)}</span>
+      <span class="u-count">${u.count.toLocaleString()}</span>
+      <button class="u-del" onclick="removeExtraUser(${i})" title="Eliminar">✕</button>
+    </div>`).join('');
+  // show recommendation filter if we have extra users AND primary loaded
+  document.getElementById('btn-filter-rec').style.display =
+    (extraUsers.length > 0 && heardCache) ? '' : 'none';
+}
+
+async function addExtraUser() {
+  const inp = document.getElementById('inp-extra-user');
+  const user = inp.value.trim();
+  if (!user) return;
+  if (extraUsers.some(u => u.user.toLowerCase() === user.toLowerCase())) {
+    inp.value = ''; return;
+  }
+  inp.disabled = true;
+  try {
+    const data = await fetch(`/api/scrobbles?user=${encodeURIComponent(user)}`).then(r => r.json());
+    if (data.error) { showError(data.error); return; }
+    const color = USER_COLORS[extraUsers.length % USER_COLORS.length];
+    extraUsers.push({ user: data.user, pairs: data.heard, color, count: data.heard.length, fetched_at: data.fetched_at });
+    saveExtraUsersLS();
+    buildUsersList();
+    inp.value = '';
+    // re-apply to refresh dots and show recommendation filter
+    if (allAlbums.length) applyCollection();
+  } catch(e) {
+    showError('Error cargando usuario: ' + e.message);
+  } finally {
+    inp.disabled = false;
+  }
+}
+
+function removeExtraUser(idx) {
+  extraUsers.splice(idx, 1);
+  saveExtraUsersLS();
+  buildUsersList();
+  if (allAlbums.length) applyCollection();
+}
+
 // ── Init: load collections into sidebar ───────────────────────────────────
 (async () => {
+  loadExtraUsersLS();
   try {
     const cols = await fetch('/api/collections').then(r => r.json());
     renderCollsSidebar(cols);
@@ -1430,6 +1578,7 @@ async function selectCollection(slug) {
   });
   activeGenres.clear();
   activeDecades.clear();
+  closeSidebar();
 
   if (heardCache) {
     await loadAndRender(slug);
@@ -1638,7 +1787,11 @@ function applyCollection(slug) {
   const raw = collCache[slug];
   if (!raw || !heardCache) return;
 
-  allAlbums = raw.map(a => ({ ...a, heard: checkHeard(heardCache.pairs, a.artist, a.title) }));
+  allAlbums = raw.map(a => ({
+    ...a,
+    heard:      checkHeard(heardCache.pairs, a.artist, a.title),
+    extraHeard: extraUsers.map(u => checkHeard(u.pairs, a.artist, a.title)),
+  }));
 
   const heardN   = allAlbums.filter(a => a.heard).length;
   const missingN = allAlbums.length - heardN;
@@ -1652,6 +1805,8 @@ function applyCollection(slug) {
 
   statsBar.classList.add('visible');
   filtersEl.classList.add('visible');
+  document.getElementById('btn-filter-rec').style.display =
+    (extraUsers.length > 0 && heardCache) ? '' : 'none';
 
   buildGenrePills();
   buildDecadePills();
@@ -1706,8 +1861,9 @@ function toggleDecade(d) {
 // ── Grid ───────────────────────────────────────────────────────────────────
 function renderGrid() {
   let f = [...allAlbums];
-  if (activeFilter === 'missing') f = f.filter(a => !a.heard);
-  if (activeFilter === 'heard')   f = f.filter(a =>  a.heard);
+  if (activeFilter === 'missing')   f = f.filter(a => !a.heard);
+  if (activeFilter === 'heard')     f = f.filter(a =>  a.heard);
+  if (activeFilter === 'recomendar') f = f.filter(a => !a.heard && a.extraHeard && a.extraHeard.some(Boolean));
   if (activeGenres.size)  f = f.filter(a => (a.genres||[]).some(g => activeGenres.has(g)));
   if (activeDecades.size) f = f.filter(a => a.year && activeDecades.has(Math.floor(a.year/10)*10));
   if (activeSort === 'year_asc')  f.sort((a,b) => (a.year||0)-(b.year||0));
@@ -1746,13 +1902,15 @@ function cardHTML(a) {
       <rect x="3" y="3" width="18" height="18" rx="2"/>
       <circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
     </svg></div>`;
-  const tick = a.heard
-    ? `<div class="badge-heard"><svg viewBox="0 0 12 9" fill="none" stroke="#0d0d0d" stroke-width="2"><path d="M1 4l3.5 3.5L11 1"/></svg></div>`
+  const dots = (a.extraHeard && a.extraHeard.length)
+    ? `<div class="extra-dots">${a.extraHeard.map((h, i) =>
+        `<div class="extra-dot${h ? ' heard' : ''}" style="color:${extraUsers[i]?.color||'#fff'};background:${extraUsers[i]?.color||'#fff'}"></div>`
+      ).join('')}</div>`
     : '';
   return `<div class="card ${cls}" data-idx="${idx}">
     ${imgEl}${ph}
     <div class="card-overlay"></div>
-    <div class="card-n">${a.n}</div>${tick}
+    <div class="card-n">${a.n}</div>${dots}
     <div class="card-info">
       <div class="card-title">${escH(a.title)}</div>
       <div class="card-artist">${escH(a.artist)}</div>
@@ -1791,6 +1949,21 @@ function openModal(idx) {
   } else {
     st.className = 'modal-status missing';
     st.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg> Pendiente`;
+  }
+  // Extra users heard status
+  const extraSt = document.getElementById('m-extra-status');
+  if (extraUsers.length && a.extraHeard) {
+    extraSt.innerHTML = extraUsers.map((u, i) => {
+      const h = a.extraHeard[i];
+      return `<span style="display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:0.62rem;color:${h ? u.color : 'var(--ink3)'}">
+        <span style="width:7px;height:7px;border-radius:50%;background:${u.color};display:inline-block;opacity:${h?1:.25}"></span>
+        ${escH(u.user)}: ${h ? '✓' : '—'}
+      </span>`;
+    }).join('');
+    extraSt.style.display = 'flex';
+  } else {
+    extraSt.innerHTML = '';
+    extraSt.style.display = 'none';
   }
 
   // YouTube embed

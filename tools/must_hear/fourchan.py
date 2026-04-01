@@ -620,7 +620,7 @@ def run_4chan(args, root_dir: Path) -> None:
     """
     from html_must_hear import (
         mh_get_users, mh_get_user_albums, mh_load_collection, check_heard,
-        mh_album_to_json, render_collection_index_html, render_user_html,
+        mh_album_to_json, render_collection_html_v2,
         update_root_index, update_collection_group_index,
     )
 
@@ -745,12 +745,8 @@ def run_4chan(args, root_dir: Path) -> None:
             json.dumps(albums_data, ensure_ascii=False, separators=(",", ":")),
             encoding="utf-8",
         )
-        (out_dir / f"user_{safe_user}.html").write_text(
-            render_user_html(user, albums_data, name, data_file=f"data/{safe_user}.json"),
-            encoding="utf-8",
-        )
         users_index.append({
-            "user": user, "file": f"user_{safe_user}.html",
+            "user": user, "json_fname": f"{safe_user}.json",
             "heard": heard_count, "total": len(albums_data), "pct": pct,
         })
         print(f"   {user}: {heard_count}/{len(albums_data)} ({pct}%)")
@@ -758,7 +754,7 @@ def run_4chan(args, root_dir: Path) -> None:
     users_index.sort(key=lambda u: u["pct"], reverse=True)
 
     (out_dir / "index.html").write_text(
-        render_collection_index_html(users_index, name, generated),
+        render_collection_html_v2(users_index, name, generated),
         encoding="utf-8",
     )
     print(f"  📋 {out_dir / 'index.html'}")

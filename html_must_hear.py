@@ -633,39 +633,50 @@ def check_heard(user_albums: set, album: dict) -> bool:
 # ── YOUTUBE PRE-FETCH ────────────────────────────────────────────────────────
 
 def _yt_search(query: str, proxy: str = "", cookies_browser: str = "") -> str | None:
-    """Return first YouTube video ID for query using yt-dlp.
+    """Return first non-live YouTube video ID for query using yt-dlp.
 
     Returns:
         str (11 chars) — video found
-        ""             — YouTube responded but no result, or content blocked (skip)
-        None           — connection/proxy error; caller should retry
+        ""             — YouTube responded but no usable result (skip this album)
+        None           — connection/proxy/timeout error; caller should NOT cache
     """
-    cmd = ["yt-dlp", "--no-playlist", "--get-id", "--quiet",
-           "--socket-timeout", "8", f"ytsearch1:{query}"]
+    cmd = [
+        "yt-dlp", "--no-playlist", "--get-id", "--quiet",
+        "--socket-timeout", "8",
+        "--retries", "0",           # no internal yt-dlp retry loops
+        "--extractor-retries", "0", # no extractor retries either
+        # skip live streams and upcoming premieres (they cause hangs with --get-id)
+        "--match-filter", "!is_live & live_status != is_upcoming",
+        f"ytsearch3:{query}",       # fetch 3 candidates so filter has fallbacks
+    ]
     if proxy:
         cmd += ["--proxy", proxy]
     if cookies_browser:
         cmd += ["--cookies-from-browser", cookies_browser]
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
     except subprocess.TimeoutExpired:
-        return None  # network stall → retry
+        return None  # network stall → do not cache, let next run retry
     if r.returncode != 0:
         err = (r.stderr or "").strip()
         # YouTube-side blocks: age gate, unavailable, private — not a proxy fault
         _YT_SKIP = ("Sign in to confirm your age", "Video unavailable",
                     "This video is private", "has been removed", "not available")
         if any(s in err for s in _YT_SKIP):
-            return ""   # skip permanently, stamp yt_searched_at
+            return ""   # skip permanently
         # Rate limit from YouTube (not proxy fault): back off but don't kill proxy
         if "HTTP Error 429" in err or "Too Many Requests" in err:
             print(f"  [yt-dlp 429] rate-limit — {query[:60]}")
-            return None  # retry after backoff
+            return None  # do not cache
         hint = err.splitlines()[-1] if err else "sin stderr"
         print(f"  [yt-dlp rc={r.returncode}] {hint[:120]}")
-        return None  # proxy/connection error → retry
-    vid = r.stdout.strip()
-    return vid if len(vid) == 11 else ""
+        return None  # proxy/connection error → do not cache
+    # ytsearch3: may return up to 3 IDs, one per line; take the first valid one
+    for line in r.stdout.splitlines():
+        vid = line.strip()
+        if len(vid) == 11:
+            return vid
+    return ""
 
 
 def fetch_youtube_ids(albums: list, cache_file: Path, force: bool = False) -> dict:
@@ -684,12 +695,13 @@ def fetch_youtube_ids(albums: list, cache_file: Path, force: bool = False) -> di
         if a.get("yt_id") and a.get("mbid"):
             cached[a["mbid"]] = a["yt_id"]
 
-    # Only search for albums without yt_id that are missing/empty in cache
+    # Only search for albums without yt_id that are missing/empty in cache.
+    # Also treat cached None (from old runs before this fix) as retryable.
     missing = [
         a for a in albums
         if a.get("mbid")
         and not a.get("yt_id")
-        and (force or a["mbid"] not in cached or cached[a["mbid"]] == "")
+        and (force or a["mbid"] not in cached or cached[a["mbid"]] in ("", None))
     ]
     if not missing:
         print(f"  📦 YouTube caché completo: {yt_cache}")
@@ -703,12 +715,17 @@ def fetch_youtube_ids(albums: list, cache_file: Path, force: bool = False) -> di
             print(f"    {i}/{len(missing)}...")
         q   = f"{album['artist']} {album['title']} full album"
         vid = _yt_search(q)
-        cached[album["mbid"]] = vid
-        if i % 25 != 0 and not vid:
-            pass  # silent miss
+        if vid is None:
+            # Transient error (timeout/network) — store "" so next run retries,
+            # rather than None which would be serialised as JSON null and never retried.
+            cached[album["mbid"]] = ""
+        else:
+            cached[album["mbid"]] = vid
+        # Periodic save so a crash or ^C doesn't lose all progress
+        if (i + 1) % 25 == 0 or (i + 1) == len(missing):
+            yt_cache.write_text(json.dumps(cached, ensure_ascii=False, indent=2))
         time.sleep(0.5)
 
-    yt_cache.write_text(json.dumps(cached, ensure_ascii=False, indent=2))
     found = sum(1 for v in cached.values() if v)
     print(f"  💾 {yt_cache} ({found}/{len(cached)} encontrados)")
     return cached
@@ -3382,6 +3399,657 @@ def render_collection_index_html(users_data: list[dict], series_name: str, gener
 """
 
 
+def render_collection_html_v2(
+    users_data: list[dict],
+    series_name: str,
+    generated: str,
+    source_url: str = "",
+) -> str:
+    """
+    Generates a single multi-user album grid index.html.
+    User switching is done via modal popup + dynamic JSON fetch.
+    `users_data` items: {user, heard, total, pct, json_fname}
+    """
+    mh_users_js = json.dumps(
+        [{"user": d["user"],
+          "json": f"data/{d['json_fname']}",
+          "heard": d["heard"],
+          "total": d.get("total", 0),
+          "pct": d["pct"]}
+         for d in users_data],
+        ensure_ascii=False,
+    )
+    user_names = [d["user"] for d in users_data]
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{series_name}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="icon" type="image/png" href="/images/discount.png" />
+<script defer src="https://cloud.umami.is/script.js" data-website-id="5d84fd6c-0760-4a0c-a2d0-ffabb82179f5"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {{
+    --bg:       #0a0a0a;
+    --surface:  #111111;
+    --border:   #1e1e1e;
+    --accent:   #e8ff47;
+    --heard:    #e8ff47;
+    --pending:  #ff4747;
+    --text:     #e0e0e0;
+    --muted:    #555;
+    --gap:      6px;
+    --panel:    390px;
+    --header-h: 80px;
+  }}
+  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  html {{ scroll-behavior: smooth; }}
+  body {{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }}
+
+  header {{
+    position: fixed; top: 0; left: 0; right: var(--panel);
+    height: var(--header-h);
+    z-index: 100;
+    background: rgba(10,10,10,.97);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }}
+  .mh-r1 {{ display:flex; align-items:center; gap:10px; padding:0 16px; height:40px; flex-shrink:0; }}
+  .mh-title {{ font-family:'Bebas Neue',sans-serif; font-size:1rem; letter-spacing:.1em; color:var(--text); white-space:nowrap; flex-shrink:0; }}
+  .mh-nav {{ display:flex; gap:2px; flex-shrink:0; }}
+  .mh-na {{ font-family:'DM Mono',monospace; font-size:.58rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); text-decoration:none; padding:2px 7px; border-radius:3px; transition:all .12s; }}
+  .mh-na:hover {{ color:var(--text); background:rgba(255,255,255,.06); }}
+  .mh-na.on {{ color:var(--accent); background:rgba(255,255,255,.04); }}
+
+  .hdr-r2 {{ display:flex; align-items:center; gap:8px; padding:0 16px; height:40px; flex-shrink:0; border-top:1px solid var(--border); overflow:hidden; }}
+  .header-sub {{
+    font-family: 'DM Mono', monospace; font-size: .62rem;
+    color: var(--muted); line-height: 1.5; flex-shrink: 0; white-space:nowrap;
+  }}
+  .progress-wrap {{ width: 110px; flex-shrink: 0; }}
+  .progress-bar {{ height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }}
+  .progress-fill {{ height: 100%; background: var(--accent); border-radius: 2px; width: 0%; transition: width .4s ease; }}
+  .progress-label {{ font-family: 'DM Mono', monospace; font-size: .6rem; color: var(--muted); margin-top: 3px; }}
+  .progress-label span {{ color: var(--accent); }}
+
+  .controls {{ display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }}
+  .filter-btn {{
+    font-family: 'DM Mono', monospace; font-size: .68rem;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 5px 11px; border-radius: 3px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all .15s;
+  }}
+  .filter-btn:hover {{ border-color: var(--muted); color: var(--text); }}
+  .filter-btn.active {{ border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,.06); }}
+  .search-box {{
+    font-family: 'DM Mono', monospace; font-size: .68rem;
+    padding: 5px 10px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 3px;
+    color: var(--text); width: 160px; outline: none; transition: border-color .15s;
+  }}
+  .search-box:focus {{ border-color: var(--accent); }}
+  .search-box::placeholder {{ color: var(--muted); }}
+
+  .genre-wrap {{ position: relative; }}
+  .genre-btn {{
+    font-family: 'DM Mono', monospace; font-size: .68rem;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 5px 11px; border-radius: 3px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  }}
+  .genre-btn:hover {{ border-color: var(--muted); color: var(--text); }}
+  .genre-btn.active {{ border-color: var(--accent); color: var(--accent); background: rgba(232,255,71,.06); }}
+  .genre-btn .badge {{
+    background: var(--accent); color: #000; border-radius: 10px;
+    padding: 1px 6px; font-size: .58rem; font-weight: 700;
+  }}
+  .genre-dropdown {{
+    display: none; position: fixed;
+    background: #161616; border: 1px solid var(--border); border-radius: 4px;
+    z-index: 9999; min-width: 220px; max-height: 360px;
+    overflow-y: auto; padding: 6px 0;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+    box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  }}
+  .genre-dropdown.open {{ display: block; }}
+  .genre-dropdown-header {{
+    padding: 6px 12px 4px;
+    font-family: 'DM Mono', monospace; font-size: .6rem;
+    letter-spacing: .15em; text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border); margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+  }}
+  .genre-clear {{ cursor: pointer; color: var(--accent); font-size: .6rem; }}
+  .genre-item {{
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 12px; cursor: pointer;
+  }}
+  .genre-item:hover {{ background: rgba(255,255,255,.04); }}
+  .genre-item input {{ accent-color: var(--accent); width: 13px; height: 13px; cursor: pointer; }}
+  .genre-item label {{ font-size: .75rem; color: var(--text); cursor: pointer; flex: 1; }}
+  .genre-count {{ color: var(--muted); font-family: 'DM Mono', monospace; font-size: .65rem; }}
+  .grid-sizer {{
+    display: flex; align-items: center; gap: 6px;
+    font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--muted);
+    flex-shrink: 0;
+  }}
+  .grid-sizer input[type=range] {{ width: 70px; accent-color: var(--accent); cursor: pointer; }}
+
+  #main {{
+    padding: 14px 14px 60px; margin-top: var(--header-h); margin-right: var(--panel);
+  }}
+  .count-bar {{
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'DM Mono', monospace; font-size: .65rem; color: var(--muted);
+    padding-bottom: 10px; margin-bottom: 6px; border-bottom: 1px solid var(--border);
+  }}
+  #grid {{
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: var(--gap);
+  }}
+  .card {{
+    position: relative; overflow: hidden;
+    border-radius: 3px; cursor: pointer;
+    background: var(--surface);
+    aspect-ratio: 1;
+    transition: transform .12s;
+  }}
+  .card:hover {{ transform: scale(1.03); z-index: 2; }}
+  .card img {{ width: 100%; height: 100%; object-fit: cover; display: block; }}
+  .card-overlay {{
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.9) 0%, transparent 55%);
+    opacity: 0; transition: opacity .15s;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: 8px;
+  }}
+  .card:hover .card-overlay {{ opacity: 1; }}
+  .card-num {{ font-family: 'DM Mono', monospace; font-size: .55rem; color: var(--muted); }}
+  .card-title {{ font-size: .72rem; font-weight: 600; line-height: 1.2; }}
+  .card-artist {{ font-size: .62rem; color: var(--muted); margin-top: 1px; }}
+  .card.pending {{ outline: 1px solid var(--pending); }}
+  .card.active-card {{ outline: 2px solid var(--accent) !important; }}
+  .card.hidden {{ display: none; }}
+
+  #panel {{
+    position: fixed; top: var(--header-h); right: 0; bottom: 0;
+    width: var(--panel);
+    background: var(--surface); border-left: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+  }}
+  .panel-topbar {{
+    padding: 10px 16px 8px;
+    font-family: 'DM Mono', monospace; font-size: .55rem;
+    letter-spacing: .15em; text-transform: uppercase; color: var(--muted);
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+    display: flex; justify-content: space-between; align-items: center;
+  }}
+  .panel-topbar-label {{ color: var(--muted); }}
+  .panel-cover {{
+    width: 100%; aspect-ratio: 1; object-fit: cover; position: relative;
+    display: flex; align-items: flex-end;
+  }}
+  .panel-cover img {{
+    width: 100%; aspect-ratio: 1; object-fit: cover;
+    max-height: 340px;
+  }}
+  .panel-cover-status {{
+    position: absolute; bottom: 8px; right: 8px;
+    font-family: 'DM Mono', monospace; font-size: .6rem; letter-spacing: .1em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 2px; font-weight: 700;
+  }}
+  .panel-cover-status.heard   {{ background: var(--heard);   color: #000; }}
+  .panel-cover-status.pending {{ background: var(--pending); color: #fff; }}
+  .panel-body {{
+    padding: 14px 16px 24px; flex: 1;
+    scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+  }}
+  .panel-num {{ font-family: 'DM Mono', monospace; font-size: .55rem; color: var(--muted); margin-bottom: 4px; }}
+  .panel-title {{ font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: .03em; line-height: 1.05; }}
+  .panel-artist {{ font-size: .85rem; color: var(--muted); margin-top: 3px; }}
+  .panel-year {{ font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--muted); margin-top: 2px; margin-bottom: 10px; }}
+  .panel-genres {{ display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }}
+  .panel-genre-tag {{ font-family: 'DM Mono', monospace; font-size: .55rem; letter-spacing: .08em;
+    padding: 3px 7px; border-radius: 2px; background: rgba(255,255,255,.05); color: var(--muted); }}
+  .panel-divider {{ height: 1px; background: var(--border); margin: 12px 0; }}
+  .panel-section-label {{ font-family: 'DM Mono', monospace; font-size: .55rem; letter-spacing: .2em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }}
+  .panel-empty {{ padding: 40px 0; text-align: center; color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: .75rem; }}
+  .panel-empty-icon {{ font-size: 2rem; margin-bottom: 8px; opacity: .3; }}
+  .panel-bio {{ font-size: .8rem; color: #aaa; line-height: 1.6; }}
+  .desc-block {{ margin-bottom: 12px; }}
+  .desc-source-label {{
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: 'DM Mono', monospace; font-size: .55rem; letter-spacing: .1em;
+    text-transform: uppercase; margin-bottom: 4px;
+  }}
+  .desc-source-label::before {{ content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }}
+  .desc-source-label.lfm {{ color: #d51007; }}
+  .desc-source-label.mb  {{ color: #ba478f; }}
+  .desc-source-label.artist {{ color: #6a9fb5; }}
+  .desc-source-text {{ font-size: .75rem; color: #aaa; line-height: 1.6; }}
+  .panel-links {{ display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }}
+  .panel-link {{
+    font-family: 'DM Mono', monospace; font-size: .62rem;
+    letter-spacing: .08em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 3px;
+    border: 1px solid var(--border); color: var(--muted);
+    text-decoration: none; transition: all .15s;
+  }}
+  .panel-link.rym{{border-color:#5baadb;color:#5baadb}}
+  .panel-link.rym:hover{{background:rgba(48,81,159,.08)}}
+  .panel-yt-wrap {{
+    margin-top: 14px; border-radius: 4px; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--border);
+  }}
+  .panel-yt-wrap iframe {{ display: block; width: 100%; height: 150px; border: none; }}
+  .panel-yt-placeholder {{
+    height: 70px; display: flex; align-items: center; justify-content: center;
+    font-family: 'DM Mono', monospace; font-size: .68rem; color: var(--muted);
+  }}
+  #empty {{ display: none; text-align: center; padding: 60px 0; font-family: 'DM Mono', monospace; color: var(--muted); font-size: .75rem; }}
+  .page-footer {{
+    position: fixed; bottom: 0; left: 0; right: var(--panel);
+    height: 28px; background: rgba(10,10,10,.95);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 16px;
+    font-family: 'DM Mono', monospace; font-size: .58rem; color: var(--muted);
+    z-index: 50;
+  }}
+  .page-footer a {{ color: var(--muted); text-decoration: underline; }}
+  .panel-close-btn {{
+    display: none;
+    position: absolute; top: 13px; right: 13px;
+    width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,.07); border: 1px solid var(--border);
+    color: var(--text); font-size: 1rem; cursor: pointer;
+    align-items: center; justify-content: center; z-index: 10;
+    transition: background .15s; flex-shrink: 0;
+  }}
+  .panel-close-btn:hover {{ background: rgba(255,255,255,.18); }}
+
+  @media (max-width: 600px) {{
+    header {{ right: 0; height: auto; min-height: var(--header-h); overflow: visible; }}
+    #main {{ padding: 12px 10px 60px; margin-right: 0; }}
+    #panel {{ inset: 0; width: 100%; border-left: none; top: 0;
+              transform: translateY(105%);
+              transition: transform .28s cubic-bezier(.4,0,.2,1); }}
+    #panel.panel-open {{ transform: translateY(0); }}
+    .panel-close-btn {{ display: flex; }}
+    .panel-cover {{ max-height: 50vw; }}
+    .panel-yt-wrap iframe {{ height: 200px; }}
+  }}
+{_mh_user_modal_css()}
+</style>
+</head>
+<body>
+{_mh_user_modal_html(user_names)}
+
+<header>
+  <div class="mh-r1">
+    <div class="mh-title">{series_name}</div>
+    <nav class="mh-nav">
+      <a class="mh-na on" href="index.html">Colección</a>
+      <a class="mh-na" href="../index_alternativo.html">Explorador</a>
+      <a class="mh-na" href="../rym_genre_tree.html">Géneros RYM</a>
+      <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
+    </nav>
+    {_mh_user_modal_btn()}
+  </div>
+  <div class="hdr-r2">
+    <div class="header-sub" id="hdr-sub">— heard · — pending</div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+      <div class="progress-label"><span id="prog-pct">—</span></div>
+    </div>
+    <div class="controls">
+      <button class="filter-btn active" id="btn-all"     onclick="setFilter('all')">All</button>
+      <button class="filter-btn"        id="btn-heard"   onclick="setFilter('heard')">Heard</button>
+      <button class="filter-btn"        id="btn-pending" onclick="setFilter('pending')">Pending</button>
+      <input class="search-box" id="search" placeholder="Search…" oninput="applyFilters()">
+      <div class="genre-wrap">
+        <button class="genre-btn" id="genre-btn" onclick="toggleGenreDropdown()">
+          Genre <span class="badge" id="genre-badge" style="display:none">0</span> ▾
+        </button>
+      </div>
+      <div class="grid-sizer">
+        <span id="grid-label">10×</span>
+        <input type="range" id="grid-slider" min="3" max="20" value="5" step="1" oninput="setGridSize(this.value)">
+      </div>
+    </div>
+  </div>
+</header>
+<div class="genre-dropdown" id="genre-dropdown">
+  <div class="genre-dropdown-header">
+    Filter by genre
+    <span class="genre-clear" onclick="clearGenres()">clear</span>
+  </div>
+  <div id="genre-list"></div>
+</div>
+
+<main id="main">
+  <div class="count-bar">
+    <span>Showing <b id="vis-count">0</b> of <b id="total-count">0</b></span>
+    <span><b id="vis-heard">0</b> heard · <b id="vis-pending">0</b> pending</span>
+  </div>
+  <div id="grid"></div>
+  <div id="empty">No albums match your filters.</div>
+</main>
+
+<aside id="panel">
+  <button class="panel-close-btn" onclick="closePanel()" aria-label="Close">✕</button>
+  <div class="panel-topbar">
+    <span class="panel-topbar-label">Album detail</span>
+  </div>
+  <div id="panel-cover-wrap" class="panel-cover" style="display:none">
+    <img id="p-cover" src="" alt="">
+    <span class="panel-cover-status" id="p-status"></span>
+  </div>
+  <div class="panel-body" id="panel-body">
+    <div class="panel-empty">
+      <div class="panel-empty-icon">◉</div>
+      Click an album to see details
+    </div>
+  </div>
+</aside>
+
+<script>
+let ALBUMS = [];
+let filter = 'all';
+let gridCols = 10;
+let currentAlbum = null;
+let selectedGenres = new Set();
+let _userPct = null;
+const SERIES_NAME = {json.dumps(series_name)};
+const MH_USERS_DATA = {mh_users_js};
+
+function thumbUrl(url) {{
+  if (!url) return url;
+  return url
+    .replace(/\/front-500\\b/, '/front-250')
+    .replace(/e\\.snmc\\.io\\/i\\/\\d+\\//, 'e.snmc.io/i/150/');
+}}
+
+const _imgObserver = new IntersectionObserver(entries => {{
+  entries.forEach(e => {{
+    if (e.isIntersecting) {{
+      const img = e.target;
+      if (img.dataset.src) {{ img.src = img.dataset.src; delete img.dataset.src; }}
+      _imgObserver.unobserve(img);
+    }}
+  }});
+}}, {{ rootMargin: '300px' }});
+
+function setGridSize(val) {{
+  gridCols = parseInt(val);
+  document.getElementById('grid-label').textContent = val + '\\xd7';
+  document.getElementById('grid').style.gridTemplateColumns = `repeat(${{gridCols}}, 1fr)`;
+  try {{ localStorage.setItem('grid-cols', val); }} catch(e) {{}}
+}}
+
+function buildGenreList() {{
+  const counts = {{}};
+  ALBUMS.forEach(a => (a.genres || []).forEach(g => counts[g] = (counts[g] || 0) + 1));
+  const sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  const list = document.getElementById('genre-list');
+  list.innerHTML = '';
+  sorted.forEach(([genre, count]) => {{
+    const div = document.createElement('div');
+    div.className = 'genre-item';
+    const id = 'g-' + genre.replace(/[^a-z0-9]/g,'_');
+    div.innerHTML = `<input type="checkbox" id="${{id}}" value="${{genre}}" onchange="toggleGenre('${{genre}}', this.checked)">
+      <label for="${{id}}">${{genre}} <span class="genre-count">${{count}}</span></label>`;
+    list.appendChild(div);
+  }});
+}}
+
+function toggleGenreDropdown() {{
+  const dd  = document.getElementById('genre-dropdown');
+  const btn = document.getElementById('genre-btn');
+  const open = !dd.classList.contains('open');
+  dd.classList.toggle('open', open);
+  btn.classList.toggle('active', open || selectedGenres.size > 0);
+  if (open) {{
+    const r = btn.getBoundingClientRect();
+    dd.style.top  = (r.bottom + 4) + 'px';
+    dd.style.left = Math.max(4, r.right - 220) + 'px';
+  }}
+}}
+function toggleGenre(genre, checked) {{
+  if (checked) selectedGenres.add(genre); else selectedGenres.delete(genre);
+  updateGenreBadge(); applyFilters();
+}}
+function clearGenres() {{
+  selectedGenres.clear();
+  document.querySelectorAll('#genre-list input').forEach(i => i.checked = false);
+  updateGenreBadge(); applyFilters();
+}}
+function updateGenreBadge() {{
+  const badge = document.getElementById('genre-badge');
+  const btn   = document.getElementById('genre-btn');
+  if (selectedGenres.size > 0) {{
+    badge.textContent = selectedGenres.size; badge.style.display = ''; btn.classList.add('active');
+  }} else {{ badge.style.display = 'none'; btn.classList.remove('active'); }}
+}}
+document.addEventListener('click', e => {{
+  if (!e.target.closest('.genre-wrap')) document.getElementById('genre-dropdown').classList.remove('open');
+}});
+
+function buildGrid() {{
+  const grid = document.getElementById('grid');
+  grid.innerHTML = ALBUMS.map((a, idx) => `
+    <div class="card ${{a.heard ? 'heard' : 'pending'}}"
+         data-title="${{a.title.toLowerCase().replace(/"/g,'&quot;')}}"
+         data-artist="${{a.artist.toLowerCase().replace(/"/g,'&quot;')}}"
+         data-heard="${{a.heard ? '1' : '0'}}"
+         data-num="${{a.n}}"
+         data-genres="${{(a.genres||[]).join(',')}}"
+         data-idx="${{idx}}"
+         onclick="openPanel(ALBUMS[${{idx}}],this)">
+      <img data-src="${{thumbUrl(a.cover)}}" src="{COVER_PLACEHOLDER}" alt="${{a.n}}"
+           onerror="this.src='{COVER_PLACEHOLDER}'">
+      <div class="card-overlay">
+        <div class="card-num">#${{a.n}}</div>
+        <div class="card-title">${{a.title}}</div>
+        <div class="card-artist">${{a.artist}} · ${{a.year ?? ''}}</div>
+      </div>
+    </div>`).join('');
+  grid.querySelectorAll('img[data-src]').forEach(img => _imgObserver.observe(img));
+  document.getElementById('total-count').textContent = ALBUMS.length;
+  applyFilters();
+}}
+
+function closePanel() {{
+  document.getElementById('panel').classList.remove('panel-open');
+  document.querySelectorAll('.card.active-card').forEach(c => c.classList.remove('active-card'));
+  currentAlbum = null;
+}}
+
+function openPanel(a, cardEl) {{
+  document.querySelectorAll('.card.active-card').forEach(c => c.classList.remove('active-card'));
+  cardEl.classList.add('active-card');
+  currentAlbum = a;
+  if (_isMobile()) document.getElementById('panel').classList.add('panel-open');
+  const coverWrap = document.getElementById('panel-cover-wrap');
+  coverWrap.style.display = '';
+  const img = document.getElementById('p-cover');
+  img.src = `https://coverartarchive.org/release-group/${{a.mbid}}/front-500`;
+  img.onerror = function() {{ this.src = '{COVER_PLACEHOLDER}'; }};
+  const statusEl = document.getElementById('p-status');
+  statusEl.textContent = a.heard ? 'Heard' : 'Pending';
+  statusEl.className   = 'panel-cover-status ' + (a.heard ? 'heard' : 'pending');
+  const body = document.getElementById('panel-body');
+  const genreTags = (a.genres || []).map(g => `<span class="panel-genre-tag">${{g}}</span>`).join('');
+  const mbUrl = `https://musicbrainz.org/release-group/${{a.mbid}}`;
+  const gen1001Url = a.spotify_id ? `https://1001albumsgenerator.com/albums/${{a.spotify_id}}` : '';
+  const ytSearchUrl = `https://www.youtube.com/results?search_query=${{encodeURIComponent(a.artist + ' ' + a.title + ' full album')}}`;
+  const ytBlock = a.yt_id
+    ? `<iframe src="https://www.youtube.com/embed/${{a.yt_id}}" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+       <div style="padding:5px 10px;font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted)">
+         <a href="${{ytSearchUrl}}" target="_blank" style="color:var(--muted);text-decoration:none">↗ open in YouTube</a>
+       </div>`
+    : `<div class="panel-yt-placeholder">No video cached — <a href="${{ytSearchUrl}}" target="_blank" style="color:var(--accent);text-decoration:none">Search YouTube ↗</a></div>`;
+  const descSources = [
+    {{ key: 'desc_lfm_album',  cls: 'lfm',     label: '💿 Album · Last.fm' }},
+    {{ key: 'desc_lfm_artist', cls: 'artist',   label: '🎙 Artist · Last.fm' }},
+    {{ key: 'desc_mb_album',   cls: 'mb',       label: '💿 Album · MusicBrainz' }},
+    {{ key: 'desc_mb_artist',  cls: 'mb artist',label: '🎙 Artist · MusicBrainz' }},
+  ];
+  const descBlocks = descSources
+    .filter(s => a[s.key] && a[s.key].length > 40)
+    .map(s => `<div class="desc-block">
+      <div class="desc-source-label ${{s.cls}}">${{s.label}}</div>
+      <div class="desc-source-text">${{a[s.key]}}</div>
+    </div>`).join('');
+  body.innerHTML = `
+    <div class="panel-num">#${{a.n}}</div>
+    <div class="panel-title">${{a.title}}</div>
+    <div class="panel-artist">${{a.artist}}</div>
+    <div class="panel-year">${{a.year ?? ''}}</div>
+    ${{genreTags ? `<div class="panel-genres">${{genreTags}}</div>` : ''}}
+    <div class="panel-links">
+      <a class="panel-link" href="${{mbUrl}}" target="_blank">MusicBrainz</a>
+      ${{gen1001Url ? `<a class="panel-link" href="${{gen1001Url}}" target="_blank" style="border-color:#7b61ff;color:#7b61ff">1001gen</a>` : ''}}
+      ${{a.rym ? `<a class="panel-link rym" href="${{a.rym}}" target="_blank">RYM</a>` : ''}}
+    </div>
+    <div class="panel-divider"></div>
+    <div class="panel-section-label">About</div>
+    <div class="panel-bio" id="p-bio">${{descBlocks || '<span style="color:var(--muted);font-size:.8rem">No info available.</span>'}}</div>
+    <div class="panel-divider"></div>
+    <div class="panel-section-label">Listen on YouTube</div>
+    <div class="panel-yt-wrap">${{ytBlock}}</div>
+  `;
+}}
+
+function setFilter(f) {{
+  filter = f;
+  ['all','heard','pending'].forEach(x => {{
+    const btn = document.getElementById('btn-' + x);
+    btn.classList.toggle('active', x === f);
+    if (x === 'pending') {{
+      btn.style.borderColor = f === 'pending' ? 'var(--pending)' : '';
+      btn.style.color       = f === 'pending' ? 'var(--pending)' : '';
+      btn.style.background  = f === 'pending' ? 'rgba(255,71,71,.06)' : '';
+    }}
+  }});
+  applyFilters();
+}}
+
+function applyFilters() {{
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  let vis = 0, visH = 0, visP = 0;
+  document.querySelectorAll('.card').forEach(c => {{
+    const matchFilter = filter === 'all'
+      || (filter === 'heard'   && c.dataset.heard === '1')
+      || (filter === 'pending' && c.dataset.heard === '0');
+    const matchSearch = !q || c.dataset.title.includes(q) || c.dataset.artist.includes(q);
+    const cardGenres = c.dataset.genres ? c.dataset.genres.split(',') : [];
+    const matchGenre = selectedGenres.size === 0 || [...selectedGenres].some(g => cardGenres.includes(g));
+    const show = matchFilter && matchSearch && matchGenre;
+    c.classList.toggle('hidden', !show);
+    if (show) {{ vis++; if (c.dataset.heard === '1') visH++; else visP++; }}
+  }});
+  document.getElementById('vis-count').textContent   = vis;
+  document.getElementById('vis-heard').textContent   = visH;
+  document.getElementById('vis-pending').textContent = visP;
+  document.getElementById('empty').style.display     = vis === 0 ? 'block' : 'none';
+  const pct = vis > 0 ? Math.round(visH / vis * 100) : 0;
+  document.getElementById('prog-pct').textContent = (filter !== 'all' || q || selectedGenres.size > 0)
+    ? pct + '%' : (_userPct !== null ? _userPct + '%' : '—');
+}}
+
+const _isMobile = () => window.matchMedia('(max-width: 600px)').matches;
+
+function adjustMainTop() {{
+  document.getElementById('main').style.marginTop = document.querySelector('header').offsetHeight + 'px';
+}}
+window.addEventListener('resize', adjustMainTop);
+
+try {{
+  const saved = localStorage.getItem('grid-cols');
+  const defaultCols = _isMobile() ? 3 : 10;
+  const v = saved ? Math.min(20, Math.max(3, parseInt(saved))) : defaultCols;
+  document.getElementById('grid-slider').value = v;
+  setGridSize(v);
+}} catch(e) {{ setGridSize(_isMobile() ? 3 : 10); }}
+
+// ── Dynamic user loading ──────────────────────────────────────────────────
+function loadUserData(username) {{
+  const u = MH_USERS_DATA.find(x => x.user === username);
+  if (!u) return;
+  try {{ localStorage.setItem('mh_user', username); }} catch(e) {{}}
+  document.title = username + ' — ' + SERIES_NAME;
+  _userPct = u.pct;
+  document.getElementById('hdr-sub').textContent = u.heard + ' heard · ' + (u.total - u.heard) + ' pending';
+  document.getElementById('prog-pct').textContent = u.pct + '%';
+  document.getElementById('prog-fill').style.width = u.pct + '%';
+  selectedGenres.clear(); updateGenreBadge();
+  filter = 'all';
+  ['all','heard','pending'].forEach(x => document.getElementById('btn-' + x).classList.toggle('active', x === 'all'));
+  document.getElementById('btn-pending').style.borderColor = '';
+  document.getElementById('btn-pending').style.color = '';
+  document.getElementById('btn-pending').style.background = '';
+  document.getElementById('search').value = '';
+  fetch(u.json)
+    .then(r => {{ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }})
+    .then(data => {{
+      ALBUMS = data;
+      buildGrid();
+      buildGenreList();
+      adjustMainTop();
+      if (!_isMobile()) {{
+        setTimeout(() => {{
+          const firstCard = document.querySelector('.card:not(.hidden)');
+          if (firstCard) {{
+            const album = ALBUMS.find(a => a.n === parseInt(firstCard.dataset.num));
+            if (album) openPanel(album, firstCard);
+          }}
+        }}, 100);
+      }}
+    }})
+    .catch(err => {{
+      document.getElementById('grid').innerHTML =
+        '<div style="color:var(--muted);font-family:monospace;padding:40px">⚠ Could not load data: ' + err.message + '</div>';
+    }});
+}}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(function() {{
+  let initUser = null;
+  try {{
+    const s = localStorage.getItem('mh_user');
+    if (s && MH_USERS_DATA.find(u => u.user === s)) initUser = s;
+  }} catch(e) {{}}
+  if (!initUser && MH_USERS_DATA.length) initUser = MH_USERS_DATA[0].user;
+  if (initUser) loadUserData(initUser);
+}})();
+</script>
+{_mh_user_modal_js(user_names, on_select_js="if (u) loadUserData(u);")}
+<div class="page-footer">
+  Fuente: {'<a href="' + source_url + '" target="_blank">' + series_name + '</a>' if source_url else series_name}
+</div>
+</body>
+</html>
+"""
+
+
 def _mh_user_modal_css() -> str:
     """Shared CSS for the user modal button + overlay (inject inside <style>)."""
     return """
@@ -3692,8 +4360,12 @@ def render_rym_charts_index_html(
     def _chart_slug(genre_slug: str) -> str:
         return "rym_chart_all_time_" + genre_slug.replace("-", "_")
 
-    chart_lookup = {s["slug"]: s for s in series}
-    n_scraped    = len(series)
+    # Normalize _2d_ encoding (series_meta uses it for hyphens) so lookup matches
+    # _chart_slug() output which uses plain underscores.
+    chart_lookup: dict[str, dict] = {}
+    for s in series:
+        chart_lookup[s["slug"].replace("_2d_", "_")] = s
+    n_scraped    = len(chart_lookup)
     total_genres = sum(1 + _count_all(g) for g in genre_tree)
 
     # ── compact tree JSON (no descriptions — keep it lean ~360KB) ───────────
@@ -3715,12 +4387,10 @@ def render_rym_charts_index_html(
     _collect_desc(genre_tree)
     desc_idx_json = json.dumps(_desc_idx, ensure_ascii=False, separators=(",", ":"))
 
-    chart_slugs_set = {s["slug"] for s in series}
-
     # ── chart data JSON (small: only scraped entries) ────────────────────────
     chart_data_json = json.dumps(
-        {s["slug"]: {"total": s.get("total", 0), "pct": round(s.get("avg_pct", 0), 1)}
-         for s in series},
+        {slug: {"total": s.get("total", 0), "pct": round(s.get("avg_pct", 0), 1)}
+         for slug, s in chart_lookup.items()},
         ensure_ascii=False, separators=(",", ":"),
     )
 
@@ -5245,22 +5915,15 @@ def _regen_one_collection(mh_conn, scrobbles_conn, root_dir: Path,
 
     # Build sorted users_index with full data available
     users_index = sorted(
-        [{"user": d["user"], "file": d["fname"],
+        [{"user": d["user"], "json_fname": d["json_fname"],
           "heard": d["heard_count"], "total": len(d["albums_data"]), "pct": d["pct"]}
          for d in user_data],
         key=lambda u: u["pct"], reverse=True,
     )
 
-    # Pass 2: write HTML for each user with full users list for user-switcher nav
-    for d in user_data:
-        (out_dir / d["fname"]).write_text(
-            render_user_html(d["user"], d["albums_data"], name,
-                             data_file=f"data/{d['json_fname']}",
-                             source_url=source_url, users_list=users_index),
-            encoding="utf-8"
-        )
+    # Pass 2: write single index.html with dynamic user switching (no per-user HTML files)
     (out_dir / "index.html").write_text(
-        render_collection_index_html(users_index, name, generated, source_url=source_url),
+        render_collection_html_v2(users_index, name, generated, source_url=source_url),
         encoding="utf-8"
     )
     print(f"  📋 {out_dir / 'index.html'}")
@@ -5434,7 +6097,6 @@ def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn,
                     out_dir = root_dir / slug
                     g_slug  = None
                     g_name  = None
-                print(f"  ── {name} ({slug})")
                 _regen_one_collection(
                     th_mh, th_scr, root_dir,
                     slug, name, out_dir, users, generated,
@@ -5448,12 +6110,16 @@ def global_index_only(args, root_dir: Path, mh_conn, scrobbles_conn,
         n_workers = min(workers, len(mb_rows))
         with ThreadPoolExecutor(max_workers=n_workers) as pool:
             futs = {pool.submit(_mb_worker, s, n): s for s, n in mb_rows}
+            done_mb = 0
             for fut in as_completed(futs):
                 slug = futs[fut]
+                done_mb += 1
                 try:
                     fut.result()
                 except Exception as exc:
                     print(f"  ⚠ MB {slug}: {exc}")
+                if done_mb % 50 == 0 or done_mb == len(mb_rows):
+                    print(f"  … {done_mb}/{len(mb_rows)} MB series listas")
 
     print(f"\n✅ Global index-only done → {root_dir / 'index.html'}")
 
@@ -6008,26 +6674,21 @@ def main():
             encoding="utf-8"
         )
 
-        fname    = f"user_{safe_user}.html"
-        data_rel = f"data/{json_fname}"
-        html     = render_user_html(user, albums_data, args.name, data_file=data_rel,
-                                    source_url=getattr(args, "series", ""))
-        (out_dir / fname).write_text(html, encoding="utf-8")
-        print(f"   💾 {out_dir / fname}  +  {data_dir / json_fname}")
+        print(f"   💾 {data_dir / json_fname}")
 
         users_index.append({
-            "user":  user,
-            "file":  fname,
-            "heard": heard_count,
-            "total": len(albums_data),
-            "pct":   pct,
+            "user":      user,
+            "json_fname": json_fname,
+            "heard":     heard_count,
+            "total":     len(albums_data),
+            "pct":       pct,
         })
 
     # ── 4. Collection index ───────────────────────────────────────────────────
     users_index.sort(key=lambda u: u["pct"], reverse=True)
     generated = datetime.now().strftime("%Y-%m-%d %H:%M")
-    index_html = render_collection_index_html(users_index, args.name, generated,
-                                               source_url=getattr(args, "series", ""))
+    index_html = render_collection_html_v2(users_index, args.name, generated,
+                                           source_url=getattr(args, "series", ""))
     (out_dir / "index.html").write_text(index_html, encoding="utf-8")
     print(f"\n📋 collection index → {out_dir / 'index.html'}")
 

@@ -42,7 +42,10 @@ def load_genre_tree(genres_json: Path) -> list[dict]:
     return json.loads(genres_json.read_text(encoding="utf-8"))
 
 
-def get_scraped_collections(mh_conn: sqlite3.Connection) -> dict[str, dict]:
+def get_scraped_collections(
+    mh_conn: sqlite3.Connection,
+    charts_dir: Path | None = None,
+) -> dict[str, dict]:
     rows = mh_conn.execute("""
         SELECT c.slug, COUNT(ca.album_id) AS total
         FROM collections c
@@ -50,32 +53,98 @@ def get_scraped_collections(mh_conn: sqlite3.Connection) -> dict[str, dict]:
         WHERE c.slug LIKE 'rym_chart_all_time_%'
         GROUP BY c.id
     """).fetchall()
-    return {r[0]: {"total": r[1]} for r in rows}
+    result = {r[0]: {"total": r[1]} for r in rows}
+
+    # Also scan charts_dir for cache JSONs not yet imported into DB
+    if charts_dir and charts_dir.is_dir():
+        for d in charts_dir.iterdir():
+            if not (d.is_dir() and d.name.startswith("rym_chart_all_time_")):
+                continue
+            if d.name in result:
+                continue
+            cache = d / "rym_chart_cache.json"
+            if cache.exists():
+                try:
+                    albums = json.loads(cache.read_text(encoding="utf-8"))
+                    result[d.name] = {"total": len(albums)}
+                except Exception:
+                    pass
+    return result
 
 
 def get_top_albums_per_collection(
     mh_conn: sqlite3.Connection,
     collection_slugs: list[str],
-    n: int = 5,
+    n_yt: int = 15,
+    n_fetch: int = 40,
+    charts_dir: Path | None = None,
 ) -> dict[str, list[dict]]:
+    """Return up to n_yt albums WITH yt_id per collection, preserving original rank."""
     result: dict[str, list[dict]] = {}
+
+    # Batch yt_id lookup by (artist_lower, title_lower) for cache-JSON enrichment
+    yt_lookup: dict[tuple, str] = {}
+    if charts_dir:
+        for row in mh_conn.execute("""
+            SELECT LOWER(TRIM(ar.name)), LOWER(TRIM(al.name)), al.yt_id
+            FROM albums al JOIN artists ar ON ar.id = al.artist_id
+            WHERE al.yt_id IS NOT NULL AND al.yt_id != ''
+        """).fetchall():
+            yt_lookup[(row[0], row[1])] = row[2]
+
+    db_slugs: set[str] = set()
     for slug in collection_slugs:
         rows = mh_conn.execute("""
-            SELECT ar.name, al.name, al.year, al.release_group_mbid, al.yt_id
+            SELECT ar.name, al.name, al.year, al.release_group_mbid, al.yt_id,
+                   COALESCE(ca.rank, 0) AS rank
             FROM collection_albums ca
             JOIN collections c  ON c.id  = ca.collection_id
             JOIN albums al      ON al.id = ca.album_id
             JOIN artists ar     ON ar.id = al.artist_id
-            WHERE c.slug = ?
+            WHERE c.slug = ? AND al.yt_id IS NOT NULL AND al.yt_id != ''
             ORDER BY ca.rank ASC NULLS LAST
             LIMIT ?
-        """, (slug, n)).fetchall()
+        """, (slug, n_yt)).fetchall()
         if rows:
+            db_slugs.add(slug)
             result[slug] = [
                 {"artist": r[0], "title": r[1], "year": r[2] or "",
-                 "mbid": r[3] or "", "yt_id": r[4] or ""}
+                 "mbid": r[3] or "", "yt_id": r[4], "rank": r[5] or 0}
                 for r in rows
             ]
+
+    # For slugs not in DB, read from cache JSON + enrich yt_ids
+    if charts_dir and charts_dir.is_dir():
+        for slug in collection_slugs:
+            if slug in db_slugs:
+                continue
+            cache = charts_dir / slug / "rym_chart_cache.json"
+            if not cache.exists():
+                continue
+            try:
+                raw = json.loads(cache.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            enriched = []
+            for a in raw[:n_fetch]:
+                yt_id = a.get("yt_id") or ""
+                if not yt_id:
+                    key = (a.get("artist", "").lower().strip(),
+                           a.get("title", "").lower().strip())
+                    yt_id = yt_lookup.get(key, "")
+                if yt_id:
+                    enriched.append({
+                        "artist": a.get("artist", ""),
+                        "title":  a.get("title", ""),
+                        "year":   a.get("year", "") or "",
+                        "mbid":   a.get("mbid", "") or "",
+                        "yt_id":  yt_id,
+                        "rank":   a.get("number", 0),
+                    })
+                    if len(enriched) >= n_yt:
+                        break
+            if enriched:
+                result[slug] = enriched
     return result
 
 
@@ -268,9 +337,25 @@ def render_html(
     width:var(--panel-w); background:var(--surface);
     border-left:1px solid var(--border);
     transform:translateX(100%); transition:transform .2s;
-    overflow-y:auto; z-index:100; padding:18px 18px 40px;
+    overflow:hidden; z-index:100;
+    display:flex; flex-direction:column;
   }}
   #panel.open {{ transform:translateX(0); }}
+  #panel-scroll {{ flex:1; overflow-y:auto; padding:18px 18px 10px; }}
+  #panel-video-area {{
+    flex-shrink:0; padding:10px 18px 14px;
+    border-top:1px solid var(--border);
+    display:none;
+  }}
+  .panel-pag-row {{
+    display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;
+  }}
+  .panel-pag-btn {{
+    font-family:'DM Mono',monospace; font-size:.58rem; padding:3px 10px;
+    border:1px solid var(--border); border-radius:4px; background:none;
+    color:var(--muted); cursor:pointer;
+  }}
+  .panel-pag-btn:disabled {{ opacity:.3; cursor:default; }}
   .panel-close {{
     background:none; border:none; color:var(--muted); cursor:pointer;
     font-size:.8rem; float:right; padding:2px 6px; transition:color .12s;
@@ -327,10 +412,10 @@ def render_html(
 <header>
   <div class="mh-title">Géneros RYM</div>
   <nav class="mh-nav">
-    <a class="mh-na" href="../index.html">Colección</a>
-    <a class="mh-na" href="../index_alternativo.html">Explorador</a>
-    <a class="mh-na on" href="../rym_genre_tree.html">Géneros RYM</a>
-    <a class="mh-na" href="../estadisticas.html">Estadísticas</a>
+    <a class="mh-na" href="index.html">Colección</a>
+    <a class="mh-na" href="index_alternativo.html">Explorador</a>
+    <a class="mh-na on" href="rym_genre_tree.html">Géneros RYM</a>
+    <a class="mh-na" href="estadisticas.html">Estadísticas</a>
   </nav>
   <div style="margin-left:auto">{_mh_user_modal_btn()}</div>
 </header>
@@ -350,8 +435,18 @@ def render_html(
   </div>
 
   <aside id="panel">
-    <button class="panel-close" onclick="closePanel()">✕</button>
-    <div id="panel-body"></div>
+    <div id="panel-scroll">
+      <button class="panel-close" onclick="closePanel()">✕</button>
+      <div id="panel-body"></div>
+    </div>
+    <div id="panel-video-area">
+      <div class="panel-pag-row">
+        <button id="panelPrev" class="panel-pag-btn" onclick="panelAlbPage(-1)">&#8592;</button>
+        <span id="panelPgInfo" style="font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)"></span>
+        <button id="panelNext" class="panel-pag-btn" onclick="panelAlbPage(1)">&#8594;</button>
+      </div>
+      <div id="panel-alb-pages"></div>
+    </div>
   </aside>
 </div>
 
@@ -664,43 +759,64 @@ function showPanel(slug) {{
     </a>`;
   }}
 
-  if (data.albums && data.albums.length) {{
+  const ytAlbums = (data.albums || []).filter(a => a.yt_id);
+  if (ytAlbums.length) {{
     html += `<div class="panel-section">Top álbumes</div>`;
-    for (const a of data.albums) html += albumHtml(a);
   }} else {{
-    html += `<div class="no-data">${{hasChart ? 'Sin álbumes en DB' : 'Sin chart scrapeado'}}</div>`;
+    html += `<div class="no-data">${{hasChart ? 'Sin álbumes con video' : 'Sin chart scrapeado'}}</div>`;
   }}
 
   document.getElementById('panel-body').innerHTML = html;
+  const va = document.getElementById('panel-video-area');
+  va.style.display = ytAlbums.length ? 'block' : 'none';
   document.getElementById('panel').classList.add('open');
   document.getElementById('tree-wrap').classList.add('panel-open');
+
+  // init pagination
+  _panelAlbs = ytAlbums;
+  _panelPage = 0;
+  _renderPanelPage();
+}}
+
+const PANEL_PER_PAGE = 3;
+let _panelAlbs = [];
+let _panelPage = 0;
+
+function _renderPanelPage() {{
+  const container = document.getElementById('panel-alb-pages');
+  if (!container) return;
+  const total = _panelAlbs.length;
+  const maxPage = Math.max(0, Math.ceil(Math.min(total, 15) / PANEL_PER_PAGE) - 1);
+  _panelPage = Math.max(0, Math.min(_panelPage, maxPage));
+  const start = _panelPage * PANEL_PER_PAGE;
+  const slice = _panelAlbs.slice(start, start + PANEL_PER_PAGE);
+  container.innerHTML = slice.map(a => albumHtml(a)).join('');
+  const info = document.getElementById('panelPgInfo');
+  if (info) info.textContent = `Pág.${{_panelPage + 1}}/${{maxPage + 1}} · ${{Math.min(total,15)}} vídeos`;
+  const prev = document.getElementById('panelPrev');
+  const next = document.getElementById('panelNext');
+  if (prev) prev.disabled = _panelPage === 0;
+  if (next) next.disabled = _panelPage >= maxPage;
+}}
+
+function panelAlbPage(dir) {{
+  _panelPage += dir;
+  _renderPanelPage();
 }}
 
 function albumHtml(a) {{
-  const ytBlock = a.yt_id
-    ? `<div class="yt-wrap"><iframe
-         src="https://www.youtube.com/embed/${{a.yt_id}}"
-         allow="autoplay;encrypted-media" allowfullscreen loading="lazy"></iframe></div>`
-    : `<div class="yt-placeholder" onclick="loadYtSearch(this,'${{encodeURIComponent(a.artist+' '+a.title)}}')">
-         <div class="yt-ph-inner">
-           <div class="yt-play">▶</div>
-           <div class="yt-ph-label">${{a.artist}}<br>${{a.title}}</div>
-         </div>
-       </div>`;
+  const rank = a.rank ? `${{a.rank}}. ` : '';
+  const esc  = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
   return `<div class="panel-album">
     <div class="album-meta">
-      <span class="album-title">${{a.title}}</span>
-      <span class="album-year">${{a.year}}</span>
+      <span class="album-title">${{rank}}${{esc(a.title)}}</span>
+      <span class="album-year">${{a.year || ''}}</span>
     </div>
-    <div class="album-artist">${{a.artist}}</div>
-    ${{ytBlock}}
+    <div class="album-artist">${{esc(a.artist)}}</div>
+    <div class="yt-wrap"><iframe
+      src="https://www.youtube.com/embed/${{a.yt_id}}"
+      allow="autoplay;encrypted-media" allowfullscreen loading="lazy"></iframe></div>
   </div>`;
-}}
-
-function loadYtSearch(el, q) {{
-  el.outerHTML = `<div class="yt-wrap"><iframe
-    src="https://www.youtube.com/embed?listType=search&list=${{q}}"
-    allow="autoplay;encrypted-media" allowfullscreen loading="lazy"></iframe></div>`;
 }}
 
 function closePanel() {{
@@ -754,9 +870,13 @@ def run(args: argparse.Namespace) -> None:
     genre_tree = load_genre_tree(genres_json)
     print(f"🌳 {len(genre_tree)} main genres")
 
+    charts_dir = out_path.parent / "rym_charts"
+
     conn = sqlite3.connect(str(mh_db))
-    scraped_map  = get_scraped_collections(conn)
-    top_albums   = get_top_albums_per_collection(conn, list(scraped_map.keys()), n=5)
+    scraped_map  = get_scraped_collections(conn, charts_dir=charts_dir)
+    top_albums   = get_top_albums_per_collection(
+        conn, list(scraped_map.keys()), n_yt=15, n_fetch=40, charts_dir=charts_dir
+    )
     users = [r[0] for r in conn.execute("SELECT username FROM users ORDER BY username").fetchall()]
     conn.close()
     print(f"✅ {len(scraped_map)} scraped collections")

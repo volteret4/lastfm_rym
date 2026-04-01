@@ -444,8 +444,8 @@ def run_rym(args, root_dir: Path) -> None:
     """
     from html_must_hear import (
         mh_get_users, mh_get_user_albums, mh_load_collection,
-        check_heard, mh_album_to_json, render_collection_index_html,
-        render_user_html, update_root_index, update_collection_group_index,
+        check_heard, mh_album_to_json, render_collection_html_v2,
+        update_root_index, update_collection_group_index,
         mh_populate_user_heard,
     )
 
@@ -606,10 +606,6 @@ def run_rym(args, root_dir: Path) -> None:
             json.dumps(albums_data, ensure_ascii=False, separators=(",", ":")),
             encoding="utf-8"
         )
-        (out_dir / fname).write_text(
-            render_user_html(user, albums_data, name, data_file=f"data/{json_fname}"),
-            encoding="utf-8"
-        )
 
         if heard_ids and mh_conn and not index_only:
             try:
@@ -621,7 +617,7 @@ def run_rym(args, root_dir: Path) -> None:
                 pass
 
         users_index.append({
-            "user": user, "file": fname,
+            "user": user, "json_fname": json_fname,
             "heard": heard_count, "total": len(albums_data), "pct": pct,
         })
         print(f"   {user}: {heard_count}/{len(albums_data)} ({pct}%)")
@@ -630,7 +626,7 @@ def run_rym(args, root_dir: Path) -> None:
 
     # ── Collection index ───────────────────────────────────────────────────────
     (out_dir / "index.html").write_text(
-        render_collection_index_html(users_index, name, generated),
+        render_collection_html_v2(users_index, name, generated),
         encoding="utf-8"
     )
     print(f"  📋 {out_dir / 'index.html'}")

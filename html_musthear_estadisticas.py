@@ -340,7 +340,7 @@ def gather_data(mh_path: str, scr_path: str, meta_dir: Path | None = None) -> di
         for aid, lst in raw_colls.items():
             named  = [c for c in lst if not c["slug"].startswith("rym_chart")]
             charts = [c for c in lst if c["slug"].startswith("rym_chart")]
-            album_colls[aid] = (named + charts)[:8]
+            album_colls[aid] = (named + charts)[:5]
 
     conn.close()
 
@@ -446,7 +446,7 @@ def gather_temporal(mh_path: str, scr_path: str, users: list[dict]) -> dict:
 
 # ── HTML rendering ────────────────────────────────────────────────────────────
 
-def render_html(data: dict, generated: str) -> str:
+def render_html(data: dict, generated: str) -> tuple[str, dict]:
     from html_must_hear import _mh_user_modal_css, _mh_user_modal_html, _mh_user_modal_btn, _mh_user_modal_js
     users        = data["users"]
     colls        = data["colls"]
@@ -475,12 +475,19 @@ def render_html(data: dict, generated: str) -> str:
     mh_modal_css  = _mh_user_modal_css()
     mh_modal_html = _mh_user_modal_html(usernames_list)
     mh_modal_btn  = _mh_user_modal_btn()
-    # On select: highlight matching user rows in the page
-    mh_modal_js   = _mh_user_modal_js(usernames_list, on_select_js="""
+    # On select: highlight rows + sync Para Ti section
+    u2uid_js = json.dumps(
+        {u["username"]: str(u["id"]) for u in users_sorted},
+        ensure_ascii=False
+    )
+    mh_modal_js   = _mh_user_modal_js(usernames_list, on_select_js=f"""
       const u2 = localStorage.getItem('mh_user');
-      document.querySelectorAll('[data-username]').forEach(el => {{
+      document.querySelectorAll('[data-username]').forEach(el => {{{{
         el.classList.toggle('usr-active', el.dataset.username === u2);
-      }});
+      }}}});
+      const _u2uid = {u2uid_js};
+      const _uid = _u2uid[u2];
+      if (_uid) showParaTi(_uid);
     """)
     user_color   = {u["username"]: USER_COLORS[i % len(USER_COLORS)]
                     for i, u in enumerate(users_sorted)}
@@ -710,16 +717,34 @@ def render_html(data: dict, generated: str) -> str:
             "pointRadius":     2,
         })
 
+    # ── album links → external JSON (rym / yt / mb / colls per album_id) ─────
+    album_links_out: dict[str, dict] = {}
+    for p in popular:
+        aid = p.get("album_id")
+        if aid is not None:
+            album_links_out[str(aid)] = {
+                "rym": p.get("rateyourmusic_url") or None,
+                "yt":  p.get("yt_id") or None,
+                "mb":  p.get("musicbrainz_url") or None,
+                "colls": album_colls.get(aid, []),
+            }
+    for uid_lst in pending_per_user.values():
+        for a in uid_lst:
+            aid = a.get("album_id")
+            if aid is not None and str(aid) not in album_links_out:
+                album_links_out[str(aid)] = {
+                    "rym": a.get("rym") or None,
+                    "yt":  a.get("yt_id") or None,
+                    "mb":  a.get("mb") or None,
+                    "colls": album_colls.get(aid, []),
+                }
+
     # ── popular albums — JS-paginated, 30 per page ────────────────────────────
     pop_page_size = 30
     pop_data_js = json.dumps(
-        [{"artist": p["artist"], "album": p["album"],
+        [{"album_id": p.get("album_id"), "artist": p["artist"], "album": p["album"],
           "year": p["year"] or "", "n": p["n_users"],
-          "who": (p["who"] or "").split(","),
-          "rym": p.get("rateyourmusic_url") or None,
-          "yt": p.get("yt_id") or None,
-          "mb": p.get("musicbrainz_url") or None,
-          "colls": album_colls.get(p.get("album_id"), [])}
+          "who": (p["who"] or "").split(",")}
          for p in popular],
         ensure_ascii=False,
     )
@@ -732,8 +757,8 @@ def render_html(data: dict, generated: str) -> str:
     # ── pending albums per user — JS data for pagination ──────────────────────
     pend_data_js = json.dumps(
         {str(uid): [
-            {**a,
-             "colls": album_colls.get(a.get("album_id"), [])}
+            {"album_id": a.get("album_id"), "artist": a["artist"],
+             "title": a["title"], "year": a["year"], "n": a["n"], "who": a["who"]}
             for a in lst
          ] for uid, lst in pending_per_user.items()},
         ensure_ascii=False,
@@ -841,11 +866,11 @@ def render_html(data: dict, generated: str) -> str:
         for rc in recs:
             my_w = min(rc["my_pct"], 100)
             sim_w = min(rc["sim_pct"], 100)
-            rec_cards += f"""<div class="rec-card">
+            rec_cards += f"""<a class="rec-card" href="{rc["slug"]}/index.html">
   <div class="rec-coll-name">{rc["name"]}</div>
   <div class="rec-bars">
     <div class="rec-bar-row">
-      <span>Tú</span>
+      <span>T&uacute;</span>
       <div class="rec-bar-track"><div class="rec-bar-fill" style="width:{my_w:.0f}%;background:{color}88"></div></div>
       <span>{rc["my_pct"]:.0f}%</span>
     </div>
@@ -856,7 +881,7 @@ def render_html(data: dict, generated: str) -> str:
     </div>
   </div>
   <div class="rec-delta">+{rc["delta"]:.0f}%</div>
-</div>"""
+</a>"""
 
         no_recs_placeholder = (
             '<div style="color:var(--muted);font-size:.72rem;padding:12px 0">Sin recomendaciones disponibles</div>'
@@ -920,7 +945,7 @@ def render_html(data: dict, generated: str) -> str:
     }}
   }});"""
 
-    return f"""<!DOCTYPE html>
+    html_str = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -1025,7 +1050,8 @@ def render_html(data: dict, generated: str) -> str:
   .para-ti-panel {{ display:none; }}
   .para-ti-panel.active {{ display:block; }}
   .rec-grid {{ display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; margin-bottom:20px; }}
-  .rec-card {{ background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:12px; }}
+  .rec-card {{ display:block; background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:12px; text-decoration:none; color:inherit; transition:border-color .12s; }}
+  .rec-card:hover {{ border-color:var(--accent); }}
   .rec-coll-name {{ font-size:.78rem; font-weight:500; margin-bottom:6px; line-height:1.3; }}
   .rec-bars {{ display:flex; flex-direction:column; gap:3px; margin-bottom:4px; }}
   .rec-bar-row {{ display:flex; align-items:center; gap:6px; font-family:'DM Mono',monospace; font-size:.58rem; color:var(--muted); }}
@@ -1200,11 +1226,12 @@ new Chart(document.getElementById('radarChart'), {{
 
 // ── Album links helper ────────────────────────────────────────────────────
 function buildAlbLinks(r, idx) {{
+  const meta = ALBUM_LINKS[r.album_id] || {{}};
   let html = '<div class="alb-links">';
-  if (r.rym)  html += `<a class="alb-link rym" href="${{r.rym}}" target="_blank" rel="noopener">RYM</a>`;
-  if (r.yt)   html += `<a class="alb-link yt"  href="https://music.youtube.com/browse/${{r.yt}}" target="_blank" rel="noopener">YT</a>`;
-  if (r.mb)   html += `<a class="alb-link mb"  href="${{r.mb}}" target="_blank" rel="noopener">MB</a>`;
-  const colls = r.colls || [];
+  if (meta.rym) html += `<a class="alb-link rym" href="${{meta.rym}}" target="_blank" rel="noopener">RYM</a>`;
+  if (meta.yt)  html += `<a class="alb-link yt"  href="https://music.youtube.com/browse/${{meta.yt}}" target="_blank" rel="noopener">YT</a>`;
+  if (meta.mb)  html += `<a class="alb-link mb"  href="${{meta.mb}}" target="_blank" rel="noopener">MB</a>`;
+  const colls = meta.colls || [];
   if (colls.length > 0) {{
     const pid = 'cp-' + idx;
     const items = colls.map(c =>
@@ -1348,9 +1375,27 @@ function showParaTi(uid) {{
   if (btn)   btn.classList.add('active');
 }}
 
-// ── Init on load ──────────────────────────────────────────────────────────
-renderPopPage(0);
-Object.keys(PEND_DATA).forEach(uid => renderPendPage(uid, 0));
+// ── Album links: load from external JSON then init tables ─────────────────
+let ALBUM_LINKS = {{}};
+const U2UID = {u2uid_js};
+function syncParaTi() {{
+  const saved = localStorage.getItem('mh_user');
+  const uid = saved && U2UID[saved];
+  if (uid) showParaTi(uid);
+}}
+fetch('data/album_links.json')
+  .then(r => r.json())
+  .then(d => {{
+    ALBUM_LINKS = d;
+    renderPopPage(0);
+    Object.keys(PEND_DATA).forEach(uid => renderPendPage(uid, 0));
+    syncParaTi();
+  }})
+  .catch(() => {{
+    renderPopPage(0);
+    Object.keys(PEND_DATA).forEach(uid => renderPendPage(uid, 0));
+    syncParaTi();
+  }});
 
 
 </script>
@@ -1358,6 +1403,7 @@ Object.keys(PEND_DATA).forEach(uid => renderPendPage(uid, 0));
 </body>
 </html>
 """
+    return html_str, album_links_out
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -1381,11 +1427,16 @@ def main():
     meta_dir  = Path(args.out).parent
     data = gather_data(args.mh_db, args.scr_db, meta_dir)
 
-    html = render_html(data, generated)
+    html, album_links = render_html(data, generated)
     out  = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf-8")
     print(f"✅ {out}  ({len(html):,} bytes)")
+
+    links_out = out.parent / "data" / "album_links.json"
+    links_out.parent.mkdir(parents=True, exist_ok=True)
+    links_out.write_text(json.dumps(album_links, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"✅ {links_out}  ({links_out.stat().st_size:,} bytes)")
 
 
 if __name__ == "__main__":

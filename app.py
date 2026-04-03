@@ -1171,7 +1171,7 @@ input::placeholder { color: var(--ink3); }
   <div style="flex:1;display:flex;align-items:center;gap:0.6rem;">
     <input id="inp-user" type="text" placeholder="Usuario Last.fm" autocomplete="off" spellcheck="false"
       style="width:180px;padding:0.4rem 0.7rem;font-size:0.8rem;">
-    <button class="btn" id="btn-go" style="padding:0.4rem 1rem;font-size:0.72rem;">Cargar</button>
+    <button class="btn" id="btn-go" style="padding:0.4rem 1rem;font-size:0.72rem;">Last.fm</button>
     <button class="btn-sm" id="btn-save-session" style="display:none">↓ Sesión</button>
     <button class="btn-sm" id="btn-sync-session" style="display:none">↻ Sync</button>
     <button class="btn-sm" id="btn-import">↑ Importar</button>
@@ -1189,7 +1189,7 @@ input::placeholder { color: var(--ink3); }
 <div id="session-bar" style="display:none;align-items:center;gap:0.6rem;padding:0.4rem 1.2rem;background:var(--bg2);border-bottom:1px solid var(--border);flex-wrap:wrap;">
   <span class="session-label">Sesión guardada:</span>
   <span id="session-info" style="font-family:var(--mono);font-size:0.72rem;color:var(--ink2);"></span>
-  <button class="btn-sm primary" id="btn-load-session">Cargar</button>
+  <button class="btn-sm primary" id="btn-load-session">Last1fm</button>
   <button class="btn-sm" id="btn-discard-session">✕</button>
 </div>
 

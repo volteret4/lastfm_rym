@@ -187,12 +187,13 @@ def render_html(
         return [{"s": n["slug"], "n": n["name"],
                  "c": _compact(n.get("subgenres", []))} for n in nodes]
 
-    compact_json = json.dumps(_compact(genre_tree), ensure_ascii=False, separators=(",", ":"))
-    charts_json  = json.dumps(
+    compact_json    = json.dumps(_compact(genre_tree), ensure_ascii=False, separators=(",", ":"))
+    charts_json     = json.dumps(
         {cs: d["total"] for cs, d in scraped_map.items()},
         ensure_ascii=False, separators=(",", ":"),
     )
-    panel_json = json.dumps(panel_data, ensure_ascii=False, separators=(",", ":"))
+    panel_json      = json.dumps(panel_data, ensure_ascii=False, separators=(",", ":"))
+    users_meta_json = json.dumps(users or [], ensure_ascii=False)
 
     n_scraped = len(scraped_map)
     n_total   = sum(1 + _count_all(g) for g in genre_tree)
@@ -278,6 +279,17 @@ def render_html(
   .dot-scraped {{ background:var(--accent); }}
   /* MH user modal */
   {_mh_user_modal_css()}
+
+  /* ── secondary user chips ── */
+  #sec-users {{ display:none; align-items:center; gap:4px; margin-left:6px; flex-wrap:nowrap; overflow:hidden; }}
+  .sec-chip {{
+    display:flex; align-items:center; gap:4px;
+    font-family:'DM Mono',monospace; font-size:.52rem; letter-spacing:.05em;
+    text-transform:uppercase; color:var(--muted); background:none;
+    border:1px solid var(--border); border-radius:3px; padding:2px 7px;
+    cursor:default; white-space:nowrap; flex-shrink:0;
+  }}
+  .sec-dot {{ width:5px; height:5px; border-radius:50%; flex-shrink:0; }}
 
   /* ── layout ── */
   #layout {{ display:flex; position:fixed; top:var(--header-h); left:0; right:0; bottom:0; }}
@@ -365,7 +377,9 @@ def render_html(
   .panel-title {{
     font-family:'Bebas Neue',sans-serif; font-size:1.5rem; color:var(--accent);
     letter-spacing:.04em; margin-bottom:8px; line-height:1.1; clear:both;
+    text-decoration:none; display:block;
   }}
+  a.panel-title:hover {{ opacity:.8; }}
   .panel-desc {{
     font-size:.82rem; color:var(--muted); line-height:1.5;
     margin-bottom:14px; border-bottom:1px solid var(--border); padding-bottom:14px;
@@ -404,6 +418,16 @@ def render_html(
   @media (max-width:700px) {{
     :root {{ --panel-w:100vw; }}
     .mh-na.on {{ display:none; }}
+    #panel {{
+      position:fixed; top:var(--header-h); left:0; right:0; bottom:0;
+      width:100%; transform:translateX(100%);
+    }}
+    #panel.open {{ transform:translateX(0); }}
+    #panel-scroll {{
+      -webkit-overflow-scrolling:touch;
+      overflow-y:auto;
+    }}
+    #tree-wrap.panel-open {{ right:0; }}
   }}
 </style>
 </head>
@@ -417,7 +441,10 @@ def render_html(
     <a class="mh-na on" href="rym_genre_tree.html">Géneros RYM</a>
     <a class="mh-na" href="estadisticas.html">Estadísticas</a>
   </nav>
-  <div style="margin-left:auto">{_mh_user_modal_btn()}</div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+    <div id="sec-users"></div>
+    {_mh_user_modal_btn()}
+  </div>
 </header>
 
 <div id="layout">
@@ -747,16 +774,14 @@ function showPanel(slug) {{
   const hasChart = !!CHARTS[cs];
 
   let html = `<div class="panel-slug">${{slug}}</div>`;
-  html += `<div class="panel-title">${{data.name || slug}}</div>`;
+  if (hasChart) {{
+    html += `<a class="panel-title" href="rym_charts/${{cs}}/index.html" target="_blank">${{data.name || slug}}</a>`;
+  }} else {{
+    html += `<div class="panel-title">${{data.name || slug}}</div>`;
+  }}
 
   if (data.desc) {{
     html += `<div class="panel-desc">${{data.desc}}</div>`;
-  }}
-
-  if (hasChart) {{
-    html += `<a class="panel-chart-link" href="rym_charts/${{cs}}/index.html" target="_blank">
-      Ver chart · ${{data.total}} álbumes ↗
-    </a>`;
   }}
 
   const ytAlbums = (data.albums || []).filter(a => a.yt_id);
@@ -833,9 +858,33 @@ document.addEventListener('click', e => {{
   }}
 }});
 
+// ── Secondary users (Para Ti) ─────────────────────────────────────────────
+const MH_USERS_META = {users_meta_json};
+const USER_COLORS_G = ['#c9a227','#6a9fb5','#78b56c','#b56c6c','#9b6cb5','#b59b6c','#6cb5b5','#b56ca0'];
+
+function updateSecUsers(primaryName) {{
+  const bar = document.getElementById('sec-users');
+  if (!bar) return;
+  const others = MH_USERS_META.filter(u => u !== primaryName);
+  if (!primaryName || others.length === 0) {{ bar.style.display = 'none'; return; }}
+  bar.style.display = 'flex';
+  bar.innerHTML = others.map((u, i) => {{
+    const allIdx = MH_USERS_META.indexOf(u);
+    const col = USER_COLORS_G[allIdx % USER_COLORS_G.length];
+    return `<span class="sec-chip"><span class="sec-dot" style="background:${{col}}"></span>${{u}}</span>`;
+  }}).join('');
+}}
+
+// Init: restore from localStorage
+(function() {{
+  try {{
+    const u = localStorage.getItem('mh_user');
+    if (u && MH_USERS_META.includes(u)) updateSecUsers(u);
+  }} catch(e) {{}}
+}})();
 
 </script>
-{_mh_user_modal_js(users or [])}
+{_mh_user_modal_js(users or [], on_select_js="if (u) updateSecUsers(u); else updateSecUsers(null);")}
 </body>
 </html>
 """

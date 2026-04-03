@@ -24,8 +24,12 @@ select,input{background:var(--bg3);color:var(--text);border:1px solid var(--bord
 /* year sections */
 .year-block{padding:18px 16px 0}
 .year-heading{font-size:.95em;font-weight:700;color:var(--muted);letter-spacing:.06em;
-              border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:10px}
+              border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:10px;
+              cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}
+.year-heading:hover{color:var(--text)}
+.yr-arrow{font-size:.7em;flex-shrink:0;transition:transform .15s}
 .album-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.album-grid.collapsed{display:none}
 /* card */
 .card{width:120px;cursor:pointer;position:relative;flex-shrink:0;border-radius:3px;overflow:hidden}
 .card-img{width:120px;height:120px;object-fit:cover;background:var(--bg3);display:block}
@@ -156,6 +160,7 @@ function render() {
     (byYear[a.year] = byYear[a.year] || []).push(a);
   });
   const years = Object.keys(byYear).map(Number).sort((a, b) => b - a);
+  const latestYear = years[0];
 
   const hc = filtered.filter(heard).length;
   const pct = filtered.length ? Math.round(hc / filtered.length * 100) : 0;
@@ -166,12 +171,13 @@ function render() {
   document.getElementById('content').innerHTML = years.map(yr => {
     const yAlb = byYear[yr];
     const yHc  = yAlb.filter(heard).length;
+    const open = (yr === latestYear);
     const cards = yAlb.map(a => {
       const idx = A.indexOf(a);
       const h   = heard(a);
       return '<div class="card' + (h ? ' heard' : '') + '" onclick="openPanel(' + idx + ')">' +
         (a.cv
-          ? '<img class="card-img" data-src="' + a.cv + '" src="" alt="">'
+          ? '<img class="card-img" data-src="' + a.cv + '" src="" alt="" referrerpolicy="no-referrer">'
           : '<div class="card-img"></div>') +
         (a.rt ? '<span class="card-rating">' + a.rt.toFixed(2) + '</span>' : '') +
         '<div class="card-info">' +
@@ -180,16 +186,25 @@ function render() {
         '</div></div>';
     }).join('');
     return '<div class="year-block">' +
-      '<div class="year-heading">' + yr +
+      '<div class="year-heading" onclick="toggleYear(this)">' +
+        '<span class="yr-arrow">' + (open ? '▾' : '▸') + '</span>' +
+        yr +
         '<small style="font-weight:400;color:#555;margin-left:8px">(' +
           yAlb.length + ' álbumes' +
           (cu ? ' · ' + yHc + ' escuchados' : '') +
         ')</small></div>' +
-      '<div class="album-grid">' + cards + '</div>' +
+      '<div class="album-grid' + (open ? '' : ' collapsed') + '">' + cards + '</div>' +
       '</div>';
   }).join('') || '<p style="padding:40px;color:#555">Sin resultados.</p>';
 
   document.querySelectorAll('.card-img[data-src]').forEach(i => obs.observe(i));
+}
+
+function toggleYear(heading) {
+  const grid  = heading.nextElementSibling;
+  const arrow = heading.querySelector('.yr-arrow');
+  const now   = grid.classList.toggle('collapsed');
+  if (arrow) arrow.textContent = now ? '▸' : '▾';
 }
 
 function openPanel(idx) {
@@ -224,6 +239,6 @@ function closePanel() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
 render();
 </script>
-<!-- 2026-03-31 17:49 -->
+<!-- 2026-04-02 23:56 -->
 </body>
 </html>

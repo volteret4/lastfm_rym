@@ -417,9 +417,10 @@ aside {
   font-family: var(--mono); font-size: .56rem;
   padding: 2px 6px; border-radius: 2px;
   background: var(--surface2); border: 1px solid var(--border);
-  color: var(--muted);
+  color: var(--muted); text-decoration: none;
   display: inline-flex; align-items: center; gap: 4px;
 }
+a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
 .panel-coll-rank {
   color: var(--accent); font-weight: 600; font-size: .58rem;
 }
@@ -463,6 +464,61 @@ aside {
 .header-nav-link:hover { border-color: var(--accent); color: var(--accent); }
 .header-nav-link.active { border-color: var(--accent); color: var(--accent); background: rgba(201,162,39,.08); }
 
+/* ── Para Ti (reco) buttons in sidebar ── */
+.reco-btn {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 5px 6px; border-radius: 3px; cursor: pointer;
+  background: none; border: none; text-align: left;
+  font-family: var(--mono); font-size: .72rem; color: var(--muted);
+  transition: background .1s, color .1s;
+}
+.reco-btn:hover { background: rgba(255,255,255,.04); color: var(--text); }
+.reco-btn.active { background: rgba(255,255,255,.04); color: var(--text); }
+.reco-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; opacity: .4; }
+.reco-btn.active .reco-dot { opacity: 1; }
+
+  /* ── MH user modal ── */
+  .mh-usr-btn {
+    display:flex; align-items:center; gap:4px;
+    background:none; border:1px solid var(--border,#1e1e1e); border-radius:4px;
+    color:var(--muted,#555); font-family:'DM Mono',monospace;
+    font-size:.62rem; padding:4px 9px; cursor:pointer; flex-shrink:0;
+    white-space:nowrap; transition:border-color .12s, color .12s;
+  }
+  .mh-usr-btn:hover { border-color:var(--accent,#c9a227); color:var(--text,#e0e0e0); }
+  .mh-usr-btn.has-user { border-color:var(--accent,#c9a227); color:var(--accent,#c9a227); }
+  .mh-modal-ov {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.78);
+    z-index:500; align-items:center; justify-content:center;
+  }
+  .mh-modal-ov.open { display:flex; }
+  .mh-modal-box {
+    background:var(--surface,#111); border:1px solid var(--border,#1e1e1e);
+    border-top:2px solid var(--accent,#c9a227); border-radius:6px;
+    padding:1.4rem; width:min(300px,92vw); max-height:80vh; overflow-y:auto;
+  }
+  .mh-modal-title {
+    font-family:'DM Mono',monospace; font-size:.6rem; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--muted,#555);
+    margin-bottom:1rem; text-align:center;
+  }
+  .mh-usr-opt {
+    padding:9px 12px; margin-bottom:5px;
+    background:var(--surface2,#161616); border:1px solid var(--border,#1e1e1e);
+    border-radius:4px; cursor:pointer; transition:all .15s;
+    font-family:'DM Mono',monospace; font-size:.75rem;
+    letter-spacing:.04em; color:var(--muted,#555);
+  }
+  .mh-usr-opt:hover { border-color:var(--accent,#c9a227); color:var(--text,#e0e0e0); }
+  .mh-usr-opt.active { border-color:var(--accent,#c9a227); color:var(--accent,#c9a227); background:rgba(201,162,39,.07); }
+  .mh-modal-close {
+    display:block; margin:1rem auto 0; padding:6px 18px;
+    background:var(--surface2,#161616); color:var(--muted,#555);
+    border:1px solid var(--border,#1e1e1e); border-radius:4px;
+    cursor:pointer; font-family:'DM Mono',monospace; font-size:.68rem;
+  }
+  .mh-modal-close:hover { color:var(--text,#e0e0e0); }
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   :root { --panel-w: 0px; }
@@ -477,6 +533,13 @@ aside {
 </head>
 <body>
 
+<div class="mh-modal-ov" id="mhUserModal">
+  <div class="mh-modal-box">
+    <div class="mh-modal-title">Seleccionar usuario</div>
+    <div id="mhUserOpts"></div>
+    <button class="mh-modal-close" id="mhModalClose">Cerrar</button>
+  </div>
+</div>
 <header>
   <div class="header-title">Must Hear</div>
   <nav class="header-nav">
@@ -486,6 +549,7 @@ aside {
     <a class="header-nav-link" href="estadisticas.html">Estadísticas</a>
   </nav>
   <div id="statusBar">Cargando…</div>
+  <button class="mh-usr-btn" id="mhUserBtn" title="Seleccionar usuario">👤 <span id="mhULbl">—</span></button>
 </header>
 
 <div class="body-wrap">
@@ -501,13 +565,13 @@ aside {
         </div>
         <div class="coll-tree panel-body-collapse open" id="panel-co"></div>
       </div>
-      <div class="panel">
-        <div class="panel-title collapsible" data-target="panel-users">
-          Usuarios
-          <button class="panel-clear" data-panel="users">limpiar</button>
+      <div class="panel" id="reco-panel" style="display:none">
+        <div class="panel-title collapsible" data-target="reco-user-btns">
+          Recomendaciones
+          <button class="panel-clear" data-panel="reco">limpiar</button>
           <span class="collapse-arrow open">▾</span>
         </div>
-        <div class="panel-body-collapse open" id="panel-users"></div>
+        <div class="panel-body-collapse open" id="reco-user-btns"></div>
       </div>
       <div class="panel">
         <div class="panel-title collapsible" data-target="panel-g">
@@ -575,11 +639,13 @@ const PAGE_SIZE = 80;
 const USER_COLORS = ['#c9a227','#6a9fb5','#78b56c','#b56c6c','#9b6cb5','#b59b6c','#6cb5b5','#b56ca0'];
 
 let DB = null;
-let selUsers  = new Set();  // selected user indices
-let selCs     = new Set();  // selected collection indices (individual series)
-let selG      = new Set();
-let selD      = new Set();
-let selStatus = 'all';      // 'all' | 'heard' | 'pending'
+let selUsers      = new Set();  // selected user indices
+let selCs         = new Set();  // selected collection indices (individual series)
+let selG          = new Set();
+let selD          = new Set();
+let selStatus     = 'all';      // 'all' | 'heard' | 'pending'
+let primaryUserIdx = -1;        // index into DB.users for primary user
+let recoUser       = null;      // user index to filter "heard by them, not by primary"
 let filtered = [];
 let page = 0;
 let currentAlbumId = null;
@@ -592,7 +658,7 @@ fetch(DATA_URL)
     DB = data;
     document.getElementById('loading').style.display = 'none';
     buildFilters();
-    buildUserPanel();
+    initPrimaryUser();
     document.getElementById('filterBtn').disabled = false;
     applyFilter();
   })
@@ -722,12 +788,7 @@ document.querySelectorAll('.panel-clear').forEach(btn => {
     }
     if (p === 'g')  { selG.clear();  document.querySelectorAll('#panel-g .chip').forEach(c => { c.classList.remove('sel'); c.querySelector('.chip-check').textContent = ''; }); }
     if (p === 'd')  { selD.clear();  document.querySelectorAll('#panel-d .decade-chip').forEach(c => c.classList.remove('sel')); }
-    if (p === 'users') {
-      selUsers.clear();
-      document.querySelectorAll('#panel-users .user-row').forEach(r => r.classList.remove('sel'));
-      saveSelUsers();
-      applyFilter();
-    }
+    if (p === 'reco') { recoUser = null; updateRecoPanel(); applyFilter(); }
   });
 });
 
@@ -747,7 +808,10 @@ function applyFilter() {
     if (selCs.size && !a.cs.some(p => selCs.has(p[0]))) return false;
     if (selG.size  && !a.g.some(gi => selG.has(gi))) return false;
     if (selD.size  && !selD.has(a.d))                return false;
-    if (selStatus !== 'all') {
+    // Reco filter: heard by secondary user, NOT by primary
+    if (recoUser !== null && primaryUserIdx >= 0) {
+      if (!a.h.includes(recoUser) || a.h.includes(primaryUserIdx)) return false;
+    } else if (selStatus !== 'all') {
       if (selUsers.size === 0) return true; // no users selected — ignore status filter
       const heardBySome = [...selUsers].some(ui => a.h.includes(ui));
       if (selStatus === 'heard'   && !heardBySome) return false;
@@ -818,7 +882,7 @@ function openPanel(a) {
   if (activeCard) activeCard.classList.add('active-card');
 
   const genreMap = Object.fromEntries(DB.genres.map(g => [g.i, g.name]));
-  const collMap  = Object.fromEntries(DB.collections.map(c => [c.i, c.name]));
+  const collMap  = Object.fromEntries(DB.collections.map(c => [c.i, {name: c.name, slug: c.slug, group: c.group}]));
   const heardBySome = selUsers.size > 0 && [...selUsers].some(ui => a.h.includes(ui));
 
   // Cover
@@ -835,8 +899,11 @@ function openPanel(a) {
   // Body
   const genres = a.g.map(gi => `<span class="panel-genre-tag">${esc(genreMap[gi] || '')}</span>`).join('');
   const colls  = a.cs.map(([ci, rank]) => {
-    const name = esc(collMap[ci] || '');
+    const cd = collMap[ci] || {};
+    const name = esc(cd.name || '');
     const rankStr = rank != null ? `<span class="panel-coll-rank">#${rank}</span>` : '';
+    const href = cd.slug ? `${cd.group}/${cd.slug}/index.html` : null;
+    if (href) return `<a class="panel-coll-tag" href="${href}" target="_blank">${rankStr}${name}</a>`;
     return `<span class="panel-coll-tag">${rankStr}${name}</span>`;
   }).join('');
 
@@ -905,36 +972,47 @@ function clearPanel() {
     </div>`;
 }
 
-// ── User panel (sidebar) ───────────────────────────────────────────────────
-function saveSelUsers() {
-  const names = [...selUsers].map(ui => DB.users[ui].name);
-  localStorage.setItem('mh_users', JSON.stringify(names));
+// ── Primary user init ──────────────────────────────────────────────────────
+function initPrimaryUser() {
+  const stored = localStorage.getItem('mh_user');
+  if (stored) {
+    const pi = DB.users.findIndex(u => u.name === stored);
+    if (pi >= 0) {
+      primaryUserIdx = pi;
+      selUsers = new Set([pi]);
+      updateRecoPanel();
+    }
+  }
 }
 
-function buildUserPanel() {
-  const container = document.getElementById('panel-users');
-  container.innerHTML = '';
-  // Restore from localStorage (multi-select)
-  let saved = [];
-  try { saved = JSON.parse(localStorage.getItem('mh_users') || '[]'); } catch(e) {}
-  // Fallback: honor old single-user key
-  if (saved.length === 0) {
-    const single = localStorage.getItem('mh_user');
-    if (single) saved = [single];
-  }
+function setPrimaryUser(username) {
+  primaryUserIdx = (username !== null && username !== undefined)
+    ? DB.users.findIndex(u => u.name === username) : -1;
+  selUsers = primaryUserIdx >= 0 ? new Set([primaryUserIdx]) : new Set();
+  recoUser = null;
+  updateRecoPanel();
+  applyFilter();
+}
+
+function updateRecoPanel() {
+  const panel = document.getElementById('reco-panel');
+  const btns  = document.getElementById('reco-user-btns');
+  if (!panel || !btns || !DB) return;
+  if (primaryUserIdx < 0) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  btns.innerHTML = '';
   DB.users.forEach((u, i) => {
-    if (saved.includes(u.name)) selUsers.add(i);
-    const row = document.createElement('div');
-    row.className = 'user-row' + (selUsers.has(i) ? ' sel' : '');
+    if (i === primaryUserIdx) return;
     const col = USER_COLORS[i % USER_COLORS.length];
-    row.innerHTML = `<div class="user-dot" style="background:${col}"></div><span class="user-row-name">${esc(u.name)}</span>`;
-    row.addEventListener('click', () => {
-      if (selUsers.has(i)) selUsers.delete(i); else selUsers.add(i);
-      row.classList.toggle('sel', selUsers.has(i));
-      saveSelUsers();
+    const btn = document.createElement('button');
+    btn.className = 'reco-btn' + (recoUser === i ? ' active' : '');
+    btn.innerHTML = `<span class="reco-dot" style="background:${col}"></span>${esc(u.name)}`;
+    btn.onclick = () => {
+      recoUser = recoUser === i ? null : i;
+      updateRecoPanel();
       applyFilter();
-    });
-    container.appendChild(row);
+    };
+    btns.appendChild(btn);
   });
 }
 
@@ -951,6 +1029,58 @@ document.querySelectorAll('.panel-title.collapsible').forEach(title => {
 });
 
 function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+
+<script>
+(function() {
+  const USERS = ["BipolarMuzik", "EliasJ72", "Frikomid", "GabredMared", "Lonsonxd", "Nubis84", "Rocky_stereo", "alberto_gu", "armandwave", "paqueradejere", "sdecandelario", "verygooood"];
+  const KEY   = 'mh_user';
+  const modal  = document.getElementById('mhUserModal');
+  const btn    = document.getElementById('mhUserBtn');
+  const opts   = document.getElementById('mhUserOpts');
+  const close  = document.getElementById('mhModalClose');
+  if (!modal || !btn || !opts) return;
+
+  function buildOpts() {
+    opts.innerHTML = '';
+    const all = document.createElement('div');
+    all.className = 'mh-usr-opt' + (localStorage.getItem(KEY) ? '' : ' active');
+    all.textContent = 'Todos (sin filtro)';
+    all.onclick = () => selectUser(null);
+    opts.appendChild(all);
+    USERS.forEach(u => {
+      const el = document.createElement('div');
+      el.className = 'mh-usr-opt' + (localStorage.getItem(KEY) === u ? ' active' : '');
+      el.textContent = u;
+      el.onclick = () => selectUser(u);
+      opts.appendChild(el);
+    });
+  }
+
+  function updateBtn() {
+    const u = localStorage.getItem(KEY);
+    const lbl = document.getElementById('mhULbl');
+    if (lbl) lbl.textContent = u || '—';
+    btn.title = u ? u : 'Seleccionar usuario';
+    btn.classList.toggle('has-user', !!u);
+  }
+
+  function selectUser(u) {
+    if (u) localStorage.setItem(KEY, u);
+    else localStorage.removeItem(KEY);
+    updateBtn();
+    buildOpts();
+    modal.classList.remove('open');
+    if (u !== null && u !== undefined) setPrimaryUser(u); else setPrimaryUser(null);
+  }
+
+  btn.addEventListener('click', e => { e.stopPropagation(); buildOpts(); modal.classList.add('open'); });
+  close.addEventListener('click', () => modal.classList.remove('open'));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') modal.classList.remove('open'); });
+
+  updateBtn();
+})();
 </script>
 </body>
 </html>

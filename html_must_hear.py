@@ -3685,9 +3685,57 @@ def render_collection_html_v2(
   }}
   .panel-close-btn:hover {{ background: rgba(255,255,255,.18); }}
 
+  /* ── mobile stats bar (hidden on desktop) ── */
+  #mob-stats-bar {{
+    display: none;
+    align-items: center; justify-content: space-between;
+    padding: 6px 8px; border-bottom: 1px solid var(--border);
+    background: var(--surface); flex-wrap: wrap; gap: 5px;
+  }}
+  .mob-stat-row {{
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center; flex: 1;
+  }}
+  .mob-stat-chip {{
+    font-family: 'DM Mono', monospace; font-size: .55rem;
+    letter-spacing: .04em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 4px;
+  }}
+  .mob-stat-dot {{
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }}
+  .mob-grid-ctrl {{
+    display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+  }}
+  .mob-grid-btn {{
+    width: 26px; height: 26px; border: 1px solid var(--border); border-radius: 3px;
+    background: none; color: var(--muted); font-size: .9rem; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all .12s;
+  }}
+  .mob-grid-btn:hover {{ border-color: var(--accent); color: var(--accent); }}
+  .mob-grid-lbl {{
+    font-family: 'DM Mono', monospace; font-size: .6rem; color: var(--muted);
+    min-width: 22px; text-align: center;
+  }}
+
   @media (max-width: 600px) {{
-    header {{ right: 0; height: auto; min-height: var(--header-h); overflow: visible; }}
-    #main {{ padding: 12px 10px 60px; margin-right: 0; }}
+    header {{ right: 0; height: auto; overflow: visible; }}
+    .mh-r1 {{ padding: 0 8px; gap: 6px; min-height: 40px; }}
+    .mh-title {{ font-size: .9rem; }}
+    .mh-nav {{ gap: 1px; }}
+    .mh-na {{ font-size: .5rem; padding: 2px 5px; letter-spacing: .04em; }}
+    /* row 2 on mobile: show only filter buttons */
+    .hdr-r2 {{ padding: 4px 8px; gap: 4px; height: auto; }}
+    .header-sub, .progress-wrap, .search-box, .genre-wrap, .grid-sizer {{
+      display: none !important;
+    }}
+    .controls {{ gap: 3px; margin-left: 0; }}
+    .filter-btn {{ font-size: .55rem; padding: 3px 7px; letter-spacing: .04em; }}
+    /* stats bar: fixed below header on mobile */
+    #mob-stats-bar {{ display: flex; position: fixed; left: 0; right: 0; z-index: 90; }}
+    /* main: no side margin, margin-top set by adjustMainTop() */
+    #main {{ padding: 8px 6px 60px; margin-right: 0; margin-top: 0; }}
+    .page-footer {{ right: 0; }}
     #panel {{ inset: 0; width: 100%; border-left: none; top: 0;
               transform: translateY(105%);
               transition: transform .28s cubic-bezier(.4,0,.2,1); }}
@@ -3723,6 +3771,7 @@ def render_collection_html_v2(
       <button class="filter-btn active" id="btn-all"     onclick="setFilter('all')">All</button>
       <button class="filter-btn"        id="btn-heard"   onclick="setFilter('heard')">Heard</button>
       <button class="filter-btn"        id="btn-pending" onclick="setFilter('pending')">Pending</button>
+      <button class="filter-btn"        id="btn-reco"    onclick="setFilter('reco')">Recomendados</button>
       <input class="search-box" id="search" placeholder="Search…" oninput="applyFilters()">
       <div class="genre-wrap">
         <button class="genre-btn" id="genre-btn" onclick="toggleGenreDropdown()">
@@ -3742,6 +3791,15 @@ def render_collection_html_v2(
     <span class="genre-clear" onclick="clearGenres()">clear</span>
   </div>
   <div id="genre-list"></div>
+</div>
+
+<div id="mob-stats-bar">
+  <div class="mob-stat-row" id="mob-stat-chips"></div>
+  <div class="mob-grid-ctrl">
+    <button class="mob-grid-btn" onclick="mobGridDec()">−</button>
+    <span class="mob-grid-lbl" id="mob-grid-lbl">3×</span>
+    <button class="mob-grid-btn" onclick="mobGridInc()">+</button>
+  </div>
 </div>
 
 <main id="main">
@@ -3777,6 +3835,8 @@ let gridCols = 10;
 let currentAlbum = null;
 let selectedGenres = new Set();
 let _userPct = null;
+let RECO_SET = new Set();
+let recoLoaded = false;
 const SERIES_NAME = {json.dumps(series_name)};
 const MH_USERS_DATA = {mh_users_js};
 
@@ -3861,6 +3921,7 @@ function buildGrid() {{
          data-heard="${{a.heard ? '1' : '0'}}"
          data-num="${{a.n}}"
          data-genres="${{(a.genres||[]).join(',')}}"
+         data-mbid="${{a.mbid || ''}}"
          data-idx="${{idx}}"
          onclick="openPanel(ALBUMS[${{idx}}],this)">
       <img data-src="${{thumbUrl(a.cover)}}" src="{COVER_PLACEHOLDER}" alt="${{a.n}}"
@@ -3871,7 +3932,17 @@ function buildGrid() {{
         <div class="card-artist">${{a.artist}} · ${{a.year ?? ''}}</div>
       </div>
     </div>`).join('');
-  grid.querySelectorAll('img[data-src]').forEach(img => _imgObserver.observe(img));
+  // Tiered lazy loading: immediate → preload → observer
+  const imgs = [...grid.querySelectorAll('img[data-src]')];
+  const immediate = gridCols * 5;
+  const preload   = gridCols * 10;
+  imgs.slice(0, immediate).forEach(img => {{ img.src = img.dataset.src; delete img.dataset.src; }});
+  setTimeout(() => {{
+    imgs.slice(immediate, immediate + preload).forEach(img => {{
+      if (img.dataset.src) {{ img.src = img.dataset.src; delete img.dataset.src; }}
+    }});
+  }}, 500);
+  imgs.slice(immediate + preload).forEach(img => _imgObserver.observe(img));
   document.getElementById('total-count').textContent = ALBUMS.length;
   applyFilters();
 }}
@@ -3940,16 +4011,23 @@ function openPanel(a, cardEl) {{
 
 function setFilter(f) {{
   filter = f;
-  ['all','heard','pending'].forEach(x => {{
+  ['all','heard','pending','reco'].forEach(x => {{
     const btn = document.getElementById('btn-' + x);
+    if (!btn) return;
     btn.classList.toggle('active', x === f);
     if (x === 'pending') {{
       btn.style.borderColor = f === 'pending' ? 'var(--pending)' : '';
       btn.style.color       = f === 'pending' ? 'var(--pending)' : '';
       btn.style.background  = f === 'pending' ? 'rgba(255,71,71,.06)' : '';
     }}
+    if (x === 'reco') {{
+      btn.style.borderColor = f === 'reco' ? '#7b61ff' : '';
+      btn.style.color       = f === 'reco' ? '#7b61ff' : '';
+      btn.style.background  = f === 'reco' ? 'rgba(123,97,255,.06)' : '';
+    }}
   }});
-  applyFilters();
+  if (f === 'reco' && !recoLoaded) loadRecoData();
+  else applyFilters();
 }}
 
 function applyFilters() {{
@@ -3958,7 +4036,8 @@ function applyFilters() {{
   document.querySelectorAll('.card').forEach(c => {{
     const matchFilter = filter === 'all'
       || (filter === 'heard'   && c.dataset.heard === '1')
-      || (filter === 'pending' && c.dataset.heard === '0');
+      || (filter === 'pending' && c.dataset.heard === '0')
+      || (filter === 'reco'    && c.dataset.heard === '0' && RECO_SET.has(c.dataset.mbid));
     const matchSearch = !q || c.dataset.title.includes(q) || c.dataset.artist.includes(q);
     const cardGenres = c.dataset.genres ? c.dataset.genres.split(',') : [];
     const matchGenre = selectedGenres.size === 0 || [...selectedGenres].some(g => cardGenres.includes(g));
@@ -3978,7 +4057,11 @@ function applyFilters() {{
 const _isMobile = () => window.matchMedia('(max-width: 600px)').matches;
 
 function adjustMainTop() {{
-  document.getElementById('main').style.marginTop = document.querySelector('header').offsetHeight + 'px';
+  const hdr = document.querySelector('header').offsetHeight;
+  const msb = document.getElementById('mob-stats-bar');
+  const msbH = (msb && getComputedStyle(msb).display !== 'none') ? msb.offsetHeight : 0;
+  if (msb && msbH > 0) msb.style.top = hdr + 'px';
+  document.getElementById('main').style.marginTop = (hdr + msbH) + 'px';
 }}
 window.addEventListener('resize', adjustMainTop);
 
@@ -4002,11 +4085,13 @@ function loadUserData(username) {{
   document.getElementById('prog-fill').style.width = u.pct + '%';
   selectedGenres.clear(); updateGenreBadge();
   filter = 'all';
-  ['all','heard','pending'].forEach(x => document.getElementById('btn-' + x).classList.toggle('active', x === 'all'));
-  document.getElementById('btn-pending').style.borderColor = '';
-  document.getElementById('btn-pending').style.color = '';
-  document.getElementById('btn-pending').style.background = '';
+  RECO_SET = new Set(); recoLoaded = false;
+  ['all','heard','pending','reco'].forEach(x => {{
+    const btn = document.getElementById('btn-' + x);
+    if (btn) {{ btn.classList.toggle('active', x === 'all'); btn.style.borderColor = ''; btn.style.color = ''; btn.style.background = ''; }}
+  }});
   document.getElementById('search').value = '';
+  updateMobStatsBar();
   fetch(u.json)
     .then(r => {{ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }})
     .then(data => {{
@@ -4028,6 +4113,49 @@ function loadUserData(username) {{
       document.getElementById('grid').innerHTML =
         '<div style="color:var(--muted);font-family:monospace;padding:40px">⚠ Could not load data: ' + err.message + '</div>';
     }});
+}}
+
+function loadRecoData() {{
+  const currentUser = (() => {{ try {{ return localStorage.getItem('mh_user'); }} catch(e) {{ return null; }} }})();
+  const others = MH_USERS_DATA.filter(u => u.user !== currentUser);
+  if (others.length === 0) {{ recoLoaded = true; applyFilters(); return; }}
+  let pending = others.length;
+  others.forEach(u => {{
+    fetch(u.json)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {{ data.forEach(a => {{ if (a.heard && a.mbid) RECO_SET.add(a.mbid); }}); }})
+      .catch(() => {{}})
+      .finally(() => {{ if (--pending === 0) {{ recoLoaded = true; applyFilters(); }} }});
+  }});
+}}
+
+function updateMobStatsBar() {{
+  const chips = document.getElementById('mob-stat-chips');
+  if (!chips) return;
+  const colors = ['#e8ff47','#47b4ff','#ff47b4','#47ffb4','#ff8c47','#c947ff'];
+  chips.innerHTML = MH_USERS_DATA.map((u, i) => {{
+    const color = colors[i % colors.length];
+    return `<span class="mob-stat-chip"><span class="mob-stat-dot" style="background:${{color}}"></span>${{u.heard}}/${{u.total}}</span>`;
+  }}).join('');
+  const lbl = document.getElementById('mob-grid-lbl');
+  if (lbl) lbl.textContent = gridCols + '\\xd7';
+}}
+
+function mobGridDec() {{
+  const v = Math.max(2, gridCols - 1);
+  const sl = document.getElementById('grid-slider');
+  if (sl) sl.value = v;
+  setGridSize(v);
+  const lbl = document.getElementById('mob-grid-lbl');
+  if (lbl) lbl.textContent = v + '\\xd7';
+}}
+function mobGridInc() {{
+  const v = Math.min(8, gridCols + 1);
+  const sl = document.getElementById('grid-slider');
+  if (sl) sl.value = v;
+  setGridSize(v);
+  const lbl = document.getElementById('mob-grid-lbl');
+  if (lbl) lbl.textContent = v + '\\xd7';
 }}
 
 // ── Init ──────────────────────────────────────────────────────────────────

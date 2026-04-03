@@ -893,6 +893,7 @@ def render_html(data: dict, generated: str) -> tuple[str, dict]:
   <h4 style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Colecciones que podr&#237;as explorar</h4>
   <div class="rec-grid">{rec_cards}{no_recs_placeholder}</div>
   <h4 style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;margin-top:4px">Álbumes pendientes (escuchados por otros)</h4>
+  <div class="pend-filter-row" id="pendFilter-{uid_str}"></div>
   <div style="overflow-x:auto;border:1px solid var(--border);border-radius:6px">
     <table style="border-collapse:collapse;width:100%">
       <thead><tr>
@@ -1071,6 +1072,13 @@ def render_html(data: dict, generated: str) -> tuple[str, dict]:
   .coll-popover.open {{ display:block; }}
   .coll-pop-item {{ display:block; font-family:'DM Mono',monospace; font-size:.58rem; color:var(--muted); padding:4px 10px; text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
   .coll-pop-item:hover {{ color:var(--accent); background:rgba(255,255,255,.03); }}
+  /* pending filter by user */
+  .pend-filter-row {{ margin-bottom:10px; display:flex; flex-wrap:wrap; gap:5px; align-items:center; }}
+  .pend-filter-label {{ font-family:'DM Mono',monospace; font-size:.55rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-right:2px; }}
+  .pend-filter-btn {{ font-family:'DM Mono',monospace; font-size:.58rem; padding:2px 9px; border:1px solid var(--border); border-radius:3px; background:none; color:var(--muted); cursor:pointer; transition:all .12s; }}
+  .pend-filter-btn:hover {{ border-color:var(--accent); color:var(--accent); }}
+  .pend-filter-btn.active {{ background:rgba(255,255,255,.05); opacity:1; }}
+  .pend-filter-btn:not(.active) {{ opacity:.5; }}
   /* rym genre tree */
   .rym-genre-hdr {{ background:#161616; }}
   .rym-genre-hdr:hover td {{ background:#1a1a1a; }}
@@ -1333,9 +1341,38 @@ function popChangePage(dir) {{
 const PEND_DATA = {pend_data_js};
 const PEND_PAGE_SIZE = 25;
 const pendCurrentPage = {{}};
+const pendWhoFilter = {{}};
+
+function buildPendFilters(uid) {{
+  const container = document.getElementById('pendFilter-' + uid);
+  if (!container) return;
+  const primaryUser = localStorage.getItem('mh_user');
+  // All users except the primary — sorted by color order (POP_USERS already sorted)
+  const others = POP_USERS.filter(u => u !== primaryUser);
+  if (!others.length) {{ container.innerHTML = ''; return; }}
+  let html = '<span class="pend-filter-label">Filtrar por:</span>';
+  const allActive = !pendWhoFilter[uid] ? ' active' : '';
+  html += `<button class="pend-filter-btn${{allActive}}" onclick="setPendFilter('${{uid}}', null)">Todos</button>`;
+  others.forEach(u => {{
+    const c = POP_COLORS[u] || '#888';
+    const active = pendWhoFilter[uid] === u ? ' active' : '';
+    html += `<button class="pend-filter-btn${{active}}" style="border-color:${{c}};color:${{c}}" onclick="setPendFilter('${{uid}}','${{u}}')">${{u}}</button>`;
+  }});
+  container.innerHTML = html;
+}}
+
+function setPendFilter(uid, username) {{
+  pendWhoFilter[uid] = username || null;
+  buildPendFilters(uid);
+  renderPendPage(uid, 0);
+}}
 
 function renderPendPage(uid, page) {{
-  const data = PEND_DATA[uid] || [];
+  let data = PEND_DATA[uid] || [];
+  const whoFilter = pendWhoFilter[uid];
+  if (whoFilter) {{
+    data = data.filter(r => r.who && r.who.split(',').map(s => s.trim()).includes(whoFilter));
+  }}
   const maxPage = Math.max(0, Math.ceil(data.length / PEND_PAGE_SIZE) - 1);
   page = Math.max(0, Math.min(page, maxPage));
   pendCurrentPage[uid] = page;
@@ -1373,6 +1410,7 @@ function showParaTi(uid) {{
   const btn   = document.getElementById('ptbtn-' + uid);
   if (panel) panel.style.display = 'block';
   if (btn)   btn.classList.add('active');
+  buildPendFilters(uid);
 }}
 
 // ── Album links: load from external JSON then init tables ─────────────────
@@ -1381,7 +1419,13 @@ const U2UID = {u2uid_js};
 function syncParaTi() {{
   const saved = localStorage.getItem('mh_user');
   const uid = saved && U2UID[saved];
-  if (uid) showParaTi(uid);
+  if (uid) {{
+    showParaTi(uid);
+  }} else {{
+    // No primary user set — build filters for whichever panel is visible
+    const visible = document.querySelector('.para-ti-panel[style*="display: block"], .para-ti-panel[style*="display:block"]');
+    if (visible) buildPendFilters(visible.id.replace('ptpanel-',''));
+  }}
 }}
 fetch('data/album_links.json')
   .then(r => r.json())

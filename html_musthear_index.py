@@ -686,9 +686,10 @@ aside {
   font-family: var(--mono); font-size: .56rem;
   padding: 2px 6px; border-radius: 2px;
   background: var(--surface2); border: 1px solid var(--border);
-  color: var(--muted);
+  color: var(--muted); text-decoration: none;
   display: inline-flex; align-items: center; gap: 4px;
 }
+a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
 .panel-coll-rank {
   color: var(--accent); font-weight: 600; font-size: .58rem;
 }
@@ -732,6 +733,20 @@ aside {
 .header-nav-link:hover { border-color: var(--accent); color: var(--accent); }
 .header-nav-link.active { border-color: var(--accent); color: var(--accent); background: rgba(201,162,39,.08); }
 
+/* ── Para Ti (reco) buttons in sidebar ── */
+.reco-btn {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 5px 6px; border-radius: 3px; cursor: pointer;
+  background: none; border: none; text-align: left;
+  font-family: var(--mono); font-size: .72rem; color: var(--muted);
+  transition: background .1s, color .1s;
+}
+.reco-btn:hover { background: rgba(255,255,255,.04); color: var(--text); }
+.reco-btn.active { background: rgba(255,255,255,.04); color: var(--text); }
+.reco-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; opacity: .4; }
+.reco-btn.active .reco-dot { opacity: 1; }
+{{MH_MODAL_CSS}}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   :root { --panel-w: 0px; }
@@ -745,7 +760,7 @@ aside {
 </style>
 </head>
 <body>
-
+{{MH_MODAL_HTML}}
 <header>
   <div class="header-title">Must Hear</div>
   <nav class="header-nav">
@@ -755,6 +770,7 @@ aside {
     <a class="header-nav-link" href="estadisticas.html">Estadísticas</a>
   </nav>
   <div id="statusBar">Cargando…</div>
+  {{MH_MODAL_BTN}}
 </header>
 
 <div class="body-wrap">
@@ -770,13 +786,13 @@ aside {
         </div>
         <div class="coll-tree panel-body-collapse open" id="panel-co"></div>
       </div>
-      <div class="panel">
-        <div class="panel-title collapsible" data-target="panel-users">
-          Usuarios
-          <button class="panel-clear" data-panel="users">limpiar</button>
+      <div class="panel" id="reco-panel" style="display:none">
+        <div class="panel-title collapsible" data-target="reco-user-btns">
+          Recomendaciones
+          <button class="panel-clear" data-panel="reco">limpiar</button>
           <span class="collapse-arrow open">▾</span>
         </div>
-        <div class="panel-body-collapse open" id="panel-users"></div>
+        <div class="panel-body-collapse open" id="reco-user-btns"></div>
       </div>
       <div class="panel">
         <div class="panel-title collapsible" data-target="panel-g">
@@ -844,11 +860,13 @@ const PAGE_SIZE = 80;
 const USER_COLORS = ['#c9a227','#6a9fb5','#78b56c','#b56c6c','#9b6cb5','#b59b6c','#6cb5b5','#b56ca0'];
 
 let DB = null;
-let selUsers  = new Set();  // selected user indices
-let selCs     = new Set();  // selected collection indices (individual series)
-let selG      = new Set();
-let selD      = new Set();
-let selStatus = 'all';      // 'all' | 'heard' | 'pending'
+let selUsers      = new Set();  // selected user indices
+let selCs         = new Set();  // selected collection indices (individual series)
+let selG          = new Set();
+let selD          = new Set();
+let selStatus     = 'all';      // 'all' | 'heard' | 'pending'
+let primaryUserIdx = -1;        // index into DB.users for primary user
+let recoUser       = null;      // user index to filter "heard by them, not by primary"
 let filtered = [];
 let page = 0;
 let currentAlbumId = null;
@@ -861,7 +879,7 @@ fetch(DATA_URL)
     DB = data;
     document.getElementById('loading').style.display = 'none';
     buildFilters();
-    buildUserPanel();
+    initPrimaryUser();
     document.getElementById('filterBtn').disabled = false;
     applyFilter();
   })
@@ -991,12 +1009,7 @@ document.querySelectorAll('.panel-clear').forEach(btn => {
     }
     if (p === 'g')  { selG.clear();  document.querySelectorAll('#panel-g .chip').forEach(c => { c.classList.remove('sel'); c.querySelector('.chip-check').textContent = ''; }); }
     if (p === 'd')  { selD.clear();  document.querySelectorAll('#panel-d .decade-chip').forEach(c => c.classList.remove('sel')); }
-    if (p === 'users') {
-      selUsers.clear();
-      document.querySelectorAll('#panel-users .user-row').forEach(r => r.classList.remove('sel'));
-      saveSelUsers();
-      applyFilter();
-    }
+    if (p === 'reco') { recoUser = null; updateRecoPanel(); applyFilter(); }
   });
 });
 
@@ -1016,7 +1029,10 @@ function applyFilter() {
     if (selCs.size && !a.cs.some(p => selCs.has(p[0]))) return false;
     if (selG.size  && !a.g.some(gi => selG.has(gi))) return false;
     if (selD.size  && !selD.has(a.d))                return false;
-    if (selStatus !== 'all') {
+    // Reco filter: heard by secondary user, NOT by primary
+    if (recoUser !== null && primaryUserIdx >= 0) {
+      if (!a.h.includes(recoUser) || a.h.includes(primaryUserIdx)) return false;
+    } else if (selStatus !== 'all') {
       if (selUsers.size === 0) return true; // no users selected — ignore status filter
       const heardBySome = [...selUsers].some(ui => a.h.includes(ui));
       if (selStatus === 'heard'   && !heardBySome) return false;
@@ -1087,7 +1103,7 @@ function openPanel(a) {
   if (activeCard) activeCard.classList.add('active-card');
 
   const genreMap = Object.fromEntries(DB.genres.map(g => [g.i, g.name]));
-  const collMap  = Object.fromEntries(DB.collections.map(c => [c.i, c.name]));
+  const collMap  = Object.fromEntries(DB.collections.map(c => [c.i, {name: c.name, slug: c.slug, group: c.group}]));
   const heardBySome = selUsers.size > 0 && [...selUsers].some(ui => a.h.includes(ui));
 
   // Cover
@@ -1104,8 +1120,11 @@ function openPanel(a) {
   // Body
   const genres = a.g.map(gi => `<span class="panel-genre-tag">${esc(genreMap[gi] || '')}</span>`).join('');
   const colls  = a.cs.map(([ci, rank]) => {
-    const name = esc(collMap[ci] || '');
+    const cd = collMap[ci] || {};
+    const name = esc(cd.name || '');
     const rankStr = rank != null ? `<span class="panel-coll-rank">#${rank}</span>` : '';
+    const href = cd.slug ? `${cd.group}/${cd.slug}/index.html` : null;
+    if (href) return `<a class="panel-coll-tag" href="${href}" target="_blank">${rankStr}${name}</a>`;
     return `<span class="panel-coll-tag">${rankStr}${name}</span>`;
   }).join('');
 
@@ -1174,36 +1193,47 @@ function clearPanel() {
     </div>`;
 }
 
-// ── User panel (sidebar) ───────────────────────────────────────────────────
-function saveSelUsers() {
-  const names = [...selUsers].map(ui => DB.users[ui].name);
-  localStorage.setItem('mh_users', JSON.stringify(names));
+// ── Primary user init ──────────────────────────────────────────────────────
+function initPrimaryUser() {
+  const stored = localStorage.getItem('mh_user');
+  if (stored) {
+    const pi = DB.users.findIndex(u => u.name === stored);
+    if (pi >= 0) {
+      primaryUserIdx = pi;
+      selUsers = new Set([pi]);
+      updateRecoPanel();
+    }
+  }
 }
 
-function buildUserPanel() {
-  const container = document.getElementById('panel-users');
-  container.innerHTML = '';
-  // Restore from localStorage (multi-select)
-  let saved = [];
-  try { saved = JSON.parse(localStorage.getItem('mh_users') || '[]'); } catch(e) {}
-  // Fallback: honor old single-user key
-  if (saved.length === 0) {
-    const single = localStorage.getItem('mh_user');
-    if (single) saved = [single];
-  }
+function setPrimaryUser(username) {
+  primaryUserIdx = (username !== null && username !== undefined)
+    ? DB.users.findIndex(u => u.name === username) : -1;
+  selUsers = primaryUserIdx >= 0 ? new Set([primaryUserIdx]) : new Set();
+  recoUser = null;
+  updateRecoPanel();
+  applyFilter();
+}
+
+function updateRecoPanel() {
+  const panel = document.getElementById('reco-panel');
+  const btns  = document.getElementById('reco-user-btns');
+  if (!panel || !btns || !DB) return;
+  if (primaryUserIdx < 0) { panel.style.display = 'none'; return; }
+  panel.style.display = '';
+  btns.innerHTML = '';
   DB.users.forEach((u, i) => {
-    if (saved.includes(u.name)) selUsers.add(i);
-    const row = document.createElement('div');
-    row.className = 'user-row' + (selUsers.has(i) ? ' sel' : '');
+    if (i === primaryUserIdx) return;
     const col = USER_COLORS[i % USER_COLORS.length];
-    row.innerHTML = `<div class="user-dot" style="background:${col}"></div><span class="user-row-name">${esc(u.name)}</span>`;
-    row.addEventListener('click', () => {
-      if (selUsers.has(i)) selUsers.delete(i); else selUsers.add(i);
-      row.classList.toggle('sel', selUsers.has(i));
-      saveSelUsers();
+    const btn = document.createElement('button');
+    btn.className = 'reco-btn' + (recoUser === i ? ' active' : '');
+    btn.innerHTML = `<span class="reco-dot" style="background:${col}"></span>${esc(u.name)}`;
+    btn.onclick = () => {
+      recoUser = recoUser === i ? null : i;
+      updateRecoPanel();
       applyFilter();
-    });
-    container.appendChild(row);
+    };
+    btns.appendChild(btn);
   });
 }
 
@@ -1221,12 +1251,21 @@ document.querySelectorAll('.panel-title.collapsible').forEach(title => {
 
 function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
+{{MH_MODAL_JS}}
 </body>
 </html>
 """
 
-def render_html(data_url: str) -> str:
-    return HTML_TEMPLATE.replace("{{DATA_URL}}", data_url)
+def render_html(data_url: str, users: list = None) -> str:
+    from html_must_hear import _mh_user_modal_css, _mh_user_modal_html, _mh_user_modal_btn, _mh_user_modal_js
+    users = users or []
+    on_select = "if (u !== null && u !== undefined) setPrimaryUser(u); else setPrimaryUser(null);"
+    return (HTML_TEMPLATE
+            .replace("{{DATA_URL}}", data_url)
+            .replace("{{MH_MODAL_CSS}}", _mh_user_modal_css())
+            .replace("{{MH_MODAL_HTML}}", _mh_user_modal_html(users))
+            .replace("{{MH_MODAL_BTN}}", _mh_user_modal_btn())
+            .replace("{{MH_MODAL_JS}}", _mh_user_modal_js(users, on_select_js=on_select)))
 
 
 # ── MAIN ──────────────────────────────────────────────────────────────────────
@@ -1263,8 +1302,9 @@ def main():
     size_kb = json_path.stat().st_size / 1024
     print(f"  💾 JSON: {json_path} ({size_kb:.0f} KB)")
 
+    users = [u["name"] for u in data["users"]]
     html_path = out_dir / "index_alternativo.html"
-    html_path.write_text(render_html("data/mh_index.json"), encoding="utf-8")
+    html_path.write_text(render_html("data/mh_index.json", users=users), encoding="utf-8")
     print(f"  📋 HTML: {html_path}")
     print(f"✅ Generado: {args.out}/index_alternativo.html")
 

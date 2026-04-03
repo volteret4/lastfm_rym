@@ -201,29 +201,25 @@ def build_data(mh_path: str, scr_path: str | None, top_genres: int) -> dict:
         # Pick best external URL for the album link
         url = r["rateyourmusic_url"] or r["aoty_url"] or r["sputnikmusic_url"] or ""
 
-        # Pick best description: prefer lfm album > mb album > lfm artist > mb artist
-        def _trunc(s, n=400): return (s[:n] + "…") if s and len(s) > n else (s or "")
-        desc = (
-            _trunc(r["d_la"]) or _trunc(r["d_ma"]) or
-            _trunc(r["d_ar"]) or _trunc(r["d_mr"])
-        )
-        desc_ar = _trunc(r["d_ar"]) or _trunc(r["d_mr"])
+        def _trunc(s, n=500): return (s[:n] + "…") if s and len(s) > n else (s or "")
 
         albums_out.append({
-            "id": aid,
-            "t":  r["name"],
-            "a":  r["artist"],
-            "y":  year,
-            "d":  decade,
-            "c":  cover,
-            "u":  url,
-            "yt": r["yt_id"],
-            "co": coll_groups,
-            "cs": coll_pairs,
-            "g":  genres,
-            "h":  heard,
-            "db": desc,     # album/artist description (best available)
-            "da": desc_ar,  # artist-only description (fallback if same as db)
+            "id":  aid,
+            "t":   r["name"],
+            "a":   r["artist"],
+            "y":   year,
+            "d":   decade,
+            "c":   cover,
+            "u":   url,
+            "yt":  r["yt_id"],
+            "co":  coll_groups,
+            "cs":  coll_pairs,
+            "g":   genres,
+            "h":   heard,
+            "dla": _trunc(r["d_la"]),   # Last.fm album desc
+            "dma": _trunc(r["d_ma"]),   # MusicBrainz album desc
+            "dar": _trunc(r["d_ar"]),   # Last.fm artist desc
+            "dmr": _trunc(r["d_mr"]),   # MusicBrainz artist desc
         })
 
         # Update group totals (count unique albums)
@@ -707,13 +703,22 @@ a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
 }
 .panel-yt-search a:hover { text-decoration: underline; }
 .panel-artist-links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-.panel-desc-text {
-  font-size: .7rem; color: var(--muted); line-height: 1.5;
-  margin-bottom: 8px; white-space: pre-wrap; word-break: break-word;
+.panel-desc-block { margin-bottom: 10px; }
+.panel-desc-label {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--mono); font-size: .52rem; letter-spacing: .12em;
+  text-transform: uppercase; margin-bottom: 3px; color: var(--muted);
 }
-.panel-desc-artist {
-  margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border);
-  font-style: italic;
+.panel-desc-label::before {
+  content: ''; display: inline-block; width: 5px; height: 5px;
+  border-radius: 50%; background: currentColor; flex-shrink: 0;
+}
+.panel-desc-label.lfm    { color: #d51007; }
+.panel-desc-label.mb     { color: #ba478f; }
+.panel-desc-label.artist { color: #6a9fb5; }
+.panel-desc-text {
+  font-size: .72rem; color: #aaa; line-height: 1.55;
+  word-break: break-word;
 }
 
 /* ── Header nav ── */
@@ -1156,11 +1161,22 @@ function openPanel(a) {
   </div>` : '';
 
   // Description blocks
-  const descHtml = a.db ? `
+  const descSources = [
+    { key: 'dla', label: '💿 Álbum · Last.fm',         cls: 'lfm' },
+    { key: 'dma', label: '💿 Álbum · MusicBrainz',     cls: 'mb' },
+    { key: 'dar', label: '🎙 Artista · Last.fm',        cls: 'lfm artist' },
+    { key: 'dmr', label: '🎙 Artista · MusicBrainz',   cls: 'mb artist' },
+  ];
+  const descBlocks = descSources
+    .filter(s => a[s.key] && a[s.key].length > 30)
+    .map(s => `<div class="panel-desc-block">
+      <div class="panel-desc-label ${s.cls}">${s.label}</div>
+      <div class="panel-desc-text">${esc(a[s.key])}</div>
+    </div>`).join('');
+  const descHtml = descBlocks ? `
     <div class="panel-divider"></div>
-    <div class="panel-section-label">Info</div>
-    <div class="panel-desc-text">${esc(a.db)}</div>
-    ${a.da && a.da !== a.db ? `<div class="panel-desc-text panel-desc-artist">${esc(a.da)}</div>` : ''}
+    <div class="panel-section-label">Información</div>
+    ${descBlocks}
   ` : '';
 
   document.getElementById('panel-body').innerHTML = `

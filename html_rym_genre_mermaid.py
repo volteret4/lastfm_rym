@@ -152,6 +152,7 @@ def build_panel_data(
     genre_tree: list[dict],
     scraped_map: dict[str, dict],
     top_albums: dict[str, list[dict]],
+    user_heard: dict[str, dict[str, int]] | None = None,
 ) -> dict[str, dict]:
     data: dict[str, dict] = {}
 
@@ -165,11 +166,47 @@ def build_panel_data(
                 "total":  scraped_map.get(cslug, {}).get("total", 0),
                 "cslug":  cslug if cslug in scraped_map else "",
                 "albums": top_albums.get(cslug, []),
+                "heard":  (user_heard or {}).get(cslug, {}),
             }
             walk(n.get("subgenres", []))
 
     walk(genre_tree)
     return data
+
+
+def get_user_heard_counts(
+    mh_conn: sqlite3.Connection,
+    users: list[str],
+    chart_slugs: list[str],
+) -> dict[str, dict[str, int]]:
+    """Return {chart_slug: {username: heard_count}} for scraped chart collections."""
+    if not users or not chart_slugs:
+        return {}
+    placeholders = ",".join("?" * len(users))
+    uid_map = {
+        r[0]: r[1]
+        for r in mh_conn.execute(
+            f"SELECT username, id FROM users WHERE username IN ({placeholders})", users
+        ).fetchall()
+    }
+    result: dict[str, dict[str, int]] = {}
+    for slug in chart_slugs:
+        counts: dict[str, int] = {}
+        for uname in users:
+            uid = uid_map.get(uname)
+            if uid is None:
+                counts[uname] = 0
+                continue
+            row = mh_conn.execute("""
+                SELECT COUNT(DISTINCT ca.album_id)
+                FROM collection_albums ca
+                JOIN collections c ON c.id = ca.collection_id
+                JOIN user_heard uh ON uh.album_id = ca.album_id
+                WHERE c.slug = ? AND uh.user_id = ?
+            """, (slug, uid)).fetchone()
+            counts[uname] = row[0] if row else 0
+        result[slug] = counts
+    return result
 
 
 # ── HTML rendering ─────────────────────────────────────────────────────────
@@ -250,7 +287,7 @@ def render_html(
   .genre-picker {{ position:absolute; top:12px; right:16px; z-index:50; }}
   .genre-picker-btn {{
     display:flex; align-items:center; gap:8px; padding:5px 12px;
-    background:rgba(10,10,10,.9); border:1px solid var(--border); border-radius:5px;
+    background:rgba(10,10,10,.9); border:1px solid #333; border-radius:5px;
     color:var(--text); font-family:'DM Sans',sans-serif; font-size:.82rem;
     cursor:pointer; white-space:nowrap; min-width:170px; justify-content:space-between;
     transition:border-color .12s; backdrop-filter:blur(8px);
@@ -353,26 +390,50 @@ def render_html(
     display:flex; flex-direction:column;
   }}
   #panel.open {{ transform:translateX(0); }}
-  #panel-scroll {{ flex:1; overflow-y:auto; padding:18px 18px 10px; }}
+  /* Close bar: fixed top, not scrollable */
+  #panel-close-bar {{
+    flex-shrink:0; display:flex; align-items:center;
+    padding:8px 14px; border-bottom:1px solid var(--border);
+  }}
+  #panel-scroll {{ flex:1; overflow-y:auto; padding:16px 18px 24px; -webkit-overflow-scrolling:touch; }}
+  /* Video area lives INSIDE the scroll */
   #panel-video-area {{
-    flex-shrink:0; padding:10px 18px 14px;
+    margin-top:16px; padding-top:14px;
     border-top:1px solid var(--border);
     display:none;
   }}
   .panel-pag-row {{
-    display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;
+    display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;
   }}
   .panel-pag-btn {{
-    font-family:'DM Mono',monospace; font-size:.58rem; padding:3px 10px;
-    border:1px solid var(--border); border-radius:4px; background:none;
-    color:var(--muted); cursor:pointer;
+    font-family:'DM Mono',monospace; font-size:.58rem; padding:4px 12px;
+    border:1px solid #444; border-radius:4px; background:none;
+    color:#bbb; cursor:pointer; transition:color .12s, border-color .12s;
   }}
+  .panel-pag-btn:hover:not(:disabled) {{ color:var(--accent); border-color:var(--accent); }}
   .panel-pag-btn:disabled {{ opacity:.3; cursor:default; }}
   .panel-close {{
-    background:none; border:none; color:var(--muted); cursor:pointer;
-    font-size:.8rem; float:right; padding:2px 6px; transition:color .12s;
+    background:none; border:1px solid #444; border-radius:4px;
+    color:#bbb; cursor:pointer;
+    font-size:.8rem; padding:3px 10px; transition:color .12s, border-color .12s;
   }}
-  .panel-close:hover {{ color:var(--accent); }}
+  .panel-close:hover {{ color:var(--accent); border-color:var(--accent); }}
+  .gp-search {{
+    display:block; width:100%; padding:7px 12px;
+    background:#161616; border:none; border-bottom:1px solid var(--border);
+    color:var(--text); font-family:'DM Mono',monospace; font-size:.75rem;
+    outline:none; box-sizing:border-box;
+  }}
+  .gp-search::placeholder {{ color:#444; }}
+  .user-stats-row {{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    font-family:'DM Mono',monospace; font-size:.62rem;
+    margin:10px 0 14px; padding:8px 10px;
+    background:#111; border-radius:4px; border:1px solid var(--border);
+  }}
+  .stat-h  {{ color:#78b56c; }}
+  .stat-p  {{ color:#b56c6c; }}
+  .stat-sep {{ color:var(--border); }}
   .panel-slug {{ font-family:'DM Mono',monospace; font-size:.52rem; color:var(--muted); margin-bottom:4px; }}
   .panel-title {{
     font-family:'Bebas Neue',sans-serif; font-size:1.5rem; color:var(--accent);
@@ -417,32 +478,41 @@ def render_html(
 
   @media (max-width:700px) {{
     :root {{ --panel-w:100vw; }}
-    .mh-na.on {{ display:none; }}
+    /* Panel: slide up from below header, not from right */
     #panel {{
       position:fixed; top:var(--header-h); left:0; right:0; bottom:0;
-      width:100%; transform:translateX(100%);
+      width:100%; z-index:500;
+      transform:translateY(105%); transition:transform .25s ease;
     }}
-    #panel.open {{ transform:translateX(0); }}
+    #panel.open {{ transform:translateY(0); }}
     #panel-scroll {{
       -webkit-overflow-scrolling:touch;
       overflow-y:auto;
     }}
     #tree-wrap.panel-open {{ right:0; }}
+    #panel-close-bar {{ padding:10px 14px; }}
+    .panel-close {{ font-size:.95rem; padding:5px 14px; }}
+    .panel-pag-btn {{ padding:6px 16px; font-size:.68rem; }}
+    .genre-picker-btn {{ min-width:140px; font-size:.78rem; }}
+    /* Header: horizontal scroll */
+    header {{ overflow-x:auto; flex-wrap:nowrap; padding:0 10px; }}
+    header::-webkit-scrollbar {{ display:none; }}
+    .mh-nav {{ flex-wrap:nowrap; flex-shrink:0; }}
+    .mh-title {{ flex-shrink:0; }}
   }}
 </style>
 </head>
 <body>
 {_mh_user_modal_html(users or [])}
 <header>
-  <div class="mh-title">Géneros RYM</div>
+  <div class="mh-title">Géneros</div>
   <nav class="mh-nav">
     <a class="mh-na" href="index.html">Colección</a>
     <a class="mh-na" href="index_alternativo.html">Explorador</a>
-    <a class="mh-na on" href="rym_genre_tree.html">Géneros RYM</a>
+    <a class="mh-na on" href="rym_genre_tree.html">Géneros</a>
     <a class="mh-na" href="estadisticas.html">Estadísticas</a>
   </nav>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-    <div id="sec-users"></div>
+  <div style="margin-left:auto;flex-shrink:0;">
     {_mh_user_modal_btn()}
   </div>
 </header>
@@ -457,22 +527,25 @@ def render_html(
         <span class="gp-caret">▾</span>
       </button>
       <div class="genre-picker-dd" id="gpDd">
+        <input id="gpSearch" class="gp-search" type="text" placeholder="Buscar género…" autocomplete="off" onclick="event.stopPropagation()" oninput="filterGenres(this.value)">
 {sidebar_html}      </div>
     </div>
   </div>
 
   <aside id="panel">
-    <div id="panel-scroll">
-      <button class="panel-close" onclick="closePanel()">✕</button>
-      <div id="panel-body"></div>
+    <div id="panel-close-bar">
+      <button class="panel-close" onclick="closePanel()">✕ Cerrar</button>
     </div>
-    <div id="panel-video-area">
-      <div class="panel-pag-row">
-        <button id="panelPrev" class="panel-pag-btn" onclick="panelAlbPage(-1)">&#8592;</button>
-        <span id="panelPgInfo" style="font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)"></span>
-        <button id="panelNext" class="panel-pag-btn" onclick="panelAlbPage(1)">&#8594;</button>
+    <div id="panel-scroll">
+      <div id="panel-body"></div>
+      <div id="panel-video-area">
+        <div class="panel-pag-row">
+          <button id="panelPrev" class="panel-pag-btn" onclick="panelAlbPage(-1)">&#8592;</button>
+          <span id="panelPgInfo" style="font-family:'DM Mono',monospace;font-size:.56rem;color:var(--muted)"></span>
+          <button id="panelNext" class="panel-pag-btn" onclick="panelAlbPage(1)">&#8594;</button>
+        </div>
+        <div id="panel-alb-pages"></div>
       </div>
-      <div id="panel-alb-pages"></div>
     </div>
   </aside>
 </div>
@@ -730,8 +803,24 @@ function render() {{
 function togglePicker() {{
   const btn = document.getElementById('gpBtn');
   const dd  = document.getElementById('gpDd');
+  const opening = !dd.classList.contains('open');
   btn.classList.toggle('open');
   dd.classList.toggle('open');
+  if (opening) {{
+    const inp = document.getElementById('gpSearch');
+    if (inp) {{ inp.value = ''; filterGenres(''); inp.focus(); }}
+  }}
+}}
+
+function filterGenres(q) {{
+  q = q.trim().toLowerCase();
+  document.querySelectorAll('#gpDd .mg-link').forEach(el => {{
+    if (!q) {{ el.style.display = ''; return; }}
+    const name = el.textContent.trim().toLowerCase();
+    // fuzzy: every space-separated token must appear somewhere in the genre name
+    const ok = q.split(/[ \t]+/).every(w => name.includes(w));
+    el.style.display = ok ? '' : 'none';
+  }});
 }}
 
 function selectGenre(slug) {{
@@ -783,6 +872,21 @@ function showPanel(slug) {{
   if (data.desc) {{
     html += `<div class="panel-desc">${{data.desc}}</div>`;
   }}
+
+  // User heard/pending stats
+  try {{
+    const selUser = localStorage.getItem('mh_user');
+    if (selUser && data.heard && data.heard[selUser] !== undefined && data.total > 0) {{
+      const h = data.heard[selUser] || 0;
+      const p = Math.max(0, data.total - h);
+      html += `<div class="user-stats-row">
+        <span class="stat-h">✓ ${{h}} escuchados</span>
+        <span class="stat-sep">·</span>
+        <span class="stat-p">○ ${{p}} pendientes</span>
+        <span style="color:var(--muted)">de ${{data.total}}</span>
+      </div>`;
+    }}
+  }} catch(e) {{}}
 
   const ytAlbums = (data.albums || []).filter(a => a.yt_id);
   if (ytAlbums.length) {{
@@ -840,7 +944,7 @@ function albumHtml(a) {{
     <div class="album-artist">${{esc(a.artist)}}</div>
     <div class="yt-wrap"><iframe
       src="https://www.youtube.com/embed/${{a.yt_id}}"
-      allow="autoplay;encrypted-media" allowfullscreen loading="lazy"></iframe></div>
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>
   </div>`;
 }}
 
@@ -927,10 +1031,11 @@ def run(args: argparse.Namespace) -> None:
         conn, list(scraped_map.keys()), n_yt=15, n_fetch=40, charts_dir=charts_dir
     )
     users = [r[0] for r in conn.execute("SELECT username FROM users ORDER BY username").fetchall()]
+    user_heard = get_user_heard_counts(conn, users, list(scraped_map.keys()))
     conn.close()
     print(f"✅ {len(scraped_map)} scraped collections")
 
-    panel_data = build_panel_data(genre_tree, scraped_map, top_albums)
+    panel_data = build_panel_data(genre_tree, scraped_map, top_albums, user_heard=user_heard)
     generated  = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     html = render_html(genre_tree, panel_data, scraped_map, generated, users=users)

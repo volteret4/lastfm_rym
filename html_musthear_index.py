@@ -564,7 +564,7 @@ aside {
 #gridArea::-webkit-scrollbar { width: 3px; }
 #results {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 8px;
 }
 .album-card {
@@ -752,15 +752,85 @@ a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
 .reco-btn.active .reco-dot { opacity: 1; }
 {{MH_MODAL_CSS}}
 
-/* ── Responsive ── */
-@media (max-width: 900px) {
-  :root { --panel-w: 0px; }
-  #panel { display: none; }
+/* ── RYM chart genre tree ── */
+.rym-tree-row {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 7px; border-radius: var(--radius);
+  border: 1px solid transparent; transition: all .12s;
+  font-size: .7rem; color: var(--muted); user-select: none;
 }
-@media (max-width: 640px) {
-  :root { --aside-w: 0px; }
-  aside { display: none; }
+.rym-tree-row.has-chart { cursor: pointer; }
+.rym-tree-row.has-chart:hover { background: var(--surface2); color: var(--text); border-color: var(--border); }
+.rym-tree-row.sel { border-color: rgba(201,162,39,.4); color: var(--accent); background: rgba(201,162,39,.05); }
+.rym-tree-row.no-chart { font-weight: 500; font-size: .68rem; margin-top: 5px; cursor: default; }
+.rym-tree-check {
+  width: 11px; height: 11px; border: 1px solid var(--border); border-radius: 2px;
+  flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 8px; transition: all .12s; visibility: hidden;
+}
+.rym-tree-row.has-chart .rym-tree-check { visibility: visible; }
+.rym-tree-row.sel .rym-tree-check { background: rgba(201,162,39,.3); border-color: var(--accent); color: var(--accent); }
+.rym-tree-caret { font-size: .5rem; color: var(--muted); flex-shrink: 0; width: 10px; text-align: center; cursor: pointer; }
+.rym-tree-caret.open { transform: rotate(90deg); }
+.rym-tree-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rym-tree-count { font-family: var(--mono); font-size: .6rem; color: var(--border); flex-shrink: 0; }
+.rym-tree-children { display: none; flex-direction: column; gap: 0; }
+.rym-tree-children.open { display: flex; }
+
+/* ── Responsive ── */
+#sidebar-toggle {
+  display: none;
+  position: fixed; bottom: 22px; left: 16px; z-index: 300;
+  width: 50px; height: 50px;
+  background: var(--accent); color: #000;
+  border: none; border-radius: 50%;
+  font-size: 1.25rem; cursor: pointer;
+  align-items: center; justify-content: center;
+  box-shadow: 0 3px 16px rgba(0,0,0,.7);
+}
+#sidebar-overlay {
+  display: none; position: fixed; inset: 0; z-index: 190;
+  background: rgba(0,0,0,.55);
+}
+#sidebar-overlay.vis { display: block; }
+#panel-close-btn {
+  display: none; background: none; border: 1px solid #444; border-radius: 4px;
+  color: #bbb; padding: 3px 12px; cursor: pointer; font-size: .9rem;
+  margin-left: auto; transition: color .12s, border-color .12s; flex-shrink: 0;
+}
+#panel-close-btn:hover { color: var(--accent); border-color: var(--accent); }
+@media (max-width: 900px) {
+  :root { --panel-w: 0px; --aside-w: 0px; }
   .body-wrap { grid-template-columns: 1fr; }
+  /* Sidebar: fixed slide-in drawer */
+  #sidebar {
+    display: flex;
+    position: fixed;
+    top: var(--header-h); left: 0; bottom: 0;
+    width: 280px;
+    transform: translateX(-105%);
+    transition: transform .25s ease;
+    z-index: 200;
+    box-shadow: 4px 0 20px rgba(0,0,0,.6);
+  }
+  #sidebar.open { transform: translateX(0); }
+  #sidebar-toggle { display: flex; }
+  /* Detail panel: full-screen slide-up from below header */
+  #panel {
+    display: flex;
+    position: fixed;
+    top: var(--header-h); left: 0; right: 0; bottom: 0;
+    z-index: 400;
+    transform: translateY(105%);
+    transition: transform .28s ease;
+  }
+  #panel.mobile-open { transform: translateY(0); }
+  #panel-close-btn { display: flex; align-items: center; }
+  /* Header: horizontal scroll for nav links */
+  header { overflow-x: auto; flex-wrap: nowrap; gap: 8px; }
+  header::-webkit-scrollbar { display: none; }
+  .header-nav { flex-wrap: nowrap; flex-shrink: 0; }
+  .header-title, #statusBar { flex-shrink: 0; }
 }
 </style>
 </head>
@@ -771,17 +841,20 @@ a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
   <nav class="header-nav">
     <a class="header-nav-link active" href="index_alternativo.html">Explorador</a>
     <a class="header-nav-link" href="index.html">Colección</a>
-    <a class="header-nav-link" href="rym_genre_tree.html">Géneros RYM</a>
+    <a class="header-nav-link" href="rym_genre_tree.html">Géneros</a>
     <a class="header-nav-link" href="estadisticas.html">Estadísticas</a>
   </nav>
   <div id="statusBar">Cargando…</div>
   {{MH_MODAL_BTN}}
 </header>
 
+<button id="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
 <div class="body-wrap">
 
   <!-- ── Left sidebar ── -->
-  <aside>
+  <aside id="sidebar">
     <div class="filter-scroll">
       <div class="panel">
         <div class="panel-title collapsible" data-target="panel-co">
@@ -843,6 +916,7 @@ a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
   <aside id="panel">
     <div class="panel-topbar">
       <span class="panel-topbar-label">Album detail</span>
+      <button id="panel-close-btn" onclick="closeDetailPanel()">✕</button>
     </div>
     <div id="panel-cover-wrap" class="panel-cover" style="display:none">
       <img id="p-cover" src="" alt="">
@@ -861,6 +935,7 @@ a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
 <script>
 const DATA_URL = '{{DATA_URL}}';
 const PAGE_SIZE = 80;
+const RYM_GENRE_TREE = {{GENRE_TREE}};
 
 const USER_COLORS = ['#c9a227','#6a9fb5','#78b56c','#b56c6c','#9b6cb5','#b59b6c','#6cb5b5','#b56ca0'];
 
@@ -893,6 +968,62 @@ fetch(DATA_URL)
     document.getElementById('loading').style.display = 'block';
   });
 
+// ── RYM genre chart tree renderer ──────────────────────────────────────────
+function buildRymChartPanel(nodes, container, indent, lookup) {
+  nodes.forEach(node => {
+    const info = lookup[node.s];
+    const hasChart = node.h && info !== undefined;
+    const hasKids  = node.c && node.c.length > 0;
+
+    const wrap = document.createElement('div');
+
+    const row = document.createElement('div');
+    row.className = 'rym-tree-row ' + (hasChart ? 'has-chart' : 'no-chart');
+    row.style.paddingLeft = (7 + indent * 14) + 'px';
+
+    const check  = document.createElement('div');  check.className  = 'rym-tree-check';
+    const caret  = document.createElement('span'); caret.className  = 'rym-tree-caret';
+    caret.textContent = hasKids ? '▶' : '';
+    const label  = document.createElement('span'); label.className  = 'rym-tree-label';
+    label.textContent = node.n;
+    const count  = document.createElement('span'); count.className  = 'rym-tree-count';
+    if (hasChart && info.n) count.textContent = info.n.toLocaleString();
+
+    row.appendChild(check);
+    row.appendChild(caret);
+    row.appendChild(label);
+    if (hasChart) row.appendChild(count);
+    wrap.appendChild(row);
+
+    if (hasKids) {
+      const childEl = document.createElement('div');
+      childEl.className = 'rym-tree-children';
+      buildRymChartPanel(node.c, childEl, indent + 1, lookup);
+      wrap.appendChild(childEl);
+
+      caret.style.cursor = 'pointer';
+      const toggleKids = (e) => {
+        e.stopPropagation();
+        const open = childEl.classList.toggle('open');
+        caret.classList.toggle('open', open);
+      };
+      caret.addEventListener('click', toggleKids);
+      if (!hasChart) row.addEventListener('click', toggleKids);
+    }
+
+    if (hasChart) {
+      const ci = info.ci;
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (selCs.has(ci)) { selCs.delete(ci); row.classList.remove('sel'); check.textContent = ''; }
+        else               { selCs.add(ci);    row.classList.add('sel');    check.textContent = '✓'; }
+      });
+    }
+
+    container.appendChild(wrap);
+  });
+}
+
 // ── Filters ────────────────────────────────────────────────────────────────
 function buildFilters() {
   // ── Collection tree ──
@@ -903,6 +1034,15 @@ function buildFilters() {
   DB.collections.forEach(c => {
     if (!collsByGroup[c.group]) collsByGroup[c.group] = [];
     collsByGroup[c.group].push(c);
+  });
+
+  // Build lookup: genre_slug → {ci, n} for RYM chart collections
+  const chartSlugToInfo = {};
+  DB.collections.forEach(c => {
+    if (c.group === 'rym_charts') {
+      const gs = c.slug.replace('rym_chart_all_time_', '').replace(/_/g, '-');
+      chartSlugToInfo[gs] = { ci: c.i, n: c.n };
+    }
   });
 
   const tree = document.getElementById('panel-co');
@@ -934,6 +1074,7 @@ function buildFilters() {
 
     // Group header click: toggle all series in this group
     row.addEventListener('click', (e) => {
+      if (g.slug === 'rym_charts') return;  // tree nodes handle their own selection
       // Left part (not arrow) toggles selection
       const allSel = groupIdxs.every(i => selCs.has(i));
       groupIdxs.forEach(i => allSel ? selCs.delete(i) : selCs.add(i));
@@ -953,23 +1094,28 @@ function buildFilters() {
       arrow.classList.toggle('open', open);
     });
 
-    // Individual series rows
-    series.forEach(c => {
-      const sr = document.createElement('div');
-      sr.className = 'cseries-row';
-      sr.innerHTML = `<div class="cseries-check"></div><span class="cseries-label">${esc(c.name)}</span><span class="cseries-count">${c.n.toLocaleString()}</span>`;
-      const sc = sr.querySelector('.cseries-check');
-      sr.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (selCs.has(c.i)) { selCs.delete(c.i); sr.classList.remove('sel'); sc.textContent = ''; }
-        else                { selCs.add(c.i);    sr.classList.add('sel');    sc.textContent = '✓'; }
-        updateGroupState();
+    // Individual series rows (or RYM genre tree)
+    if (g.slug === 'rym_charts' && RYM_GENRE_TREE && RYM_GENRE_TREE.length) {
+      buildRymChartPanel(RYM_GENRE_TREE, seriesEl, 0, chartSlugToInfo);
+    } else {
+      series.forEach(c => {
+        const sr = document.createElement('div');
+        sr.className = 'cseries-row';
+        sr.innerHTML = `<div class="cseries-check"></div><span class="cseries-label">${esc(c.name)}</span><span class="cseries-count">${c.n.toLocaleString()}</span>`;
+        const sc = sr.querySelector('.cseries-check');
+        sr.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (selCs.has(c.i)) { selCs.delete(c.i); sr.classList.remove('sel'); sc.textContent = ''; }
+          else                { selCs.add(c.i);    sr.classList.add('sel');    sc.textContent = '✓'; }
+          updateGroupState();
+        });
+        seriesEl.appendChild(sr);
       });
-      seriesEl.appendChild(sr);
-    });
+    }
 
     tree.appendChild(row);
-    if (series.length > 1) tree.appendChild(seriesEl);
+    if (series.length > 1 || (g.slug === 'rym_charts' && RYM_GENRE_TREE && RYM_GENRE_TREE.length))
+      tree.appendChild(seriesEl);
   });
 
   // ── Genres ──
@@ -1191,13 +1337,19 @@ function openPanel(a) {
       <a class="panel-link rym" href="${rymArtistUrl}" target="_blank">RYM artist ↗</a>
     </div>
     <div class="panel-yt-wrap">
-      ${a.yt ? `<iframe src="https://www.youtube.com/embed/${a.yt}" allow="autoplay;encrypted-media" allowfullscreen></iframe>` : `<div class="panel-yt-search"><a href="${ytSearchUrl}" target="_blank">▶ Buscar en YouTube ↗</a></div>`}
+      ${a.yt ? `<iframe src="https://www.youtube.com/embed/${a.yt}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>` : `<div class="panel-yt-search"><a href="${ytSearchUrl}" target="_blank">▶ Buscar en YouTube ↗</a></div>`}
     </div>
     ${descHtml}
     ${colls ? `<div class="panel-divider"></div>
       <div class="panel-section-label">Colecciones</div>
       <div class="panel-collections">${colls}</div>` : ''}
   `;
+
+  // On mobile show panel as full-screen overlay
+  if (window.innerWidth <= 900) {
+    document.getElementById('panel').classList.add('mobile-open');
+    closeSidebar();
+  }
 }
 
 function clearPanel() {
@@ -1266,18 +1418,53 @@ document.querySelectorAll('.panel-title.collapsible').forEach(title => {
 });
 
 function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Mobile sidebar ─────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const s = document.getElementById('sidebar');
+  const o = document.getElementById('sidebar-overlay');
+  const open = s.classList.toggle('open');
+  o.classList.toggle('vis', open);
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('vis');
+}
+
+// ── Mobile detail panel ────────────────────────────────────────────────────
+function closeDetailPanel() {
+  document.getElementById('panel').classList.remove('mobile-open');
+}
 </script>
 {{MH_MODAL_JS}}
 </body>
 </html>
 """
 
-def render_html(data_url: str, users: list = None) -> str:
+def _prune_rym_tree(nodes: list[dict], chart_slugs: set[str]) -> list[dict]:
+    """Return compact pruned genre tree keeping nodes that have a chart or chart-descendant."""
+    result = []
+    for n in nodes:
+        cs = "rym_chart_all_time_" + n["slug"].replace("-", "_")
+        children = _prune_rym_tree(n.get("subgenres", []), chart_slugs)
+        if cs in chart_slugs or children:
+            result.append({
+                "s": n["slug"],
+                "n": n["name"],
+                "c": children,
+                "h": cs in chart_slugs,  # has a direct chart
+            })
+    return result
+
+
+def render_html(data_url: str, users: list = None, genre_tree: list = None) -> str:
     from html_must_hear import _mh_user_modal_css, _mh_user_modal_html, _mh_user_modal_btn, _mh_user_modal_js
     users = users or []
     on_select = "if (u !== null && u !== undefined) setPrimaryUser(u); else setPrimaryUser(null);"
+    genre_tree_json = json.dumps(genre_tree or [], ensure_ascii=False, separators=(",", ":"))
     return (HTML_TEMPLATE
             .replace("{{DATA_URL}}", data_url)
+            .replace("{{GENRE_TREE}}", genre_tree_json)
             .replace("{{MH_MODAL_CSS}}", _mh_user_modal_css())
             .replace("{{MH_MODAL_HTML}}", _mh_user_modal_html(users))
             .replace("{{MH_MODAL_BTN}}", _mh_user_modal_btn())
@@ -1290,6 +1477,7 @@ def main():
     parser = argparse.ArgumentParser(description="Must Hear Alternative Index Generator")
     parser.add_argument("--must-hear-db",  dest="mh_db",       default="db/must_hear_rym_new.db")
     parser.add_argument("--scrobbles-db",  dest="scr_db",      default=None)
+    parser.add_argument("--genres-json",   dest="genres_json",  default=None)
     parser.add_argument("--out",                                default="docs/must_hear")
     parser.add_argument("--top-genres",    dest="top_genres",  type=int, default=50)
     args = parser.parse_args()
@@ -1310,6 +1498,27 @@ def main():
     print(f"  🎵 {total_albums} álbumes | {len(data['genres'])} géneros | "
           f"{len(data['groups'])} grupos | {len(data['users'])} usuarios")
 
+    # Load genre tree for RYM chart tree rendering
+    rym_genre_tree = None
+    if args.genres_json:
+        gj = Path(args.genres_json)
+    else:
+        mh_db = Path(args.mh_db)
+        candidates = [
+            mh_db.parent.parent / "docs/must_hear/rym_charts/rym_genres.json",
+            out_dir / "rym_charts/rym_genres.json",
+            mh_db.parent / "rym_genres.json",
+        ]
+        gj = next((p for p in candidates if p.exists()), None)
+    if gj and Path(gj).exists():
+        try:
+            raw_tree = json.loads(Path(gj).read_text(encoding="utf-8"))
+            chart_slugs = {c["slug"] for c in data["collections"] if c["group"] == "rym_charts"}
+            rym_genre_tree = _prune_rym_tree(raw_tree, chart_slugs)
+            print(f"  🌳 Árbol RYM: {gj}")
+        except Exception as e:
+            print(f"  ⚠ No se pudo cargar rym_genres.json: {e}", file=sys.stderr)
+
     json_path = data_dir / "mh_index.json"
     json_path.write_text(
         json.dumps(data, ensure_ascii=False, separators=(",", ":")),
@@ -1320,7 +1529,7 @@ def main():
 
     users = [u["name"] for u in data["users"]]
     html_path = out_dir / "index_alternativo.html"
-    html_path.write_text(render_html("data/mh_index.json", users=users), encoding="utf-8")
+    html_path.write_text(render_html("data/mh_index.json", users=users, genre_tree=rym_genre_tree), encoding="utf-8")
     print(f"  📋 HTML: {html_path}")
     print(f"✅ Generado: {args.out}/index_alternativo.html")
 

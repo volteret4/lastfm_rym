@@ -525,12 +525,13 @@ def render_html(
     .panel-close {{ font-size:.95rem; padding:5px 14px; }}
     .panel-pag-btn {{ padding:6px 16px; font-size:.68rem; }}
     .genre-picker-btn {{ min-width:140px; font-size:.78rem; }}
-    /* On mobile: genre picker on top-right, search bars below it */
+    /* On mobile: search bars at bottom, dropdowns open upward */
     #sb-bar {{
       top:auto; bottom:16px; left:8px; right:8px; flex-direction:row;
     }}
     .sb-wrap {{ flex:1; }}
     .sb-inp {{ width:100%; box-sizing:border-box; }}
+    .sb-dd {{ top:auto; bottom:calc(100% + 4px); }}
     /* Header: horizontal scroll */
     header {{ overflow-x:auto; flex-wrap:nowrap; padding:0 10px; }}
     header::-webkit-scrollbar {{ display:none; }}

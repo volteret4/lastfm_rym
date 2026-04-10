@@ -1082,6 +1082,8 @@ function buildFilters() {
     // Group header row
     const row = document.createElement('div');
     row.className = 'cgroup-row';
+    row.dataset.name = g.name;
+    row.dataset.slug = g.slug;
     row.innerHTML = `<div class="cgroup-check"></div><span class="cgroup-label">${esc(g.name)}</span><span class="cgroup-count">${g.n.toLocaleString()}</span><span class="cgroup-arrow">▶</span>`;
     const check  = row.querySelector('.cgroup-check');
     const arrow  = row.querySelector('.cgroup-arrow');
@@ -1134,6 +1136,8 @@ function buildFilters() {
       series.forEach(c => {
         const sr = document.createElement('div');
         sr.className = 'cseries-row';
+        sr.dataset.name = c.name;
+        sr.dataset.slug = c.slug;
         sr.innerHTML = `<div class="cseries-check"></div><span class="cseries-label">${esc(c.name)}</span><span class="cseries-count">${c.n.toLocaleString()}</span>`;
         const sc = sr.querySelector('.cseries-check');
         sr.addEventListener('click', (e) => {
@@ -1230,18 +1234,21 @@ function filterSidebar(q) {
   // cgroup-row and cgroup-series are siblings directly under #panel-co
   document.querySelectorAll('#panel-co > .cgroup-row').forEach(row => {
     const seriesEl = row.nextElementSibling; // .cgroup-series
-    const groupName = (row.querySelector('.cgroup-label') || row).textContent.toLowerCase();
     if (tokens.length === 0) {
       row.style.display = '';
       if (seriesEl) { seriesEl.style.display = ''; seriesEl.querySelectorAll('.cseries-row').forEach(r => r.style.display = ''); }
       return;
     }
-    const groupMatch = tokens.every(t => groupName.includes(t));
+    function rowMatches(el) {
+      const name = (el.dataset.name || '').toLowerCase();
+      const slug = (el.dataset.slug || '').toLowerCase();
+      return tokens.every(t => name.includes(t) || slug.includes(t));
+    }
+    const groupMatch = rowMatches(row);
     let anySeriesMatch = false;
     if (seriesEl) {
       seriesEl.querySelectorAll('.cseries-row').forEach(r => {
-        const sName = (r.querySelector('.cseries-label') || r).textContent.toLowerCase();
-        const match = groupMatch || tokens.every(t => sName.includes(t));
+        const match = groupMatch || rowMatches(r);
         r.style.display = match ? '' : 'none';
         if (match) anySeriesMatch = true;
       });

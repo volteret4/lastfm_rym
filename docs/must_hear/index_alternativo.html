@@ -803,6 +803,8 @@ function buildRymChartPanel(nodes, container, indent, lookup) {
     const count  = document.createElement('span'); count.className  = 'rym-tree-count';
     if (hasChart && info.n) count.textContent = info.n.toLocaleString();
 
+    row.dataset.name = node.n;
+    row.dataset.slug = node.s;
     row.appendChild(check);
     row.appendChild(caret);
     row.appendChild(label);
@@ -1014,29 +1016,69 @@ function showWelcome() {
 
 function filterSidebar(q) {
   const tokens = q.toLowerCase().trim().split(/[ 	]+/).filter(Boolean);
+
+  function elMatches(el) {
+    const name = (el.dataset.name || '').toLowerCase();
+    const slug = (el.dataset.slug || '').toLowerCase();
+    return tokens.every(t => name.includes(t) || slug.includes(t));
+  }
+
+  // Recursively filter a rym-tree wrap div; returns true if this node or any descendant matches.
+  function filterRymWrap(wrap) {
+    const row      = wrap.querySelector(':scope > .rym-tree-row');
+    const childCon = wrap.querySelector(':scope > .rym-tree-children');
+    const self     = row ? elMatches(row) : false;
+    let anyChild   = false;
+    if (childCon) {
+      childCon.querySelectorAll(':scope > div').forEach(child => {
+        if (filterRymWrap(child)) anyChild = true;
+      });
+      // Force-open if a descendant matched, restore CSS otherwise
+      childCon.style.display = anyChild ? 'flex' : '';
+    }
+    const visible = self || anyChild;
+    wrap.style.display = visible ? '' : 'none';
+    return visible;
+  }
+
+  // Reset rym-tree to natural state (CSS controls visibility)
+  function resetRymWrap(wrap) {
+    wrap.style.display = '';
+    const childCon = wrap.querySelector(':scope > .rym-tree-children');
+    if (childCon) {
+      childCon.style.display = '';
+      childCon.querySelectorAll(':scope > div').forEach(resetRymWrap);
+    }
+  }
+
   // cgroup-row and cgroup-series are siblings directly under #panel-co
   document.querySelectorAll('#panel-co > .cgroup-row').forEach(row => {
     const seriesEl = row.nextElementSibling; // .cgroup-series
     if (tokens.length === 0) {
       row.style.display = '';
-      if (seriesEl) { seriesEl.style.display = ''; seriesEl.querySelectorAll('.cseries-row').forEach(r => r.style.display = ''); }
+      if (seriesEl) {
+        seriesEl.style.display = '';
+        seriesEl.querySelectorAll('.cseries-row').forEach(r => r.style.display = '');
+        seriesEl.querySelectorAll(':scope > div').forEach(resetRymWrap);
+      }
       return;
     }
-    function rowMatches(el) {
-      const name = (el.dataset.name || '').toLowerCase();
-      const slug = (el.dataset.slug || '').toLowerCase();
-      return tokens.every(t => name.includes(t) || slug.includes(t));
-    }
-    const groupMatch = rowMatches(row);
-    let anySeriesMatch = false;
+    const groupMatch = elMatches(row);
+    let anyChildMatch = false;
     if (seriesEl) {
-      seriesEl.querySelectorAll('.cseries-row').forEach(r => {
-        const match = groupMatch || rowMatches(r);
+      // Regular cseries rows
+      seriesEl.querySelectorAll(':scope > .cseries-row').forEach(r => {
+        const match = groupMatch || elMatches(r);
         r.style.display = match ? '' : 'none';
-        if (match) anySeriesMatch = true;
+        if (match) anyChildMatch = true;
+      });
+      // RYM genre tree wrap divs (direct children that are not cseries-row)
+      seriesEl.querySelectorAll(':scope > div:not(.cseries-row)').forEach(wrap => {
+        if (groupMatch) { resetRymWrap(wrap); anyChildMatch = true; }
+        else if (filterRymWrap(wrap)) anyChildMatch = true;
       });
     }
-    const show = groupMatch || anySeriesMatch;
+    const show = groupMatch || anyChildMatch;
     row.style.display = show ? '' : 'none';
     if (seriesEl) seriesEl.style.display = show ? '' : 'none';
   });

@@ -425,6 +425,37 @@ def render_html(
     outline:none; box-sizing:border-box;
   }}
   .gp-search::placeholder {{ color:#444; }}
+  /* ── Genre / Artist search bars ── */
+  #sb-bar {{
+    position:absolute; top:12px; left:12px; z-index:50;
+    display:flex; gap:8px; pointer-events:none;
+  }}
+  .sb-wrap {{ position:relative; pointer-events:all; }}
+  .sb-inp {{
+    padding:5px 10px; background:rgba(10,10,10,.9); border:1px solid #333;
+    border-radius:5px; color:var(--text); font-family:'DM Mono',monospace;
+    font-size:.72rem; outline:none; width:160px; backdrop-filter:blur(8px);
+    transition:border-color .12s;
+  }}
+  .sb-inp::placeholder {{ color:#555; }}
+  .sb-inp:focus {{ border-color:var(--accent); }}
+  .sb-dd {{
+    display:none; position:absolute; top:calc(100% + 4px); left:0;
+    background:#0d0d0d; border:1px solid var(--border); border-radius:6px;
+    padding:4px 0; min-width:210px; max-height:52vh; overflow-y:auto;
+    box-shadow:0 6px 24px rgba(0,0,0,.7); z-index:200;
+    scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  }}
+  .sb-dd.open {{ display:block; }}
+  .sb-item {{
+    padding:7px 14px; font-size:.78rem; cursor:pointer;
+    font-family:'DM Sans',sans-serif; color:var(--muted);
+    transition:background .1s, color .1s; border-bottom:1px solid #111;
+  }}
+  .sb-item:last-child {{ border-bottom:none; }}
+  .sb-item:hover, .sb-item.sb-sel {{ background:rgba(201,162,39,.08); color:var(--text); }}
+  .sb-item-sub {{ font-family:'DM Mono',monospace; font-size:.6rem; color:#444; display:block; margin-top:1px; }}
+  .sb-item-hl {{ color:var(--accent); font-weight:600; }}
   .user-stats-row {{
     display:flex; gap:10px; align-items:center; flex-wrap:wrap;
     font-family:'DM Mono',monospace; font-size:.62rem;
@@ -521,6 +552,16 @@ def render_html(
   <div id="tree-wrap">
     <svg id="tree-svg"></svg>
     <div id="tree-placeholder">Selecciona un género para ver su árbol</div>
+    <div id="sb-bar">
+      <div class="sb-wrap">
+        <input id="sb-genre-inp" class="sb-inp" type="text" placeholder="Buscar género…" autocomplete="off">
+        <div class="sb-dd" id="sb-genre-dd"></div>
+      </div>
+      <div class="sb-wrap">
+        <input id="sb-artist-inp" class="sb-inp" type="text" placeholder="Buscar artista…" autocomplete="off">
+        <div class="sb-dd" id="sb-artist-dd"></div>
+      </div>
+    </div>
     <div class="genre-picker" id="genrePicker">
       <button class="genre-picker-btn" id="gpBtn" onclick="togglePicker()">
         <span id="gpLabel">Selecciona un género…</span>
@@ -563,10 +604,35 @@ const PANEL_DATA = {panel_json};  // genre_slug → {{name,desc,cslug,total,albu
 function cslug(s) {{ return 'rym_chart_all_time_' + s.replace(/-/g,'_'); }}
 function isScraped(s) {{ return !!CHARTS[cslug(s)]; }}
 
+// ── Genre & Artist indexes for search ─────────────────────────────────────
+// GENRE_META: slug → {{name, parent|null}}
+const GENRE_META = {{}};
+(function buildMeta(nodes, parent) {{
+  for (const n of nodes) {{
+    GENRE_META[n.s] = {{name: n.n, parent: parent || null}};
+    buildMeta(n.c || [], n.s);
+  }}
+}})({compact_json}, null);
+
+// TOP_GENRES: top-level slugs (roots)
+const TOP_GENRES = {compact_json}.map(n => n.s);
+
+// ARTIST_INDEX: artistLower → {{display, genres:[slug]}}
+const ARTIST_INDEX = {{}};
+for (const [slug, pd] of Object.entries(PANEL_DATA)) {{
+  for (const alb of (pd.albums || [])) {{
+    if (!alb.yt_id) continue;
+    const key = alb.artist.toLowerCase().trim();
+    if (!ARTIST_INDEX[key]) ARTIST_INDEX[key] = {{display: alb.artist, genres: []}};
+    if (!ARTIST_INDEX[key].genres.includes(slug)) ARTIST_INDEX[key].genres.push(slug);
+  }}
+}}
+
 // ── Tree state ────────────────────────────────────────────────────────────
 // Each node in our working tree: {{slug, name, children:null|[], _raw, expanded}}
 let treeRoot = null;
 let activeSlug = null;
+let highlightedSlug = null;
 
 function makeNode(compactNode, expanded=false) {{
   return {{
@@ -793,6 +859,11 @@ function render() {{
     const isOpen  = d.data.node.children !== null;
     const hasKids = (d.data.node._raw.c || []).length > 0;
     d3.select(this).select('._expand_txt').text(!hasKids ? '' : isOpen ? '−' : '+');
+    // Highlight searched node
+    const isHl = highlightedSlug && d.data.node.slug === highlightedSlug;
+    d3.select(this).select('rect')
+      .attr('stroke', isHl ? '#ff9' : NODE_STR(d.depth, isScraped(d.data.node.slug)))
+      .attr('stroke-width', isHl ? 3 : NODE_STW(d.depth));
   }});
 
   // ── exit ───────────────────────────────────────────────────────────────
@@ -952,6 +1023,137 @@ function closePanel() {{
   document.getElementById('panel').classList.remove('open');
   document.getElementById('tree-wrap').classList.remove('panel-open');
 }}
+
+// ── Genre/Artist search navigation ────────────────────────────────────────
+function ancestorPath(slug) {{
+  // Returns [topSlug, …, slug] using GENRE_META parent chain
+  const path = [];
+  let cur = slug;
+  while (cur) {{ path.unshift(cur); cur = GENRE_META[cur]?.parent; }}
+  return path;
+}}
+
+function expandPathInTree(node, path, depth) {{
+  if (node.slug !== path[depth]) return false;
+  if (depth === path.length - 1) return true;
+  if (node.children === null) expandNode(node);
+  for (const child of (node.children || [])) {{
+    if (expandPathInTree(child, path, depth + 1)) return true;
+  }}
+  return false;
+}}
+
+function centerOnSlug(slug) {{
+  // After render(), pan view so highlighted node is visible
+  const wrap = document.getElementById('tree-wrap');
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  // Find the D3 node position by looking at TREE_IDX parent chain
+  // Simple approach: just re-center the tree (user can pan to find highlight)
+  svg.transition().duration(400).call(
+    zoomBehavior.transform,
+    d3.zoomIdentity.translate(80, H / 2).scale(1)
+  );
+}}
+
+function navigateToGenre(slug) {{
+  if (!GENRE_META[slug]) return;
+  const path = ancestorPath(slug);
+  const topSlug = path[0];
+  highlightedSlug = slug;
+  selectGenre(topSlug);   // loads tree + calls render()
+  // Expand path from root to target
+  if (path.length > 1 && treeRoot) {{
+    expandPathInTree(treeRoot, path, 0);
+    render();
+  }}
+  centerOnSlug(slug);
+  // Update picker label to reflect top genre
+  const link = document.querySelector(`.mg-link[data-slug="${{topSlug}}"]`);
+  if (link) document.getElementById('gpLabel').textContent = link.textContent.trim();
+}}
+
+function navigateToArtist(key) {{
+  const entry = ARTIST_INDEX[key];
+  if (!entry || !entry.genres.length) return;
+  const slug = entry.genres[0];
+  navigateToGenre(slug);
+  // Open panel for that genre to show the artist's video
+  showPanel(slug);
+}}
+
+// ── Generic autocomplete ──────────────────────────────────────────────────
+function setupSb(inpId, ddId, getResults, onPick) {{
+  const inp = document.getElementById(inpId);
+  const dd  = document.getElementById(ddId);
+  let selIdx = -1;
+
+  function showDd(items) {{
+    dd.innerHTML = '';
+    if (!items.length) {{ dd.classList.remove('open'); return; }}
+    items.slice(0, 30).forEach((item, i) => {{
+      const el = document.createElement('div');
+      el.className = 'sb-item';
+      el.innerHTML = item.html;
+      el.addEventListener('mousedown', e => {{ e.preventDefault(); onPick(item.key); inp.value = ''; dd.classList.remove('open'); }});
+      dd.appendChild(el);
+    }});
+    selIdx = -1;
+    dd.classList.add('open');
+  }}
+
+  inp.addEventListener('input', () => {{
+    const q = inp.value.trim();
+    if (!q) {{ dd.classList.remove('open'); return; }}
+    showDd(getResults(q));
+  }});
+
+  inp.addEventListener('keydown', e => {{
+    const items = dd.querySelectorAll('.sb-item');
+    if (e.key === 'ArrowDown') {{ selIdx = Math.min(selIdx + 1, items.length - 1); }}
+    else if (e.key === 'ArrowUp') {{ selIdx = Math.max(selIdx - 1, 0); }}
+    else if (e.key === 'Enter' && selIdx >= 0) {{ items[selIdx].dispatchEvent(new MouseEvent('mousedown')); inp.value = ''; dd.classList.remove('open'); e.preventDefault(); return; }}
+    else if (e.key === 'Escape') {{ dd.classList.remove('open'); inp.blur(); return; }}
+    items.forEach((el, i) => el.classList.toggle('sb-sel', i === selIdx));
+  }});
+
+  inp.addEventListener('blur', () => setTimeout(() => dd.classList.remove('open'), 150));
+
+  // Close on outside click
+  document.addEventListener('click', e => {{
+    if (!inp.contains(e.target) && !dd.contains(e.target)) dd.classList.remove('open');
+  }});
+}}
+
+// ── Wire up searches ──────────────────────────────────────────────────────
+function esc(s) {{ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }}
+
+setupSb('sb-genre-inp', 'sb-genre-dd',
+  q => {{
+    const tokens = q.toLowerCase().trim().split(/[ \t]+/);
+    return Object.entries(GENRE_META)
+      .filter(([slug, m]) => tokens.every(t => m.name.toLowerCase().includes(t)))
+      .slice(0, 30)
+      .map(([slug, m]) => ({{
+        key: slug,
+        html: `<span>${{esc(m.name)}}</span><span class="sb-item-sub">${{slug}}</span>`,
+      }}));
+  }},
+  slug => navigateToGenre(slug)
+);
+
+setupSb('sb-artist-inp', 'sb-artist-dd',
+  q => {{
+    const tokens = q.toLowerCase().trim().split(/[ \t]+/);
+    return Object.entries(ARTIST_INDEX)
+      .filter(([key]) => tokens.every(t => key.includes(t)))
+      .slice(0, 30)
+      .map(([key, entry]) => ({{
+        key,
+        html: `<span>${{esc(entry.display)}}</span><span class="sb-item-sub">${{entry.genres.map(s => GENRE_META[s]?.name || s).join(', ')}}</span>`,
+      }}));
+  }},
+  key => navigateToArtist(key)
+);
 
 // Close genre picker on outside click
 document.addEventListener('click', e => {{

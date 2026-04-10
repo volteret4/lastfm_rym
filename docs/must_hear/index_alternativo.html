@@ -528,6 +528,31 @@ a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
   }
   .mh-modal-close:hover { color:var(--text,#e0e0e0); }
 
+/* ── Welcome screen ── */
+.welcome-msg {
+  grid-column: 1/-1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 5rem 2rem; text-align: center; gap: 16px;
+}
+.welcome-icon { font-size: 3rem; opacity: .12; }
+.welcome-title { font-family: var(--display); font-size: 1.8rem; letter-spacing: .06em; color: var(--accent); }
+.welcome-body { font-family: var(--mono); font-size: .72rem; color: var(--muted); line-height: 2; max-width: 380px; }
+.welcome-body strong { color: var(--text); }
+
+/* ── Sidebar collection search ── */
+.sidebar-search-wrap {
+  padding: 8px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+#sidebar-search {
+  width: 100%; padding: 6px 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-family: var(--mono); font-size: .72rem; outline: none;
+  transition: border-color .12s;
+}
+#sidebar-search::placeholder { color: var(--muted); }
+#sidebar-search:focus { border-color: var(--accent); }
+
 /* ── RYM chart genre tree ── */
 .rym-tree-row {
   display: flex; align-items: center; gap: 5px;
@@ -638,6 +663,9 @@ a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
 
   <!-- ── Left sidebar ── -->
   <aside id="sidebar">
+    <div class="sidebar-search-wrap">
+      <input id="sidebar-search" type="text" placeholder="Buscar colección…" autocomplete="off" oninput="filterSidebar(this.value)">
+    </div>
     <div class="filter-scroll">
       <div class="panel">
         <div class="panel-title collapsible" data-target="panel-co">
@@ -744,7 +772,7 @@ fetch(DATA_URL)
     buildFilters();
     initPrimaryUser();
     document.getElementById('filterBtn').disabled = false;
-    applyFilter();
+    showWelcome();
   })
   .catch(e => {
     document.getElementById('loading').textContent = '❌ Error: ' + e;
@@ -956,6 +984,51 @@ document.querySelectorAll('.status-btn').forEach(btn => {
     btn.classList.add('sel');
   });
 });
+
+function showWelcome() {
+  const container = document.getElementById('results');
+  const total = DB ? DB.albums.length : 0;
+  container.innerHTML = `
+    <div class="welcome-msg">
+      <div class="welcome-icon">🎵</div>
+      <div class="welcome-title">Must Hear Albums</div>
+      <div class="welcome-body">
+        <strong>${total}</strong> álbumes cargados.<br>
+        Selecciona una <strong>colección</strong> en el panel izquierdo<br>
+        o usa los filtros para explorar.<br>
+        Haz clic en una portada para ver detalles y vídeos.
+      </div>
+    </div>`;
+  document.getElementById('statusBar').textContent = '';
+  document.getElementById('moreBtn').style.display = 'none';
+}
+
+function filterSidebar(q) {
+  const tokens = q.toLowerCase().trim().split(/[ 	]+/).filter(Boolean);
+  // cgroup-row and cgroup-series are siblings directly under #panel-co
+  document.querySelectorAll('#panel-co > .cgroup-row').forEach(row => {
+    const seriesEl = row.nextElementSibling; // .cgroup-series
+    const groupName = (row.querySelector('.cgroup-label') || row).textContent.toLowerCase();
+    if (tokens.length === 0) {
+      row.style.display = '';
+      if (seriesEl) { seriesEl.style.display = ''; seriesEl.querySelectorAll('.cseries-row').forEach(r => r.style.display = ''); }
+      return;
+    }
+    const groupMatch = tokens.every(t => groupName.includes(t));
+    let anySeriesMatch = false;
+    if (seriesEl) {
+      seriesEl.querySelectorAll('.cseries-row').forEach(r => {
+        const sName = (r.querySelector('.cseries-label') || r).textContent.toLowerCase();
+        const match = groupMatch || tokens.every(t => sName.includes(t));
+        r.style.display = match ? '' : 'none';
+        if (match) anySeriesMatch = true;
+      });
+    }
+    const show = groupMatch || anySeriesMatch;
+    row.style.display = show ? '' : 'none';
+    if (seriesEl) seriesEl.style.display = show ? '' : 'none';
+  });
+}
 
 function applyFilter() {
   if (!DB) return;

@@ -7,7 +7,7 @@ Usage:
     python3 html_rym_genre_mermaid.py --mh-db db/must_hear_rym_new.db
     python3 html_rym_genre_mermaid.py --mh-db db/must_hear_rym_new.db \\
         --genres-json docs/must_hear/rym_charts/rym_genres.json \\
-        --output docs/must_hear/rym_genre_tree.html
+        --output docs/must_hear/rym_charts/rym_genre_tree.html
 
 Can also be called from html_must_hear.py via --rym-genre-mermaid.
 
@@ -525,6 +525,12 @@ def render_html(
     .panel-close {{ font-size:.95rem; padding:5px 14px; }}
     .panel-pag-btn {{ padding:6px 16px; font-size:.68rem; }}
     .genre-picker-btn {{ min-width:140px; font-size:.78rem; }}
+    /* On mobile: genre picker on top-right, search bars below it */
+    #sb-bar {{
+      top:auto; bottom:16px; left:8px; right:8px; flex-direction:row;
+    }}
+    .sb-wrap {{ flex:1; }}
+    .sb-inp {{ width:100%; box-sizing:border-box; }}
     /* Header: horizontal scroll */
     header {{ overflow-x:auto; flex-wrap:nowrap; padding:0 10px; }}
     header::-webkit-scrollbar {{ display:none; }}
@@ -1144,15 +1150,25 @@ setupSb('sb-genre-inp', 'sb-genre-dd',
 setupSb('sb-artist-inp', 'sb-artist-dd',
   q => {{
     const tokens = q.toLowerCase().trim().split(/[ \t]+/);
-    return Object.entries(ARTIST_INDEX)
-      .filter(([key]) => tokens.every(t => key.includes(t)))
-      .slice(0, 30)
-      .map(([key, entry]) => ({{
-        key,
-        html: `<span>${{esc(entry.display)}}</span><span class="sb-item-sub">${{entry.genres.map(s => GENRE_META[s]?.name || s).join(', ')}}</span>`,
-      }}));
+    const results = [];
+    for (const [key, entry] of Object.entries(ARTIST_INDEX)) {{
+      if (!tokens.every(t => key.includes(t))) continue;
+      for (const slug of entry.genres) {{
+        results.push({{
+          key: key + '\x00' + slug,
+          html: `<span>${{esc(entry.display)}}</span><span class="sb-item-sub">${{esc(GENRE_META[slug]?.name || slug)}}</span>`,
+        }});
+      }}
+    }}
+    return results.slice(0, 30);
   }},
-  key => navigateToArtist(key)
+  combined => {{
+    const sep = combined.indexOf('\x00');
+    const artistKey = combined.slice(0, sep);
+    const slug = combined.slice(sep + 1);
+    navigateToGenre(slug);
+    showPanel(slug);
+  }}
 );
 
 // Close genre picker on outside click

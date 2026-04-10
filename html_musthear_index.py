@@ -500,11 +500,15 @@ aside {
 .cgroup-row.sel .cgroup-check { background: var(--accent); border-color: var(--accent); color: #000; }
 .cgroup-row.partial .cgroup-check { background: rgba(201,162,39,.2); border-color: rgba(201,162,39,.4); color: var(--accent); font-size: 8px; }
 .cgroup-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.cgroup-count { font-family: var(--mono); font-size: .62rem; color: var(--muted); flex-shrink: 0; }
+.cgroup-count { font-family: var(--mono); font-size: .62rem; color: var(--muted); flex-shrink: 0; cursor: pointer; padding: 2px 4px; border-radius: 3px; }
+.cgroup-count:hover { color: var(--text); }
 .cgroup-arrow {
-  font-size: .55rem; color: var(--muted); flex-shrink: 0;
-  transition: transform .15s; width: 10px; text-align: center;
+  font-size: .7rem; color: var(--muted); flex-shrink: 0;
+  transition: transform .15s; width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px; cursor: pointer;
 }
+.cgroup-arrow:hover { color: var(--accent); background: rgba(201,162,39,.08); }
 .cgroup-arrow.open { transform: rotate(90deg); }
 .cgroup-series {
   display: none; flex-direction: column; gap: 1px;
@@ -661,7 +665,7 @@ aside {
   color: rgba(201,162,39,.7); letter-spacing: .04em;
 }
 .panel-divider { height: 1px; background: var(--border); margin: 12px 0; }
-.panel-links { display: flex; gap: 6px; flex-wrap: wrap; }
+.panel-links { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 .panel-link {
   font-family: var(--mono); font-size: .58rem;
   letter-spacing: .08em; text-transform: uppercase;
@@ -702,7 +706,6 @@ a.panel-coll-tag:hover { border-color: var(--accent); color: var(--accent); }
   text-decoration: none; letter-spacing: .06em;
 }
 .panel-yt-search a:hover { text-decoration: underline; }
-.panel-artist-links { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .panel-desc-block { margin-bottom: 10px; }
 .panel-desc-label {
   display: inline-flex; align-items: center; gap: 5px;
@@ -1115,12 +1118,14 @@ function buildFilters() {
       updateGroupState();
     });
 
-    // Arrow click: toggle expand (stop propagation so group click doesn't fire)
-    arrow.addEventListener('click', (e) => {
+    // Arrow or count click: toggle expand (stop propagation so group click doesn't fire)
+    function toggleExpand(e) {
       e.stopPropagation();
       const open = seriesEl.classList.toggle('open');
       arrow.classList.toggle('open', open);
-    });
+    }
+    arrow.addEventListener('click', toggleExpand);
+    row.querySelector('.cgroup-count').addEventListener('click', toggleExpand);
 
     // Individual series rows (or RYM genre tree)
     if (g.slug === 'rym_charts' && RYM_GENRE_TREE && RYM_GENRE_TREE.length) {
@@ -1404,8 +1409,8 @@ function openPanel(a) {
     <div class="panel-year-t">${a.y || ''}${a.d ? ' · ' + a.d + 's' : ''}</div>
     ${userStatusLine}
     ${genres ? `<div class="panel-genres">${genres}</div>` : ''}
-    ${links.length ? `<div class="panel-links">${links.join('')}</div>` : ''}
-    <div class="panel-artist-links">
+    <div class="panel-links">
+      ${links.join('')}
       <a class="panel-link" href="${lfmArtistUrl}" target="_blank">Last.fm ↗</a>
       <a class="panel-link rym" href="${rymArtistUrl}" target="_blank">RYM artist ↗</a>
     </div>

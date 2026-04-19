@@ -308,6 +308,8 @@ def main():
                         help="Solo álbumes sin release_group_mbid (default)")
     parser.add_argument("--also-missing-mbid", action="store_true",
                         help="También álbumes sin ningún mbid")
+    parser.add_argument("--start-from", type=int, default=0,
+                        help="Saltar los primeros N álbumes de la lista (para reanudar)")
     args = parser.parse_args()
 
     if not args.proxies:
@@ -331,6 +333,10 @@ def main():
         ORDER BY albums.id
     """).fetchall()
     main_conn.close()
+
+    if args.start_from:
+        rows = rows[args.start_from:]
+        print(f"⏩ Saltando primeros {args.start_from} álbumes, empezando desde el #{args.start_from + 1}")
 
     print(f"🚀 Iniciando {num_threads} hilos para {len(rows)} álbumes...")
 

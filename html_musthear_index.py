@@ -1024,9 +1024,9 @@ function buildRymChartPanel(nodes, container, indent, lookup) {
     row.dataset.name = node.n;
     row.dataset.slug = node.s;
     row.appendChild(check);
-    row.appendChild(caret);
     row.appendChild(label);
     if (hasChart) row.appendChild(count);
+    row.appendChild(caret);
     wrap.appendChild(row);
 
     if (hasKids) {
